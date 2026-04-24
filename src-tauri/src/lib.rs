@@ -1,6 +1,8 @@
 mod file_preview;
+mod move_project;
 
 use file_preview::{build_file_preview, FilePreview};
+use move_project::{discover_move_packages, MovePackage};
 use serde::Serialize;
 use std::{
     fs,
@@ -25,6 +27,7 @@ struct PackageTree {
     root_path: String,
     root_name: String,
     paths: Vec<String>,
+    move_packages: Vec<MovePackage>,
 }
 
 #[tauri::command]
@@ -82,6 +85,7 @@ fn build_package_tree(root_path: String) -> Result<PackageTree, String> {
         root_path: root.to_string_lossy().into_owned(),
         root_name,
         paths,
+        move_packages: discover_move_packages(&root),
     })
 }
 

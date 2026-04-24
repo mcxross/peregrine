@@ -8,6 +8,7 @@ import {
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
 import { EditorTabs } from "@/features/project-workspace/editor-tabs";
+import { MovePackagePanel } from "@/features/project-workspace/move-package-panel";
 import { ProjectFileTree } from "@/features/project-workspace/project-file-tree";
 
 type ProjectWorkspaceProps = {
@@ -89,6 +90,7 @@ export function ProjectWorkspace({ packageTree }: ProjectWorkspaceProps) {
 
   const openFile = React.useCallback(
     (path: string) => {
+      setSelectedPath(path);
       setTabs((currentTabs) =>
         ensureTab(currentTabs, path),
       );
@@ -209,7 +211,7 @@ export function ProjectWorkspace({ packageTree }: ProjectWorkspaceProps) {
   );
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)] bg-background">
+    <div className="grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)_300px] bg-background">
       <ProjectFileTree
         packageTree={packageTree}
         selectedPath={selectedPath}
@@ -223,6 +225,11 @@ export function ProjectWorkspace({ packageTree }: ProjectWorkspaceProps) {
         onUpdateTabSource={updateTabSource}
         packageName={packageTree.rootName}
         tabs={tabs}
+      />
+      <MovePackagePanel
+        activePath={activePath}
+        packages={packageTree.movePackages}
+        onOpenFile={openFile}
       />
     </div>
   );

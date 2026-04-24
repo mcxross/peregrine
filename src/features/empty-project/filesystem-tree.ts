@@ -4,6 +4,20 @@ export type PackageTree = {
   rootPath: string;
   rootName: string;
   paths: string[];
+  movePackages: MovePackage[];
+};
+
+export type MovePackage = {
+  name: string;
+  path: string;
+  manifestPath: string;
+  modules: MoveModule[];
+};
+
+export type MoveModule = {
+  name: string;
+  address: string | null;
+  filePath: string;
 };
 
 export type FilePreview =
