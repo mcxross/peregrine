@@ -3,10 +3,11 @@ import { Download, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type ProjectDropzoneProps = {
+  isLoading?: boolean;
   onOpenProject?: () => void;
 };
 
-export function ProjectDropzone({ onOpenProject }: ProjectDropzoneProps) {
+export function ProjectDropzone({ isLoading = false, onOpenProject }: ProjectDropzoneProps) {
   return (
     <section className="rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
       <div className="flex min-h-[220px] flex-col items-center justify-center rounded-md border border-dashed border-muted-foreground/35 px-6 py-8 text-center">
@@ -22,9 +23,9 @@ export function ProjectDropzone({ onOpenProject }: ProjectDropzoneProps) {
           locally.
         </p>
 
-        <Button className="mt-5" onClick={onOpenProject}>
+        <Button className="mt-5" onClick={onOpenProject} disabled={isLoading}>
           <FolderOpen aria-hidden="true" />
-          Open Move Package
+          {isLoading ? "Opening..." : "Open Move Package"}
         </Button>
       </div>
 

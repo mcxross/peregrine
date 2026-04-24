@@ -1,3 +1,6 @@
+import type React from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
 import { cn } from "@/lib/utils";
 import type { LayoutSettings } from "@/layout/layout-store";
 import { trafficLightInset } from "@/layout/window-chrome";
@@ -9,11 +12,22 @@ type TitlebarProps = {
 };
 
 export function Titlebar({ layout, sectionTitle, detail }: TitlebarProps) {
+  const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    getCurrentWindow().startDragging().catch(() => {
+      // Browser previews do not expose the native Tauri window API.
+    });
+  };
+
   return (
     <header
       data-tauri-drag-region
+      onPointerDown={handlePointerDown}
       className={cn(
-        "grid h-[52px] grid-cols-[280px_minmax(0,1fr)_auto] border-b bg-background/95 text-foreground backdrop-blur",
+        "grid h-[52px] select-none grid-cols-[280px_minmax(0,1fr)_auto] border-b bg-background/95 text-foreground backdrop-blur",
         layout.chrome === "compact" && "h-11 grid-cols-[220px_minmax(0,1fr)_auto]",
       )}
     >
