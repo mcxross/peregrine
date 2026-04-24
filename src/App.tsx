@@ -1,26 +1,26 @@
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import React from "react";
+import { listen } from "@tauri-apps/api/event";
+
+import { AppShell } from "@/app/app-shell";
 
 function App() {
+  const [screen, setScreen] = React.useState<"workspace" | "settings">("workspace");
+
+  React.useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    listen(OPEN_SETTINGS_EVENT, () => setScreen("settings")).then((cleanup) => {
+      unlisten = cleanup;
+    });
+
+    return () => unlisten?.();
+  }, []);
+
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background p-6 text-foreground">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Peregrine</CardTitle>
-          <CardDescription>Move Security</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button className="w-full">Continue</Button>
-        </CardContent>
-      </Card>
-    </main>
+    <AppShell screen={screen} onCloseSettings={() => setScreen("workspace")} />
   );
 }
+
+const OPEN_SETTINGS_EVENT = "open-settings";
 
 export default App;

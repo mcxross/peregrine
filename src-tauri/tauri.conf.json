@@ -13,8 +13,18 @@
     "windows": [
       {
         "title": "Peregrine",
-        "width": 800,
-        "height": 600
+        "width": 1200,
+        "height": 780,
+        "minWidth": 900,
+        "minHeight": 600,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 18,
+          "y": 18
+        },
+        "acceptFirstMouse": true
       }
     ],
     "security": {
