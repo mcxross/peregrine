@@ -12,6 +12,7 @@ type AppShellProps = {
 export function AppShell({ screen, onCloseSettings }: AppShellProps) {
   const layout = defaultLayoutSettings;
   const isSettings = screen === "settings";
+  const showSidebar = isSettings;
 
   return (
     <main className="grid h-svh grid-rows-[52px_1fr] overflow-hidden bg-background text-foreground">
@@ -22,7 +23,7 @@ export function AppShell({ screen, onCloseSettings }: AppShellProps) {
       />
 
       <section className="flex min-h-0">
-        <Sidebar layout={layout} />
+        {showSidebar ? <Sidebar layout={layout} /> : null}
         <div className="min-w-0 flex-1">
           {isSettings ? <SettingsScreen onBack={onCloseSettings} /> : <Workspace />}
         </div>
