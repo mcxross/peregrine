@@ -1,3 +1,6 @@
+mod file_preview;
+
+use file_preview::{build_file_preview, FilePreview};
 use serde::Serialize;
 use std::{
     fs,
@@ -32,15 +35,32 @@ async fn load_package_tree(root_path: String) -> Result<PackageTree, String> {
 }
 
 #[tauri::command]
-async fn read_package_text_file(root_path: String, relative_path: String) -> Result<String, String> {
+async fn load_file_preview(
+    root_path: String,
+    relative_path: String,
+) -> Result<FilePreview, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let file_path = resolve_package_child_path(&root_path, &relative_path)?;
-
-        fs::read_to_string(&file_path)
-            .map_err(|error| format!("Could not read {}: {error}", file_path.display()))
+        build_file_preview(&file_path, relative_path)
     })
     .await
-    .map_err(|error| format!("Could not join file read task: {error}"))?
+    .map_err(|error| format!("Could not join file preview task: {error}"))?
+}
+
+#[tauri::command]
+async fn save_text_file(
+    root_path: String,
+    relative_path: String,
+    contents: String,
+) -> Result<FilePreview, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let file_path = resolve_package_child_path(&root_path, &relative_path)?;
+        fs::write(&file_path, contents)
+            .map_err(|error| format!("Could not write {}: {error}", file_path.display()))?;
+        build_file_preview(&file_path, relative_path)
+    })
+    .await
+    .map_err(|error| format!("Could not join file save task: {error}"))?
 }
 
 fn build_package_tree(root_path: String) -> Result<PackageTree, String> {
@@ -107,8 +127,14 @@ fn collect_paths(root: &Path, directory: &Path, paths: &mut Vec<String>) -> Resu
 }
 
 fn compare_dir_entries(left: &fs::DirEntry, right: &fs::DirEntry) -> std::cmp::Ordering {
-    let left_is_dir = left.file_type().map(|file_type| file_type.is_dir()).unwrap_or(false);
-    let right_is_dir = right.file_type().map(|file_type| file_type.is_dir()).unwrap_or(false);
+    let left_is_dir = left
+        .file_type()
+        .map(|file_type| file_type.is_dir())
+        .unwrap_or(false);
+    let right_is_dir = right
+        .file_type()
+        .map(|file_type| file_type.is_dir())
+        .unwrap_or(false);
 
     right_is_dir
         .cmp(&left_is_dir)
@@ -119,9 +145,7 @@ fn compare_tree_paths(left: &str, right: &str) -> std::cmp::Ordering {
     let left_is_dir = left.ends_with('/');
     let right_is_dir = right.ends_with('/');
 
-    right_is_dir
-        .cmp(&left_is_dir)
-        .then_with(|| left.cmp(right))
+    right_is_dir.cmp(&left_is_dir).then_with(|| left.cmp(right))
 }
 
 fn normalize_tree_path(path: &Path) -> Option<String> {
@@ -247,7 +271,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             load_package_tree,
-            read_package_text_file
+            load_file_preview,
+            save_text_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

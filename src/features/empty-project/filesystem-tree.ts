@@ -6,6 +6,39 @@ export type PackageTree = {
   paths: string[];
 };
 
+export type FilePreview =
+  | {
+      kind: "text";
+      path: string;
+      language: string;
+      source: string;
+      highlightedHtml: string;
+    }
+  | {
+      kind: "markdown";
+      path: string;
+      source: string;
+      html: string;
+    }
+  | {
+      kind: "image";
+      path: string;
+      mime: string;
+      dataUrl: string;
+    }
+  | {
+      kind: "video";
+      path: string;
+      mime: string;
+      dataUrl: string;
+    }
+  | {
+      kind: "unsupported";
+      path: string;
+      reason: string;
+      size: number;
+    };
+
 export async function loadPackageTree(rootPath: string): Promise<PackageTree> {
   return invoke<PackageTree>("load_package_tree", { rootPath });
 }
@@ -20,12 +53,24 @@ export function resolvePackagePath(packageTree: PackageTree, relativePath: strin
   return `${packageTree.rootPath}/${normalizedRelativePath}`;
 }
 
-export async function readPackageTextFile(
+export async function loadFilePreview(
   packageTree: PackageTree,
   relativePath: string,
 ) {
-  return invoke<string>("read_package_text_file", {
+  return invoke<FilePreview>("load_file_preview", {
     rootPath: packageTree.rootPath,
     relativePath,
+  });
+}
+
+export async function saveTextFile(
+  packageTree: PackageTree,
+  relativePath: string,
+  contents: string,
+) {
+  return invoke<FilePreview>("save_text_file", {
+    rootPath: packageTree.rootPath,
+    relativePath,
+    contents,
   });
 }
