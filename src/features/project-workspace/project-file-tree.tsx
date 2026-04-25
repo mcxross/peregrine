@@ -2,20 +2,28 @@ import { FileTree, useFileTree, useFileTreeSelection } from "@pierre/trees/react
 import React, { type CSSProperties } from "react";
 
 import type { PackageTree } from "@/features/empty-project/filesystem-tree";
+import { cn } from "@/lib/utils";
 
 type ProjectFileTreeProps = {
   packageTree: PackageTree;
   selectedPath: string | null;
+  side?: "left" | "right";
   onSelectPath: (path: string | null) => void;
 };
 
 export function ProjectFileTree({
   packageTree,
   selectedPath,
+  side = "left",
   onSelectPath,
 }: ProjectFileTreeProps) {
   return (
-    <aside className="grid min-h-0 grid-rows-[auto_1fr] border-r bg-sidebar text-sidebar-foreground">
+    <aside
+      className={cn(
+        "grid min-h-0 grid-rows-[auto_1fr] bg-sidebar text-sidebar-foreground",
+        side === "left" ? "border-r" : "border-l",
+      )}
+    >
       <header className="min-w-0 border-b px-4 py-3">
         <h2 className="truncate text-sm font-semibold">{packageTree.rootName}</h2>
         <p className="mt-1 truncate text-xs text-muted-foreground">

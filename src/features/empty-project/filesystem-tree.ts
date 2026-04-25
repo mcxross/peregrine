@@ -5,6 +5,7 @@ export type PackageTree = {
   rootName: string;
   paths: string[];
   movePackages: MovePackage[];
+  dependencyGraph: PackageDependencyGraph;
 };
 
 export type MovePackage = {
@@ -18,6 +19,40 @@ export type MoveModule = {
   name: string;
   address: string | null;
   filePath: string;
+  functions: MoveFunctionSignature[];
+};
+
+export type MoveFunctionSignature = {
+  name: string;
+  visibility: string;
+  isEntry: boolean;
+  signature: string;
+};
+
+export type PackageDependencyGraph = {
+  root: string | null;
+  nodes: PackageDependencyNode[];
+  edges: PackageDependencyEdge[];
+  summaryPath: string | null;
+};
+
+export type PackageDependencyNode = {
+  id: string;
+  address: string | null;
+  moduleCount: number;
+  isRoot: boolean;
+};
+
+export type PackageDependencyEdge = {
+  source: string;
+  target: string;
+  dependencyCount: number;
+};
+
+export type CommandOutput = {
+  status: number | null;
+  stdout: string;
+  stderr: string;
 };
 
 export type FilePreview =
@@ -86,5 +121,15 @@ export async function saveTextFile(
     rootPath: packageTree.rootPath,
     relativePath,
     contents,
+  });
+}
+
+export async function buildMovePackage(
+  packageTree: PackageTree,
+  packagePath: string,
+) {
+  return invoke<CommandOutput>("build_move_package", {
+    rootPath: packageTree.rootPath,
+    packagePath,
   });
 }

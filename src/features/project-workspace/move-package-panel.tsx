@@ -1,4 +1,11 @@
-import { Box, FileCode2, Package } from "lucide-react";
+import {
+  Box,
+  FileCode2,
+  Loader2,
+  Package,
+  PanelLeftClose,
+  Play,
+} from "lucide-react";
 
 import type {
   MoveModule,
@@ -6,24 +13,53 @@ import type {
 } from "@/features/empty-project/filesystem-tree";
 import { cn } from "@/lib/utils";
 
+export type PackageBuildStatus = {
+  message: string | null;
+  state: "idle" | "running" | "success" | "error";
+};
+
 type MovePackagePanelProps = {
   activePath: string | null;
+  buildStatuses: Record<string, PackageBuildStatus>;
   packages: MovePackage[];
+  rootPackage: string | null;
+  onBuildPackage: (movePackage: MovePackage) => void;
+  onCollapse: () => void;
   onOpenFile: (path: string) => void;
+  onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
+  selectedModulePath: string | null;
 };
 
 export function MovePackagePanel({
   activePath,
+  buildStatuses,
   packages,
+  rootPackage,
+  onBuildPackage,
+  onCollapse,
   onOpenFile,
+  onSelectModule,
+  selectedModulePath,
 }: MovePackagePanelProps) {
   return (
-    <aside className="grid min-h-0 grid-rows-[auto_1fr] border-l bg-sidebar text-sidebar-foreground">
+    <aside className="grid min-h-0 grid-rows-[auto_1fr] border-r bg-sidebar text-sidebar-foreground">
       <header className="border-b px-4 py-3">
-        <h2 className="text-sm font-semibold">Move Packages</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {packageCountLabel(packages)}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold">Move Packages</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {packageCountLabel(packages)}
+            </p>
+          </div>
+          <button
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            onClick={onCollapse}
+            title="Collapse package panel"
+            type="button"
+          >
+            <PanelLeftClose className="size-4" aria-hidden="true" />
+          </button>
+        </div>
       </header>
 
       {packages.length ? (
@@ -33,8 +69,13 @@ export function MovePackagePanel({
               <PackageSection
                 key={movePackage.manifestPath}
                 activePath={activePath}
+                buildStatus={buildStatuses[movePackage.path]}
+                isRoot={movePackage.name === rootPackage}
                 movePackage={movePackage}
+                onBuildPackage={onBuildPackage}
                 onOpenFile={onOpenFile}
+                onSelectModule={onSelectModule}
+                selectedModulePath={selectedModulePath}
               />
             ))}
           </div>
@@ -50,30 +91,79 @@ export function MovePackagePanel({
 
 type PackageSectionProps = {
   activePath: string | null;
+  buildStatus?: PackageBuildStatus;
+  isRoot: boolean;
   movePackage: MovePackage;
+  onBuildPackage: (movePackage: MovePackage) => void;
   onOpenFile: (path: string) => void;
+  onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
+  selectedModulePath: string | null;
 };
 
 function PackageSection({
   activePath,
+  buildStatus,
+  isRoot,
   movePackage,
+  onBuildPackage,
   onOpenFile,
+  onSelectModule,
+  selectedModulePath,
 }: PackageSectionProps) {
   return (
     <section>
-      <button
-        className="flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        onClick={() => onOpenFile(movePackage.manifestPath)}
-        type="button"
-      >
-        <Package className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium">{movePackage.name}</span>
-          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-            {movePackage.path || "."}
+      <div className="flex items-start gap-1">
+        <button
+          className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          onClick={() => onOpenFile(movePackage.manifestPath)}
+          type="button"
+        >
+          <Package className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="min-w-0">
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-sm font-medium">{movePackage.name}</span>
+              {isRoot ? (
+                <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  root
+                </span>
+              ) : null}
+            </span>
+            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+              {movePackage.path || "."}
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+        {isRoot ? (
+          <button
+            className="mt-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+            disabled={buildStatus?.state === "running"}
+            onClick={() => onBuildPackage(movePackage)}
+            title="Run sui move build"
+            type="button"
+          >
+            {buildStatus?.state === "running" ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Play className="size-4" aria-hidden="true" />
+            )}
+          </button>
+        ) : null}
+      </div>
+
+      {isRoot && buildStatus?.message ? (
+        <div
+          className={cn(
+            "mx-2 mb-2 rounded border px-2 py-1 text-xs",
+            buildStatus.state === "success" &&
+              "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+            buildStatus.state === "error" &&
+              "border-destructive/40 bg-destructive/10 text-destructive",
+            buildStatus.state === "running" && "bg-muted text-muted-foreground",
+          )}
+        >
+          {buildStatus.message}
+        </div>
+      ) : null}
 
       <div className="mt-2 space-y-1 pl-3">
         <div className="flex items-center gap-2 px-2 text-xs font-medium text-muted-foreground">
@@ -86,7 +176,8 @@ function PackageSection({
               key={moveModule.filePath}
               activePath={activePath}
               moveModule={moveModule}
-              onOpenFile={onOpenFile}
+              onSelectModule={(module) => onSelectModule(movePackage, module)}
+              selectedModulePath={selectedModulePath}
             />
           ))
         ) : (
@@ -102,21 +193,26 @@ function PackageSection({
 type ModuleButtonProps = {
   activePath: string | null;
   moveModule: MoveModule;
-  onOpenFile: (path: string) => void;
+  onSelectModule: (moveModule: MoveModule) => void;
+  selectedModulePath: string | null;
 };
 
 function ModuleButton({
   activePath,
   moveModule,
-  onOpenFile,
+  onSelectModule,
+  selectedModulePath,
 }: ModuleButtonProps) {
+  const isSelected = selectedModulePath === moveModule.filePath;
+
   return (
     <button
       className={cn(
         "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        activePath === moveModule.filePath && "bg-sidebar-accent text-sidebar-accent-foreground",
+        (activePath === moveModule.filePath || isSelected) &&
+          "bg-sidebar-accent text-sidebar-accent-foreground",
       )}
-      onClick={() => onOpenFile(moveModule.filePath)}
+      onClick={() => onSelectModule(moveModule)}
       type="button"
     >
       <FileCode2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />

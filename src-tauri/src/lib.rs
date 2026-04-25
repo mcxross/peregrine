@@ -2,11 +2,12 @@ mod file_preview;
 mod move_project;
 
 use file_preview::{build_file_preview, FilePreview};
-use move_project::{discover_move_packages, MovePackage};
+use move_project::{discover_move_project, MovePackage, PackageDependencyGraph};
 use serde::Serialize;
 use std::{
     fs,
     path::{Path, PathBuf},
+    process::Command,
 };
 use tauri::{
     menu::{AboutMetadata, Menu, MenuItemBuilder, PredefinedMenuItem, Submenu},
@@ -28,6 +29,15 @@ struct PackageTree {
     root_name: String,
     paths: Vec<String>,
     move_packages: Vec<MovePackage>,
+    dependency_graph: PackageDependencyGraph,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CommandOutput {
+    status: Option<i32>,
+    stdout: String,
+    stderr: String,
 }
 
 #[tauri::command]
@@ -66,6 +76,43 @@ async fn save_text_file(
     .map_err(|error| format!("Could not join file save task: {error}"))?
 }
 
+#[tauri::command]
+async fn build_move_package(
+    root_path: String,
+    package_path: String,
+) -> Result<CommandOutput, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let package_root = resolve_package_child_path(&root_path, &package_path)?;
+
+        if !package_root.is_dir() {
+            return Err("Selected package path is not a directory.".to_string());
+        }
+
+        if !package_root.join("Move.toml").is_file() {
+            return Err("Selected package does not contain a Move.toml file.".to_string());
+        }
+
+        let output = Command::new("sui")
+            .args(["move", "build"])
+            .current_dir(&package_root)
+            .output()
+            .map_err(|error| {
+                format!(
+                    "Could not execute `sui move build` in {}: {error}",
+                    package_root.display()
+                )
+            })?;
+
+        Ok(CommandOutput {
+            status: output.status.code(),
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        })
+    })
+    .await
+    .map_err(|error| format!("Could not join package build task: {error}"))?
+}
+
 fn build_package_tree(root_path: String) -> Result<PackageTree, String> {
     let root = PathBuf::from(&root_path);
     let root = root
@@ -81,11 +128,14 @@ fn build_package_tree(root_path: String) -> Result<PackageTree, String> {
     collect_paths(&root, &root, &mut paths)?;
     paths.sort_by(|left, right| compare_tree_paths(left, right));
 
+    let (move_packages, dependency_graph) = discover_move_project(&root);
+
     Ok(PackageTree {
         root_path: root.to_string_lossy().into_owned(),
         root_name,
         paths,
-        move_packages: discover_move_packages(&root),
+        move_packages,
+        dependency_graph,
     })
 }
 
@@ -276,7 +326,8 @@ pub fn run() {
             greet,
             load_package_tree,
             load_file_preview,
-            save_text_file
+            save_text_file,
+            build_move_package
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

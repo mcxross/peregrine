@@ -1,6 +1,7 @@
 import React from "react";
 
 import {
+  buildMovePackage,
   isDirectoryPath,
   loadFilePreview,
   saveTextFile,
@@ -8,8 +9,14 @@ import {
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
 import { EditorTabs } from "@/features/project-workspace/editor-tabs";
-import { MovePackagePanel } from "@/features/project-workspace/move-package-panel";
+import {
+  MovePackagePanel,
+  type PackageBuildStatus,
+} from "@/features/project-workspace/move-package-panel";
 import { ProjectFileTree } from "@/features/project-workspace/project-file-tree";
+import { Button } from "@/components/ui/button";
+import { Package, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
+import type { SelectedMoveModule } from "@/features/project-workspace/module-signature-screen";
 
 type ProjectWorkspaceProps = {
   packageTree: PackageTree;
@@ -29,8 +36,17 @@ export function ProjectWorkspace({ packageTree }: ProjectWorkspaceProps) {
   const [selectedPath, setSelectedPath] = React.useState<string | null>(null);
   const [tabs, setTabs] = React.useState<OpenFileTab[]>([]);
   const [activePath, setActivePath] = React.useState<string | null>(null);
+  const [selectedModule, setSelectedModule] =
+    React.useState<SelectedMoveModule | null>(null);
+  const [isPackagePanelCollapsed, setIsPackagePanelCollapsed] = React.useState(false);
+  const [isFileTreeCollapsed, setIsFileTreeCollapsed] = React.useState(true);
+  const [buildStatuses, setBuildStatuses] = React.useState<
+    Record<string, PackageBuildStatus>
+  >({});
   const loadingPathsRef = React.useRef<Set<string>>(new Set());
   const previewCacheRef = React.useRef<Map<string, FilePreview>>(new Map());
+  const rootPackageName =
+    packageTree.dependencyGraph.root ?? packageTree.movePackages[0]?.name ?? null;
 
   const loadPreview = React.useCallback(
     (path: string, options: { force?: boolean } = {}) => {
@@ -90,6 +106,7 @@ export function ProjectWorkspace({ packageTree }: ProjectWorkspaceProps) {
 
   const openFile = React.useCallback(
     (path: string) => {
+      setSelectedModule(null);
       setSelectedPath(path);
       setTabs((currentTabs) =>
         ensureTab(currentTabs, path),
@@ -129,9 +146,11 @@ export function ProjectWorkspace({ packageTree }: ProjectWorkspaceProps) {
   React.useEffect(() => {
     previewCacheRef.current.clear();
     loadingPathsRef.current.clear();
+    setSelectedModule(null);
     setSelectedPath(null);
     setTabs([]);
     setActivePath(null);
+    setBuildStatuses({});
   }, [packageTree.rootPath]);
 
   const closeTab = (path: string) => {
@@ -210,27 +229,123 @@ export function ProjectWorkspace({ packageTree }: ProjectWorkspaceProps) {
     [packageTree, tabs],
   );
 
+  const buildPackage = React.useCallback(
+    (movePackage: { name: string; path: string }) => {
+      setBuildStatuses((currentStatuses) => ({
+        ...currentStatuses,
+        [movePackage.path]: {
+          message: "Running sui move build...",
+          state: "running",
+        },
+      }));
+
+      withTimeout(buildMovePackage(packageTree, movePackage.path), 120_000)
+        .then((output) => {
+          const didSucceed = output.status === 0;
+          const outputText = didSucceed
+            ? output.stdout || "Build completed."
+            : output.stderr || output.stdout || "Build failed.";
+
+          setBuildStatuses((currentStatuses) => ({
+            ...currentStatuses,
+            [movePackage.path]: {
+              message: summarizeCommandOutput(outputText),
+              state: didSucceed ? "success" : "error",
+            },
+          }));
+        })
+        .catch((error: unknown) => {
+          setBuildStatuses((currentStatuses) => ({
+            ...currentStatuses,
+            [movePackage.path]: {
+              message: error instanceof Error ? error.message : String(error),
+              state: "error",
+            },
+          }));
+        });
+    },
+    [packageTree],
+  );
+
+  const selectModule = React.useCallback(
+    (movePackage: SelectedMoveModule["movePackage"], moveModule: SelectedMoveModule["moveModule"]) => {
+      setSelectedModule({ moveModule, movePackage });
+      setSelectedPath(moveModule.filePath);
+      setActivePath(null);
+    },
+    [],
+  );
+
   return (
-    <div className="grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)_300px] bg-background">
-      <ProjectFileTree
-        packageTree={packageTree}
-        selectedPath={selectedPath}
-        onSelectPath={selectPath}
-      />
+    <div
+      className={workspaceGridClass(isPackagePanelCollapsed, isFileTreeCollapsed)}
+    >
+      {isPackagePanelCollapsed ? (
+        <aside className="grid min-h-0 grid-rows-[auto_1fr] border-r bg-sidebar text-sidebar-foreground">
+          <div className="flex h-10 items-center justify-center border-b">
+            <Button
+              aria-label="Show package panel"
+              onClick={() => setIsPackagePanelCollapsed(false)}
+              size="icon-xs"
+              type="button"
+              variant="ghost"
+            >
+              <PanelLeftOpen aria-hidden="true" />
+            </Button>
+          </div>
+          <div className="flex justify-center pt-3 text-muted-foreground">
+            <Package className="size-4" aria-hidden="true" />
+          </div>
+        </aside>
+      ) : (
+        <MovePackagePanel
+          activePath={activePath}
+          buildStatuses={buildStatuses}
+          packages={packageTree.movePackages}
+          rootPackage={rootPackageName}
+          selectedModulePath={selectedModule?.moveModule.filePath ?? null}
+          onBuildPackage={buildPackage}
+          onCollapse={() => setIsPackagePanelCollapsed(true)}
+          onOpenFile={openFile}
+          onSelectModule={selectModule}
+        />
+      )}
       <EditorTabs
         activePath={activePath}
         onActivateTab={activateTab}
         onCloseTab={closeTab}
         onSaveTab={saveTab}
         onUpdateTabSource={updateTabSource}
+        dependencyGraph={packageTree.dependencyGraph}
         packageName={packageTree.rootName}
+        selectedModule={selectedModule}
         tabs={tabs}
       />
-      <MovePackagePanel
-        activePath={activePath}
-        packages={packageTree.movePackages}
-        onOpenFile={openFile}
-      />
+      <aside className="grid min-h-0 grid-rows-[auto_1fr] border-l bg-sidebar text-sidebar-foreground">
+        <div className="flex h-10 items-center justify-center border-b">
+          <Button
+            aria-label={isFileTreeCollapsed ? "Show file tree" : "Hide file tree"}
+            onClick={() => setIsFileTreeCollapsed((isCollapsed) => !isCollapsed)}
+            size="icon-xs"
+            type="button"
+            variant="ghost"
+          >
+            {isFileTreeCollapsed ? (
+              <PanelRightOpen aria-hidden="true" />
+            ) : (
+              <PanelRightClose aria-hidden="true" />
+            )}
+          </Button>
+        </div>
+        {isFileTreeCollapsed ? null : (
+          <ProjectFileTree
+            packageTree={packageTree}
+            selectedPath={selectedPath}
+            side="right"
+            onSelectPath={selectPath}
+          />
+        )}
+      </aside>
     </div>
   );
 }
@@ -273,4 +388,32 @@ function withTimeout<TValue>(promise: Promise<TValue>, timeoutMs: number) {
       .catch(reject)
       .finally(() => window.clearTimeout(timeout));
   });
+}
+
+function summarizeCommandOutput(output: string) {
+  const lines = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines.at(-1) ?? "Command finished.";
+}
+
+function workspaceGridClass(
+  isPackagePanelCollapsed: boolean,
+  isFileTreeCollapsed: boolean,
+) {
+  if (isPackagePanelCollapsed && isFileTreeCollapsed) {
+    return "grid h-full min-h-0 grid-cols-[44px_minmax(0,1fr)_44px] bg-background";
+  }
+
+  if (isPackagePanelCollapsed) {
+    return "grid h-full min-h-0 grid-cols-[44px_minmax(0,1fr)_300px] bg-background";
+  }
+
+  if (isFileTreeCollapsed) {
+    return "grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)_44px] bg-background";
+  }
+
+  return "grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)_300px] bg-background";
 }

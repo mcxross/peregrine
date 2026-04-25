@@ -2,7 +2,13 @@ import { FileText, X } from "lucide-react";
 import React from "react";
 
 import type { OpenFileTab } from "@/features/project-workspace/project-workspace";
+import { DependencyGraphScreen } from "@/features/project-workspace/dependency-graph-screen";
+import {
+  ModuleSignatureScreen,
+  type SelectedMoveModule,
+} from "@/features/project-workspace/module-signature-screen";
 import { cn } from "@/lib/utils";
+import type { PackageDependencyGraph } from "@/features/empty-project/filesystem-tree";
 
 const PreviewRenderer = React.lazy(() =>
   import("@/features/project-workspace/preview-renderer"),
@@ -10,6 +16,8 @@ const PreviewRenderer = React.lazy(() =>
 
 type EditorTabsProps = {
   packageName: string;
+  dependencyGraph: PackageDependencyGraph;
+  selectedModule: SelectedMoveModule | null;
   tabs: OpenFileTab[];
   activePath: string | null;
   onActivateTab: (path: string) => void;
@@ -20,6 +28,8 @@ type EditorTabsProps = {
 
 export function EditorTabs({
   packageName,
+  dependencyGraph,
+  selectedModule,
   tabs,
   activePath,
   onActivateTab,
@@ -70,7 +80,13 @@ export function EditorTabs({
       </div>
 
       {activeTab ? (
-        <React.Suspense fallback={<EditorEmptyState message="Loading renderer..." />}>
+        <React.Suspense
+          fallback={
+            <div className="flex min-h-0 items-center justify-center px-6 text-sm text-muted-foreground">
+              Loading renderer...
+            </div>
+          }
+        >
           <PreviewRenderer
             tab={activeTab}
             onSave={() => onSaveTab(activeTab.path)}
@@ -78,17 +94,13 @@ export function EditorTabs({
           />
         </React.Suspense>
       ) : (
-        <EditorEmptyState message="Select a file from the tree." />
+        selectedModule ? (
+          <ModuleSignatureScreen selectedModule={selectedModule} />
+        ) : (
+          <DependencyGraphScreen graph={dependencyGraph} packageName={packageName} />
+        )
       )}
     </section>
-  );
-}
-
-function EditorEmptyState({ message }: { message: string }) {
-  return (
-    <div className="flex min-h-0 items-center justify-center px-6 text-sm text-muted-foreground">
-      {message}
-    </div>
   );
 }
 
