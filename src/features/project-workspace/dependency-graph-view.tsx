@@ -1,12 +1,16 @@
 import {
   Background,
+  BaseEdge,
   Controls,
+  EdgeLabelRenderer,
   Handle,
   MarkerType,
   NodeToolbar,
   Position,
   ReactFlow,
+  getSmoothStepPath,
   type Edge,
+  type EdgeProps,
   type Node,
   type NodeProps,
 } from "@xyflow/react";
@@ -44,8 +48,18 @@ type LayoutNode = PackageDependencyNode & {
   y: number;
 };
 
+type DependencyEdgeData = {
+  color: string;
+  label?: string;
+  primary: boolean;
+};
+
 const NODE_TYPES = {
   package: PackageGraphNode,
+};
+
+const EDGE_TYPES = {
+  dependency: DependencyGraphEdge,
 };
 
 const ROOT_COLOR = "#0ea5e9";
@@ -94,27 +108,18 @@ export function DependencyGraphView({
       },
     };
   });
-  const flowEdges = renderGraph.edges.map<Edge>((edge) => {
+  const flowEdges = renderGraph.edges.map<Edge<DependencyEdgeData>>((edge) => {
     const id = edgeId(edge);
     const isPrimary = primaryEdges.has(id);
     const isDirect = edge.source === renderGraph.root;
     const color = isDirect ? ROOT_COLOR : isPrimary ? DIRECT_COLOR : "#64748b";
+    const label = edgeLabel(edge, renderGraph, isPrimary);
 
     return {
       id,
       source: edge.source,
       target: edge.target,
-      label: edgeLabel(edge, renderGraph, isPrimary),
-      labelBgPadding: [6, 4],
-      labelBgBorderRadius: 4,
-      labelBgStyle: {
-        fill: "color-mix(in oklch, var(--background) 88%, transparent)",
-      },
-      labelStyle: {
-        fill: isPrimary ? color : "#94a3b8",
-        fontSize: 10,
-        fontWeight: 600,
-      },
+      data: { color, label, primary: isPrimary },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         color,
@@ -125,7 +130,7 @@ export function DependencyGraphView({
         strokeDasharray: isPrimary ? undefined : "6 8",
         strokeWidth: isDirect ? 2.1 : isPrimary ? 1.7 : 1.2,
       },
-      type: "smoothstep",
+      type: "dependency",
     };
   });
   const flowKey = `${renderGraph.root ?? "graph"}-${flowNodes.length}-${flowEdges.length}`;
@@ -144,6 +149,7 @@ export function DependencyGraphView({
         nodes={flowNodes}
         nodesDraggable={false}
         nodesFocusable={false}
+        edgeTypes={EDGE_TYPES}
         nodeTypes={NODE_TYPES}
         proOptions={{ hideAttribution: true }}
       >
@@ -173,6 +179,49 @@ export function DependencyGraphView({
 }
 
 export default DependencyGraphView;
+
+function DependencyGraphEdge({
+  markerEnd,
+  sourcePosition,
+  sourceX,
+  sourceY,
+  style,
+  targetPosition,
+  targetX,
+  targetY,
+  data,
+}: EdgeProps) {
+  const edgeData = data as DependencyEdgeData | undefined;
+  const [edgePath] = getSmoothStepPath({
+    sourcePosition,
+    sourceX,
+    sourceY,
+    targetPosition,
+    targetX,
+    targetY,
+    borderRadius: 10,
+  });
+  const labelPosition = branchLabelPosition(sourceX, targetX, targetY);
+
+  return (
+    <>
+      <BaseEdge markerEnd={markerEnd} path={edgePath} style={style} />
+      {edgeData?.label ? (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan pointer-events-none absolute z-[1000] rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-semibold leading-none shadow-sm"
+            style={{
+              color: edgeData.primary ? edgeData.color : "#94a3b8",
+              transform: `translate(-50%, -50%) translate(${labelPosition.x}px, ${labelPosition.y}px)`,
+            }}
+          >
+            {edgeData.label}
+          </div>
+        </EdgeLabelRenderer>
+      ) : null}
+    </>
+  );
+}
 
 function PackageGraphNode({ data }: NodeProps<Node<PackageNodeData>>) {
   const entryFunctionCount = data.entryFunctionCount ?? 0;
@@ -573,6 +622,16 @@ function edgeLabel(
 
 function edgeId(edge: PackageDependencyEdge) {
   return `${edge.source}->${edge.target}`;
+}
+
+function branchLabelPosition(sourceX: number, targetX: number, targetY: number) {
+  const horizontalDistance = Math.abs(targetX - sourceX);
+  const direction = targetX >= sourceX ? 1 : -1;
+  const x = horizontalDistance > 180
+    ? targetX - direction * 82
+    : sourceX + (targetX - sourceX) * 0.5;
+
+  return { x, y: targetY };
 }
 
 function shortAddress(address: string | null | undefined) {
