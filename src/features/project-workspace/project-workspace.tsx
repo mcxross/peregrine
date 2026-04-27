@@ -4,7 +4,6 @@ import {
   Box,
   Check,
   ChevronDown,
-  ChevronRight,
   FileCheck2,
   FileText,
   Gauge,
@@ -13,12 +12,10 @@ import {
   Link2,
   Lock,
   Network,
-  PackageCheck,
   PanelLeftOpen,
   PanelRightClose,
   ScanEye,
   ShieldAlert,
-  ShieldCheck,
   Sparkles,
   Target,
   UsersRound,
@@ -85,39 +82,6 @@ const validationItems = [
   { icon: FileText, label: "Audit Report", value: "", tone: "muted" },
 ];
 
-const overviewMetrics = [
-  { label: "Entry Functions", value: "4" },
-  { label: "Capabilities", value: "2" },
-  { label: "Shared Object", value: "1" },
-  { label: "Asset Movers", value: "3" },
-  { label: "Oracle Usage", value: "1" },
-  { label: "Admin Controls", value: "2" },
-];
-
-const topRisks = [
-  {
-    file: "vault.move:128",
-    level: "High",
-    text: "Withdraw allows fund movement via receipt authority.",
-  },
-  {
-    file: "oracle.move:56",
-    level: "High",
-    text: "Oracle price freshness not enforced in all paths.",
-  },
-  {
-    file: "config.move:42",
-    level: "Medium",
-    text: "Emergency penalty can be set without upper bound.",
-  },
-];
-
-const nextActions = [
-  "Prove withdrawal accounting invariant",
-  "Add stale oracle rejection test",
-  "Review admin update functions",
-];
-
 export function ProjectWorkspace({
   activePackageManifestPath,
   activeWorkspaceTab,
@@ -138,11 +102,6 @@ export function ProjectWorkspace({
           (movePackage) => movePackage.manifestPath === activePackageManifestPath,
         ) ?? null;
   const packageName = activeMovePackage?.name || packageTree.rootName || packageTree.movePackages[0]?.name || "savings_personal";
-  const moduleCount =
-    activeMovePackage?.modules.length ??
-    packageTree.movePackages.find((movePackage) => movePackage.name === packageTree.dependencyGraph.root)
-      ?.modules.length ??
-    packageTree.movePackages.reduce((count, movePackage) => count + movePackage.modules.length, 0);
 
   React.useEffect(() => {
     setSelectedModule(null);
@@ -228,8 +187,6 @@ export function ProjectWorkspace({
 
       {isRightPanelOpen ? (
         <InspectorPanel
-          moduleCount={Math.max(moduleCount, 5)}
-          packageName={packageName}
           onCollapse={() => setIsRightPanelOpen(false)}
         />
       ) : (
@@ -722,14 +679,10 @@ function MetricBadge({
 
 function InspectorPanel({
   className,
-  moduleCount,
   onCollapse,
-  packageName,
 }: {
   className?: string;
-  moduleCount: number;
   onCollapse: () => void;
-  packageName: string;
 }) {
   return (
     <aside className={cn("grid min-h-0 grid-rows-[auto_1fr] overflow-hidden border-l border-[color:var(--app-border)] bg-[var(--app-panel)] text-foreground", className)}>
@@ -759,104 +712,7 @@ function InspectorPanel({
         </Button>
       </header>
 
-      <ScrollArea className="min-h-0">
-      <div className="min-w-0 px-3 py-3">
-        <div className="flex items-start gap-3 border-b border-[color:var(--app-border)] pb-3">
-          <span className="inline-flex size-7 items-center justify-center rounded bg-chart-1 text-primary-foreground">
-            <PackageCheck className="size-4" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h2 className="truncate text-base font-semibold">{packageName}</h2>
-              <Badge
-                className="max-w-full rounded bg-[var(--app-subtle)] px-2 py-0.5 text-[11px] text-muted-foreground"
-                variant="secondary"
-              >
-                root package
-              </Badge>
-            </div>
-            <p className="mt-1.5 text-xs text-muted-foreground">{moduleCount} modules</p>
-          </div>
-        </div>
-
-        <PanelTitle>Security Overview</PanelTitle>
-        <Card className="min-w-0 gap-0 overflow-hidden rounded-md p-3 shadow-none">
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-            <div className="min-w-0">
-              <div className="text-[11px] font-medium text-muted-foreground">Risk Score</div>
-              <div className="mt-1.5 text-3xl font-semibold leading-none text-amber-400">
-                72<span className="ml-1.5 text-base font-normal text-muted-foreground">/100</span>
-              </div>
-            </div>
-            <div className="min-w-0 text-right">
-              <div className="text-[11px] font-medium text-muted-foreground">Risk Level</div>
-              <div className="mt-3 inline-flex max-w-full items-center gap-1.5 text-sm font-semibold text-amber-400">
-                <span className="size-2 rounded-full bg-amber-400" />
-                <span className="truncate">Medium</span>
-              </div>
-            </div>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-[color:var(--app-border)] pt-3 min-[1680px]:grid-cols-3">
-            {overviewMetrics.map((metric) => (
-              <div className="min-w-0" key={metric.label}>
-                <div className="text-sm font-semibold leading-none">{metric.value}</div>
-                <div className="mt-1 text-[11px] leading-4 text-muted-foreground">{metric.label}</div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <PanelTitle>Top Risks</PanelTitle>
-        <Card className="min-w-0 gap-3 overflow-hidden rounded-md p-3 shadow-none">
-          {topRisks.map((risk) => (
-            <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1" key={risk.file}>
-              <span
-                className={cn(
-                  "mt-1 size-2 rounded-full",
-                  risk.level === "High" ? "bg-red-400" : "bg-amber-400",
-                )}
-              />
-              <div className="min-w-0">
-                <div
-                  className={cn(
-                    "text-sm font-semibold",
-                    risk.level === "High" ? "text-red-400" : "text-amber-400",
-                  )}
-                >
-                  {risk.level}
-                </div>
-                <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">{risk.text}</p>
-              </div>
-              <span className="col-start-2 min-w-0 truncate text-xs text-muted-foreground">{risk.file}</span>
-            </div>
-          ))}
-          <Button className="h-auto justify-start gap-2 p-0 text-sm text-chart-1" type="button" variant="ghost">
-            View all issues
-            <ChevronRight className="size-4" aria-hidden="true" />
-          </Button>
-        </Card>
-
-        <PanelTitle>Next Actions</PanelTitle>
-        <Card className="gap-2 rounded-md p-3 shadow-none">
-          {nextActions.map((action) => (
-            <div className="flex items-center gap-3 text-sm" key={action}>
-              <ShieldCheck className="size-4 text-chart-4" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate">{action}</span>
-              <Badge
-                className="rounded bg-chart-4/15 px-2 py-0.5 text-[11px] font-semibold text-chart-4"
-                variant="secondary"
-              >
-                AI
-              </Badge>
-            </div>
-          ))}
-          <Button className="h-auto justify-start gap-2 p-0 text-sm text-chart-1" type="button" variant="ghost">
-            View full checklist
-            <ChevronRight className="size-4" aria-hidden="true" />
-          </Button>
-        </Card>
-      </div>
-      </ScrollArea>
+      <div aria-hidden="true" className="min-h-0" />
     </aside>
   );
 }
@@ -899,14 +755,6 @@ function CollapsedPanelRail({
         </Button>
       </div>
     </aside>
-  );
-}
-
-function PanelTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="mb-2 mt-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-      {children}
-    </h3>
   );
 }
 
