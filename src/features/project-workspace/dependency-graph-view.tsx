@@ -73,7 +73,7 @@ export function DependencyGraphView({
   packageName = "",
 }: DependencyGraphViewProps) {
   const [hoveredNodeId, setHoveredNodeId] = React.useState<string | null>(null);
-  const renderGraph = connectedPackageGraph(graph, packageName);
+  const renderGraph = focusedPackageGraph(graph, packageName);
 
   if (!renderGraph.summaryPath) {
     return (
@@ -345,50 +345,51 @@ function EmptyGraphState({
   );
 }
 
-function connectedPackageGraph(
+function focusedPackageGraph(
   graph: PackageDependencyGraph,
   packageName: string,
 ): PackageDependencyGraph {
   const knownNodes = new Set(graph.nodes.map((node) => node.id));
-  const focus =
-    packageName && knownNodes.has(packageName)
-      ? packageName
-      : graph.root && knownNodes.has(graph.root)
-        ? graph.root
-        : graph.nodes[0]?.id ?? null;
+  const requestedFocus = packageName.trim();
+
+  if (requestedFocus && !knownNodes.has(requestedFocus)) {
+    return {
+      ...graph,
+      root: requestedFocus,
+      nodes: [],
+      edges: [],
+      summaryPath: null,
+    };
+  }
+
+  const focus = requestedFocus
+    || (graph.root && knownNodes.has(graph.root) ? graph.root : "")
+    || graph.nodes[0]?.id
+    || null;
 
   if (!focus) {
     return graph;
   }
 
-  const adjacency = new Map<string, Set<string>>();
-
-  for (const node of graph.nodes) {
-    adjacency.set(node.id, new Set());
-  }
-
-  for (const edge of graph.edges) {
-    if (!knownNodes.has(edge.source) || !knownNodes.has(edge.target)) {
-      continue;
-    }
-
-    adjacency.get(edge.source)?.add(edge.target);
-    adjacency.get(edge.target)?.add(edge.source);
-  }
-
-  const connected = new Set<string>([focus]);
+  // Edges are directed: source package uses target package. Only follow outgoing
+  // edges from the active package so upstream consumers are not shown as deps.
+  const validEdges = graph.edges.filter(
+    (edge) => knownNodes.has(edge.source) && knownNodes.has(edge.target),
+  );
+  const outgoing = outgoingEdges(validEdges);
+  const reachable = new Set<string>([focus]);
   const queue = [focus];
 
   while (queue.length) {
-    const node = queue.shift()!;
+    const source = queue.shift()!;
 
-    for (const next of adjacency.get(node) ?? []) {
-      if (connected.has(next)) {
+    for (const edge of outgoing.get(source) ?? []) {
+      if (reachable.has(edge.target)) {
         continue;
       }
 
-      connected.add(next);
-      queue.push(next);
+      reachable.add(edge.target);
+      queue.push(edge.target);
     }
   }
 
@@ -396,13 +397,13 @@ function connectedPackageGraph(
     ...graph,
     root: focus,
     nodes: graph.nodes
-      .filter((node) => connected.has(node.id))
+      .filter((node) => reachable.has(node.id))
       .map((node) => ({
         ...node,
         isRoot: node.id === focus,
       })),
-    edges: graph.edges.filter(
-      (edge) => connected.has(edge.source) && connected.has(edge.target),
+    edges: validEdges.filter(
+      (edge) => reachable.has(edge.source) && reachable.has(edge.target),
     ),
   };
 }
@@ -609,7 +610,7 @@ function edgeLabel(
 ) {
   const count = edge.dependencyCount ?? 0;
 
-  if (!isPrimary && graph.edges.length > 10) {
+  if (!isPrimary) {
     return undefined;
   }
 
