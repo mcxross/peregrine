@@ -3,6 +3,7 @@ import {
   Controls,
   Handle,
   MarkerType,
+  NodeToolbar,
   Position,
   ReactFlow,
   type Edge,
@@ -10,6 +11,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import React from "react";
 
 import { Badge } from "@/components/ui/badge";
 import type {
@@ -30,6 +32,8 @@ type PackageNodeData = PackageDependencyNode & {
   directDependencies: number;
   focus: boolean;
   incomingPackages: number;
+  isHovered: boolean;
+  onHover: (nodeId: string | null) => void;
   outgoingPackages: number;
   role: string;
 };
@@ -54,6 +58,7 @@ export function DependencyGraphView({
   graph,
   packageName = "",
 }: DependencyGraphViewProps) {
+  const [hoveredNodeId, setHoveredNodeId] = React.useState<string | null>(null);
   const renderGraph = connectedPackageGraph(graph, packageName);
 
   if (!renderGraph.summaryPath) {
@@ -75,12 +80,15 @@ export function DependencyGraphView({
       id: node.id,
       type: "package",
       position: { x: node.x, y: node.y },
+      zIndex: node.id === hoveredNodeId ? 1000 : node.id === renderGraph.root ? 20 : 10,
       data: {
         ...node,
         color,
         directDependencies: stats.outgoing.get(node.id) ?? 0,
         focus: node.id === renderGraph.root,
         incomingPackages: stats.incoming.get(node.id) ?? 0,
+        isHovered: node.id === hoveredNodeId,
+        onHover: setHoveredNodeId,
         outgoingPackages: stats.outgoing.get(node.id) ?? 0,
         role: nodeRole(node, renderGraph.root),
       },
@@ -173,6 +181,8 @@ function PackageGraphNode({ data }: NodeProps<Node<PackageNodeData>>) {
   return (
     <div
       className="group relative w-56 rounded-md border bg-[var(--app-elevated)] px-3 py-2.5 shadow-sm"
+      onMouseEnter={() => data.onHover(data.id)}
+      onMouseLeave={() => data.onHover(null)}
       style={{
         borderColor: data.color,
         boxShadow: data.focus
@@ -235,18 +245,25 @@ function PackageGraphNode({ data }: NodeProps<Node<PackageNodeData>>) {
         {shortAddress(data.address) ?? "unresolved address"}
       </div>
 
-      <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-72 -translate-x-1/2 rounded-lg border bg-popover p-3 text-popover-foreground shadow-xl group-hover:block">
-        <div className="text-sm font-semibold">{data.id}</div>
-        <dl className="mt-2 space-y-1 text-xs">
-          <MetadataRow label="Role" value={data.role} />
-          <MetadataRow label="Address" value={data.address ?? "unresolved"} />
-          <MetadataRow label="Modules" value={String(data.moduleCount ?? 0)} />
-          <MetadataRow label="Entry functions" value={String(entryFunctionCount)} />
-          <MetadataRow label="Public functions" value={String(publicFunctionCount)} />
-          <MetadataRow label="Uses packages" value={String(data.outgoingPackages)} />
-          <MetadataRow label="Used by packages" value={String(data.incomingPackages)} />
-        </dl>
-      </div>
+      <NodeToolbar
+        className="pointer-events-none z-[10000]"
+        isVisible={data.isHovered}
+        offset={10}
+        position={Position.Bottom}
+      >
+        <div className="w-72 rounded-lg border border-[color:var(--app-border)] bg-popover p-3 text-popover-foreground shadow-2xl">
+          <div className="text-sm font-semibold">{data.id}</div>
+          <dl className="mt-2 space-y-1 text-xs">
+            <MetadataRow label="Role" value={data.role} />
+            <MetadataRow label="Address" value={data.address ?? "unresolved"} />
+            <MetadataRow label="Modules" value={String(data.moduleCount ?? 0)} />
+            <MetadataRow label="Entry functions" value={String(entryFunctionCount)} />
+            <MetadataRow label="Public functions" value={String(publicFunctionCount)} />
+            <MetadataRow label="Uses packages" value={String(data.outgoingPackages)} />
+            <MetadataRow label="Used by packages" value={String(data.incomingPackages)} />
+          </dl>
+        </div>
+      </NodeToolbar>
     </div>
   );
 }
@@ -353,8 +370,8 @@ function layoutGraph(graph: PackageDependencyGraph): LayoutNode[] {
     grouped.set(depth, siblings);
   }
 
-  const columnWidth = 335;
-  const rowHeight = 132;
+  const columnWidth = 360;
+  const rowHeight = 184;
   const laidOut: LayoutNode[] = [];
 
   for (const [depth, siblings] of [...grouped].sort((left, right) => left[0] - right[0])) {
