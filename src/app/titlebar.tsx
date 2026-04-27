@@ -29,21 +29,28 @@ import {
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { LayoutSettings } from "@/layout/layout-store";
-import { trafficLightInset } from "@/layout/window-chrome";
+import {
+  trafficLightInset,
+  workspaceSidebarWidth,
+} from "@/layout/window-chrome";
 
 type TitlebarProps = {
   activeWorkspaceTab?: WorkspaceTab;
+  buildActionState?: WorkspaceActionState;
   isLeftPanelOpen?: boolean;
   layout: LayoutSettings;
   hasWorkspace?: boolean;
+  onBuildPackage?: () => void;
   onToggleLeftPanel?: () => void;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
 };
 
 export function Titlebar({
+  buildActionState,
   isLeftPanelOpen = true,
   layout,
   hasWorkspace = true,
+  onBuildPackage,
   onToggleLeftPanel,
 }: TitlebarProps) {
   const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
@@ -65,7 +72,7 @@ export function Titlebar({
         layout.chrome === "compact" && "h-12",
       )}
       style={{
-        gridTemplateColumns: `${hasWorkspace && isLeftPanelOpen ? "270px" : "128px"} minmax(0, 1fr) ${hasWorkspace ? "360px" : "270px"}`,
+        gridTemplateColumns: `${hasWorkspace && isLeftPanelOpen ? `${workspaceSidebarWidth}px` : "128px"} minmax(0, 1fr) ${hasWorkspace ? "360px" : `${workspaceSidebarWidth}px`}`,
       }}
     >
       <div
@@ -97,7 +104,12 @@ export function Titlebar({
         <div className="flex min-w-0 items-center justify-center">
           <div className="flex items-center gap-1" onPointerDown={(event) => event.stopPropagation()}>
             {workspaceActions.map((action) => (
-              <WorkspaceActionButton action={action} key={action.label} />
+              <WorkspaceActionButton
+                action={action}
+                key={action.label}
+                state={action.id === "build" ? buildActionState : undefined}
+                onClick={action.id === "build" ? onBuildPackage : undefined}
+              />
             ))}
           </div>
         </div>
@@ -142,24 +154,39 @@ const networkOptions = [
 type NetworkId = (typeof networkOptions)[number]["id"];
 
 const workspaceActions = [
-  { icon: Hammer, label: "Build package", tone: "success" },
-  { icon: FlaskConical, label: "Run tests", tone: "success" },
-  { icon: Gauge, label: "Check coverage", tone: "default" },
-  { icon: Bug, label: "Run fuzzing", tone: "danger" },
-  { icon: SquareFunction, label: "Run formal checks", tone: "success" },
-  { icon: ShieldAlert, label: "Open audit", tone: "warning" },
-  { icon: FileCheck2, label: "Run CI", tone: "default" },
-];
+  { id: "build", icon: Hammer, label: "Build package", tone: "success" },
+  { id: "test", icon: FlaskConical, label: "Run tests", tone: "success" },
+  { id: "coverage", icon: Gauge, label: "Check coverage", tone: "default" },
+  { id: "fuzzing", icon: Bug, label: "Run fuzzing", tone: "danger" },
+  { id: "formal", icon: SquareFunction, label: "Run formal checks", tone: "success" },
+  { id: "audit", icon: ShieldAlert, label: "Open audit", tone: "warning" },
+  { id: "ci", icon: FileCheck2, label: "Run CI", tone: "default" },
+] as const;
 
 type WorkspaceAction = (typeof workspaceActions)[number];
+type WorkspaceActionState = {
+  disabled?: boolean;
+  running?: boolean;
+};
 
-function WorkspaceActionButton({ action }: { action: WorkspaceAction }) {
+function WorkspaceActionButton({
+  action,
+  onClick,
+  state,
+}: {
+  action: WorkspaceAction;
+  onClick?: () => void;
+  state?: WorkspaceActionState;
+}) {
   const Icon = action.icon;
+  const isDisabled = state?.disabled || state?.running || !onClick;
 
   return (
     <Button
       aria-label={action.label}
       className="h-8 gap-1.5 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2 text-muted-foreground hover:bg-[var(--app-elevated)] hover:text-foreground"
+      disabled={isDisabled}
+      onClick={onClick}
       title={action.label}
       type="button"
       variant="ghost"
@@ -173,7 +200,13 @@ function WorkspaceActionButton({ action }: { action: WorkspaceAction }) {
         )}
         aria-hidden="true"
       />
-      <Play className="size-2.5 text-muted-foreground" aria-hidden="true" />
+      <Play
+        className={cn(
+          "size-2.5 text-muted-foreground",
+          state?.running && "animate-pulse text-foreground",
+        )}
+        aria-hidden="true"
+      />
     </Button>
   );
 }

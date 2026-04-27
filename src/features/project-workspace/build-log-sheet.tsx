@@ -1,0 +1,246 @@
+import React from "react";
+import { CheckCircle2, GripHorizontal, Loader2, RotateCcw, Terminal, X, XCircle } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import type { CommandOutput } from "@/features/empty-project/filesystem-tree";
+import { cn } from "@/lib/utils";
+
+export type BuildRunState = "running" | "success" | "error";
+
+export type BuildLogRun = {
+  command: string;
+  error: string | null;
+  finishedAt: Date | null;
+  id: number;
+  output: CommandOutput | null;
+  packageName: string;
+  packagePath: string;
+  startedAt: Date;
+  state: BuildRunState;
+  workingDirectory: string;
+};
+
+type BuildLogSheetProps = {
+  bottomInset?: number;
+  isOpen: boolean;
+  run: BuildLogRun | null;
+  onClose: () => void;
+  onRerun: () => void;
+};
+
+export type BuildLogSheetController = Omit<BuildLogSheetProps, "bottomInset">;
+
+const DEFAULT_SHEET_HEIGHT = 360;
+const MIN_SHEET_HEIGHT = 180;
+const MAX_SHEET_HEIGHT_RATIO = 0.72;
+
+export function BuildLogSheet({
+  bottomInset = 0,
+  isOpen,
+  onClose,
+  onRerun,
+  run,
+}: BuildLogSheetProps) {
+  const [height, setHeight] = React.useState(DEFAULT_SHEET_HEIGHT);
+  const [isResizing, setIsResizing] = React.useState(false);
+
+  const handleResizeStart = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startY = event.clientY;
+    const startHeight = height;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "ns-resize";
+    document.body.style.userSelect = "none";
+    setIsResizing(true);
+
+    const handleResizeMove = (moveEvent: PointerEvent) => {
+      const availableHeight = Math.max(MIN_SHEET_HEIGHT, window.innerHeight - bottomInset - 80);
+      const maxHeight = Math.min(availableHeight, window.innerHeight * MAX_SHEET_HEIGHT_RATIO);
+      const nextHeight = startHeight + startY - moveEvent.clientY;
+
+      setHeight(Math.min(maxHeight, Math.max(MIN_SHEET_HEIGHT, nextHeight)));
+    };
+
+    const handleResizeEnd = () => {
+      window.removeEventListener("pointermove", handleResizeMove);
+      window.removeEventListener("pointerup", handleResizeEnd);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      setIsResizing(false);
+    };
+
+    window.addEventListener("pointermove", handleResizeMove);
+    window.addEventListener("pointerup", handleResizeEnd, { once: true });
+  }, [bottomInset, height]);
+
+  if (!run) {
+    return null;
+  }
+
+  const isRunning = run.state === "running";
+  const statusLabel = buildStatusLabel(run);
+  const statusTone = run.state === "success" ? "success" : run.state === "error" ? "error" : "running";
+
+  return (
+    <section
+      aria-label="Build logs"
+      aria-hidden={!isOpen}
+      className={cn(
+        "absolute inset-x-0 z-40 grid grid-rows-[auto_minmax(0,1fr)] border-x-0 border-b-0 border-t border-[color:var(--app-border)] bg-[var(--app-panel)] shadow-[0_-18px_60px_rgba(0,0,0,0.45)] transition-transform duration-200",
+        isResizing && "transition-none",
+        isOpen
+          ? "pointer-events-auto translate-y-0"
+          : "pointer-events-none translate-y-[calc(100%+var(--build-sheet-bottom-inset))]",
+      )}
+      style={{
+        "--build-sheet-bottom-inset": `${bottomInset}px`,
+        bottom: bottomInset,
+        height,
+      } as React.CSSProperties}
+    >
+      <button
+        aria-label="Resize build log sheet"
+        className="absolute left-1/2 top-0 z-10 flex h-5 w-16 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[var(--app-panel)] text-muted-foreground shadow-sm hover:text-foreground"
+        onPointerDown={handleResizeStart}
+        type="button"
+      >
+        <GripHorizontal className="size-4" aria-hidden="true" />
+      </button>
+
+      <header className="flex items-start justify-between gap-4 border-b border-[color:var(--app-border)] px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <Terminal className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <h2 className="truncate text-sm font-semibold">Move build</h2>
+            <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
+          </div>
+          <p className="mt-1 truncate text-xs text-muted-foreground" title={run.workingDirectory}>
+            {run.packageName} - {run.workingDirectory}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            className="h-8 gap-2"
+            disabled={isRunning}
+            onClick={onRerun}
+            type="button"
+            variant="outline"
+          >
+            <RotateCcw className="size-3.5" aria-hidden="true" />
+            Rerun
+          </Button>
+          <Button
+            aria-label="Close build logs"
+            className="size-8 text-muted-foreground"
+            onClick={onClose}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </Button>
+        </div>
+      </header>
+
+      <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 px-4 py-3">
+        <div className="grid gap-1.5 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-xs">
+          <LogMeta label="Package" value={run.packagePath} />
+          <LogMeta label="Command" value={run.command} />
+          <LogMeta label="Started" value={run.startedAt.toLocaleTimeString()} />
+          {run.finishedAt ? <LogMeta label="Finished" value={run.finishedAt.toLocaleTimeString()} /> : null}
+        </div>
+
+        <ScrollArea className="min-h-0 rounded-md border border-[color:var(--app-border)] bg-black/35">
+          <pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs leading-5 text-muted-foreground">
+            {buildLogText(run)}
+          </pre>
+        </ScrollArea>
+      </div>
+    </section>
+  );
+}
+
+function StatusBadge({
+  children,
+  tone,
+}: {
+  children: React.ReactNode;
+  tone: "error" | "running" | "success";
+}) {
+  return (
+    <Badge
+      className={cn(
+        "gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold",
+        tone === "success" && "bg-emerald-500/15 text-emerald-400",
+        tone === "error" && "bg-red-500/15 text-red-400",
+        tone === "running" && "bg-muted text-muted-foreground",
+      )}
+      variant="secondary"
+    >
+      {tone === "success" ? <CheckCircle2 className="size-3" aria-hidden="true" /> : null}
+      {tone === "error" ? <XCircle className="size-3" aria-hidden="true" /> : null}
+      {tone === "running" ? <Loader2 className="size-3 animate-spin" aria-hidden="true" /> : null}
+      {children}
+    </Badge>
+  );
+}
+
+function LogMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid min-w-0 grid-cols-[5rem_minmax(0,1fr)] gap-2">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="min-w-0 truncate font-mono text-foreground" title={value}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function buildStatusLabel(run: BuildLogRun) {
+  if (run.state === "running") {
+    return "Running";
+  }
+
+  if (run.output?.status === 0) {
+    return "Succeeded";
+  }
+
+  return run.output?.status == null ? "Failed" : `Failed ${run.output.status}`;
+}
+
+function buildLogText(run: BuildLogRun) {
+  const lines = [
+    `$ ${run.command}`,
+    `cwd: ${run.workingDirectory}`,
+    "",
+  ];
+
+  if (run.state === "running") {
+    lines.push("Running build...");
+    return lines.join("\n");
+  }
+
+  if (run.output?.stdout.trim()) {
+    lines.push("stdout", run.output.stdout.trim(), "");
+  }
+
+  if (run.output?.stderr.trim()) {
+    lines.push("stderr", run.output.stderr.trim(), "");
+  }
+
+  if (run.error) {
+    lines.push("error", run.error, "");
+  }
+
+  if (!run.output?.stdout.trim() && !run.output?.stderr.trim() && !run.error) {
+    lines.push("Build finished without output.");
+  }
+
+  return lines.join("\n").trimEnd();
+}

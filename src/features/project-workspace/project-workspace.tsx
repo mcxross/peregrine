@@ -39,6 +39,10 @@ import type {
   SuiCliStatus,
 } from "@/features/empty-project/filesystem-tree";
 import { checkSuiCli } from "@/features/empty-project/filesystem-tree";
+import {
+  BuildLogSheet,
+  type BuildLogSheetController,
+} from "@/features/project-workspace/build-log-sheet";
 import { DependencyGraphScreen } from "@/features/project-workspace/dependency-graph-screen";
 import { MovePackagesOverviewScreen } from "@/features/project-workspace/move-packages-overview-screen";
 import type { SelectedMoveModule } from "@/features/project-workspace/module-signature-screen";
@@ -46,11 +50,18 @@ import {
   SurfaceDetailScreen,
   type SurfaceDetailKind,
 } from "@/features/project-workspace/surface-detail-screen";
+import {
+  workspaceSidebarWidth,
+  workspaceStatusBarHeight,
+} from "@/layout/window-chrome";
 import { cn } from "@/lib/utils";
 
 type ProjectWorkspaceProps = {
   activeWorkspaceTab: WorkspaceTab;
+  activePackageManifestPath: string | null;
+  buildLogSheet: BuildLogSheetController;
   isLeftPanelOpen: boolean;
+  onActivePackageManifestPathChange: (manifestPath: string | null) => void;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
   packageTree: PackageTree;
 };
@@ -107,17 +118,17 @@ const nextActions = [
 ];
 
 export function ProjectWorkspace({
+  activePackageManifestPath,
   activeWorkspaceTab,
+  buildLogSheet,
   isLeftPanelOpen,
+  onActivePackageManifestPathChange,
   onWorkspaceTabChange,
   packageTree,
 }: ProjectWorkspaceProps) {
   const [isRightPanelOpen, setIsRightPanelOpen] = React.useState(true);
   const [selectedModule, setSelectedModule] = React.useState<SelectedMoveModule | null>(null);
   const [activeSurfaceDetail, setActiveSurfaceDetail] = React.useState<SurfaceDetailKind | null>(null);
-  const [activePackageManifestPath, setActivePackageManifestPath] = React.useState<string | null>(
-    packageTree.activePackageManifestPath ?? null,
-  );
   const activeMovePackage =
     packageTree.movePackages.length === 1
       ? packageTree.movePackages[0]
@@ -132,10 +143,9 @@ export function ProjectWorkspace({
     packageTree.movePackages.reduce((count, movePackage) => count + movePackage.modules.length, 0);
 
   React.useEffect(() => {
-    setActivePackageManifestPath(packageTree.activePackageManifestPath ?? null);
     setSelectedModule(null);
     setActiveSurfaceDetail(null);
-  }, [packageTree.activePackageManifestPath, packageTree.rootPath]);
+  }, [activePackageManifestPath, packageTree.rootPath]);
 
   React.useEffect(() => {
     const firstModule = activeMovePackage?.modules[0] ?? null;
@@ -158,7 +168,7 @@ export function ProjectWorkspace({
       className="grid h-full min-h-0 overflow-hidden bg-[var(--app-window)] text-foreground"
       style={{
         gridTemplateColumns: isLeftPanelOpen
-          ? `270px minmax(0, 1fr) ${isRightPanelOpen ? "clamp(360px, 24vw, 400px)" : "44px"}`
+          ? `${workspaceSidebarWidth}px minmax(0, 1fr) ${isRightPanelOpen ? "clamp(360px, 24vw, 400px)" : "44px"}`
           : `minmax(0, 1fr) ${isRightPanelOpen ? "clamp(360px, 24vw, 400px)" : "44px"}`,
       }}
     >
@@ -174,7 +184,7 @@ export function ProjectWorkspace({
             onWorkspaceTabChange("Explore");
           }}
           onSelectPackage={(movePackage) => {
-            setActivePackageManifestPath(movePackage.manifestPath);
+            onActivePackageManifestPathChange(movePackage.manifestPath);
             setActiveSurfaceDetail(null);
             setSelectedModule(null);
           }}
@@ -185,7 +195,10 @@ export function ProjectWorkspace({
         />
       ) : null}
 
-      <main className="grid min-h-0 grid-rows-[minmax(0,1fr)_36px] border-r border-[color:var(--app-border)] bg-[var(--app-window)]">
+      <main
+        className="relative grid min-h-0 overflow-hidden border-r border-[color:var(--app-border)] bg-[var(--app-window)]"
+        style={{ gridTemplateRows: `minmax(0, 1fr) ${workspaceStatusBarHeight}px` }}
+      >
         <WorkspaceMainPanel
           activeWorkspaceTab={activeWorkspaceTab}
           activeSurfaceDetail={activeSurfaceDetail}
@@ -198,6 +211,13 @@ export function ProjectWorkspace({
             setActiveSurfaceDetail(null);
             setSelectedModule({ moveModule, movePackage });
           }}
+        />
+        <BuildLogSheet
+          bottomInset={workspaceStatusBarHeight}
+          isOpen={buildLogSheet.isOpen}
+          onClose={buildLogSheet.onClose}
+          onRerun={buildLogSheet.onRerun}
+          run={buildLogSheet.run}
         />
         <footer className="flex items-center overflow-hidden border-t border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 text-[11px] leading-none text-muted-foreground">
           <span className="truncate">Last scanned: 2 minutes ago</span>
