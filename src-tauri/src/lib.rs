@@ -40,6 +40,14 @@ struct CommandOutput {
     stderr: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SuiCliStatus {
+    installed: bool,
+    version: Option<String>,
+    install_hint: Option<String>,
+}
+
 #[tauri::command]
 async fn load_package_tree(root_path: String) -> Result<PackageTree, String> {
     tauri::async_runtime::spawn_blocking(move || build_package_tree(root_path))
@@ -111,6 +119,57 @@ async fn build_move_package(
     })
     .await
     .map_err(|error| format!("Could not join package build task: {error}"))?
+}
+
+#[tauri::command]
+async fn check_sui_cli() -> Result<SuiCliStatus, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let output = match Command::new("sui").arg("--version").output() {
+            Ok(output) => output,
+            Err(_) => {
+                return Ok(SuiCliStatus {
+                    installed: false,
+                    version: None,
+                    install_hint: Some(
+                        "Install the Sui CLI and make sure `sui` is on PATH.".to_string(),
+                    ),
+                });
+            }
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let version_source = stdout
+            .lines()
+            .chain(stderr.lines())
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .unwrap_or("");
+
+        Ok(SuiCliStatus {
+            installed: output.status.success(),
+            version: parse_sui_version(version_source),
+            install_hint: if output.status.success() {
+                None
+            } else {
+                Some("Install the Sui CLI and make sure `sui` is on PATH.".to_string())
+            },
+        })
+    })
+    .await
+    .map_err(|error| format!("Could not join Sui CLI check task: {error}"))?
+}
+
+fn parse_sui_version(source: &str) -> Option<String> {
+    source
+        .split_whitespace()
+        .find(|token| {
+            token
+                .chars()
+                .next()
+                .is_some_and(|character| character.is_ascii_digit())
+        })
+        .map(|version| version.trim_start_matches('v').to_string())
 }
 
 fn build_package_tree(root_path: String) -> Result<PackageTree, String> {
@@ -327,7 +386,8 @@ pub fn run() {
             load_package_tree,
             load_file_preview,
             save_text_file,
-            build_move_package
+            build_move_package,
+            check_sui_cli
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
