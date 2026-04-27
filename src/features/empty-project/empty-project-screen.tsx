@@ -11,6 +11,12 @@ import {
 } from "@/features/empty-project/filesystem-tree";
 import { ProjectDropzone } from "@/features/empty-project/project-dropzone";
 import { RecentProjects } from "@/features/empty-project/recent-projects";
+import {
+  activeManifestPathForRecentProject,
+  clearRecentProjects,
+  loadRecentProjects,
+  rememberRecentProject,
+} from "@/features/empty-project/recent-project-store";
 import type { RecentProject } from "@/features/empty-project/types";
 
 type EmptyProjectScreenProps = {
@@ -22,15 +28,24 @@ type EmptyProjectScreenProps = {
 };
 
 export function EmptyProjectScreen({
-  recentProjects = [],
+  recentProjects,
   onOpenProject,
   onOpenRecentProject,
   onClearRecentProjects,
   onProjectSelected,
 }: EmptyProjectScreenProps) {
+  const [storedRecentProjects, setStoredRecentProjects] = React.useState<RecentProject[]>(() => loadRecentProjects());
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [pendingPackageTree, setPendingPackageTree] = React.useState<PackageTree | null>(null);
+  const visibleRecentProjects = recentProjects ?? storedRecentProjects;
+  const selectProject = React.useCallback(
+    (packageTree: PackageTree) => {
+      setStoredRecentProjects((projects) => rememberRecentProject(projects, packageTree));
+      onProjectSelected?.(packageTree);
+    },
+    [onProjectSelected],
+  );
 
   const handleOpenProject = onOpenProject ?? (async () => {
     setLoadError(null);
@@ -51,13 +66,42 @@ export function EmptyProjectScreen({
         return;
       }
 
-      onProjectSelected?.(withActivePackage(packageTree, packageTree.movePackages[0] ?? null));
+      selectProject(withActivePackage(packageTree, packageTree.movePackages[0] ?? null));
     } catch (error) {
       setLoadError(getOpenPackageErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
   });
+  const handleOpenRecentProject = onOpenRecentProject ?? (async (project: RecentProject) => {
+    setLoadError(null);
+    setPendingPackageTree(null);
+    setIsLoading(true);
+
+    try {
+      const packageTree = await loadPackageTree(project.rootPath);
+      const activePackageManifestPath = activeManifestPathForRecentProject(packageTree, project);
+
+      if (packageTree.movePackages.length > 1 && !activePackageManifestPath) {
+        setPendingPackageTree(packageTree);
+        return;
+      }
+
+      selectProject({
+        ...packageTree,
+        activePackageManifestPath,
+      });
+    } catch (error) {
+      setLoadError(getOpenPackageErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
+  });
+  const handleClearRecentProjects = React.useCallback(() => {
+    clearRecentProjects();
+    setStoredRecentProjects([]);
+    onClearRecentProjects?.();
+  }, [onClearRecentProjects]);
 
   if (pendingPackageTree) {
     return (
@@ -65,26 +109,26 @@ export function EmptyProjectScreen({
         packageTree={pendingPackageTree}
         onCancel={() => setPendingPackageTree(null)}
         onSelectPackage={(movePackage) => {
-          onProjectSelected?.(withActivePackage(pendingPackageTree, movePackage));
+          selectProject(withActivePackage(pendingPackageTree, movePackage));
         }}
       />
     );
   }
 
   return (
-    <div className="grid h-full min-h-0 overflow-hidden bg-background px-6 py-6">
-      <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-5">
+    <div className="grid h-full min-h-0 place-items-center overflow-hidden bg-background px-6 py-5">
+      <div className="flex max-h-full w-full max-w-[660px] flex-col items-stretch gap-4">
         <ProjectDropzone onOpenProject={handleOpenProject} isLoading={isLoading} />
         {loadError ? (
           <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {loadError}
           </p>
         ) : null}
-        <ScrollArea className="min-h-0">
+        <ScrollArea className="max-h-[240px] min-h-0">
           <RecentProjects
-            projects={recentProjects}
-            onClear={onClearRecentProjects}
-            onOpenProject={onOpenRecentProject}
+            projects={visibleRecentProjects}
+            onClear={handleClearRecentProjects}
+            onOpenProject={handleOpenRecentProject}
           />
         </ScrollArea>
       </div>

@@ -9,6 +9,7 @@ type WorkspaceProps = {
   activePackageManifestPath: string | null;
   buildLogSheet: BuildLogSheetController;
   isLeftPanelOpen: boolean;
+  lastScannedAt: number | null;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
   packageTree: PackageTree | null;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
@@ -20,6 +21,7 @@ export function Workspace({
   activePackageManifestPath,
   buildLogSheet,
   isLeftPanelOpen,
+  lastScannedAt,
   onActivePackageManifestPathChange,
   onWorkspaceTabChange,
   packageTree,
@@ -32,6 +34,7 @@ export function Workspace({
         activePackageManifestPath={activePackageManifestPath}
         buildLogSheet={buildLogSheet}
         isLeftPanelOpen={isLeftPanelOpen}
+        lastScannedAt={lastScannedAt}
         onActivePackageManifestPathChange={onActivePackageManifestPathChange}
         onWorkspaceTabChange={onWorkspaceTabChange}
         packageTree={packageTree}

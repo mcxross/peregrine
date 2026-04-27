@@ -5,6 +5,7 @@ import { Sidebar } from "@/app/sidebar";
 import { Workspace } from "@/app/workspace";
 import {
   buildMovePackage,
+  loadPackageTree,
   type MovePackage,
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
@@ -34,6 +35,8 @@ export function AppShell({
   const [buildRun, setBuildRun] = useState<BuildLogRun | null>(null);
   const [isBuildSheetOpen, setIsBuildSheetOpen] = useState(false);
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
+  const [isRescanning, setIsRescanning] = useState(false);
+  const [lastScannedAt, setLastScannedAt] = useState<number | null>(null);
   const layout = defaultLayoutSettings;
   const isSettings = screen === "settings";
   const showSidebar = isSettings;
@@ -47,7 +50,40 @@ export function AppShell({
     setActivePackageManifestPath(packageTree?.activePackageManifestPath ?? null);
     setBuildRun(null);
     setIsBuildSheetOpen(false);
+    setLastScannedAt(packageTree ? Date.now() : null);
   }, [packageTree?.rootPath, packageTree?.activePackageManifestPath]);
+
+  const rescanProject = useCallback(async () => {
+    if (!packageTree || isRescanning) {
+      return;
+    }
+
+    const previousActiveManifestPath =
+      activePackageManifestPath ?? packageTree.activePackageManifestPath ?? null;
+
+    setIsRescanning(true);
+
+    try {
+      const rescannedPackageTree = await loadPackageTree(packageTree.rootPath);
+      const activePackageManifestPath =
+        previousActiveManifestPath &&
+        rescannedPackageTree.movePackages.some(
+          (movePackage) => movePackage.manifestPath === previousActiveManifestPath,
+        )
+          ? previousActiveManifestPath
+          : rescannedPackageTree.movePackages[0]?.manifestPath ?? null;
+
+      onProjectSelected({
+        ...rescannedPackageTree,
+        activePackageManifestPath,
+      });
+      setLastScannedAt(Date.now());
+    } catch (error) {
+      console.error("Could not rescan package.", error);
+    } finally {
+      setIsRescanning(false);
+    }
+  }, [activePackageManifestPath, isRescanning, onProjectSelected, packageTree]);
 
   const runBuild = useCallback(async () => {
     if (!packageTree || !activeMovePackage || isBuildRunning) {
@@ -112,10 +148,15 @@ export function AppShell({
           disabled: !activeMovePackage,
           running: isBuildRunning,
         }}
+        rescanActionState={{
+          disabled: !packageTree,
+          running: isRescanning,
+        }}
         isLeftPanelOpen={isLeftPanelOpen}
         layout={layout}
         hasWorkspace={!isSettings && Boolean(packageTree)}
         onBuildPackage={runBuild}
+        onRescanProject={rescanProject}
         onToggleLeftPanel={() => setIsLeftPanelOpen((isOpen) => !isOpen)}
         onWorkspaceTabChange={setActiveWorkspaceTab}
       />
@@ -131,6 +172,7 @@ export function AppShell({
               activePackageManifestPath={activePackageManifestPath}
               buildLogSheet={buildLogSheet}
               isLeftPanelOpen={isLeftPanelOpen}
+              lastScannedAt={lastScannedAt}
               onActivePackageManifestPathChange={setActivePackageManifestPath}
               onWorkspaceTabChange={setActiveWorkspaceTab}
               packageTree={packageTree}

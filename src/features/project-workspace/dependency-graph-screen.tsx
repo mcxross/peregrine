@@ -53,9 +53,9 @@ type ScoreCardData = (typeof scoreCards)[number];
 
 function ScoreCard({ card }: { card: ScoreCardData }) {
   return (
-    <Card className="grid h-[78px] min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-md px-3 py-3 shadow-none min-[1500px]:px-4">
-      <div className="grid min-h-0 min-w-0 grid-rows-[auto_1fr_auto]">
-        <div className="truncate text-[11px] font-medium leading-none text-muted-foreground">
+    <Card className="grid h-[86px] min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-md px-3 py-3 shadow-none min-[1500px]:px-4">
+      <div className="grid min-h-0 min-w-0 grid-rows-[auto_1fr_auto] gap-0.5">
+        <div className="truncate text-[11px] font-medium leading-4 text-muted-foreground">
           {card.label}
         </div>
 
@@ -76,7 +76,7 @@ function ScoreCard({ card }: { card: ScoreCardData }) {
         {card.secondary ? (
           <div
             className={cn(
-              "truncate text-[11px] font-semibold leading-none",
+              "min-h-4 truncate text-[11px] font-semibold leading-4",
               card.tone === "success" && "text-emerald-400",
               card.tone === "danger" && "text-red-400",
               card.tone === "warning" && "text-amber-400",

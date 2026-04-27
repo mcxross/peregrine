@@ -1,17 +1,10 @@
-export type RecentProjectStatus =
-  | {
-      kind: "assessed";
-      score: number;
-      summary: string;
-    }
-  | {
-      kind: "new";
-      label: string;
-    };
-
 export type RecentProject = {
+  activePackageManifestPath: string | null;
   id: string;
+  lastOpenedAt: number;
+  moduleCount: number;
   name: string;
-  path: string;
-  status: RecentProjectStatus;
+  packageCount: number;
+  packagePath: string;
+  rootPath: string;
 };

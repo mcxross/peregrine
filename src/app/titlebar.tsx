@@ -41,7 +41,9 @@ type TitlebarProps = {
   layout: LayoutSettings;
   hasWorkspace?: boolean;
   onBuildPackage?: () => void;
+  onRescanProject?: () => void;
   onToggleLeftPanel?: () => void;
+  rescanActionState?: WorkspaceActionState;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
 };
 
@@ -51,7 +53,9 @@ export function Titlebar({
   layout,
   hasWorkspace = true,
   onBuildPackage,
+  onRescanProject,
   onToggleLeftPanel,
+  rescanActionState,
 }: TitlebarProps) {
   const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
     if (event.button !== 0) {
@@ -119,7 +123,13 @@ export function Titlebar({
 
       {hasWorkspace ? (
         <div className="flex h-full items-center justify-end gap-4 pr-5" onPointerDown={(event) => event.stopPropagation()}>
-          <TitlebarAction icon={RefreshCw} label="Rescan" />
+          <TitlebarAction
+            disabled={rescanActionState?.disabled || rescanActionState?.running}
+            icon={RefreshCw}
+            isRunning={rescanActionState?.running}
+            label="Rescan"
+            onClick={onRescanProject}
+          />
           <TitlebarAction icon={Share} label="Export" />
           <NetworkSelector />
         </div>
@@ -179,12 +189,12 @@ function WorkspaceActionButton({
   state?: WorkspaceActionState;
 }) {
   const Icon = action.icon;
-  const isDisabled = state?.disabled || state?.running || !onClick;
+  const isDisabled = Boolean(state?.disabled || state?.running);
 
   return (
     <Button
       aria-label={action.label}
-      className="h-8 gap-1.5 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2 text-muted-foreground hover:bg-[var(--app-elevated)] hover:text-foreground"
+      className="group h-8 gap-1.5 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2 text-foreground hover:bg-[var(--app-elevated)]"
       disabled={isDisabled}
       onClick={onClick}
       title={action.label}
@@ -193,7 +203,7 @@ function WorkspaceActionButton({
     >
       <Icon
         className={cn(
-          "size-3.5 shrink-0",
+          "size-3.5 shrink-0 text-zinc-300",
           action.tone === "success" && "text-emerald-400",
           action.tone === "danger" && "text-red-400",
           action.tone === "warning" && "text-amber-400",
@@ -202,7 +212,7 @@ function WorkspaceActionButton({
       />
       <Play
         className={cn(
-          "size-2.5 text-muted-foreground",
+          "size-2.5 text-zinc-300 transition-colors group-hover:text-foreground",
           state?.running && "animate-pulse text-foreground",
         )}
         aria-hidden="true"
@@ -292,21 +302,29 @@ function NetworkSelector() {
 }
 
 function TitlebarAction({
+  disabled,
   icon: Icon,
+  isRunning,
   label,
+  onClick,
   suffix,
 }: {
+  disabled?: boolean;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  isRunning?: boolean;
   label: string;
+  onClick?: () => void;
   suffix?: string;
 }) {
   return (
     <Button
-      className="h-auto gap-2 p-0 text-sm font-medium text-foreground hover:text-chart-1"
+      className="h-auto gap-2 p-0 text-sm font-medium text-foreground hover:text-chart-1 disabled:opacity-50"
+      disabled={disabled}
+      onClick={onClick}
       type="button"
       variant="ghost"
     >
-      <Icon className="size-4" aria-hidden="true" />
+      <Icon className={cn("size-4", isRunning && "animate-spin")} aria-hidden="true" />
       <span>{label}</span>
       {suffix ? <span className="text-muted-foreground">{suffix}</span> : null}
     </Button>

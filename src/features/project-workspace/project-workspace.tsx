@@ -16,7 +16,7 @@ import {
   PackageCheck,
   PanelLeftOpen,
   PanelRightClose,
-  PanelRightOpen,
+  ScanEye,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
@@ -61,6 +61,7 @@ type ProjectWorkspaceProps = {
   activePackageManifestPath: string | null;
   buildLogSheet: BuildLogSheetController;
   isLeftPanelOpen: boolean;
+  lastScannedAt: number | null;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
   packageTree: PackageTree;
@@ -122,6 +123,7 @@ export function ProjectWorkspace({
   activeWorkspaceTab,
   buildLogSheet,
   isLeftPanelOpen,
+  lastScannedAt,
   onActivePackageManifestPathChange,
   onWorkspaceTabChange,
   packageTree,
@@ -219,8 +221,8 @@ export function ProjectWorkspace({
           onRerun={buildLogSheet.onRerun}
           run={buildLogSheet.run}
         />
-        <footer className="flex items-center overflow-hidden border-t border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 text-[11px] leading-none text-muted-foreground">
-          <span className="truncate">Last scanned: 2 minutes ago</span>
+        <footer className="flex items-center justify-end overflow-hidden border-t border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 text-[11px] leading-5 text-muted-foreground">
+          <LastScannedStatus scannedAt={lastScannedAt} />
         </footer>
       </main>
 
@@ -326,7 +328,7 @@ function SecuritySidebar({
   return (
     <aside className="grid min-h-0 grid-rows-[1fr_auto] border-r border-[color:var(--app-border)] bg-[var(--app-panel)] text-foreground">
       <ScrollArea className="min-h-0">
-        <div className="px-3 py-4">
+        <div className="px-3 pb-3 pt-2.5">
         <ProjectSwitcher
           activeMovePackage={activeMovePackage}
           packageTree={packageTree}
@@ -373,16 +375,16 @@ function SecuritySidebar({
           ))}
         </SidebarSection>
 
-        <Card className="mt-6 gap-0 rounded-md p-4">
+        <Card className="mt-4 gap-0 rounded-md p-3">
           <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-primary">
             <span>AI Copilot</span>
             <Sparkles className="size-3.5" aria-hidden="true" />
           </div>
-          <p className="mt-5 text-sm text-muted-foreground">
+          <p className="mt-3 text-sm text-muted-foreground">
             Ask anything about your Move package security.
           </p>
           <Button
-            className="mt-5 h-11 w-full text-foreground"
+            className="mt-3 h-9 w-full text-foreground"
             type="button"
             variant="outline"
           >
@@ -404,7 +406,8 @@ function SuiCliFooter({ status }: { status: SuiCliStatus | null }) {
 
   return (
     <div
-      className="flex h-[58px] items-center justify-between gap-2 border-t border-[color:var(--app-border)] bg-[var(--app-panel-strong)] px-5 text-xs text-muted-foreground"
+      className="flex items-center justify-between gap-2 border-t border-[color:var(--app-border)] bg-[var(--app-panel-strong)] px-4 text-xs text-muted-foreground"
+      style={{ height: workspaceStatusBarHeight }}
       title={!isInstalled && status?.installHint ? status.installHint : undefined}
     >
       <span className="shrink-0">Sui CLI</span>
@@ -422,6 +425,54 @@ function SuiCliFooter({ status }: { status: SuiCliStatus | null }) {
       <span className="min-w-0 truncate text-right">{versionLabel}</span>
     </div>
   );
+}
+
+function LastScannedStatus({ scannedAt }: { scannedAt: number | null }) {
+  const [now, setNow] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 15_000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  React.useEffect(() => {
+    setNow(Date.now());
+  }, [scannedAt]);
+
+  return (
+    <span className="min-w-0 truncate text-right leading-5">
+      Last scanned: {formatRelativeScanTime(scannedAt, now)}
+    </span>
+  );
+}
+
+function formatRelativeScanTime(scannedAt: number | null, now: number) {
+  if (!scannedAt) {
+    return "not yet";
+  }
+
+  const elapsed = Math.max(0, now - scannedAt);
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (elapsed < minute) {
+    return "just now";
+  }
+
+  if (elapsed < hour) {
+    const minutes = Math.floor(elapsed / minute);
+    return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
+  }
+
+  if (elapsed < day) {
+    const hours = Math.floor(elapsed / hour);
+    return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+  }
+
+  const days = Math.floor(elapsed / day);
+  return `${days} ${days === 1 ? "day" : "days"} ago`;
 }
 
 function packageSurfaceItems(movePackage: MovePackage | null) {
@@ -519,21 +570,29 @@ function ProjectSwitcher({
     : compactPath(packageTree.rootPath);
 
   return (
-    <div className="relative mb-4">
+    <div className="relative mb-2">
       <Button
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        className="grid h-auto w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-3 py-2.5 text-left shadow-none hover:bg-accent"
+        className={cn(
+          "relative grid h-9 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2.5 pl-3 text-left text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.055),0_0_0_1px_rgba(255,255,255,0.018)] hover:border-primary/35 hover:bg-[var(--app-subtle)] hover:text-foreground",
+          isOpen && "border-primary/45 bg-[var(--app-subtle)]",
+        )}
         disabled={!hasMultiplePackages}
         onClick={() => setIsOpen((open) => !open)}
+        title={`${name} - ${path}`}
         type="button"
-        variant="outline"
+        variant="ghost"
       >
-        <span className="min-w-0">
-          <span className="block max-w-full truncate text-base font-semibold leading-tight text-foreground">
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-1 left-1 w-px rounded-full bg-primary/50"
+        />
+        <span className="flex min-w-0 items-baseline gap-2">
+          <span className="min-w-0 truncate text-sm font-semibold leading-5 text-foreground">
             {name}
           </span>
-          <span className="mt-1 block max-w-full truncate text-xs font-normal leading-tight text-muted-foreground">
+          <span className="min-w-0 truncate text-[11px] font-normal leading-5 text-muted-foreground">
             {path}
           </span>
         </span>
@@ -594,12 +653,12 @@ function SidebarSection({
   title: string;
 }) {
   return (
-    <section className="py-3.5 first:pt-0">
-      <h2 className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <section className="py-2.5 first:pt-0">
+      <h2 className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </h2>
-      <div className="space-y-1">{children}</div>
-      <Separator className="mt-3.5" />
+      <div className="space-y-0.5">{children}</div>
+      <Separator className="mt-2.5" />
     </section>
   );
 }
@@ -622,14 +681,14 @@ function SidebarItem({
   return (
     <Button
       className={cn(
-        "h-8 w-full justify-start gap-2 px-2 text-left text-sm font-normal text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground",
+        "h-7 w-full justify-start gap-2 px-2 text-left text-[13px] font-normal text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground",
         active && "bg-[var(--app-subtle)] text-foreground",
       )}
       onClick={onClick}
       type="button"
       variant="ghost"
     >
-      <Icon className="size-4 shrink-0" aria-hidden="true" />
+      <Icon className="size-3.5 shrink-0" aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {badge ? <MetricBadge tone={tone}>{badge === "check" ? <Check className="size-3" /> : badge}</MetricBadge> : null}
     </Button>
@@ -811,7 +870,7 @@ function CollapsedPanelRail({
   onOpen: () => void;
   side: "left" | "right";
 }) {
-  const Icon = side === "left" ? PanelLeftOpen : PanelRightOpen;
+  const Icon = side === "left" ? PanelLeftOpen : ScanEye;
 
   return (
     <aside
@@ -822,7 +881,12 @@ function CollapsedPanelRail({
           : "border-l border-[color:var(--app-border)]",
       )}
     >
-      <div className="flex h-12 items-center justify-center border-b border-[color:var(--app-border)]">
+      <div
+        className={cn(
+          "flex h-12 items-center justify-center",
+          side === "left" && "border-b border-[color:var(--app-border)]",
+        )}
+      >
         <Button
           aria-label={label}
           className="size-8 text-muted-foreground hover:text-foreground"
