@@ -1,6 +1,7 @@
 mod file_preview;
 mod move_project;
 
+use base64::{engine::general_purpose, Engine};
 use file_preview::{build_file_preview, FilePreview};
 use move_project::{discover_move_project, MovePackage, PackageDependencyGraph};
 use serde::Serialize;
@@ -82,6 +83,22 @@ async fn save_text_file(
     })
     .await
     .map_err(|error| format!("Could not join file save task: {error}"))?
+}
+
+#[tauri::command]
+async fn save_graph_png(path: String, png_data_url: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let encoded = png_data_url
+            .strip_prefix("data:image/png;base64,")
+            .ok_or_else(|| "Expected a PNG data URL.".to_string())?;
+        let bytes = general_purpose::STANDARD
+            .decode(encoded)
+            .map_err(|error| format!("Could not decode graph PNG: {error}"))?;
+
+        fs::write(&path, bytes).map_err(|error| format!("Could not write {path}: {error}"))
+    })
+    .await
+    .map_err(|error| format!("Could not join graph image save task: {error}"))?
 }
 
 #[tauri::command]
@@ -386,6 +403,7 @@ pub fn run() {
             load_package_tree,
             load_file_preview,
             save_text_file,
+            save_graph_png,
             build_move_package,
             check_sui_cli
         ])

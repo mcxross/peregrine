@@ -15,9 +15,13 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
 import React from "react";
+import { Download } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type {
   PackageDependencyEdge,
   PackageDependencyGraph,
@@ -66,6 +70,10 @@ const ROOT_COLOR = "#0ea5e9";
 const DIRECT_COLOR = "#10b981";
 const TRANSITIVE_COLOR = "#8b5cf6";
 const FRAMEWORK_COLOR = "#64748b";
+const EXPORT_NODE_WIDTH = 540;
+const EXPORT_NODE_HEIGHT = 330;
+const EXPORT_PILL_HEIGHT = 44;
+const EXPORT_PILL_GAP = 12;
 
 export function DependencyGraphView({
   className = "h-72 rounded-md border",
@@ -87,6 +95,17 @@ export function DependencyGraphView({
   const layoutNodes = layoutGraph(renderGraph);
   const primaryEdges = primaryEdgeIds(renderGraph);
   const stats = graphStats(renderGraph);
+  const handleDownload = () => {
+    void downloadGraphPng({
+      graph: renderGraph,
+      layoutNodes,
+      primaryEdges,
+      stats,
+      packageName: packageName || renderGraph.root || "dependency-graph",
+    }).catch((error) => {
+      console.error("Could not save graph image", error);
+    });
+  };
   const flowNodes = layoutNodes.map<Node<PackageNodeData>>((node) => {
     const color = nodeColor(node);
 
@@ -160,6 +179,17 @@ export function DependencyGraphView({
           showInteractive={false}
         />
       </ReactFlow>
+      <Button
+        aria-label="Download graph as 4K PNG"
+        className="absolute right-3 top-3 z-20 size-8 border border-[color:var(--app-border)] bg-background/90 text-muted-foreground shadow-sm backdrop-blur hover:bg-[var(--app-elevated)] hover:text-foreground"
+        onClick={handleDownload}
+        size="icon-sm"
+        title="Download graph as 4K PNG"
+        type="button"
+        variant="ghost"
+      >
+        <Download className="size-4" aria-hidden="true" />
+      </Button>
       <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-[color:var(--app-border)] bg-background/80 px-2.5 py-2 text-[11px] leading-tight text-muted-foreground shadow-sm backdrop-blur">
         <div className="font-medium text-foreground">Immediate module dependencies</div>
         <div className="mt-1">source package uses target package</div>
@@ -343,6 +373,347 @@ function EmptyGraphState({
       </div>
     </div>
   );
+}
+
+async function downloadGraphPng({
+  graph,
+  layoutNodes,
+  packageName,
+  primaryEdges,
+  stats,
+}: {
+  graph: PackageDependencyGraph;
+  layoutNodes: LayoutNode[];
+  packageName: string;
+  primaryEdges: Set<string>;
+  stats: ReturnType<typeof graphStats>;
+}) {
+  const canvas = document.createElement("canvas");
+  const width = 3840;
+  const height = 2160;
+  const context = canvas.getContext("2d");
+
+  if (!context || layoutNodes.length === 0) {
+    return;
+  }
+
+  canvas.width = width;
+  canvas.height = height;
+
+  const bounds = graphBounds(layoutNodes);
+  const padding = { top: 180, right: 220, bottom: 180, left: 220 };
+  const availableWidth = width - padding.left - padding.right;
+  const availableHeight = height - padding.top - padding.bottom;
+  const scale = Math.min(
+    availableWidth / Math.max(bounds.width, 1),
+    availableHeight / Math.max(bounds.height, 1),
+  );
+  const offsetX = padding.left - bounds.minX * scale + (availableWidth - bounds.width * scale) / 2;
+  const offsetY = padding.top - bounds.minY * scale + (availableHeight - bounds.height * scale) / 2;
+  const nodeById = new Map(layoutNodes.map((node) => [node.id, node]));
+
+  drawExportBackground(context, width, height);
+
+  for (const edge of graph.edges) {
+    const source = nodeById.get(edge.source);
+    const target = nodeById.get(edge.target);
+
+    if (!source || !target) {
+      continue;
+    }
+
+    drawExportEdge(context, {
+      edge,
+      graph,
+      isPrimary: primaryEdges.has(edgeId(edge)),
+      source: exportNodeRect(source, scale, offsetX, offsetY),
+      target: exportNodeRect(target, scale, offsetX, offsetY),
+    });
+  }
+
+  for (const node of layoutNodes) {
+    drawExportNode(context, {
+      node,
+      rect: exportNodeRect(node, scale, offsetX, offsetY),
+      stats,
+    });
+  }
+
+  const fileName = `${safeFileName(packageName || graph.root || "dependency-graph")}-graph-4k.png`;
+  const path = await save({
+    defaultPath: fileName,
+    filters: [{ name: "PNG image", extensions: ["png"] }],
+    title: "Save dependency graph",
+  });
+
+  if (!path) {
+    return;
+  }
+
+  await invoke("save_graph_png", {
+    path,
+    pngDataUrl: canvas.toDataURL("image/png"),
+  });
+}
+
+function drawExportBackground(context: CanvasRenderingContext2D, width: number, height: number) {
+  context.fillStyle = "#09090b";
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = "#27272a";
+
+  for (let x = 0; x < width; x += 36) {
+    for (let y = 0; y < height; y += 36) {
+      context.globalAlpha = 0.42;
+      context.fillRect(x, y, 2, 2);
+    }
+  }
+
+  context.globalAlpha = 1;
+}
+
+function drawExportEdge(
+  context: CanvasRenderingContext2D,
+  {
+    edge,
+    graph,
+    isPrimary,
+    source,
+    target,
+  }: {
+    edge: PackageDependencyEdge;
+    graph: PackageDependencyGraph;
+    isPrimary: boolean;
+    source: ExportNodeRect;
+    target: ExportNodeRect;
+  },
+) {
+  const isDirect = edge.source === graph.root;
+  const color = isDirect ? ROOT_COLOR : isPrimary ? DIRECT_COLOR : FRAMEWORK_COLOR;
+  const startX = source.x + source.width;
+  const startY = source.y + source.height / 2;
+  const endX = target.x;
+  const endY = target.y + target.height / 2;
+  const midX = startX + Math.max(90, (endX - startX) * 0.45);
+
+  context.save();
+  context.strokeStyle = color;
+  context.lineWidth = isDirect ? 7 : isPrimary ? 5 : 3;
+  context.globalAlpha = isPrimary ? 0.9 : 0.3;
+  context.setLineDash(isPrimary ? [] : [18, 18]);
+  context.beginPath();
+  context.moveTo(startX, startY);
+  context.lineTo(midX, startY);
+  context.lineTo(midX, endY);
+  context.lineTo(endX, endY);
+  context.stroke();
+  context.setLineDash([]);
+  drawArrowHead(context, endX, endY, color);
+  context.restore();
+
+  if (isPrimary) {
+    drawExportEdgeLabel(context, edgeLabel(edge, graph, isPrimary) ?? "", midX, endY, color);
+  }
+}
+
+function drawArrowHead(context: CanvasRenderingContext2D, x: number, y: number, color: string) {
+  context.save();
+  context.fillStyle = color;
+  context.beginPath();
+  context.moveTo(x, y);
+  context.lineTo(x - 24, y - 15);
+  context.lineTo(x - 24, y + 15);
+  context.closePath();
+  context.fill();
+  context.restore();
+}
+
+function drawExportEdgeLabel(
+  context: CanvasRenderingContext2D,
+  label: string,
+  x: number,
+  y: number,
+  color: string,
+) {
+  if (!label) {
+    return;
+  }
+
+  context.save();
+  context.font = "700 24px Inter, system-ui, sans-serif";
+  const metrics = context.measureText(label);
+  const width = metrics.width + 28;
+  const height = 34;
+
+  context.fillStyle = "rgba(0, 0, 0, 0.72)";
+  roundRect(context, x - width / 2, y - height / 2, width, height, 8);
+  context.fill();
+  context.fillStyle = color;
+  context.fillText(label, x - metrics.width / 2, y + 8);
+  context.restore();
+}
+
+function drawExportNode(
+  context: CanvasRenderingContext2D,
+  {
+    node,
+    rect,
+    stats,
+  }: {
+    node: LayoutNode;
+    rect: ExportNodeRect;
+    stats: ReturnType<typeof graphStats>;
+  },
+) {
+  const color = nodeColor(node);
+  const entryFunctionCount = node.entryFunctionCount ?? 0;
+  const publicFunctionCount = node.publicFunctionCount ?? 0;
+  const outgoingPackages = stats.outgoing.get(node.id) ?? 0;
+  const contentX = rect.x + 28;
+  const firstMetricY = rect.y + 132;
+  const secondMetricY = firstMetricY + EXPORT_PILL_HEIGHT + EXPORT_PILL_GAP;
+  const addressY = rect.y + rect.height - 34;
+
+  context.save();
+  context.fillStyle = "#18181b";
+  context.strokeStyle = color;
+  context.lineWidth = node.isRoot ? 5 : 3;
+  roundRect(context, rect.x, rect.y, rect.width, rect.height, 14);
+  context.fill();
+  context.stroke();
+
+  context.fillStyle = color;
+  context.beginPath();
+  context.arc(rect.x + 38, rect.y + 42, 10, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = "#f4f4f5";
+  context.font = "700 34px Inter, system-ui, sans-serif";
+  context.fillText(truncateCanvasText(context, node.id, rect.width - 110), rect.x + 70, rect.y + 54);
+
+  if (node.isRoot) {
+    drawExportPill(context, "active", rect.x + rect.width - 118, rect.y + 25, 76, 38, "#27272a", "#f4f4f5");
+  }
+
+  context.fillStyle = "#a1a1aa";
+  context.font = "26px Inter, system-ui, sans-serif";
+  context.fillText(nodeRole(node, node.isRoot ? node.id : null), rect.x + 28, rect.y + 100);
+
+  drawExportPill(context, pluralize(node.moduleCount ?? 0, "module"), contentX, firstMetricY, 188, EXPORT_PILL_HEIGHT, "#27272a", "#d4d4d8");
+  drawExportPill(context, pluralize(outgoingPackages, "dependency"), contentX + 188 + EXPORT_PILL_GAP, firstMetricY, 214, EXPORT_PILL_HEIGHT, "#27272a", "#d4d4d8");
+
+  if (entryFunctionCount > 0) {
+    drawExportPill(context, pluralize(entryFunctionCount, "entry"), contentX, secondMetricY, 188, EXPORT_PILL_HEIGHT, "rgba(244, 63, 94, 0.22)", "#fda4af");
+  }
+
+  if (publicFunctionCount > 0) {
+    drawExportPill(context, pluralize(publicFunctionCount, "public"), contentX + 188 + EXPORT_PILL_GAP, secondMetricY, 214, EXPORT_PILL_HEIGHT, "rgba(14, 165, 233, 0.18)", "#7dd3fc");
+  }
+
+  context.fillStyle = "#0f0f11";
+  roundRect(context, contentX - 4, addressY - 30, rect.width - 48, 44, 8);
+  context.fill();
+  context.fillStyle = "#a1a1aa";
+  context.font = "23px Inter, system-ui, sans-serif";
+  context.fillText(shortAddress(node.address) ?? "unresolved address", contentX, addressY);
+  context.restore();
+}
+
+function drawExportPill(
+  context: CanvasRenderingContext2D,
+  label: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  background: string,
+  foreground: string,
+) {
+  context.save();
+  context.fillStyle = background;
+  roundRect(context, x, y, width, height, 8);
+  context.fill();
+  context.fillStyle = foreground;
+  context.font = "24px Inter, system-ui, sans-serif";
+  context.fillText(truncateCanvasText(context, label, width - 22), x + 12, y + 29);
+  context.restore();
+}
+
+type ExportNodeRect = {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+};
+
+function exportNodeRect(
+  node: LayoutNode,
+  scale: number,
+  offsetX: number,
+  offsetY: number,
+): ExportNodeRect {
+  return {
+    height: EXPORT_NODE_HEIGHT,
+    width: EXPORT_NODE_WIDTH,
+    x: node.x * scale + offsetX,
+    y: node.y * scale + offsetY,
+  };
+}
+
+function graphBounds(nodes: LayoutNode[]) {
+  const nodeWidth = EXPORT_NODE_WIDTH;
+  const nodeHeight = EXPORT_NODE_HEIGHT;
+  const minX = Math.min(...nodes.map((node) => node.x));
+  const minY = Math.min(...nodes.map((node) => node.y));
+  const maxX = Math.max(...nodes.map((node) => node.x + nodeWidth));
+  const maxY = Math.max(...nodes.map((node) => node.y + nodeHeight));
+
+  return {
+    height: maxY - minY,
+    minX,
+    minY,
+    width: maxX - minX,
+  };
+}
+
+function roundRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const safeRadius = Math.min(radius, width / 2, height / 2);
+
+  context.beginPath();
+  context.moveTo(x + safeRadius, y);
+  context.arcTo(x + width, y, x + width, y + height, safeRadius);
+  context.arcTo(x + width, y + height, x, y + height, safeRadius);
+  context.arcTo(x, y + height, x, y, safeRadius);
+  context.arcTo(x, y, x + width, y, safeRadius);
+  context.closePath();
+}
+
+function truncateCanvasText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+) {
+  if (context.measureText(text).width <= maxWidth) {
+    return text;
+  }
+
+  let nextText = text;
+
+  while (nextText.length > 1 && context.measureText(`${nextText}...`).width > maxWidth) {
+    nextText = nextText.slice(0, -1);
+  }
+
+  return `${nextText}...`;
+}
+
+function safeFileName(value: string) {
+  return value.trim().replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "") || "dependency-graph";
 }
 
 function focusedPackageGraph(
