@@ -12,3 +12,8 @@
   Find risks. Prove safety. Ship with confidence.
   <br>
 </p>
+
+> [!WARNING]
+> **This is an experimental project**
+>
+> It is not guaranteed to be actively maintained or worked on.
