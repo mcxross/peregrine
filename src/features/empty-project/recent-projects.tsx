@@ -1,6 +1,8 @@
 import { Folder } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { RecentProject } from "@/features/empty-project/types";
 
@@ -37,9 +39,9 @@ export function RecentProjects({
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border bg-card px-5 py-6 text-sm text-muted-foreground">
+        <Card className="rounded-md px-5 py-6 text-sm text-muted-foreground shadow-none">
           No recent projects yet.
-        </div>
+        </Card>
       )}
     </section>
   );
@@ -53,10 +55,11 @@ function RecentProjectRow({
   onOpen: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={onOpen}
-      className="grid w-full grid-cols-[1fr_auto] items-center gap-4 rounded-lg border bg-card px-4 py-3 text-left text-card-foreground transition hover:border-ring hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="grid h-auto w-full grid-cols-[1fr_auto] items-center gap-4 rounded-md px-4 py-3 text-left text-card-foreground"
+      variant="outline"
     >
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
@@ -69,16 +72,16 @@ function RecentProjectRow({
       </div>
 
       <ProjectStatus project={project} />
-    </button>
+    </Button>
   );
 }
 
 function ProjectStatus({ project }: { project: RecentProject }) {
   if (project.status.kind === "new") {
     return (
-      <div className="rounded-md border px-3 py-2 text-sm font-medium text-primary">
+      <Badge className="rounded-md px-3 py-2 text-sm font-medium text-primary" variant="outline">
         {project.status.label}
-      </div>
+      </Badge>
     );
   }
 
@@ -92,9 +95,9 @@ function ProjectStatus({ project }: { project: RecentProject }) {
       >
         {project.status.summary}
       </span>
-      <div className="min-w-14 rounded-md border px-3 py-2 text-center text-sm font-semibold text-primary">
+      <Badge className="min-w-14 rounded-md px-3 py-2 text-center text-sm font-semibold text-primary" variant="outline">
         {project.status.score}
-      </div>
+      </Badge>
     </div>
   );
 }

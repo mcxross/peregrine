@@ -42,7 +42,7 @@ export function MovePackagePanel({
   selectedModulePath,
 }: MovePackagePanelProps) {
   return (
-    <aside className="grid min-h-0 grid-rows-[auto_1fr] border-r bg-sidebar text-sidebar-foreground">
+    <aside className="grid min-h-0 grid-rows-[auto_1fr] border-r border-[color:var(--app-border)] bg-[var(--app-panel)] text-foreground">
       <header className="border-b px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -52,7 +52,7 @@ export function MovePackagePanel({
             </p>
           </div>
           <button
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground"
             onClick={onCollapse}
             title="Collapse package panel"
             type="button"
@@ -114,7 +114,7 @@ function PackageSection({
     <section>
       <div className="flex items-start gap-1">
         <button
-          className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-[var(--app-subtle)] hover:text-foreground"
           onClick={() => onOpenFile(movePackage.manifestPath)}
           type="button"
         >
@@ -135,7 +135,7 @@ function PackageSection({
         </button>
         {isRoot ? (
           <button
-            className="mt-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+            className="mt-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
             disabled={buildStatus?.state === "running"}
             onClick={() => onBuildPackage(movePackage)}
             title="Run sui move build"
@@ -208,9 +208,9 @@ function ModuleButton({
   return (
     <button
       className={cn(
-        "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-[var(--app-subtle)] hover:text-foreground",
         (activePath === moveModule.filePath || isSelected) &&
-          "bg-sidebar-accent text-sidebar-accent-foreground",
+          "bg-[var(--app-subtle)] text-foreground",
       )}
       onClick={() => onSelectModule(moveModule)}
       type="button"

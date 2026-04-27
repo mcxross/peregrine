@@ -13,7 +13,7 @@ export function Sidebar({ layout }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "flex min-h-0 flex-col border-r bg-sidebar text-sidebar-foreground",
+        "flex min-h-0 flex-col border-r border-[color:var(--app-border)] bg-[var(--app-panel)] text-foreground",
         layout.density === "compact" ? "w-[240px]" : "w-[280px]",
       )}
     >

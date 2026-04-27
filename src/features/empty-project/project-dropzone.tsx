@@ -1,6 +1,7 @@
 import { Download, FolderOpen } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 type ProjectDropzoneProps = {
   isLoading?: boolean;
@@ -9,9 +10,9 @@ type ProjectDropzoneProps = {
 
 export function ProjectDropzone({ isLoading = false, onOpenProject }: ProjectDropzoneProps) {
   return (
-    <section className="rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
-      <div className="flex min-h-[220px] flex-col items-center justify-center rounded-md border border-dashed border-muted-foreground/35 px-6 py-8 text-center">
-        <div className="mb-4 flex size-16 items-center justify-center rounded-full border bg-muted text-muted-foreground">
+    <Card className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-0 rounded-md p-5 shadow-none">
+      <div className="flex min-h-0 flex-col items-center justify-center rounded-md border border-dashed border-muted-foreground/35 px-6 py-8 text-center">
+        <div className="mb-4 flex size-14 items-center justify-center rounded-full border bg-muted text-muted-foreground">
           <FolderOpen className="size-8" aria-hidden="true" />
         </div>
 
@@ -33,6 +34,6 @@ export function ProjectDropzone({ isLoading = false, onOpenProject }: ProjectDro
         <Download className="size-4" aria-hidden="true" />
         <span>You can also drag and drop a folder anywhere in this area</span>
       </div>
-    </section>
+    </Card>
   );
 }

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type PackageTree = {
+  activePackageManifestPath?: string | null;
   rootPath: string;
   rootName: string;
   paths: string[];
@@ -12,21 +13,101 @@ export type MovePackage = {
   name: string;
   path: string;
   manifestPath: string;
+  surface: MovePackageSurface;
   modules: MoveModule[];
+};
+
+export type MovePackageSurface = {
+  entryFunctionCount: number;
+  capabilityCount: number;
+  sharedObjectCount: number;
+  addressOwnedObjectCount: number;
+  immutableObjectCount: number;
+  wrappedObjectCount: number;
+  partyObjectCount: number;
+  adminControlCount: number;
+  externalCallCount: number;
+  publicPackageRelationshipCount: number;
+  capabilityStructs: string[];
+  capabilityFindings: CapabilityFinding[];
+  sharedObjectStructs: string[];
+  objectOwnershipFindings: ObjectOwnershipFinding[];
+  adminControlFindings: AdminControlFinding[];
+  externalCallFindings: ExternalCallFinding[];
+  publicPackageRelationships: PublicPackageRelationship[];
+};
+
+export type CapabilityFinding = {
+  typeName: string;
+  moduleName: string;
+  qualifiedName: string;
+  confidence: "high" | "medium" | "low";
+  evidence: string[];
+  protectedFunctions: string[];
+};
+
+export type ObjectOwnershipFinding = {
+  typeName: string;
+  moduleName: string;
+  qualifiedName: string;
+  ownershipKind: "shared" | "addressOwned" | "immutable" | "wrapped" | "party";
+  confidence: "high" | "medium" | "low";
+  evidence: string[];
+  relatedFunctions: string[];
+  wrappedTypes: string[];
+};
+
+export type AdminControlFinding = {
+  functionName: string;
+  moduleName: string;
+  qualifiedName: string;
+  confidence: "high" | "medium" | "low";
+  evidence: string[];
+  guardingTypes: string[];
+};
+
+export type ExternalCallFinding = {
+  callerModule: string;
+  callerFunction: string;
+  targetModule: string;
+  targetFunction: string;
+  target: string;
+};
+
+export type PublicPackageRelationship = {
+  sourceModule: string;
+  sourceFunction: string;
+  targetModule: string;
+  targetFunction: string;
 };
 
 export type MoveModule = {
   name: string;
   address: string | null;
   filePath: string;
+  structs: MoveStructSignature[];
   functions: MoveFunctionSignature[];
+};
+
+export type MoveStructSignature = {
+  name: string;
+  abilities: string[];
+  fields: MoveStructField[];
+  signature: string;
+};
+
+export type MoveStructField = {
+  name: string;
+  typeName: string;
 };
 
 export type MoveFunctionSignature = {
   name: string;
   visibility: string;
   isEntry: boolean;
+  isTransactionCallable: boolean;
   signature: string;
+  body: string | null;
 };
 
 export type PackageDependencyGraph = {
@@ -40,6 +121,8 @@ export type PackageDependencyNode = {
   id: string;
   address: string | null;
   moduleCount: number;
+  publicFunctionCount: number;
+  entryFunctionCount: number;
   isRoot: boolean;
 };
 
@@ -47,12 +130,19 @@ export type PackageDependencyEdge = {
   source: string;
   target: string;
   dependencyCount: number;
+  dependencyKind: string;
 };
 
 export type CommandOutput = {
   status: number | null;
   stdout: string;
   stderr: string;
+};
+
+export type SuiCliStatus = {
+  installed: boolean;
+  version: string | null;
+  installHint: string | null;
 };
 
 export type FilePreview =
@@ -132,4 +222,8 @@ export async function buildMovePackage(
     rootPath: packageTree.rootPath,
     packagePath,
   });
+}
+
+export async function checkSuiCli() {
+  return invoke<SuiCliStatus>("check_sui_cli");
 }

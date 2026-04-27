@@ -1,7 +1,12 @@
 import React from "react";
+import { Package } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   loadPackageTree,
+  type MovePackage,
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
 import { ProjectDropzone } from "@/features/empty-project/project-dropzone";
@@ -25,9 +30,11 @@ export function EmptyProjectScreen({
 }: EmptyProjectScreenProps) {
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [pendingPackageTree, setPendingPackageTree] = React.useState<PackageTree | null>(null);
 
   const handleOpenProject = onOpenProject ?? (async () => {
     setLoadError(null);
+    setPendingPackageTree(null);
     setIsLoading(true);
 
     try {
@@ -37,7 +44,14 @@ export function EmptyProjectScreen({
         return;
       }
 
-      onProjectSelected?.(await loadPackageTree(packagePath));
+      const packageTree = await loadPackageTree(packagePath);
+
+      if (packageTree.movePackages.length > 1) {
+        setPendingPackageTree(packageTree);
+        return;
+      }
+
+      onProjectSelected?.(withActivePackage(packageTree, packageTree.movePackages[0] ?? null));
     } catch (error) {
       setLoadError(getOpenPackageErrorMessage(error));
     } finally {
@@ -45,23 +59,124 @@ export function EmptyProjectScreen({
     }
   });
 
+  if (pendingPackageTree) {
+    return (
+      <PackageLoadSelection
+        packageTree={pendingPackageTree}
+        onCancel={() => setPendingPackageTree(null)}
+        onSelectPackage={(movePackage) => {
+          onProjectSelected?.(withActivePackage(pendingPackageTree, movePackage));
+        }}
+      />
+    );
+  }
+
   return (
-    <div className="h-full min-h-0 overflow-auto bg-background">
-      <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center gap-6 px-6 py-10">
+    <div className="grid h-full min-h-0 overflow-hidden bg-background px-6 py-6">
+      <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-5">
         <ProjectDropzone onOpenProject={handleOpenProject} isLoading={isLoading} />
         {loadError ? (
           <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {loadError}
           </p>
         ) : null}
-        <RecentProjects
-          projects={recentProjects}
-          onClear={onClearRecentProjects}
-          onOpenProject={onOpenRecentProject}
-        />
+        <ScrollArea className="min-h-0">
+          <RecentProjects
+            projects={recentProjects}
+            onClear={onClearRecentProjects}
+            onOpenProject={onOpenRecentProject}
+          />
+        </ScrollArea>
       </div>
     </div>
   );
+}
+
+function PackageLoadSelection({
+  onCancel,
+  onSelectPackage,
+  packageTree,
+}: {
+  onCancel: () => void;
+  onSelectPackage: (movePackage: MovePackage) => void;
+  packageTree: PackageTree;
+}) {
+  const packages = orderedPackages(packageTree);
+
+  return (
+    <div className="grid h-full min-h-0 bg-background px-6 py-6">
+      <div className="mx-auto grid h-full min-h-0 w-full max-w-4xl grid-rows-[auto_minmax(0,1fr)] gap-5">
+        <header className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-muted-foreground">Multiple Move packages found</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Select the active package</h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              Peregrine will focus the workspace, module surface, and security context on the package you select.
+            </p>
+          </div>
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+        </header>
+
+        <ScrollArea className="min-h-0">
+          <div className="grid gap-3 pb-2 sm:grid-cols-2">
+            {packages.map((movePackage) => (
+              <button
+                className="group min-w-0 rounded-md text-left"
+                key={movePackage.manifestPath}
+                onClick={() => onSelectPackage(movePackage)}
+                type="button"
+              >
+                <Card className="h-full min-w-0 gap-0 rounded-md p-4 transition group-hover:border-primary/60 group-hover:bg-[var(--app-subtle)]">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <Package className="mt-0.5 size-5 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <h2 className="truncate text-base font-semibold">{movePackage.name}</h2>
+                      <p className="mt-1 truncate text-sm text-muted-foreground">
+                        {movePackage.path || "."}
+                      </p>
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        {moduleCountLabel(movePackage.modules.length)}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              </button>
+            ))}
+          </div>
+        </ScrollArea>
+      </div>
+    </div>
+  );
+}
+
+function orderedPackages(packageTree: PackageTree) {
+  const rootPackage = packageTree.dependencyGraph.root;
+
+  return [...packageTree.movePackages].sort((left, right) => {
+    const leftIsRoot = left.name === rootPackage;
+    const rightIsRoot = right.name === rootPackage;
+
+    return Number(rightIsRoot) - Number(leftIsRoot)
+      || left.name.localeCompare(right.name)
+      || left.path.localeCompare(right.path);
+  });
+}
+
+function withActivePackage(packageTree: PackageTree, movePackage: MovePackage | null): PackageTree {
+  return {
+    ...packageTree,
+    activePackageManifestPath: movePackage?.manifestPath ?? null,
+  };
+}
+
+function moduleCountLabel(count: number) {
+  if (count === 1) {
+    return "1 module";
+  }
+
+  return `${count} modules`;
 }
 
 async function openMovePackage(): Promise<string | null> {

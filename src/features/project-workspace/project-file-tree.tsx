@@ -20,8 +20,8 @@ export function ProjectFileTree({
   return (
     <aside
       className={cn(
-        "grid min-h-0 grid-rows-[auto_1fr] bg-sidebar text-sidebar-foreground",
-        side === "left" ? "border-r" : "border-l",
+        "grid min-h-0 grid-rows-[auto_1fr] bg-[var(--app-panel)] text-foreground",
+        side === "left" ? "border-r border-[color:var(--app-border)]" : "border-l border-[color:var(--app-border)]",
       )}
     >
       <header className="min-w-0 border-b px-4 py-3">
@@ -70,14 +70,14 @@ function ProjectFileTreeBody({
 
 const treeStyles = {
   height: "100%",
-  "--trees-bg-override": "var(--sidebar)",
-  "--trees-fg-override": "var(--sidebar-foreground)",
+  "--trees-bg-override": "var(--app-panel)",
+  "--trees-fg-override": "var(--foreground)",
   "--trees-fg-muted-override": "var(--muted-foreground)",
-  "--trees-bg-muted-override": "var(--sidebar-accent)",
-  "--trees-selected-bg-override": "var(--sidebar-accent)",
-  "--trees-selected-fg-override": "var(--sidebar-accent-foreground)",
+  "--trees-bg-muted-override": "var(--app-subtle)",
+  "--trees-selected-bg-override": "var(--app-subtle)",
+  "--trees-selected-fg-override": "var(--foreground)",
   "--trees-selected-focused-border-color-override": "var(--ring)",
-  "--trees-border-color-override": "var(--sidebar-border)",
+  "--trees-border-color-override": "var(--app-border)",
   "--trees-focus-ring-color-override": "var(--ring)",
   "--trees-search-bg-override": "var(--muted)",
   "--trees-search-fg-override": "var(--foreground)",
