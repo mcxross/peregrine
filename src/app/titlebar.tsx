@@ -1,7 +1,8 @@
-import type React from "react";
+import React from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Bug,
+  ChevronDown,
   FileCheck2,
   FlaskConical,
   Gauge,
@@ -16,6 +17,16 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { LayoutSettings } from "@/layout/layout-store";
 import { trafficLightInset } from "@/layout/window-chrome";
@@ -54,7 +65,7 @@ export function Titlebar({
         layout.chrome === "compact" && "h-12",
       )}
       style={{
-        gridTemplateColumns: `${hasWorkspace && isLeftPanelOpen ? "270px" : "128px"} minmax(0, 1fr) ${hasWorkspace ? "128px" : "270px"}`,
+        gridTemplateColumns: `${hasWorkspace && isLeftPanelOpen ? "270px" : "128px"} minmax(0, 1fr) ${hasWorkspace ? "360px" : "270px"}`,
       }}
     >
       <div
@@ -96,6 +107,7 @@ export function Titlebar({
 
       {hasWorkspace ? (
         <div className="flex h-full items-center justify-end gap-4 pr-5" onPointerDown={(event) => event.stopPropagation()}>
+          <NetworkSelector />
           <TitlebarAction icon={RefreshCw} label="Rescan" />
           <TitlebarAction icon={Share} label="Export" />
         </div>
@@ -118,6 +130,16 @@ const workspaceTabs = [
 ] as const;
 
 export type WorkspaceTab = (typeof workspaceTabs)[number];
+
+const networkOptions = [
+  { id: "testnet", label: "Testnet" },
+  { id: "devnet", label: "Devnet" },
+  { id: "localnet", label: "Localnet" },
+  { id: "mainnet", label: "Mainnet" },
+  { id: "custom", label: "Custom RPC" },
+] as const;
+
+type NetworkId = (typeof networkOptions)[number]["id"];
 
 const workspaceActions = [
   { icon: Hammer, label: "Build package", tone: "success" },
@@ -153,6 +175,86 @@ function WorkspaceActionButton({ action }: { action: WorkspaceAction }) {
       />
       <Play className="size-2.5 text-muted-foreground" aria-hidden="true" />
     </Button>
+  );
+}
+
+function NetworkSelector() {
+  const [network, setNetwork] = React.useState<NetworkId>("testnet");
+  const [customRpc, setCustomRpc] = React.useState("");
+  const [customRpcDraft, setCustomRpcDraft] = React.useState("");
+  const activeNetwork = networkOptions.find((option) => option.id === network) ?? networkOptions[0];
+  const label = network === "custom" && customRpc ? "Custom RPC" : activeNetwork.label;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={`Switch network. Current network: ${label}`}
+          className="h-8 gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2.5 text-xs font-medium text-foreground hover:bg-[var(--app-elevated)]"
+          type="button"
+          variant="ghost"
+        >
+          <span className="relative flex size-2.5 shrink-0">
+            <span className="absolute inline-flex size-full rounded-full bg-emerald-400 opacity-40" />
+            <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400" />
+          </span>
+          <span className="max-w-24 truncate">{label}</span>
+          <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">
+          Sui network
+        </DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={network}
+          onValueChange={(value) => setNetwork(value as NetworkId)}
+        >
+          {networkOptions.map((option) => (
+            <DropdownMenuRadioItem key={option.id} value={option.id}>
+              <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                <span>{option.label}</span>
+                {option.id === "testnet" ? (
+                  <span className="text-[11px] text-muted-foreground">default</span>
+                ) : null}
+              </span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+
+        <DropdownMenuSeparator />
+
+        <div className="grid gap-2 p-2" onKeyDown={(event) => event.stopPropagation()}>
+          <DropdownMenuLabel className="px-0 py-0 text-xs text-muted-foreground">
+            Custom RPC endpoint
+          </DropdownMenuLabel>
+          <Input
+            className="h-8 text-xs"
+            onChange={(event) => setCustomRpcDraft(event.target.value)}
+            onKeyDown={(event) => event.stopPropagation()}
+            placeholder="https://fullnode.testnet.sui.io:443"
+            value={customRpcDraft}
+          />
+          <Button
+            className="h-8 justify-center text-xs"
+            disabled={!customRpcDraft.trim()}
+            onClick={() => {
+              setCustomRpc(customRpcDraft.trim());
+              setNetwork("custom");
+            }}
+            type="button"
+            variant="outline"
+          >
+            Use custom RPC
+          </Button>
+          {network === "custom" && customRpc ? (
+            <p className="truncate text-[11px] text-muted-foreground" title={customRpc}>
+              Active: {customRpc}
+            </p>
+          ) : null}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

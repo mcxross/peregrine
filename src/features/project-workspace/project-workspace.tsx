@@ -199,9 +199,8 @@ export function ProjectWorkspace({
             setSelectedModule({ moveModule, movePackage });
           }}
         />
-        <footer className="grid grid-cols-2 items-center gap-3 overflow-hidden border-t border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 text-[11px] leading-none text-muted-foreground">
+        <footer className="flex items-center overflow-hidden border-t border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 text-[11px] leading-none text-muted-foreground">
           <span className="truncate">Last scanned: 2 minutes ago</span>
-          <span className="text-right">Network: Local</span>
         </footer>
       </main>
 
