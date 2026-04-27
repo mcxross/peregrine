@@ -345,12 +345,6 @@ function SecuritySidebar({
             label="Explore"
             onClick={() => onWorkspaceTabChange("Explore")}
           />
-          <SidebarItem
-            active={activeWorkspaceTab === "Attack Surface" && !activeSurfaceDetail}
-            icon={ShieldAlert}
-            label="Attack Surface"
-            onClick={() => onWorkspaceTabChange("Attack Surface")}
-          />
         </SidebarSection>
 
         <SidebarSection title="Surface Analysis">

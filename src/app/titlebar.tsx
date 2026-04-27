@@ -119,9 +119,9 @@ export function Titlebar({
 
       {hasWorkspace ? (
         <div className="flex h-full items-center justify-end gap-4 pr-5" onPointerDown={(event) => event.stopPropagation()}>
-          <NetworkSelector />
           <TitlebarAction icon={RefreshCw} label="Rescan" />
           <TitlebarAction icon={Share} label="Export" />
+          <NetworkSelector />
         </div>
       ) : (
         <div data-tauri-drag-region />
