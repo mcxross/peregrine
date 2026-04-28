@@ -3,6 +3,7 @@ import type { PackageTree } from "@/features/empty-project/filesystem-tree";
 import type {
   BuildLogRun,
   BuildLogSheetController,
+  BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
 import { ProjectWorkspace } from "@/features/project-workspace/project-workspace";
 import type { WorkspaceTab } from "@/app/titlebar";
@@ -14,7 +15,7 @@ type WorkspaceProps = {
   isLeftPanelOpen: boolean;
   lastScannedAt: number | null;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
-  onCommandLog: (run: BuildLogRun) => void;
+  onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   packageTree: PackageTree | null;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
   onProjectSelected: (packageTree: PackageTree) => void;

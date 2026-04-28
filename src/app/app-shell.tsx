@@ -12,6 +12,7 @@ import {
 import type {
   BuildLogRun,
   BuildLogSheetController,
+  BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
 import { defaultLayoutSettings } from "@/layout/layout-store";
 import { titlebarHeight } from "@/layout/window-chrome";
@@ -32,7 +33,7 @@ export function AppShell({
 }: AppShellProps) {
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTab>("Overview");
   const [activePackageManifestPath, setActivePackageManifestPath] = useState<string | null>(null);
-  const [buildRun, setBuildRun] = useState<BuildLogRun | null>(null);
+  const [buildRuns, setBuildRuns] = useState<BuildLogRun[]>([]);
   const [isBuildSheetOpen, setIsBuildSheetOpen] = useState(false);
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
   const [isRescanning, setIsRescanning] = useState(false);
@@ -45,7 +46,7 @@ export function AppShell({
     () => resolveActiveMovePackage(packageTree, activePackageManifestPath),
     [activePackageManifestPath, packageTree],
   );
-  const isBuildRunning = buildRun?.state === "running";
+  const isBuildRunning = buildRuns.some((run) => run.state === "running");
   const handleProjectSelected = useCallback(
     (nextPackageTree: PackageTree) => {
       onProjectSelected(nextPackageTree);
@@ -56,7 +57,7 @@ export function AppShell({
 
   useEffect(() => {
     setActivePackageManifestPath(packageTree?.activePackageManifestPath ?? null);
-    setBuildRun(null);
+    setBuildRuns([]);
     setIsBuildSheetOpen(false);
     setLastScannedAt(packageTree ? Date.now() : null);
   }, [packageTree?.rootPath, packageTree?.activePackageManifestPath]);
@@ -113,28 +114,31 @@ export function AppShell({
       workingDirectory,
     };
 
-    setBuildRun(nextRun);
+    currentCommandLogIdRef.current = nextRun.id;
+    setBuildRuns([nextRun]);
     setIsBuildSheetOpen(true);
 
     try {
       const output = await buildMovePackage(packageTree, activeMovePackage.path, {
         streamId: nextRun.id,
         onOutput: (output) => {
-          setBuildRun((current) =>
-            current?.id === nextRun.id && current.state === "running"
-              ? { ...current, output }
-              : current,
+          setBuildRuns((current) =>
+            updateLogRun(current, nextRun.id, (run) =>
+              run.state === "running" ? { ...run, output } : run,
+            ),
           );
         },
       });
       const state = output.status === 0 ? "success" : "error";
 
-      setBuildRun({
-        ...nextRun,
-        finishedAt: new Date(),
-        output,
-        state,
-      });
+      setBuildRuns((current) =>
+        updateLogRun(current, nextRun.id, (run) => ({
+          ...run,
+          finishedAt: new Date(),
+          output,
+          state,
+        })),
+      );
 
       if (state === "success") {
         try {
@@ -155,20 +159,23 @@ export function AppShell({
         }
       }
     } catch (error) {
-      setBuildRun({
-        ...nextRun,
-        error: getBuildErrorMessage(error),
-        finishedAt: new Date(),
-        state: "error",
-      });
+      setBuildRuns((current) =>
+        updateLogRun(current, nextRun.id, (run) => ({
+          ...run,
+          error: getBuildErrorMessage(error),
+          finishedAt: new Date(),
+          state: "error",
+        })),
+      );
     }
   }, [activeMovePackage, handleProjectSelected, isBuildRunning, packageTree]);
-  const showCommandLog = useCallback((run: BuildLogRun) => {
+  const showCommandLog = useCallback((run: BuildLogRun, options?: BuildLogUpdateOptions) => {
+    const shouldReset = options?.reset === true;
     const isSameRun = currentCommandLogIdRef.current === run.id;
     currentCommandLogIdRef.current = run.id;
-    setBuildRun(run);
+    setBuildRuns((current) => shouldReset ? [run] : upsertLogRun(current, run));
 
-    if (!isSameRun) {
+    if (shouldReset || !isSameRun) {
       setIsBuildSheetOpen(true);
     }
   }, []);
@@ -178,9 +185,9 @@ export function AppShell({
       isOpen: isBuildSheetOpen,
       onClose: () => setIsBuildSheetOpen(false),
       onRerun: runBuild,
-      run: buildRun,
+      runs: buildRuns,
     }),
-    [buildRun, isBuildSheetOpen, runBuild],
+    [buildRuns, isBuildSheetOpen, runBuild],
   );
 
   return (
@@ -259,6 +266,24 @@ function packagePathLabel(movePackage: MovePackage, packageTree: PackageTree) {
   }
 
   return `${packageTree.rootPath}/${movePackage.path}`;
+}
+
+function upsertLogRun(runs: BuildLogRun[], nextRun: BuildLogRun) {
+  const existingIndex = runs.findIndex((run) => run.id === nextRun.id);
+
+  if (existingIndex === -1) {
+    return [...runs, nextRun];
+  }
+
+  return runs.map((run, index) => index === existingIndex ? nextRun : run);
+}
+
+function updateLogRun(
+  runs: BuildLogRun[],
+  runId: number,
+  update: (run: BuildLogRun) => BuildLogRun,
+) {
+  return runs.map((run) => run.id === runId ? update(run) : run);
 }
 
 function getBuildErrorMessage(error: unknown) {

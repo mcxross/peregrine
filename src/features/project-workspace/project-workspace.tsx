@@ -41,6 +41,7 @@ import {
   BuildLogSheet,
   type BuildLogRun,
   type BuildLogSheetController,
+  type BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
 import { DependencyGraphScreen } from "@/features/project-workspace/dependency-graph-screen";
 import { ExecutionBuilderScreen } from "@/features/project-workspace/execution-builder-screen";
@@ -63,7 +64,7 @@ type ProjectWorkspaceProps = {
   isLeftPanelOpen: boolean;
   lastScannedAt: number | null;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
-  onCommandLog: (run: BuildLogRun) => void;
+  onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
   packageTree: PackageTree;
@@ -187,7 +188,7 @@ export function ProjectWorkspace({
           isOpen={buildLogSheet.isOpen}
           onClose={buildLogSheet.onClose}
           onRerun={buildLogSheet.onRerun}
-          run={buildLogSheet.run}
+          runs={buildLogSheet.runs}
         />
         <footer className="flex items-center justify-end overflow-hidden border-t border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 text-[11px] leading-5 text-muted-foreground">
           <LastScannedStatus scannedAt={lastScannedAt} />
@@ -225,7 +226,7 @@ function WorkspaceMainPanel({
   activeSurfaceDetail: SurfaceDetailKind | null;
   activeMovePackage: MovePackage | null;
   onClearSelectedModule: () => void;
-  onCommandLog: (run: BuildLogRun) => void;
+  onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
   onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
   packageTree: PackageTree;

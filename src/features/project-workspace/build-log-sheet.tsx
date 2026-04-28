@@ -31,12 +31,15 @@ export type BuildLogRun = {
 type BuildLogSheetProps = {
   bottomInset?: number;
   isOpen: boolean;
-  run: BuildLogRun | null;
+  runs: BuildLogRun[];
   onClose: () => void;
   onRerun: () => void;
 };
 
 export type BuildLogSheetController = Omit<BuildLogSheetProps, "bottomInset">;
+export type BuildLogUpdateOptions = {
+  reset?: boolean;
+};
 
 const DEFAULT_SHEET_HEIGHT = 360;
 const MIN_SHEET_HEIGHT = 180;
@@ -49,10 +52,11 @@ export function BuildLogSheet({
   isOpen,
   onClose,
   onRerun,
-  run,
+  runs,
 }: BuildLogSheetProps) {
   const [height, setHeight] = React.useState(DEFAULT_SHEET_HEIGHT);
   const [isResizing, setIsResizing] = React.useState(false);
+  const latestRun = runs[runs.length - 1] ?? null;
 
   const handleResizeStart = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -86,13 +90,13 @@ export function BuildLogSheet({
     window.addEventListener("pointerup", handleResizeEnd, { once: true });
   }, [bottomInset, height]);
 
-  if (!run) {
+  if (!latestRun) {
     return null;
   }
 
-  const isRunning = run.state === "running";
-  const statusLabel = buildStatusLabel(run);
-  const statusTone = run.state === "success" ? "success" : run.state === "error" ? "error" : "running";
+  const isRunning = runs.some((run) => run.state === "running");
+  const statusLabel = buildStatusLabel(latestRun);
+  const statusTone = latestRun.state === "success" ? "success" : latestRun.state === "error" ? "error" : "running";
 
   return (
     <section
@@ -124,16 +128,18 @@ export function BuildLogSheet({
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
             <Terminal className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <h2 className="truncate text-sm font-semibold">{run.title ?? "Move build"}</h2>
+            <h2 className="truncate text-sm font-semibold">
+              {runs.length > 1 ? "Execution logs" : latestRun.title ?? "Move build"}
+            </h2>
             <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
           </div>
-          <p className="mt-1 truncate text-xs text-muted-foreground" title={run.workingDirectory}>
-            {run.packageName} - {run.workingDirectory}
+          <p className="mt-1 truncate text-xs text-muted-foreground" title={latestRun.workingDirectory}>
+            {latestRun.packageName} - {latestRun.workingDirectory}
           </p>
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          {run.canRerun !== false ? (
+          {latestRun.canRerun !== false ? (
             <Button
               className="h-8 gap-2"
               disabled={isRunning}
@@ -158,24 +164,54 @@ export function BuildLogSheet({
         </div>
       </header>
 
-      <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3 px-4 py-3">
-        <div className="grid gap-1.5 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-xs">
+      <div className="grid min-h-0 px-4 py-3">
+        <ScrollArea className="min-h-0 rounded-md border border-[color:var(--app-border)] bg-black/25">
+          <div className="grid gap-3 p-3">
+            {runs.map((run, index) => (
+              <LogRunGroup
+                key={run.id}
+                index={index}
+                run={run}
+              />
+            ))}
+          </div>
+        </ScrollArea>
+      </div>
+    </section>
+  );
+}
+
+function LogRunGroup({ index, run }: { index: number; run: BuildLogRun }) {
+  const statusTone = run.state === "success" ? "success" : run.state === "error" ? "error" : "running";
+
+  return (
+    <article className="overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
+      <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[11px] font-semibold text-muted-foreground">
+            {index + 1}
+          </span>
+          <h3 className="truncate text-xs font-semibold text-foreground">{logRunTitle(run)}</h3>
+        </div>
+        <StatusBadge tone={statusTone}>{buildStatusLabel(run)}</StatusBadge>
+      </header>
+
+      <div className="grid gap-2 px-3 py-2">
+        <div className="grid gap-1 text-xs">
           <LogMeta label="Package" value={run.packagePath} />
           <LogMeta label="Command" value={run.command} />
           {run.metadata?.map((item) => (
-            <LogMeta key={`${item.label}:${item.value}`} label={item.label} value={item.value} />
+            <LogMeta key={`${run.id}:${item.label}:${item.value}`} label={item.label} value={item.value} />
           ))}
           <LogMeta label="Started" value={run.startedAt.toLocaleTimeString()} />
           {run.finishedAt ? <LogMeta label="Finished" value={run.finishedAt.toLocaleTimeString()} /> : null}
         </div>
 
-        <ScrollArea className="min-h-0 rounded-md border border-[color:var(--app-border)] bg-black/35">
-          <pre className="whitespace-pre-wrap break-words p-3 font-mono text-xs leading-5 text-muted-foreground">
-            {buildLogText(run)}
-          </pre>
-        </ScrollArea>
+        <pre className="max-h-[460px] overflow-auto rounded border border-[color:var(--app-border)] bg-black/35 p-3 font-mono text-xs leading-5 text-muted-foreground whitespace-pre-wrap break-words">
+          {buildLogText(run)}
+        </pre>
       </div>
-    </section>
+    </article>
   );
 }
 
@@ -215,6 +251,16 @@ function LogMeta({ label, value }: { label: string; value: string }) {
   );
 }
 
+function logRunTitle(run: BuildLogRun) {
+  const step = run.metadata?.find((item) => item.label === "Step")?.value;
+
+  if (step) {
+    return step;
+  }
+
+  return run.title ?? "Move build";
+}
+
 function buildStatusLabel(run: BuildLogRun) {
   if (run.state === "running") {
     return "Running";
@@ -238,15 +284,18 @@ function buildLogText(run: BuildLogRun) {
     "",
   ];
 
-  if (run.state === "running") {
-    lines.push(run.runningText ?? "Running build...");
-    return lines.join("\n");
-  }
-
   const stdout = sanitizeTerminalText(run.output?.stdout ?? "").trim();
   const stderr = sanitizeTerminalText(run.output?.stderr ?? "").trim();
   const note = sanitizeTerminalText(run.note ?? "").trim();
   const error = sanitizeTerminalText(run.error ?? "").trim();
+
+  if (run.state === "running") {
+    lines.push(run.runningText ?? "Running build...");
+
+    if (stdout || stderr) {
+      lines.push("");
+    }
+  }
 
   if (stdout) {
     lines.push("stdout", stdout, "");
@@ -264,7 +313,7 @@ function buildLogText(run: BuildLogRun) {
     lines.push("error", error, "");
   }
 
-  if (!stdout && !stderr && !note && !error) {
+  if (run.state !== "running" && !stdout && !stderr && !note && !error) {
     lines.push(run.emptyText ?? "Build finished without output.");
   }
 

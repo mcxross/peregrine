@@ -58,12 +58,15 @@ import {
   type PackageTree,
   type SecurityCommandKind,
 } from "@/features/empty-project/filesystem-tree";
-import type { BuildLogRun } from "@/features/project-workspace/build-log-sheet";
+import type {
+  BuildLogRun,
+  BuildLogUpdateOptions,
+} from "@/features/project-workspace/build-log-sheet";
 import { cn } from "@/lib/utils";
 
 type ExecutionBuilderScreenProps = {
   activeMovePackage: MovePackage | null;
-  onCommandLog: (run: BuildLogRun) => void;
+  onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   packageTree: PackageTree;
   onProjectSelected: (packageTree: PackageTree) => void;
 };
@@ -506,7 +509,7 @@ export function ExecutionBuilderScreen({
         step,
       });
 
-      onCommandLog(runningLog);
+      onCommandLog(runningLog, { reset: index === 0 });
       updateStepResult(step.id, {
         startedAt: stepStartedAt,
         state: "running",
