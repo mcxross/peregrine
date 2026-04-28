@@ -7,8 +7,11 @@ use move_project::{discover_move_project, MovePackage, PackageDependencyGraph};
 use serde::Serialize;
 use std::{
     env, fs,
+    io::Read,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
+    sync::mpsc,
+    thread,
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{
@@ -18,6 +21,7 @@ use tauri::{
 
 const OPEN_SETTINGS_MENU_ID: &str = "open-settings";
 const OPEN_SETTINGS_EVENT: &str = "open-settings";
+const COMMAND_OUTPUT_EVENT: &str = "command-output";
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -42,6 +46,14 @@ struct CommandOutput {
     stderr: String,
 }
 
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct CommandOutputChunk {
+    stream_id: String,
+    stream: &'static str,
+    chunk: String,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SuiCliStatus {
@@ -55,6 +67,17 @@ struct PackageCommand {
     args: Vec<String>,
     display: String,
     temp_pubfile_path: Option<PathBuf>,
+}
+
+#[derive(Clone)]
+struct CommandOutputStream {
+    app: tauri::AppHandle,
+    stream_id: String,
+}
+
+struct CommandReaderChunk {
+    stream: &'static str,
+    bytes: Vec<u8>,
 }
 
 #[tauri::command]
@@ -111,11 +134,18 @@ async fn save_graph_png(path: String, png_data_url: String) -> Result<(), String
 
 #[tauri::command]
 async fn build_move_package(
+    app: tauri::AppHandle,
     root_path: String,
     package_path: String,
+    stream_id: Option<String>,
 ) -> Result<CommandOutput, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        run_package_command(&root_path, &package_path, package_command("move-build")?)
+        run_package_command(
+            &root_path,
+            &package_path,
+            package_command("move-build")?,
+            command_output_stream(app, stream_id),
+        )
     })
     .await
     .map_err(|error| format!("Could not join package build task: {error}"))?
@@ -123,14 +153,21 @@ async fn build_move_package(
 
 #[tauri::command]
 async fn run_security_command(
+    app: tauri::AppHandle,
     root_path: String,
     package_path: String,
     command_kind: String,
+    stream_id: Option<String>,
 ) -> Result<CommandOutput, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let command = package_command(&command_kind)?;
 
-        run_package_command(&root_path, &package_path, command)
+        run_package_command(
+            &root_path,
+            &package_path,
+            command,
+            command_output_stream(app, stream_id),
+        )
     })
     .await
     .map_err(|error| format!("Could not join security command task: {error}"))?
@@ -138,12 +175,19 @@ async fn run_security_command(
 
 #[tauri::command]
 async fn run_security_script(
+    app: tauri::AppHandle,
     root_path: String,
     package_path: String,
     script_path: String,
+    stream_id: Option<String>,
 ) -> Result<CommandOutput, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        run_package_script(&root_path, &package_path, &script_path)
+        run_package_script(
+            &root_path,
+            &package_path,
+            &script_path,
+            command_output_stream(app, stream_id),
+        )
     })
     .await
     .map_err(|error| format!("Could not join security script task: {error}"))?
@@ -303,6 +347,7 @@ fn run_package_command(
     root_path: &str,
     package_path: &str,
     command: PackageCommand,
+    stream: Option<CommandOutputStream>,
 ) -> Result<CommandOutput, String> {
     let package_root = resolve_package_child_path(root_path, package_path)?;
 
@@ -314,24 +359,127 @@ fn run_package_command(
         return Err("Selected package does not contain a Move.toml file.".to_string());
     }
 
-    let output = Command::new(command.program)
-        .args(&command.args)
-        .current_dir(&package_root)
-        .output()
-        .map_err(|error| {
-            format!(
-                "Could not execute `{}` in {}: {error}",
-                command.display,
-                package_root.display()
-            )
-        })?;
+    let mut process = Command::new(command.program);
+    let output = run_configured_command(
+        configure_plain_command_output(process.args(&command.args).current_dir(&package_root)),
+        stream,
+    )
+    .map_err(|error| {
+        format!(
+            "Could not execute `{}` in {}: {error}",
+            command.display,
+            package_root.display()
+        )
+    })?;
     cleanup_temp_pubfile(command.temp_pubfile_path.as_deref());
 
+    Ok(output)
+}
+
+fn configure_plain_command_output(command: &mut Command) -> &mut Command {
+    command
+        .env("NO_COLOR", "1")
+        .env("CLICOLOR", "0")
+        .env("TERM", "dumb")
+}
+
+fn command_output_stream(
+    app: tauri::AppHandle,
+    stream_id: Option<String>,
+) -> Option<CommandOutputStream> {
+    let stream_id = stream_id?.trim().to_string();
+
+    if stream_id.is_empty() {
+        return None;
+    }
+
+    Some(CommandOutputStream { app, stream_id })
+}
+
+fn run_configured_command(
+    command: &mut Command,
+    stream: Option<CommandOutputStream>,
+) -> Result<CommandOutput, String> {
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("Could not start process: {error}"))?;
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    let (sender, receiver) = mpsc::channel::<CommandReaderChunk>();
+
+    if let Some(stdout) = stdout {
+        spawn_output_reader(stdout, "stdout", sender.clone());
+    }
+
+    if let Some(stderr) = stderr {
+        spawn_output_reader(stderr, "stderr", sender.clone());
+    }
+
+    drop(sender);
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+
+    for chunk in receiver {
+        match chunk.stream {
+            "stdout" => stdout.extend_from_slice(&chunk.bytes),
+            "stderr" => stderr.extend_from_slice(&chunk.bytes),
+            _ => {}
+        }
+
+        if let Some(stream) = stream.as_ref() {
+            let _ = stream.app.emit(
+                COMMAND_OUTPUT_EVENT,
+                CommandOutputChunk {
+                    stream_id: stream.stream_id.clone(),
+                    stream: chunk.stream,
+                    chunk: String::from_utf8_lossy(&chunk.bytes).into_owned(),
+                },
+            );
+        }
+    }
+
+    let status = child
+        .wait()
+        .map_err(|error| format!("Could not wait for process: {error}"))?;
+
     Ok(CommandOutput {
-        status: output.status.code(),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        status: status.code(),
+        stdout: String::from_utf8_lossy(&stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&stderr).into_owned(),
     })
+}
+
+fn spawn_output_reader<R>(
+    mut reader: R,
+    stream: &'static str,
+    sender: mpsc::Sender<CommandReaderChunk>,
+) where
+    R: Read + Send + 'static,
+{
+    thread::spawn(move || {
+        let mut buffer = [0u8; 8192];
+
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(size) => {
+                    if sender
+                        .send(CommandReaderChunk {
+                            stream,
+                            bytes: buffer[..size].to_vec(),
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+    });
 }
 
 fn cleanup_temp_pubfile(path: Option<&Path>) {
@@ -346,6 +494,7 @@ fn run_package_script(
     root_path: &str,
     package_path: &str,
     script_path: &str,
+    stream: Option<CommandOutputStream>,
 ) -> Result<CommandOutput, String> {
     let package_root = resolve_package_child_path(root_path, package_path)?;
     let script_path = script_path.trim();
@@ -372,22 +521,17 @@ fn run_package_script(
 
     let script_path = resolve_package_script_path(&package_root, script_path)?;
 
-    let output = Command::new("bash")
-        .arg(&script_path)
-        .current_dir(&package_root)
-        .output()
-        .map_err(|error| {
-            format!(
-                "Could not execute bash script {} in {}: {error}",
-                script_path.display(),
-                package_root.display()
-            )
-        })?;
-
-    Ok(CommandOutput {
-        status: output.status.code(),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+    let mut process = Command::new("bash");
+    run_configured_command(
+        configure_plain_command_output(process.arg(&script_path).current_dir(&package_root)),
+        stream,
+    )
+    .map_err(|error| {
+        format!(
+            "Could not execute bash script {} in {}: {error}",
+            script_path.display(),
+            package_root.display()
+        )
     })
 }
 

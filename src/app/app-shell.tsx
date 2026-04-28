@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Titlebar } from "@/app/titlebar";
 import type { WorkspaceTab } from "@/app/titlebar";
 import { Sidebar } from "@/app/sidebar";
@@ -37,6 +37,7 @@ export function AppShell({
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
   const [isRescanning, setIsRescanning] = useState(false);
   const [lastScannedAt, setLastScannedAt] = useState<number | null>(null);
+  const currentCommandLogIdRef = useRef<number | null>(null);
   const layout = defaultLayoutSettings;
   const isSettings = screen === "settings";
   const showSidebar = isSettings;
@@ -116,7 +117,16 @@ export function AppShell({
     setIsBuildSheetOpen(true);
 
     try {
-      const output = await buildMovePackage(packageTree, activeMovePackage.path);
+      const output = await buildMovePackage(packageTree, activeMovePackage.path, {
+        streamId: nextRun.id,
+        onOutput: (output) => {
+          setBuildRun((current) =>
+            current?.id === nextRun.id && current.state === "running"
+              ? { ...current, output }
+              : current,
+          );
+        },
+      });
       const state = output.status === 0 ? "success" : "error";
 
       setBuildRun({
@@ -154,8 +164,13 @@ export function AppShell({
     }
   }, [activeMovePackage, handleProjectSelected, isBuildRunning, packageTree]);
   const showCommandLog = useCallback((run: BuildLogRun) => {
+    const isSameRun = currentCommandLogIdRef.current === run.id;
+    currentCommandLogIdRef.current = run.id;
     setBuildRun(run);
-    setIsBuildSheetOpen(true);
+
+    if (!isSameRun) {
+      setIsBuildSheetOpen(true);
+    }
   }, []);
 
   const buildLogSheet = useMemo<BuildLogSheetController>(

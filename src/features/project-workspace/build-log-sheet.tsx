@@ -41,6 +41,8 @@ export type BuildLogSheetController = Omit<BuildLogSheetProps, "bottomInset">;
 const DEFAULT_SHEET_HEIGHT = 360;
 const MIN_SHEET_HEIGHT = 180;
 const MAX_SHEET_HEIGHT_RATIO = 0.72;
+const ANSI_ESCAPE_PATTERN = /(?:\u001B|\u009B|\uFFFD)\[[0-?]*[ -/]*[@-~]/g;
+const ANSI_OSC_PATTERN = /\u001B\][\s\S]*?(?:\u0007|\u001B\\)/g;
 
 export function BuildLogSheet({
   bottomInset = 0,
@@ -241,25 +243,36 @@ function buildLogText(run: BuildLogRun) {
     return lines.join("\n");
   }
 
-  if (run.output?.stdout.trim()) {
-    lines.push("stdout", run.output.stdout.trim(), "");
+  const stdout = sanitizeTerminalText(run.output?.stdout ?? "").trim();
+  const stderr = sanitizeTerminalText(run.output?.stderr ?? "").trim();
+  const note = sanitizeTerminalText(run.note ?? "").trim();
+  const error = sanitizeTerminalText(run.error ?? "").trim();
+
+  if (stdout) {
+    lines.push("stdout", stdout, "");
   }
 
-  if (run.output?.stderr.trim()) {
-    lines.push("stderr", run.output.stderr.trim(), "");
+  if (stderr) {
+    lines.push("stderr", stderr, "");
   }
 
-  if (run.note?.trim()) {
-    lines.push("details", run.note.trim(), "");
+  if (note) {
+    lines.push("details", note, "");
   }
 
-  if (run.error) {
-    lines.push("error", run.error, "");
+  if (error) {
+    lines.push("error", error, "");
   }
 
-  if (!run.output?.stdout.trim() && !run.output?.stderr.trim() && !run.note?.trim() && !run.error) {
+  if (!stdout && !stderr && !note && !error) {
     lines.push(run.emptyText ?? "Build finished without output.");
   }
 
   return lines.join("\n").trimEnd();
+}
+
+function sanitizeTerminalText(value: string) {
+  return value
+    .replace(ANSI_OSC_PATTERN, "")
+    .replace(ANSI_ESCAPE_PATTERN, "");
 }

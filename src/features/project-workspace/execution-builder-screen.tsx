@@ -498,15 +498,15 @@ export function ExecutionBuilderScreen({
       }
 
       const stepStartedAt = new Date();
-      onCommandLog(
-        executionLogRun({
-          movePackage: currentPackage,
-          packageTree: currentTree,
-          startedAt: stepStartedAt,
-          state: "running",
-          step,
-        }),
-      );
+      const runningLog = executionLogRun({
+        movePackage: currentPackage,
+        packageTree: currentTree,
+        startedAt: stepStartedAt,
+        state: "running",
+        step,
+      });
+
+      onCommandLog(runningLog);
       updateStepResult(step.id, {
         startedAt: stepStartedAt,
         state: "running",
@@ -518,6 +518,14 @@ export function ExecutionBuilderScreen({
           movePackage: currentPackage,
           onProjectSelected,
           packageTree: currentTree,
+          onCommandOutput: (output) => {
+            onCommandLog({
+              ...runningLog,
+              output,
+            });
+          },
+          startedAt: stepStartedAt,
+          streamId: runningLog.id,
           step,
         });
 
@@ -1658,20 +1666,28 @@ function StepStateBadge({
 
 async function executeStep({
   movePackage,
+  onCommandOutput,
   onProjectSelected,
   packageTree,
+  startedAt,
+  streamId,
   step,
 }: {
   movePackage: MovePackage;
+  onCommandOutput?: (output: CommandOutput) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
   packageTree: PackageTree;
+  startedAt: Date;
+  streamId?: number | string;
   step: ExecutionStep;
 }): Promise<StepExecutionOutcome> {
   const definition = definitionByKind[step.kind];
-  const startedAt = new Date();
 
   if (step.kind === "build") {
-    const output = await buildMovePackage(packageTree, movePackage.path);
+    const output = await buildMovePackage(packageTree, movePackage.path, {
+      onOutput: onCommandOutput,
+      streamId,
+    });
     const finishedAt = new Date();
 
     if (output.status !== 0) {
@@ -1703,8 +1719,10 @@ async function executeStep({
         resolveActiveMovePackage(nextPackageTree, movePackage) ?? movePackage;
       const scriptOutcome = await executeScriptStep({
         movePackage: refreshedMovePackage,
+        onCommandOutput,
         packageTree: nextPackageTree,
         startedAt,
+        streamId,
         step,
       });
 
@@ -1752,15 +1770,20 @@ async function executeStep({
   if (step.config.useScript) {
     return executeScriptStep({
       movePackage,
+      onCommandOutput,
       packageTree,
       startedAt,
+      streamId,
       step,
     });
   }
 
   if (step.kind === "publish") {
     const commandKind = publishCommandKind(step);
-    const output = await runSecurityCommand(packageTree, movePackage.path, commandKind);
+    const output = await runSecurityCommand(packageTree, movePackage.path, commandKind, {
+      onOutput: onCommandOutput,
+      streamId,
+    });
     const targetLabel = publishTargetLabel(step.config.publishTarget ?? "localnet");
     const finishedAt = new Date();
 
@@ -1781,7 +1804,15 @@ async function executeStep({
   }
 
   if (definition.commandKind) {
-    const output = await runSecurityCommand(packageTree, movePackage.path, definition.commandKind);
+    const output = await runSecurityCommand(
+      packageTree,
+      movePackage.path,
+      definition.commandKind,
+      {
+        onOutput: onCommandOutput,
+        streamId,
+      },
+    );
     const finishedAt = new Date();
 
     return {
@@ -1810,13 +1841,17 @@ async function executeStep({
 
 async function executeScriptStep({
   movePackage,
+  onCommandOutput,
   packageTree,
   startedAt,
+  streamId,
   step,
 }: {
   movePackage: MovePackage;
+  onCommandOutput?: (output: CommandOutput) => void;
   packageTree: PackageTree;
   startedAt: Date;
+  streamId?: number | string;
   step: ExecutionStep;
 }): Promise<StepExecutionOutcome> {
   const scriptPath = normalizedScriptPath(step);
@@ -1833,7 +1868,10 @@ async function executeScriptStep({
     };
   }
 
-  const output = await runSecurityScript(packageTree, movePackage.path, scriptPath);
+  const output = await runSecurityScript(packageTree, movePackage.path, scriptPath, {
+    onOutput: onCommandOutput,
+    streamId,
+  });
   const finishedAt = new Date();
 
   return {

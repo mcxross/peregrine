@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 export type PackageTree = {
   activePackageManifestPath?: string | null;
@@ -139,6 +140,19 @@ export type CommandOutput = {
   stderr: string;
 };
 
+export type CommandOutputStreamOptions = {
+  streamId?: number | string;
+  onOutput?: (output: CommandOutput) => void;
+};
+
+type CommandOutputChunk = {
+  streamId: string;
+  stream: "stderr" | "stdout";
+  chunk: string;
+};
+
+const COMMAND_OUTPUT_EVENT = "command-output";
+
 export type SecurityCommandKind =
   | "move-coverage"
   | "move-fuzz"
@@ -230,37 +244,74 @@ export async function saveTextFile(
 export async function buildMovePackage(
   packageTree: PackageTree,
   packagePath: string,
+  options?: CommandOutputStreamOptions,
 ) {
-  return invoke<CommandOutput>("build_move_package", {
+  return invokeCommandOutput("build_move_package", {
     rootPath: packageTree.rootPath,
     packagePath,
-  });
+  }, options);
 }
 
 export async function runSecurityCommand(
   packageTree: PackageTree,
   packagePath: string,
   commandKind: SecurityCommandKind,
+  options?: CommandOutputStreamOptions,
 ) {
-  return invoke<CommandOutput>("run_security_command", {
+  return invokeCommandOutput("run_security_command", {
     rootPath: packageTree.rootPath,
     packagePath,
     commandKind,
-  });
+  }, options);
 }
 
 export async function runSecurityScript(
   packageTree: PackageTree,
   packagePath: string,
   scriptPath: string,
+  options?: CommandOutputStreamOptions,
 ) {
-  return invoke<CommandOutput>("run_security_script", {
+  return invokeCommandOutput("run_security_script", {
     rootPath: packageTree.rootPath,
     packagePath,
     scriptPath,
-  });
+  }, options);
 }
 
 export async function checkSuiCli() {
   return invoke<SuiCliStatus>("check_sui_cli");
+}
+
+async function invokeCommandOutput(
+  command: string,
+  args: Record<string, unknown>,
+  options?: CommandOutputStreamOptions,
+) {
+  const streamId = options?.streamId == null ? null : String(options.streamId);
+  const output: CommandOutput = { status: null, stderr: "", stdout: "" };
+  const onOutput = options?.onOutput;
+  const unlisten = streamId && onOutput
+    ? await listen<CommandOutputChunk>(COMMAND_OUTPUT_EVENT, (event) => {
+        if (event.payload.streamId !== streamId) {
+          return;
+        }
+
+        if (event.payload.stream === "stdout") {
+          output.stdout += event.payload.chunk;
+        } else {
+          output.stderr += event.payload.chunk;
+        }
+
+        onOutput({ ...output });
+      })
+    : null;
+
+  try {
+    return await invoke<CommandOutput>(command, {
+      ...args,
+      streamId,
+    });
+  } finally {
+    unlisten?.();
+  }
 }
