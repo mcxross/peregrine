@@ -19,6 +19,7 @@ import {
   Sparkles,
   Target,
   UsersRound,
+  Workflow,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -38,9 +39,11 @@ import type {
 import { checkSuiCli } from "@/features/empty-project/filesystem-tree";
 import {
   BuildLogSheet,
+  type BuildLogRun,
   type BuildLogSheetController,
 } from "@/features/project-workspace/build-log-sheet";
 import { DependencyGraphScreen } from "@/features/project-workspace/dependency-graph-screen";
+import { ExecutionBuilderScreen } from "@/features/project-workspace/execution-builder-screen";
 import { MovePackagesOverviewScreen } from "@/features/project-workspace/move-packages-overview-screen";
 import type { SelectedMoveModule } from "@/features/project-workspace/module-signature-screen";
 import {
@@ -60,6 +63,8 @@ type ProjectWorkspaceProps = {
   isLeftPanelOpen: boolean;
   lastScannedAt: number | null;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
+  onCommandLog: (run: BuildLogRun) => void;
+  onProjectSelected: (packageTree: PackageTree) => void;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
   packageTree: PackageTree;
 };
@@ -89,6 +94,8 @@ export function ProjectWorkspace({
   isLeftPanelOpen,
   lastScannedAt,
   onActivePackageManifestPathChange,
+  onCommandLog,
+  onProjectSelected,
   onWorkspaceTabChange,
   packageTree,
 }: ProjectWorkspaceProps) {
@@ -119,7 +126,7 @@ export function ProjectWorkspace({
   }, [activeMovePackage]);
 
   React.useEffect(() => {
-    if (activeWorkspaceTab === "Overview") {
+    if (activeWorkspaceTab === "Overview" || activeWorkspaceTab === "Execution") {
       setIsRightPanelOpen(false);
     }
   }, [activeWorkspaceTab]);
@@ -167,6 +174,8 @@ export function ProjectWorkspace({
           packageTree={packageTree}
           packageName={packageName}
           selectedModule={selectedModule}
+          onCommandLog={onCommandLog}
+          onProjectSelected={onProjectSelected}
           onClearSelectedModule={() => setSelectedModule(null)}
           onSelectModule={(movePackage, moveModule) => {
             setActiveSurfaceDetail(null);
@@ -209,11 +218,15 @@ function WorkspaceMainPanel({
   packageTree,
   packageName,
   selectedModule,
+  onProjectSelected,
+  onCommandLog,
 }: {
   activeWorkspaceTab: WorkspaceTab;
   activeSurfaceDetail: SurfaceDetailKind | null;
   activeMovePackage: MovePackage | null;
   onClearSelectedModule: () => void;
+  onCommandLog: (run: BuildLogRun) => void;
+  onProjectSelected: (packageTree: PackageTree) => void;
   onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
   packageTree: PackageTree;
   packageName: string;
@@ -231,6 +244,17 @@ function WorkspaceMainPanel({
         onClearSelectedModule={onClearSelectedModule}
         onSelectModule={onSelectModule}
         selectedModule={selectedModule}
+      />
+    );
+  }
+
+  if (activeWorkspaceTab === "Execution") {
+    return (
+      <ExecutionBuilderScreen
+        activeMovePackage={activeMovePackage}
+        onCommandLog={onCommandLog}
+        onProjectSelected={onProjectSelected}
+        packageTree={packageTree}
       />
     );
   }
@@ -303,6 +327,12 @@ function SecuritySidebar({
             icon={Gauge}
             label="Explore"
             onClick={() => onWorkspaceTabChange("Explore")}
+          />
+          <SidebarItem
+            active={activeWorkspaceTab === "Execution" && !activeSurfaceDetail}
+            icon={Workflow}
+            label="Execution"
+            onClick={() => onWorkspaceTabChange("Execution")}
           />
         </SidebarSection>
 

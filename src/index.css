@@ -152,3 +152,31 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+@keyframes execution-step-border-glow {
+  0% {
+    border-color: color-mix(in oklch, var(--primary) 38%, transparent);
+    box-shadow:
+      0 14px 30px rgba(0, 0, 0, 0.22),
+      0 0 0 0 color-mix(in oklch, var(--primary) 0%, transparent);
+  }
+
+  50% {
+    border-color: color-mix(in oklch, var(--primary) 78%, transparent);
+    box-shadow:
+      0 14px 30px rgba(0, 0, 0, 0.22),
+      0 0 0 1px color-mix(in oklch, var(--primary) 35%, transparent),
+      0 0 24px color-mix(in oklch, var(--primary) 24%, transparent);
+  }
+
+  100% {
+    border-color: color-mix(in oklch, var(--primary) 38%, transparent);
+    box-shadow:
+      0 14px 30px rgba(0, 0, 0, 0.22),
+      0 0 0 0 color-mix(in oklch, var(--primary) 0%, transparent);
+  }
+}
+
+.execution-step-active {
+  animation: execution-step-border-glow 1.65s ease-in-out infinite;
+}

@@ -143,6 +143,7 @@ export function Titlebar({
 const workspaceTabs = [
   "Overview",
   "Explore",
+  "Execution",
   "Attack Surface",
   "Tests",
   "Fuzzing",

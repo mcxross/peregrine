@@ -10,15 +10,21 @@ import { cn } from "@/lib/utils";
 export type BuildRunState = "running" | "success" | "error";
 
 export type BuildLogRun = {
+  canRerun?: boolean;
   command: string;
   error: string | null;
+  emptyText?: string;
   finishedAt: Date | null;
   id: number;
+  metadata?: { label: string; value: string }[];
+  note?: string | null;
   output: CommandOutput | null;
   packageName: string;
   packagePath: string;
+  runningText?: string;
   startedAt: Date;
   state: BuildRunState;
+  title?: string;
   workingDirectory: string;
 };
 
@@ -88,7 +94,7 @@ export function BuildLogSheet({
 
   return (
     <section
-      aria-label="Build logs"
+      aria-label="Command logs"
       aria-hidden={!isOpen}
       className={cn(
         "absolute inset-x-0 z-40 grid grid-rows-[auto_minmax(0,1fr)] border-x-0 border-b-0 border-t border-[color:var(--app-border)] bg-[var(--app-panel)] shadow-[0_-18px_60px_rgba(0,0,0,0.45)] transition-transform duration-200",
@@ -116,7 +122,7 @@ export function BuildLogSheet({
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
             <Terminal className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <h2 className="truncate text-sm font-semibold">Move build</h2>
+            <h2 className="truncate text-sm font-semibold">{run.title ?? "Move build"}</h2>
             <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
           </div>
           <p className="mt-1 truncate text-xs text-muted-foreground" title={run.workingDirectory}>
@@ -125,16 +131,18 @@ export function BuildLogSheet({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <Button
-            className="h-8 gap-2"
-            disabled={isRunning}
-            onClick={onRerun}
-            type="button"
-            variant="outline"
-          >
-            <RotateCcw className="size-3.5" aria-hidden="true" />
-            Rerun
-          </Button>
+          {run.canRerun !== false ? (
+            <Button
+              className="h-8 gap-2"
+              disabled={isRunning}
+              onClick={onRerun}
+              type="button"
+              variant="outline"
+            >
+              <RotateCcw className="size-3.5" aria-hidden="true" />
+              Rerun
+            </Button>
+          ) : null}
           <Button
             aria-label="Close build logs"
             className="size-8 text-muted-foreground"
@@ -152,6 +160,9 @@ export function BuildLogSheet({
         <div className="grid gap-1.5 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-xs">
           <LogMeta label="Package" value={run.packagePath} />
           <LogMeta label="Command" value={run.command} />
+          {run.metadata?.map((item) => (
+            <LogMeta key={`${item.label}:${item.value}`} label={item.label} value={item.value} />
+          ))}
           <LogMeta label="Started" value={run.startedAt.toLocaleTimeString()} />
           {run.finishedAt ? <LogMeta label="Finished" value={run.finishedAt.toLocaleTimeString()} /> : null}
         </div>
@@ -207,6 +218,10 @@ function buildStatusLabel(run: BuildLogRun) {
     return "Running";
   }
 
+  if (run.state === "success" && run.output?.status == null) {
+    return "Succeeded";
+  }
+
   if (run.output?.status === 0) {
     return "Succeeded";
   }
@@ -222,7 +237,7 @@ function buildLogText(run: BuildLogRun) {
   ];
 
   if (run.state === "running") {
-    lines.push("Running build...");
+    lines.push(run.runningText ?? "Running build...");
     return lines.join("\n");
   }
 
@@ -234,12 +249,16 @@ function buildLogText(run: BuildLogRun) {
     lines.push("stderr", run.output.stderr.trim(), "");
   }
 
+  if (run.note?.trim()) {
+    lines.push("details", run.note.trim(), "");
+  }
+
   if (run.error) {
     lines.push("error", run.error, "");
   }
 
-  if (!run.output?.stdout.trim() && !run.output?.stderr.trim() && !run.error) {
-    lines.push("Build finished without output.");
+  if (!run.output?.stdout.trim() && !run.output?.stderr.trim() && !run.note?.trim() && !run.error) {
+    lines.push(run.emptyText ?? "Build finished without output.");
   }
 
   return lines.join("\n").trimEnd();

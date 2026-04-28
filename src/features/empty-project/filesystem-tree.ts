@@ -139,6 +139,19 @@ export type CommandOutput = {
   stderr: string;
 };
 
+export type SecurityCommandKind =
+  | "move-coverage"
+  | "move-fuzz"
+  | "move-test"
+  | "publish-dry-run-localnet"
+  | "publish-dry-run-devnet"
+  | "publish-dry-run-testnet"
+  | "publish-dry-run-mainnet"
+  | "publish-localnet"
+  | "publish-devnet"
+  | "publish-testnet"
+  | "publish-mainnet";
+
 export type SuiCliStatus = {
   installed: boolean;
   version: string | null;
@@ -221,6 +234,30 @@ export async function buildMovePackage(
   return invoke<CommandOutput>("build_move_package", {
     rootPath: packageTree.rootPath,
     packagePath,
+  });
+}
+
+export async function runSecurityCommand(
+  packageTree: PackageTree,
+  packagePath: string,
+  commandKind: SecurityCommandKind,
+) {
+  return invoke<CommandOutput>("run_security_command", {
+    rootPath: packageTree.rootPath,
+    packagePath,
+    commandKind,
+  });
+}
+
+export async function runSecurityScript(
+  packageTree: PackageTree,
+  packagePath: string,
+  scriptPath: string,
+) {
+  return invoke<CommandOutput>("run_security_script", {
+    rootPath: packageTree.rootPath,
+    packagePath,
+    scriptPath,
   });
 }
 

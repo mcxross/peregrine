@@ -45,6 +45,13 @@ export function AppShell({
     [activePackageManifestPath, packageTree],
   );
   const isBuildRunning = buildRun?.state === "running";
+  const handleProjectSelected = useCallback(
+    (nextPackageTree: PackageTree) => {
+      onProjectSelected(nextPackageTree);
+      setLastScannedAt(Date.now());
+    },
+    [onProjectSelected],
+  );
 
   useEffect(() => {
     setActivePackageManifestPath(packageTree?.activePackageManifestPath ?? null);
@@ -73,17 +80,16 @@ export function AppShell({
           ? previousActiveManifestPath
           : rescannedPackageTree.movePackages[0]?.manifestPath ?? null;
 
-      onProjectSelected({
+      handleProjectSelected({
         ...rescannedPackageTree,
         activePackageManifestPath,
       });
-      setLastScannedAt(Date.now());
     } catch (error) {
       console.error("Could not rescan package.", error);
     } finally {
       setIsRescanning(false);
     }
-  }, [activePackageManifestPath, isRescanning, onProjectSelected, packageTree]);
+  }, [activePackageManifestPath, handleProjectSelected, isRescanning, packageTree]);
 
   const runBuild = useCallback(async () => {
     if (!packageTree || !activeMovePackage || isBuildRunning) {
@@ -93,6 +99,7 @@ export function AppShell({
     const startedAt = new Date();
     const workingDirectory = packagePathLabel(activeMovePackage, packageTree);
     const nextRun: BuildLogRun = {
+      canRerun: true,
       command: "sui move build",
       error: null,
       finishedAt: null,
@@ -118,6 +125,25 @@ export function AppShell({
         output,
         state,
       });
+
+      if (state === "success") {
+        try {
+          const rescannedPackageTree = await loadPackageTree(packageTree.rootPath);
+          const activePackageManifestPath =
+            rescannedPackageTree.movePackages.some(
+              (movePackage) => movePackage.manifestPath === activeMovePackage.manifestPath,
+            )
+              ? activeMovePackage.manifestPath
+              : rescannedPackageTree.movePackages[0]?.manifestPath ?? null;
+
+          handleProjectSelected({
+            ...rescannedPackageTree,
+            activePackageManifestPath,
+          });
+        } catch (error) {
+          console.error("Could not rescan package after build.", error);
+        }
+      }
     } catch (error) {
       setBuildRun({
         ...nextRun,
@@ -126,7 +152,12 @@ export function AppShell({
         state: "error",
       });
     }
-  }, [activeMovePackage, isBuildRunning, packageTree]);
+  }, [activeMovePackage, handleProjectSelected, isBuildRunning, packageTree]);
+  const showCommandLog = useCallback((run: BuildLogRun) => {
+    setBuildRun(run);
+    setIsBuildSheetOpen(true);
+  }, []);
+
   const buildLogSheet = useMemo<BuildLogSheetController>(
     () => ({
       isOpen: isBuildSheetOpen,
@@ -176,7 +207,8 @@ export function AppShell({
               onActivePackageManifestPathChange={setActivePackageManifestPath}
               onWorkspaceTabChange={setActiveWorkspaceTab}
               packageTree={packageTree}
-              onProjectSelected={onProjectSelected}
+              onCommandLog={showCommandLog}
+              onProjectSelected={handleProjectSelected}
             />
           )}
         </div>

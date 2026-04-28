@@ -6,9 +6,10 @@ use file_preview::{build_file_preview, FilePreview};
 use move_project::{discover_move_project, MovePackage, PackageDependencyGraph};
 use serde::Serialize;
 use std::{
-    fs,
+    env, fs,
     path::{Path, PathBuf},
     process::Command,
+    time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{
     menu::{AboutMetadata, Menu, MenuItemBuilder, PredefinedMenuItem, Submenu},
@@ -47,6 +48,13 @@ struct SuiCliStatus {
     installed: bool,
     version: Option<String>,
     install_hint: Option<String>,
+}
+
+struct PackageCommand {
+    program: &'static str,
+    args: Vec<String>,
+    display: String,
+    temp_pubfile_path: Option<PathBuf>,
 }
 
 #[tauri::command]
@@ -107,35 +115,38 @@ async fn build_move_package(
     package_path: String,
 ) -> Result<CommandOutput, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let package_root = resolve_package_child_path(&root_path, &package_path)?;
-
-        if !package_root.is_dir() {
-            return Err("Selected package path is not a directory.".to_string());
-        }
-
-        if !package_root.join("Move.toml").is_file() {
-            return Err("Selected package does not contain a Move.toml file.".to_string());
-        }
-
-        let output = Command::new("sui")
-            .args(["move", "build"])
-            .current_dir(&package_root)
-            .output()
-            .map_err(|error| {
-                format!(
-                    "Could not execute `sui move build` in {}: {error}",
-                    package_root.display()
-                )
-            })?;
-
-        Ok(CommandOutput {
-            status: output.status.code(),
-            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-        })
+        run_package_command(&root_path, &package_path, package_command("move-build")?)
     })
     .await
     .map_err(|error| format!("Could not join package build task: {error}"))?
+}
+
+#[tauri::command]
+async fn run_security_command(
+    root_path: String,
+    package_path: String,
+    command_kind: String,
+) -> Result<CommandOutput, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let command = package_command(&command_kind)?;
+
+        run_package_command(&root_path, &package_path, command)
+    })
+    .await
+    .map_err(|error| format!("Could not join security command task: {error}"))?
+}
+
+#[tauri::command]
+async fn run_security_script(
+    root_path: String,
+    package_path: String,
+    script_path: String,
+) -> Result<CommandOutput, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_package_script(&root_path, &package_path, &script_path)
+    })
+    .await
+    .map_err(|error| format!("Could not join security script task: {error}"))?
 }
 
 #[tauri::command]
@@ -187,6 +198,223 @@ fn parse_sui_version(source: &str) -> Option<String> {
                 .is_some_and(|character| character.is_ascii_digit())
         })
         .map(|version| version.trim_start_matches('v').to_string())
+}
+
+fn package_command(command_kind: &str) -> Result<PackageCommand, String> {
+    match command_kind {
+        "move-build" => Ok(PackageCommand {
+            program: "sui",
+            args: command_args(&["move", "build"]),
+            display: "sui move build".to_string(),
+            temp_pubfile_path: None,
+        }),
+        "move-test" => Ok(PackageCommand {
+            program: "sui",
+            args: command_args(&["move", "test"]),
+            display: "sui move test".to_string(),
+            temp_pubfile_path: None,
+        }),
+        "move-coverage" => Ok(PackageCommand {
+            program: "sui",
+            args: command_args(&["move", "test", "--coverage"]),
+            display: "sui move test --coverage".to_string(),
+            temp_pubfile_path: None,
+        }),
+        "move-fuzz" => Ok(PackageCommand {
+            program: "sui",
+            args: command_args(&["move", "test", "--rand-num-iters", "256"]),
+            display: "sui move test --rand-num-iters 256".to_string(),
+            temp_pubfile_path: None,
+        }),
+        "publish-dry-run-localnet" => publish_dry_run_command("localnet"),
+        "publish-dry-run-devnet" => publish_dry_run_command("devnet"),
+        "publish-dry-run-testnet" => publish_dry_run_command("testnet"),
+        "publish-dry-run-mainnet" => publish_dry_run_command("mainnet"),
+        "publish-localnet" => Ok(PackageCommand {
+            program: "sui",
+            args: command_args(&["client", "publish", "--client.env", "localnet", "."]),
+            display: "sui client publish --client.env localnet .".to_string(),
+            temp_pubfile_path: None,
+        }),
+        "publish-devnet" => Ok(PackageCommand {
+            program: "sui",
+            args: command_args(&["client", "publish", "--client.env", "devnet", "."]),
+            display: "sui client publish --client.env devnet .".to_string(),
+            temp_pubfile_path: None,
+        }),
+        "publish-testnet" => Ok(PackageCommand {
+            program: "sui",
+            args: command_args(&["client", "publish", "--client.env", "testnet", "."]),
+            display: "sui client publish --client.env testnet .".to_string(),
+            temp_pubfile_path: None,
+        }),
+        "publish-mainnet" => Ok(PackageCommand {
+            program: "sui",
+            args: command_args(&["client", "publish", "--client.env", "mainnet", "."]),
+            display: "sui client publish --client.env mainnet .".to_string(),
+            temp_pubfile_path: None,
+        }),
+        _ => Err(format!("Unsupported security command: {command_kind}")),
+    }
+}
+
+fn command_args(args: &[&str]) -> Vec<String> {
+    args.iter().map(|arg| (*arg).to_string()).collect()
+}
+
+fn publish_dry_run_command(environment: &str) -> Result<PackageCommand, String> {
+    let pubfile_path = temp_publish_file_path(environment);
+    let pubfile_display = pubfile_path.to_string_lossy().into_owned();
+    let args = vec![
+        "client".to_string(),
+        "publish".to_string(),
+        "--dry-run".to_string(),
+        "--client.env".to_string(),
+        environment.to_string(),
+        "--pubfile-path".to_string(),
+        pubfile_display.clone(),
+        ".".to_string(),
+    ];
+
+    Ok(PackageCommand {
+        program: "sui",
+        display: format!(
+            "sui client publish --dry-run --client.env {environment} --pubfile-path {} .",
+            pubfile_display
+        ),
+        args,
+        temp_pubfile_path: Some(pubfile_path),
+    })
+}
+
+fn temp_publish_file_path(environment: &str) -> PathBuf {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+
+    env::temp_dir().join(format!(
+        "peregrine-publish-dry-run-{environment}-{}-{timestamp}.toml",
+        std::process::id()
+    ))
+}
+
+fn run_package_command(
+    root_path: &str,
+    package_path: &str,
+    command: PackageCommand,
+) -> Result<CommandOutput, String> {
+    let package_root = resolve_package_child_path(root_path, package_path)?;
+
+    if !package_root.is_dir() {
+        return Err("Selected package path is not a directory.".to_string());
+    }
+
+    if !package_root.join("Move.toml").is_file() {
+        return Err("Selected package does not contain a Move.toml file.".to_string());
+    }
+
+    let output = Command::new(command.program)
+        .args(&command.args)
+        .current_dir(&package_root)
+        .output()
+        .map_err(|error| {
+            format!(
+                "Could not execute `{}` in {}: {error}",
+                command.display,
+                package_root.display()
+            )
+        })?;
+    cleanup_temp_pubfile(command.temp_pubfile_path.as_deref());
+
+    Ok(CommandOutput {
+        status: output.status.code(),
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+    })
+}
+
+fn cleanup_temp_pubfile(path: Option<&Path>) {
+    if let Some(path) = path {
+        if path.exists() {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+
+fn run_package_script(
+    root_path: &str,
+    package_path: &str,
+    script_path: &str,
+) -> Result<CommandOutput, String> {
+    let package_root = resolve_package_child_path(root_path, package_path)?;
+    let script_path = script_path.trim();
+
+    if script_path.is_empty() {
+        return Err("Bash script path cannot be empty.".to_string());
+    }
+
+    if script_path.len() > 1_024 {
+        return Err("Bash script path is too long.".to_string());
+    }
+
+    if script_path.contains('\0') {
+        return Err("Bash script path contains an invalid null byte.".to_string());
+    }
+
+    if !package_root.is_dir() {
+        return Err("Selected package path is not a directory.".to_string());
+    }
+
+    if !package_root.join("Move.toml").is_file() {
+        return Err("Selected package does not contain a Move.toml file.".to_string());
+    }
+
+    let script_path = resolve_package_script_path(&package_root, script_path)?;
+
+    let output = Command::new("bash")
+        .arg(&script_path)
+        .current_dir(&package_root)
+        .output()
+        .map_err(|error| {
+            format!(
+                "Could not execute bash script {} in {}: {error}",
+                script_path.display(),
+                package_root.display()
+            )
+        })?;
+
+    Ok(CommandOutput {
+        status: output.status.code(),
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+    })
+}
+
+fn resolve_package_script_path(package_root: &Path, script_path: &str) -> Result<PathBuf, String> {
+    let relative_script_path = Path::new(script_path);
+
+    if relative_script_path.is_absolute() {
+        return Err("Use a script path relative to the selected Move package.".to_string());
+    }
+
+    let script_path = package_root.join(relative_script_path);
+    let script_path = script_path.canonicalize().map_err(|error| {
+        format!(
+            "Could not resolve bash script {}: {error}",
+            script_path.display()
+        )
+    })?;
+
+    if !script_path.starts_with(package_root) {
+        return Err("Bash script must be inside the selected Move package.".to_string());
+    }
+
+    if !script_path.is_file() {
+        return Err("Bash script path does not point to a file.".to_string());
+    }
+
+    Ok(script_path)
 }
 
 fn build_package_tree(root_path: String) -> Result<PackageTree, String> {
@@ -405,6 +633,8 @@ pub fn run() {
             save_text_file,
             save_graph_png,
             build_move_package,
+            run_security_command,
+            run_security_script,
             check_sui_cli
         ])
         .run(tauri::generate_context!())
