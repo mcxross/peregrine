@@ -153,6 +153,261 @@
   }
 }
 
+.ai-liquid-launcher {
+  border: 1px solid color-mix(in oklch, var(--app-border) 92%, white 6%);
+  background: color-mix(in oklch, var(--app-elevated) 72%, transparent);
+  box-shadow:
+    0 18px 60px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(24px) saturate(1.25);
+  backdrop-filter: blur(24px) saturate(1.25);
+}
+
+.ai-liquid-launcher:hover {
+  border-color: color-mix(in oklch, var(--foreground) 18%, var(--app-border));
+  background: color-mix(in oklch, var(--app-elevated) 84%, transparent);
+}
+
+.ai-liquid-panel {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid color-mix(in oklch, var(--app-border) 88%, white 6%);
+  background: color-mix(in oklch, var(--app-elevated) 38%, transparent);
+  box-shadow:
+    0 30px 100px rgba(0, 0, 0, 0.5),
+    0 10px 32px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.11),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  -webkit-backdrop-filter: blur(24px) saturate(1.14) brightness(1.02);
+  backdrop-filter: blur(24px) saturate(1.14) brightness(1.02);
+}
+
+.ai-liquid-panel::before,
+.ai-liquid-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ai-liquid-panel::before {
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  opacity: 0.8;
+}
+
+.ai-liquid-panel::after {
+  inset: 1px;
+  box-shadow:
+    inset 0 0 40px rgba(255, 255, 255, 0.025),
+    inset 0 1px 8px rgba(255, 255, 255, 0.035);
+  opacity: 0.72;
+}
+
+.ai-liquid-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ai-liquid-titlebar {
+  background: color-mix(in oklch, var(--app-chrome) 28%, transparent);
+  box-shadow:
+    inset 0 -1px 0 color-mix(in oklch, var(--app-border) 72%, transparent),
+    0 1px 0 rgba(0, 0, 0, 0.16);
+}
+
+.ai-liquid-symbol,
+.ai-liquid-control,
+.ai-liquid-chip,
+.ai-liquid-input,
+.ai-liquid-popover {
+  -webkit-backdrop-filter: blur(18px) saturate(1.18);
+  backdrop-filter: blur(18px) saturate(1.18);
+}
+
+.ai-liquid-symbol {
+  border: 1px solid color-mix(in oklch, var(--app-border) 88%, white 6%);
+  background: color-mix(in oklch, var(--app-panel-strong) 82%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+.ai-liquid-control {
+  border: 1px solid color-mix(in oklch, var(--app-border) 88%, white 5%);
+  background: color-mix(in oklch, var(--app-panel-strong) 70%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 6px 18px rgba(0, 0, 0, 0.16);
+}
+
+.ai-liquid-control:hover {
+  border-color: color-mix(in oklch, var(--foreground) 16%, var(--app-border));
+  background: color-mix(in oklch, var(--app-panel-strong) 84%, transparent);
+  color: var(--foreground);
+}
+
+.ai-liquid-control:active {
+  transform: scale(0.98);
+}
+
+.ai-liquid-popover {
+  border: 1px solid color-mix(in oklch, var(--app-border) 88%, white 6%);
+  background: color-mix(in oklch, var(--app-elevated) 50%, transparent);
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.ai-liquid-scroll {
+  background: transparent;
+}
+
+.ai-liquid-composer {
+  background: color-mix(in oklch, var(--app-chrome) 28%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, var(--app-border) 72%, transparent),
+    0 -12px 42px rgba(0, 0, 0, 0.12);
+}
+
+.ai-liquid-chip {
+  border: 1px solid color-mix(in oklch, var(--app-border) 84%, transparent);
+  background: color-mix(in oklch, var(--app-panel) 62%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.ai-liquid-chip:hover {
+  border-color: color-mix(in oklch, var(--foreground) 14%, var(--app-border));
+  background: color-mix(in oklch, var(--app-panel-strong) 78%, transparent);
+  color: var(--foreground);
+}
+
+.ai-liquid-input {
+  border: 1px solid color-mix(in oklch, var(--app-border) 88%, white 4%);
+  background: color-mix(in oklch, var(--background) 24%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.ai-liquid-input:focus {
+  border-color: color-mix(in oklch, var(--foreground) 18%, var(--app-border));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 0 0 3px color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+
+.ai-liquid-inline-code {
+  border: 1px solid color-mix(in oklch, var(--app-border) 72%, transparent);
+  background: color-mix(in oklch, var(--app-panel-strong) 76%, transparent);
+}
+
+.ai-liquid-code-block {
+  border: 1px solid color-mix(in oklch, var(--app-border) 78%, transparent);
+  background: color-mix(in oklch, var(--background) 30%, transparent);
+}
+
+.ai-peregrine-thinking {
+  color: rgb(255, 68, 68);
+}
+
+.peregrine-mask-icon {
+  display: block;
+  background: currentColor;
+  -webkit-mask-image: var(--peregrine-mark);
+  mask-image: var(--peregrine-mark);
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.ai-peregrine-thinking__mark {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 30px;
+  background: currentColor;
+  filter: drop-shadow(0 0 10px rgba(255, 68, 68, 0.28));
+  transform-origin: 52% 44%;
+  -webkit-mask-image: var(--peregrine-mark);
+  mask-image: var(--peregrine-mark);
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  animation: ai-peregrine-blink 1.05s ease-in-out infinite;
+}
+
+.ai-peregrine-thinking__mark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(255, 68, 68);
+  clip-path: inset(24% 30% 34% 30%);
+  transform-origin: 52% 38%;
+  -webkit-mask-image: var(--peregrine-mark);
+  mask-image: var(--peregrine-mark);
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  animation: ai-peregrine-head 0.7s ease-in-out infinite;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ai-liquid-launcher,
+  .ai-liquid-panel,
+  .ai-liquid-popover {
+    background: color-mix(in oklch, var(--app-elevated) 92%, black 8%);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .ai-liquid-symbol,
+  .ai-liquid-control,
+  .ai-liquid-chip,
+  .ai-liquid-input {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@keyframes ai-peregrine-blink {
+  0% {
+    opacity: 0.42;
+    transform: translateY(0) scale(0.96);
+  }
+
+  48% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1);
+  }
+
+  100% {
+    opacity: 0.42;
+    transform: translateY(0) scale(0.96);
+  }
+}
+
+@keyframes ai-peregrine-head {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+
+  45% {
+    transform: translateY(-2px) rotate(-5deg);
+  }
+}
+
 @keyframes execution-step-border-glow {
   0% {
     border-color: color-mix(in oklch, var(--primary) 38%, transparent);

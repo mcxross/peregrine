@@ -34,6 +34,7 @@ import type {
   SuiCliStatus,
 } from "@/features/empty-project/filesystem-tree";
 import { checkSuiCli } from "@/features/empty-project/filesystem-tree";
+import { AiFloatingWindow } from "@/features/project-workspace/ai/ai-floating-window";
 import {
   BuildLogSheet,
   type BuildLogRun,
@@ -94,6 +95,7 @@ export function ProjectWorkspace({
   packageTree,
 }: ProjectWorkspaceProps) {
   const [isRightPanelOpen, setIsRightPanelOpen] = React.useState(true);
+  const [isAiOpen, setIsAiOpen] = React.useState(true);
   const [selectedModule, setSelectedModule] = React.useState<SelectedMoveModule | null>(null);
   const [activeSurfaceDetail, setActiveSurfaceDetail] = React.useState<SurfaceDetailKind | null>(null);
   const activeMovePackage =
@@ -127,7 +129,7 @@ export function ProjectWorkspace({
 
   return (
     <div
-      className="grid h-full min-h-0 overflow-hidden bg-[var(--app-window)] text-foreground"
+      className="relative grid h-full min-h-0 overflow-hidden bg-[var(--app-window)] text-foreground"
       style={{
         gridTemplateColumns: isLeftPanelOpen
           ? `${workspaceSidebarWidth}px minmax(0, 1fr) ${isRightPanelOpen ? "clamp(360px, 24vw, 400px)" : "44px"}`
@@ -151,6 +153,7 @@ export function ProjectWorkspace({
             setActiveSurfaceDetail(null);
             setSelectedModule(null);
           }}
+          onOpenAi={() => setIsAiOpen(true)}
           onWorkspaceTabChange={(tab) => {
             setActiveSurfaceDetail(null);
             onWorkspaceTabChange(tab);
@@ -201,6 +204,15 @@ export function ProjectWorkspace({
           onOpen={() => setIsRightPanelOpen(true)}
         />
       )}
+
+      {activeMovePackage ? (
+        <AiFloatingWindow
+          activeMovePackage={activeMovePackage}
+          isOpen={isAiOpen}
+          onOpenChange={setIsAiOpen}
+          packageTree={packageTree}
+        />
+      ) : null}
     </div>
   );
 }
@@ -272,6 +284,7 @@ function SecuritySidebar({
   activeWorkspaceTab,
   loadAssessment,
   packageTree,
+  onOpenAi,
   onSelectPackage,
   onSelectSurfaceDetail,
   onWorkspaceTabChange,
@@ -281,6 +294,7 @@ function SecuritySidebar({
   activeWorkspaceTab: WorkspaceTab;
   loadAssessment: PackageLoadAssessment | null;
   packageTree: PackageTree;
+  onOpenAi: () => void;
   onSelectPackage: (movePackage: MovePackage) => void;
   onSelectSurfaceDetail: (detail: SurfaceDetailKind) => void;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
@@ -379,6 +393,7 @@ function SecuritySidebar({
           </p>
           <Button
             className="mt-3 h-9 w-full text-foreground"
+            onClick={onOpenAi}
             type="button"
             variant="outline"
           >
