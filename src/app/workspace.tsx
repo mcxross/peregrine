@@ -5,6 +5,7 @@ import type {
   BuildLogSheetController,
   BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
+import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
 import { ProjectWorkspace } from "@/features/project-workspace/project-workspace";
 import type { WorkspaceTab } from "@/app/titlebar";
 
@@ -14,6 +15,7 @@ type WorkspaceProps = {
   buildLogSheet: BuildLogSheetController;
   isLeftPanelOpen: boolean;
   lastScannedAt: number | null;
+  loadAssessment: PackageLoadAssessment | null;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   packageTree: PackageTree | null;
@@ -27,6 +29,7 @@ export function Workspace({
   buildLogSheet,
   isLeftPanelOpen,
   lastScannedAt,
+  loadAssessment,
   onActivePackageManifestPathChange,
   onCommandLog,
   onWorkspaceTabChange,
@@ -41,6 +44,7 @@ export function Workspace({
         buildLogSheet={buildLogSheet}
         isLeftPanelOpen={isLeftPanelOpen}
         lastScannedAt={lastScannedAt}
+        loadAssessment={loadAssessment}
         onActivePackageManifestPathChange={onActivePackageManifestPathChange}
         onCommandLog={onCommandLog}
         onProjectSelected={onProjectSelected}

@@ -4,8 +4,6 @@ import {
   Box,
   Check,
   ChevronDown,
-  FileCheck2,
-  FileText,
   Gauge,
   GitBranch,
   KeyRound,
@@ -17,7 +15,6 @@ import {
   ScanEye,
   ShieldAlert,
   Sparkles,
-  Target,
   UsersRound,
   Workflow,
 } from "lucide-react";
@@ -46,6 +43,8 @@ import {
 import { DependencyGraphScreen } from "@/features/project-workspace/dependency-graph-screen";
 import { ExecutionBuilderScreen } from "@/features/project-workspace/execution-builder-screen";
 import { MovePackagesOverviewScreen } from "@/features/project-workspace/move-packages-overview-screen";
+import { assessmentSidebarItems } from "@/features/project-workspace/package-load-assessment-cards";
+import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
 import type { SelectedMoveModule } from "@/features/project-workspace/module-signature-screen";
 import {
   SurfaceDetailScreen,
@@ -63,6 +62,7 @@ type ProjectWorkspaceProps = {
   buildLogSheet: BuildLogSheetController;
   isLeftPanelOpen: boolean;
   lastScannedAt: number | null;
+  loadAssessment: PackageLoadAssessment | null;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
@@ -80,20 +80,13 @@ export type OpenFileTab = {
   status: "idle" | "loading" | "loaded" | "error";
 };
 
-const validationItems = [
-  { icon: FileCheck2, label: "Tests", value: "check", tone: "success" },
-  { icon: Gauge, label: "Coverage", value: "74%", tone: "success" },
-  { icon: Target, label: "Fuzzing", value: "2", tone: "danger" },
-  { icon: FileText, label: "Formal Specs", value: "5 / 8", tone: "warning" },
-  { icon: FileText, label: "Audit Report", value: "", tone: "muted" },
-];
-
 export function ProjectWorkspace({
   activePackageManifestPath,
   activeWorkspaceTab,
   buildLogSheet,
   isLeftPanelOpen,
   lastScannedAt,
+  loadAssessment,
   onActivePackageManifestPathChange,
   onCommandLog,
   onProjectSelected,
@@ -146,6 +139,7 @@ export function ProjectWorkspace({
           activeMovePackage={activeMovePackage}
           activeSurfaceDetail={activeSurfaceDetail}
           activeWorkspaceTab={activeWorkspaceTab}
+          loadAssessment={loadAssessment}
           packageTree={packageTree}
           onSelectSurfaceDetail={(detail) => {
             setActiveSurfaceDetail(detail);
@@ -172,6 +166,7 @@ export function ProjectWorkspace({
           activeWorkspaceTab={activeWorkspaceTab}
           activeSurfaceDetail={activeSurfaceDetail}
           activeMovePackage={activeMovePackage}
+          loadAssessment={loadAssessment}
           packageTree={packageTree}
           packageName={packageName}
           selectedModule={selectedModule}
@@ -214,6 +209,7 @@ function WorkspaceMainPanel({
   activeWorkspaceTab,
   activeSurfaceDetail,
   activeMovePackage,
+  loadAssessment,
   onClearSelectedModule,
   onSelectModule,
   packageTree,
@@ -225,6 +221,7 @@ function WorkspaceMainPanel({
   activeWorkspaceTab: WorkspaceTab;
   activeSurfaceDetail: SurfaceDetailKind | null;
   activeMovePackage: MovePackage | null;
+  loadAssessment: PackageLoadAssessment | null;
   onClearSelectedModule: () => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
@@ -260,13 +257,20 @@ function WorkspaceMainPanel({
     );
   }
 
-  return <DependencyGraphScreen graph={packageTree.dependencyGraph} packageName={packageName} />;
+  return (
+    <DependencyGraphScreen
+      graph={packageTree.dependencyGraph}
+      loadAssessment={loadAssessment}
+      packageName={packageName}
+    />
+  );
 }
 
 function SecuritySidebar({
   activeMovePackage,
   activeSurfaceDetail,
   activeWorkspaceTab,
+  loadAssessment,
   packageTree,
   onSelectPackage,
   onSelectSurfaceDetail,
@@ -275,12 +279,14 @@ function SecuritySidebar({
   activeMovePackage: MovePackage | null;
   activeSurfaceDetail: SurfaceDetailKind | null;
   activeWorkspaceTab: WorkspaceTab;
+  loadAssessment: PackageLoadAssessment | null;
   packageTree: PackageTree;
   onSelectPackage: (movePackage: MovePackage) => void;
   onSelectSurfaceDetail: (detail: SurfaceDetailKind) => void;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
 }) {
   const surfaceItems = packageSurfaceItems(activeMovePackage);
+  const validationItems = assessmentSidebarItems(loadAssessment);
   const [suiCliStatus, setSuiCliStatus] = React.useState<SuiCliStatus | null>(null);
 
   React.useEffect(() => {
@@ -354,7 +360,7 @@ function SecuritySidebar({
         <SidebarSection title="Validation">
           {validationItems.map((item) => (
             <SidebarItem
-              badge={item.value}
+              badge={item.badge}
               icon={item.icon}
               key={item.label}
               label={item.label}

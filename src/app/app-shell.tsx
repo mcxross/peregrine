@@ -14,6 +14,11 @@ import type {
   BuildLogSheetController,
   BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
+import {
+  packageLoadAssessmentKey,
+  runPackageLoadAssessment,
+  type PackageLoadAssessment,
+} from "@/features/project-workspace/package-load-assessment";
 import { defaultLayoutSettings } from "@/layout/layout-store";
 import { titlebarHeight } from "@/layout/window-chrome";
 import { SettingsScreen } from "@/screens/settings-screen";
@@ -38,7 +43,10 @@ export function AppShell({
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
   const [isRescanning, setIsRescanning] = useState(false);
   const [lastScannedAt, setLastScannedAt] = useState<number | null>(null);
+  const [loadAssessment, setLoadAssessment] = useState<PackageLoadAssessment | null>(null);
+  const activeLoadAssessmentKeyRef = useRef<string | null>(null);
   const currentCommandLogIdRef = useRef<number | null>(null);
+  const lastAutoAssessmentKeyRef = useRef<string | null>(null);
   const layout = defaultLayoutSettings;
   const isSettings = screen === "settings";
   const showSidebar = isSettings;
@@ -60,7 +68,46 @@ export function AppShell({
     setBuildRuns([]);
     setIsBuildSheetOpen(false);
     setLastScannedAt(packageTree ? Date.now() : null);
+    setLoadAssessment(null);
   }, [packageTree?.rootPath, packageTree?.activePackageManifestPath]);
+
+  const showCommandLog = useCallback((run: BuildLogRun, options?: BuildLogUpdateOptions) => {
+    const shouldReset = options?.reset === true;
+    const shouldOpen = options?.open !== false;
+    const shouldForceOpen = options?.open === true;
+    const isSameRun = currentCommandLogIdRef.current === run.id;
+    currentCommandLogIdRef.current = run.id;
+    setBuildRuns((current) => shouldReset ? [run] : upsertLogRun(current, run));
+
+    if (shouldOpen && (shouldForceOpen || shouldReset || !isSameRun)) {
+      setIsBuildSheetOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!packageTree || !activeMovePackage) {
+      activeLoadAssessmentKeyRef.current = null;
+      return;
+    }
+
+    const assessmentKey = packageLoadAssessmentKey(packageTree, activeMovePackage);
+
+    if (lastAutoAssessmentKeyRef.current === assessmentKey) {
+      return;
+    }
+
+    lastAutoAssessmentKeyRef.current = assessmentKey;
+    activeLoadAssessmentKeyRef.current = assessmentKey;
+
+    void runPackageLoadAssessment({
+      isCurrent: () => activeLoadAssessmentKeyRef.current === assessmentKey,
+      movePackage: activeMovePackage,
+      onAssessmentChange: setLoadAssessment,
+      onCommandLog: showCommandLog,
+      onProjectSelected: handleProjectSelected,
+      packageTree,
+    });
+  }, [activeMovePackage, handleProjectSelected, packageTree, showCommandLog]);
 
   const rescanProject = useCallback(async () => {
     if (!packageTree || isRescanning) {
@@ -169,17 +216,6 @@ export function AppShell({
       );
     }
   }, [activeMovePackage, handleProjectSelected, isBuildRunning, packageTree]);
-  const showCommandLog = useCallback((run: BuildLogRun, options?: BuildLogUpdateOptions) => {
-    const shouldReset = options?.reset === true;
-    const isSameRun = currentCommandLogIdRef.current === run.id;
-    currentCommandLogIdRef.current = run.id;
-    setBuildRuns((current) => shouldReset ? [run] : upsertLogRun(current, run));
-
-    if (shouldReset || !isSameRun) {
-      setIsBuildSheetOpen(true);
-    }
-  }, []);
-
   const buildLogSheet = useMemo<BuildLogSheetController>(
     () => ({
       isOpen: isBuildSheetOpen,
@@ -226,6 +262,7 @@ export function AppShell({
               buildLogSheet={buildLogSheet}
               isLeftPanelOpen={isLeftPanelOpen}
               lastScannedAt={lastScannedAt}
+              loadAssessment={loadAssessment}
               onActivePackageManifestPathChange={setActivePackageManifestPath}
               onWorkspaceTabChange={setActiveWorkspaceTab}
               packageTree={packageTree}

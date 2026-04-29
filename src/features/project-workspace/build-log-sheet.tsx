@@ -38,6 +38,7 @@ type BuildLogSheetProps = {
 
 export type BuildLogSheetController = Omit<BuildLogSheetProps, "bottomInset">;
 export type BuildLogUpdateOptions = {
+  open?: boolean;
   reset?: boolean;
 };
 
