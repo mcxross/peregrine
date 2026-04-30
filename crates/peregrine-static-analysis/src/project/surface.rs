@@ -1,6 +1,7 @@
 use super::{
-    AdminControlFinding, CapabilityFinding, ExternalCallFinding, MoveFunctionSignature, MoveModule,
-    MovePackageSurface, MoveStructSignature, ObjectOwnershipFinding, PublicPackageRelationship,
+    object_lifecycle::object_lifecycle_maps, AdminControlFinding, CapabilityFinding,
+    ExternalCallFinding, MoveFunctionSignature, MoveModule, MovePackageSurface,
+    MoveStructSignature, ObjectOwnershipFinding, PublicPackageRelationship,
 };
 use std::collections::HashSet;
 
@@ -17,6 +18,7 @@ pub(crate) fn package_surface(modules: &[MoveModule]) -> MovePackageSurface {
         .map(|finding| finding.qualified_name.clone())
         .collect::<Vec<_>>();
     let object_ownership_findings = object_ownership_findings(modules, &capability_structs);
+    let object_lifecycle_maps = object_lifecycle_maps(modules, &capability_structs);
     let admin_control_findings = admin_control_findings(modules, &capability_structs);
     let external_call_findings = external_call_findings(modules);
     let public_package_relationships = public_package_relationships(modules);
@@ -61,6 +63,7 @@ pub(crate) fn package_surface(modules: &[MoveModule]) -> MovePackageSurface {
         capability_structs,
         capability_findings,
         shared_object_structs,
+        object_lifecycle_maps,
         object_ownership_findings,
         admin_control_findings,
         external_call_findings,
@@ -362,11 +365,15 @@ fn object_ownership_findings(
 fn key_structs(modules: &[MoveModule]) -> Vec<(String, &MoveStructSignature)> {
     modules
         .iter()
+        .filter(|module| !is_test_module(module))
         .flat_map(|module| {
             module
                 .structs
                 .iter()
-                .filter(|move_struct| struct_has_ability(move_struct, "key"))
+                .filter(|move_struct| {
+                    struct_has_ability(move_struct, "key")
+                        && !has_test_attribute(&move_struct.attributes)
+                })
                 .map(|move_struct| (module.name.clone(), move_struct))
         })
         .collect()
@@ -382,34 +389,69 @@ fn ownership_evidence(
     let mut related_functions = Vec::new();
 
     for module in modules {
+        if is_test_module(module) {
+            continue;
+        }
+
         for function in &module.functions {
+            if has_test_attribute(&function.attributes) {
+                continue;
+            }
+
             let Some(body) = function.body.as_deref() else {
                 continue;
             };
 
-            let lower_body = body.to_ascii_lowercase();
-            let references_type = type_reference_matches(body, type_name)
-                || body.contains(qualified_name)
-                || body_constructs_type(body, type_name)
-                || function_returns_type(&function.signature, type_name)
+            let returns_type = function_returns_type(&function.signature, type_name)
                 || function_returns_type(&function.signature, qualified_name);
             let matched = match kind {
-                "shared" => references_type && lower_body.contains("share_object"),
+                "shared" => operation_touches_type(
+                    body,
+                    &function.signature,
+                    type_name,
+                    qualified_name,
+                    &[
+                        "transfer::share_object",
+                        "transfer::public_share_object",
+                        "share_object",
+                    ],
+                ),
                 "addressOwned" => {
-                    (references_type
-                        && (lower_body.contains("transfer::transfer")
-                            || lower_body.contains("transfer::public_transfer")
-                            || lower_body.contains("public_transfer")))
-                        || (function.is_transaction_callable
-                            && function_returns_type(&function.signature, type_name))
-                        || (function.is_transaction_callable
-                            && function_returns_type(&function.signature, qualified_name))
+                    operation_touches_type(
+                        body,
+                        &function.signature,
+                        type_name,
+                        qualified_name,
+                        &[
+                            "transfer::transfer",
+                            "transfer::public_transfer",
+                            "public_transfer",
+                        ],
+                    ) || (function.is_transaction_callable && returns_type)
                 }
-                "immutable" => references_type && lower_body.contains("freeze_object"),
-                "party" => {
-                    references_type
-                        && (lower_body.contains("party_transfer") || lower_body.contains("party::"))
-                }
+                "immutable" => operation_touches_type(
+                    body,
+                    &function.signature,
+                    type_name,
+                    qualified_name,
+                    &[
+                        "transfer::freeze_object",
+                        "transfer::public_freeze_object",
+                        "freeze_object",
+                    ],
+                ),
+                "party" => operation_touches_type(
+                    body,
+                    &function.signature,
+                    type_name,
+                    qualified_name,
+                    &[
+                        "transfer::party_transfer",
+                        "transfer::public_party_transfer",
+                        "party_transfer",
+                        "party::",
+                    ],
+                ),
                 _ => false,
             };
 
@@ -490,6 +532,181 @@ fn function_returns_type(signature: &str, type_name: &str) -> bool {
     };
 
     type_reference_matches(return_type, type_name)
+}
+
+fn operation_touches_type(
+    body: &str,
+    signature: &str,
+    type_name: &str,
+    qualified_name: &str,
+    operations: &[&str],
+) -> bool {
+    let value_names = owned_or_constructed_value_names(body, signature, type_name, qualified_name);
+
+    operation_call_snippets(body, operations)
+        .iter()
+        .any(|snippet| {
+            body_constructs_type(snippet, type_name)
+                || body_constructs_type(snippet, qualified_name)
+                || value_names
+                    .iter()
+                    .any(|value_name| source_contains_identifier(snippet, value_name))
+        })
+}
+
+fn owned_or_constructed_value_names(
+    body: &str,
+    signature: &str,
+    type_name: &str,
+    qualified_name: &str,
+) -> HashSet<String> {
+    let mut names = HashSet::new();
+
+    names.extend(owned_parameter_names(signature, type_name));
+    names.extend(owned_parameter_names(signature, qualified_name));
+    names.extend(constructed_value_names(body, type_name));
+    names.extend(constructed_value_names(body, qualified_name));
+    names
+}
+
+fn owned_parameter_names(signature: &str, type_name: &str) -> HashSet<String> {
+    let mut names = HashSet::new();
+    let Some(parameters) = function_parameters(signature) else {
+        return names;
+    };
+
+    for parameter in split_top_level(parameters, ',') {
+        let Some((name, parameter_type)) = parameter.split_once(':') else {
+            continue;
+        };
+        let parameter_type = parameter_type.trim();
+
+        if parameter_type.starts_with('&') || !type_reference_matches(parameter_type, type_name) {
+            continue;
+        }
+
+        let name = name
+            .split_whitespace()
+            .last()
+            .unwrap_or("")
+            .trim_matches(|character: char| !is_identifier_character(character));
+
+        if !name.is_empty() {
+            names.insert(name.to_string());
+        }
+    }
+
+    names
+}
+
+fn constructed_value_names(body: &str, type_name: &str) -> HashSet<String> {
+    let mut names = HashSet::new();
+
+    for statement in body.split(';') {
+        let Some((left, right)) = statement.split_once('=') else {
+            continue;
+        };
+
+        if !left.contains("let") || !body_constructs_type(right, type_name) {
+            continue;
+        }
+
+        let Some(raw_name) = left
+            .split("let")
+            .last()
+            .and_then(|binding| binding.split(':').next())
+        else {
+            continue;
+        };
+
+        let name = raw_name
+            .split_whitespace()
+            .filter(|part| *part != "mut")
+            .next_back()
+            .unwrap_or("")
+            .trim_matches(|character: char| !is_identifier_character(character));
+
+        if !name.is_empty() {
+            names.insert(name.to_string());
+        }
+    }
+
+    names
+}
+
+fn operation_call_snippets(body: &str, operations: &[&str]) -> Vec<String> {
+    let lower_body = body.to_ascii_lowercase();
+    let mut snippets = Vec::new();
+
+    for operation in operations {
+        let operation = operation.to_ascii_lowercase();
+        let mut search_start = 0;
+
+        while let Some(relative_start) = lower_body[search_start..].find(&operation) {
+            let start = search_start + relative_start;
+            let end = lower_body[start..]
+                .find(';')
+                .map(|offset| start + offset)
+                .unwrap_or(body.len());
+
+            snippets.push(body[start..end].to_string());
+            search_start = end.saturating_add(1);
+        }
+    }
+
+    snippets
+}
+
+fn split_top_level(source: &str, delimiter: char) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut start = 0;
+    let mut angle_depth = 0_i32;
+    let mut paren_depth = 0_i32;
+
+    for (index, character) in source.char_indices() {
+        match character {
+            '<' => angle_depth += 1,
+            '>' => angle_depth -= 1,
+            '(' => paren_depth += 1,
+            ')' => paren_depth -= 1,
+            _ if character == delimiter && angle_depth == 0 && paren_depth == 0 => {
+                parts.push(source[start..index].trim());
+                start = index + character.len_utf8();
+            }
+            _ => {}
+        }
+    }
+
+    parts.push(source[start..].trim());
+    parts
+}
+
+fn source_contains_identifier(source: &str, identifier: &str) -> bool {
+    source
+        .split(|character: char| !is_identifier_character(character))
+        .any(|token| token == identifier)
+}
+
+fn is_identifier_character(character: char) -> bool {
+    character.is_ascii_alphanumeric() || character == '_'
+}
+
+fn is_test_module(module: &MoveModule) -> bool {
+    module
+        .file_path
+        .split('/')
+        .any(|segment| segment == "tests")
+        || has_test_attribute(&module.attributes)
+}
+
+fn has_test_attribute(attributes: &[String]) -> bool {
+    attributes.iter().any(|attribute| {
+        let attribute = attribute.to_ascii_lowercase();
+        attribute.contains("test")
+            || attribute.contains("test_only")
+            || attribute.contains("random_test")
+            || attribute.contains("expected_failure")
+    })
 }
 
 fn wrapped_object_findings(

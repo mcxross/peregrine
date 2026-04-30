@@ -1,4 +1,5 @@
 mod dependency_graph;
+mod object_lifecycle;
 mod source_parser;
 mod surface;
 
@@ -44,10 +45,58 @@ pub struct MovePackageSurface {
     pub capability_structs: Vec<String>,
     pub capability_findings: Vec<CapabilityFinding>,
     pub shared_object_structs: Vec<String>,
+    pub object_lifecycle_maps: Vec<ObjectLifecycleMap>,
     pub object_ownership_findings: Vec<ObjectOwnershipFinding>,
     pub admin_control_findings: Vec<AdminControlFinding>,
     pub external_call_findings: Vec<ExternalCallFinding>,
     pub public_package_relationships: Vec<PublicPackageRelationship>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectLifecycleMap {
+    pub type_name: String,
+    pub module_name: String,
+    pub qualified_name: String,
+    pub file_path: String,
+    pub abilities: Vec<String>,
+    pub is_capability_like: bool,
+    pub stages: Vec<ObjectLifecycleStage>,
+    pub touched_by: Vec<ObjectLifecycleFunctionRef>,
+    pub risks: Vec<ObjectLifecycleRisk>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectLifecycleStage {
+    pub kind: String,
+    pub functions: Vec<ObjectLifecycleFunctionRef>,
+    pub evidence: Vec<String>,
+}
+
+#[derive(Serialize, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectLifecycleFunctionRef {
+    pub module_name: String,
+    pub function_name: String,
+    pub qualified_name: String,
+    pub file_path: String,
+    pub visibility: String,
+    pub is_entry: bool,
+    pub is_transaction_callable: bool,
+    pub direct: bool,
+    pub call_path: Vec<String>,
+    pub evidence: Vec<String>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectLifecycleRisk {
+    pub kind: String,
+    pub severity: String,
+    pub message: String,
+    pub evidence: Vec<String>,
+    pub functions: Vec<ObjectLifecycleFunctionRef>,
 }
 
 #[derive(Serialize)]
@@ -110,6 +159,7 @@ pub struct MoveModule {
     pub name: String,
     pub address: Option<String>,
     pub file_path: String,
+    pub attributes: Vec<String>,
     pub structs: Vec<MoveStructSignature>,
     pub functions: Vec<MoveFunctionSignature>,
 }
@@ -121,6 +171,7 @@ pub struct MoveStructSignature {
     pub abilities: Vec<String>,
     pub fields: Vec<MoveStructField>,
     pub signature: String,
+    pub attributes: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -139,6 +190,7 @@ pub struct MoveFunctionSignature {
     pub is_transaction_callable: bool,
     pub signature: String,
     pub body: Option<String>,
+    pub attributes: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -578,5 +630,339 @@ module savings_personal::savings_personal {
         assert!(surface.address_owned_object_count >= 1);
         assert!(surface.wrapped_object_count >= 1);
         assert!(surface.admin_control_count >= 1);
+    }
+
+    #[test]
+    fn package_surface_builds_object_lifecycle_maps() {
+        let root = Path::new("/workspace");
+        let module = parse_module_declaration(
+            r#"
+module lifecycle::vault {
+    public struct AdminCap has key, store { id: UID }
+    public struct Vault has key, store { id: UID }
+    public struct VaultReceipt has key, store { id: UID }
+    public struct ReceiptWrapper has key, store { id: UID, receipt: VaultReceipt }
+
+    fun create_internal(ctx: &mut TxContext): Vault {
+        Vault { id: object::new(ctx) }
+    }
+
+    public entry fun create_vault(ctx: &mut TxContext) {
+        let vault = Vault { id: object::new(ctx) };
+        transfer::transfer(vault, tx_context::sender(ctx));
+    }
+
+    public entry fun route_create(ctx: &mut TxContext) {
+        let _vault = create_internal(ctx);
+    }
+
+    public entry fun deposit(vault: &mut Vault) {}
+
+    public entry fun share_vault(vault: Vault) {
+        transfer::share_object(vault);
+    }
+
+    public entry fun freeze_vault(vault: Vault) {
+        transfer::freeze_object(vault);
+    }
+
+    public entry fun party_vault(vault: Vault, party: Party) {
+        transfer::party_transfer(vault, party);
+    }
+
+    public entry fun delete_vault(vault: Vault) {
+        let Vault { id } = vault;
+        id.delete();
+    }
+
+    public fun issue_receipt(ctx: &mut TxContext): VaultReceipt {
+        VaultReceipt { id: object::new(ctx) }
+    }
+
+    public entry fun leak_cap(ctx: &mut TxContext) {
+        transfer::transfer(AdminCap { id: object::new(ctx) }, @0x1);
+    }
+}
+"#,
+            root,
+            Path::new("/workspace/sources/vault.move"),
+        )
+        .expect("lifecycle module should parse");
+
+        let surface = package_surface(&[module]);
+        let vault = surface
+            .object_lifecycle_maps
+            .iter()
+            .find(|lifecycle| lifecycle.qualified_name == "vault::Vault")
+            .expect("vault lifecycle map");
+        let stage_kinds = vault
+            .stages
+            .iter()
+            .map(|stage| stage.kind.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(stage_kinds.contains(&"created"));
+        assert!(stage_kinds.contains(&"owned"));
+        assert!(stage_kinds.contains(&"mutated"));
+        assert!(stage_kinds.contains(&"transferred"));
+        assert!(stage_kinds.contains(&"shared"));
+        assert!(stage_kinds.contains(&"immutable"));
+        assert!(stage_kinds.contains(&"party"));
+        assert!(stage_kinds.contains(&"deleted"));
+        assert!(vault.touched_by.iter().any(|function| {
+            function.qualified_name == "vault::route_create"
+                && !function.direct
+                && function.call_path == ["vault::route_create", "vault::create_internal"]
+        }));
+
+        let receipt = surface
+            .object_lifecycle_maps
+            .iter()
+            .find(|lifecycle| lifecycle.qualified_name == "vault::VaultReceipt")
+            .expect("receipt lifecycle map");
+
+        assert!(receipt.stages.iter().any(|stage| stage.kind == "wrapped"));
+        assert!(receipt
+            .risks
+            .iter()
+            .any(|risk| risk.kind == "longLivedReceiptOrPosition"));
+
+        let admin_cap = surface
+            .object_lifecycle_maps
+            .iter()
+            .find(|lifecycle| lifecycle.qualified_name == "vault::AdminCap")
+            .expect("admin cap lifecycle map");
+
+        assert!(admin_cap.is_capability_like);
+        assert!(admin_cap
+            .risks
+            .iter()
+            .any(|risk| risk.kind == "privilegedObjectLeak"));
+    }
+
+    #[test]
+    fn package_surface_excludes_test_only_lifecycle_code() {
+        let root = Path::new("/workspace");
+        let module = parse_module_declaration(
+            r#"
+module lifecycle::objects {
+    public struct LiveObject has key, store { id: UID }
+    public struct TestOnlyObject has key, store { id: UID }
+
+    public fun create_live(ctx: &mut TxContext): LiveObject {
+        LiveObject { id: object::new(ctx) }
+    }
+
+    #[test]
+    public fun create_test(ctx: &mut TxContext): TestOnlyObject {
+        TestOnlyObject { id: object::new(ctx) }
+    }
+}
+"#,
+            root,
+            Path::new("/workspace/sources/objects.move"),
+        )
+        .expect("objects module should parse");
+        let test_only_module = parse_module_declaration(
+            r#"
+#[test_only]
+module lifecycle::test_support {
+    public struct FixtureObject has key, store { id: UID }
+
+    public fun fixture(ctx: &mut TxContext): FixtureObject {
+        FixtureObject { id: object::new(ctx) }
+    }
+}
+"#,
+            root,
+            Path::new("/workspace/sources/test_support.move"),
+        )
+        .expect("test-only module should parse");
+
+        let surface = package_surface(&[module, test_only_module]);
+        let lifecycle_names = surface
+            .object_lifecycle_maps
+            .iter()
+            .map(|lifecycle| lifecycle.qualified_name.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(lifecycle_names.contains(&"objects::LiveObject"));
+        assert!(lifecycle_names.contains(&"objects::TestOnlyObject"));
+        assert!(!surface.object_lifecycle_maps.iter().any(|lifecycle| {
+            lifecycle
+                .touched_by
+                .iter()
+                .any(|function| function.qualified_name == "objects::create_test")
+        }));
+        assert!(!lifecycle_names.contains(&"test_support::FixtureObject"));
+    }
+
+    #[test]
+    fn lifecycle_scanner_avoids_read_only_false_ownership_events() {
+        let root = Path::new("/workspace");
+        let module = parse_module_declaration(
+            r#"
+module savings_personal::savings_personal {
+    public struct SavingsVault<phantom Asset> has key, store { id: UID }
+    public struct SavingsTreasury has key { id: UID, address: address }
+    public struct VaultReceipt has key, store { id: UID, vault_id: ID }
+
+    fun init(ctx: &mut TxContext) {
+        transfer::share_object(SavingsTreasury {
+            id: object::new(ctx),
+            address: ctx.sender(),
+        });
+    }
+
+    public fun register_account<Asset>(
+        vault: &mut SavingsVault<Asset>,
+        ctx: &mut TxContext,
+    ): VaultReceipt {
+        let receipt_uid = object::new(ctx);
+        let vault_id = object::id(vault);
+
+        VaultReceipt {
+            id: receipt_uid,
+            vault_id,
+        }
+    }
+
+    public fun emergency_withdraw_from_bucket<Asset>(
+        treasury: &SavingsTreasury,
+        receipt: &VaultReceipt,
+        penalty_coin: Coin<Asset>,
+    ) {
+        let _receipt_id = object::id(receipt);
+        transfer::public_transfer(penalty_coin, treasury_address(treasury));
+    }
+
+    public fun deposit_to_bucket<Asset>(
+        vault: &mut SavingsVault<Asset>,
+        receipt: &VaultReceipt,
+    ) {
+        let receipt_id = object::id(receipt);
+        let account = vault.borrow_account_mut(receipt_id);
+        vault::set_bucket_balance(account, 10);
+    }
+
+    public fun withdraw_from_bucket<Asset>(
+        vault: &mut SavingsVault<Asset>,
+        receipt: &VaultReceipt,
+    ) {
+        let receipt_id = object::id(receipt);
+        withdraw_unlocked_amount(vault, receipt_id);
+    }
+
+    fun withdraw_unlocked_amount<Asset>(
+        vault: &mut SavingsVault<Asset>,
+        receipt_id: ID,
+    ) {
+        let account = vault.borrow_account_mut(receipt_id);
+        vault::set_bucket_balance(account, 0);
+    }
+
+    public fun get_bucket_info<Asset>(
+        vault: &SavingsVault<Asset>,
+        receipt: &VaultReceipt,
+    ): u64 {
+        let receipt_id = object::id(receipt);
+        let _account = vault.borrow_account(receipt_id);
+        0
+    }
+
+    public fun treasury_address(treasury: &SavingsTreasury): address {
+        treasury.address
+    }
+
+    #[test_only]
+    public fun destroy_receipt_for_testing(receipt: VaultReceipt) {
+        let VaultReceipt { id, vault_id: _ } = receipt;
+        object::delete(id);
+    }
+}
+"#,
+            root,
+            Path::new("/workspace/sources/savings_personal.move"),
+        )
+        .expect("savings-like module should parse");
+
+        let surface = package_surface(&[module]);
+        let receipt = surface
+            .object_lifecycle_maps
+            .iter()
+            .find(|lifecycle| lifecycle.qualified_name == "savings_personal::VaultReceipt")
+            .expect("receipt lifecycle map");
+        let receipt_stages = receipt
+            .stages
+            .iter()
+            .map(|stage| stage.kind.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(receipt_stages.contains(&"created"));
+        assert!(receipt_stages.contains(&"owned"));
+        assert!(receipt_stages.contains(&"mutated"));
+        assert!(receipt_stages.contains(&"transferred"));
+        assert!(!receipt_stages.contains(&"deleted"));
+        assert!(receipt
+            .touched_by
+            .iter()
+            .any(|function| function.qualified_name == "savings_personal::register_account"));
+        assert!(!receipt.touched_by.iter().any(|function| {
+            function.qualified_name == "savings_personal::emergency_withdraw_from_bucket"
+        }));
+        assert!(receipt.touched_by.iter().any(|function| {
+            function.qualified_name == "savings_personal::deposit_to_bucket"
+                && function
+                    .evidence
+                    .iter()
+                    .any(|item| item.contains("mutates state keyed by"))
+        }));
+        assert!(receipt.touched_by.iter().any(|function| {
+            function.qualified_name == "savings_personal::withdraw_from_bucket"
+                && function
+                    .evidence
+                    .iter()
+                    .any(|item| item.contains("mutates state keyed by"))
+        }));
+        assert!(receipt.touched_by.iter().any(|function| {
+            function.qualified_name == "savings_personal::register_account"
+                && function
+                    .evidence
+                    .iter()
+                    .any(|item| item.contains("returned to transaction caller"))
+        }));
+        assert!(!receipt
+            .touched_by
+            .iter()
+            .any(|function| { function.qualified_name == "savings_personal::get_bucket_info" }));
+
+        let receipt_ownership = surface
+            .object_ownership_findings
+            .iter()
+            .find(|finding| {
+                finding.qualified_name == "savings_personal::VaultReceipt"
+                    && finding.ownership_kind == "addressOwned"
+            })
+            .expect("receipt address-owned finding");
+
+        assert_eq!(
+            receipt_ownership.related_functions,
+            vec!["savings_personal::register_account"]
+        );
+        assert!(!surface.object_ownership_findings.iter().any(|finding| {
+            finding.qualified_name == "savings_personal::VaultReceipt"
+                && finding
+                    .related_functions
+                    .iter()
+                    .any(|function| function == "savings_personal::emergency_withdraw_from_bucket")
+        }));
+
+        let treasury = surface
+            .object_lifecycle_maps
+            .iter()
+            .find(|lifecycle| lifecycle.qualified_name == "savings_personal::SavingsTreasury")
+            .expect("treasury lifecycle map");
+
+        assert!(treasury.stages.iter().any(|stage| stage.kind == "shared"));
     }
 }

@@ -32,10 +32,61 @@ export type MovePackageSurface = {
   capabilityStructs: string[];
   capabilityFindings: CapabilityFinding[];
   sharedObjectStructs: string[];
+  objectLifecycleMaps: ObjectLifecycleMap[];
   objectOwnershipFindings: ObjectOwnershipFinding[];
   adminControlFindings: AdminControlFinding[];
   externalCallFindings: ExternalCallFinding[];
   publicPackageRelationships: PublicPackageRelationship[];
+};
+
+export type ObjectLifecycleStageKind =
+  | "created"
+  | "owned"
+  | "mutated"
+  | "transferred"
+  | "shared"
+  | "wrapped"
+  | "immutable"
+  | "party"
+  | "deleted";
+
+export type ObjectLifecycleMap = {
+  typeName: string;
+  moduleName: string;
+  qualifiedName: string;
+  filePath: string;
+  abilities: string[];
+  isCapabilityLike: boolean;
+  stages: ObjectLifecycleStage[];
+  touchedBy: ObjectLifecycleFunctionRef[];
+  risks: ObjectLifecycleRisk[];
+};
+
+export type ObjectLifecycleStage = {
+  kind: ObjectLifecycleStageKind;
+  functions: ObjectLifecycleFunctionRef[];
+  evidence: string[];
+};
+
+export type ObjectLifecycleFunctionRef = {
+  moduleName: string;
+  functionName: string;
+  qualifiedName: string;
+  filePath: string;
+  visibility: string;
+  isEntry: boolean;
+  isTransactionCallable: boolean;
+  direct: boolean;
+  callPath: string[];
+  evidence: string[];
+};
+
+export type ObjectLifecycleRisk = {
+  kind: string;
+  severity: "high" | "medium" | "low" | string;
+  message: string;
+  evidence: string[];
+  functions: ObjectLifecycleFunctionRef[];
 };
 
 export type CapabilityFinding = {
@@ -86,6 +137,7 @@ export type MoveModule = {
   name: string;
   address: string | null;
   filePath: string;
+  attributes: string[];
   structs: MoveStructSignature[];
   functions: MoveFunctionSignature[];
 };
@@ -95,6 +147,7 @@ export type MoveStructSignature = {
   abilities: string[];
   fields: MoveStructField[];
   signature: string;
+  attributes: string[];
 };
 
 export type MoveStructField = {
@@ -109,6 +162,7 @@ export type MoveFunctionSignature = {
   isTransactionCallable: boolean;
   signature: string;
   body: string | null;
+  attributes: string[];
 };
 
 export type PackageDependencyGraph = {

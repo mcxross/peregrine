@@ -19,6 +19,7 @@ pub use plugins::{
 pub use project::{
     discover_move_project, AdminControlFinding, CapabilityFinding, ExternalCallFinding,
     MoveFunctionSignature, MoveModule, MovePackage, MovePackageSurface, MoveProject,
-    MoveStructField, MoveStructSignature, ObjectOwnershipFinding, PackageDependencyEdge,
+    MoveStructField, MoveStructSignature, ObjectLifecycleFunctionRef, ObjectLifecycleMap,
+    ObjectLifecycleRisk, ObjectLifecycleStage, ObjectOwnershipFinding, PackageDependencyEdge,
     PackageDependencyGraph, PackageDependencyNode, PublicPackageRelationship,
 };

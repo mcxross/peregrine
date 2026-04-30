@@ -6,8 +6,9 @@ use move_compiler::{
     editions::Flavor,
     parser::{
         ast::{
-            Ability_, Definition, Function, FunctionBody_, LeadingNameAccess, LeadingNameAccess_,
-            ModuleDefinition, ModuleMember, StructDefinition, StructFields, Type, Visibility,
+            Ability_, Attribute_, Attributes, Definition, Function, FunctionBody_,
+            LeadingNameAccess, LeadingNameAccess_, ModuleDefinition, ModuleMember,
+            StructDefinition, StructFields, Type, Visibility,
         },
         syntax::parse_file_string,
     },
@@ -145,6 +146,7 @@ fn convert_ast_module(
         name,
         address,
         file_path: file_path.to_string(),
+        attributes: ast_attributes(&module.attributes, source),
         structs,
         functions,
     }
@@ -160,6 +162,7 @@ fn convert_ast_struct(move_struct: &StructDefinition, source: &str) -> MoveStruc
             .collect(),
         fields: ast_struct_fields(&move_struct.fields, source),
         signature: ast_struct_signature(move_struct, source),
+        attributes: ast_attributes(&move_struct.attributes, source),
     }
 }
 
@@ -224,7 +227,46 @@ fn convert_ast_function(function: &Function, source: &str) -> MoveFunctionSignat
         is_entry,
         signature: ast_function_signature(function, source),
         body: ast_function_body(function, source),
+        attributes: ast_attributes(&function.attributes, source),
     }
+}
+
+fn ast_attributes(attributes: &[Attributes], source: &str) -> Vec<String> {
+    let mut names = Vec::new();
+
+    for attribute_group in attributes {
+        let snippet = source_for_range(
+            source,
+            attribute_group.loc.start() as usize,
+            attribute_group.loc.end() as usize,
+        )
+        .unwrap_or_default();
+
+        for attribute in &attribute_group.value.0 {
+            let name = match &attribute.value {
+                Attribute_::Mode { .. } => {
+                    if snippet.contains("test_only") {
+                        "test_only"
+                    } else if snippet.contains("mode(test)") || snippet.contains("mode = test") {
+                        "mode(test)"
+                    } else {
+                        attribute.value.attribute_name()
+                    }
+                }
+                _ => attribute.value.attribute_name(),
+            };
+
+            names.push(name.to_string());
+        }
+
+        if snippet.contains("test_only") && !names.iter().any(|name| name == "test_only") {
+            names.push("test_only".to_string());
+        }
+    }
+
+    names.sort();
+    names.dedup();
+    names
 }
 
 fn ast_function_signature(function: &Function, source: &str) -> String {
