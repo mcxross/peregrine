@@ -36,9 +36,15 @@ import React from "react";
 
 type CodeEditorProps = {
   complexityHighlights?: ComplexityHighlight[];
+  jumpRequest?: CodeEditorJumpRequest | null;
   language: string;
   value: string;
   onChange: (value: string) => void;
+};
+
+export type CodeEditorJumpRequest = {
+  line: number;
+  token: number;
 };
 
 export type ComplexityHighlight = {
@@ -73,6 +79,7 @@ const complexityHighlightField = StateField.define<DecorationSet>({
 
 export function CodeEditor({
   complexityHighlights = EMPTY_COMPLEXITY_HIGHLIGHTS,
+  jumpRequest = null,
   language,
   value,
   onChange,
@@ -138,6 +145,22 @@ export function CodeEditor({
       effects: setComplexityHighlights.of(complexityHighlights),
     });
   }, [complexityHighlights]);
+
+  React.useEffect(() => {
+    const editor = editorRef.current;
+
+    if (!editor || !jumpRequest) {
+      return;
+    }
+
+    const line = editor.state.doc.line(clampLineNumber(jumpRequest.line, editor.state.doc.lines));
+
+    editor.dispatch({
+      selection: { anchor: line.from },
+      effects: EditorView.scrollIntoView(line.from, { y: "center" }),
+    });
+    editor.focus();
+  }, [jumpRequest]);
 
   return <div ref={hostRef} className="min-h-0 flex-1 overflow-hidden" />;
 }

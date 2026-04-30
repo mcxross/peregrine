@@ -2,6 +2,14 @@ import { Box, FileCode2, FileText, Folder, Package, SquarePen, X } from "lucide-
 import React from "react";
 
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
   AnalysisFinding,
@@ -13,7 +21,10 @@ import type {
   PackageTree,
 } from "@/features/empty-project/filesystem-tree";
 import { analyzeMovePackage, loadFilePreview } from "@/features/empty-project/filesystem-tree";
-import type { ComplexityHighlight } from "@/features/project-workspace/code-editor";
+import type {
+  CodeEditorJumpRequest,
+  ComplexityHighlight,
+} from "@/features/project-workspace/code-editor";
 import {
   ModuleSignatureScreen,
   type SelectedMoveModule,
@@ -471,6 +482,7 @@ function ModuleSourceEditorWorkspace({
     ?? editorTabs[0]
     ?? null;
   const activePath = activeTab?.selectedModule.moveModule.filePath ?? null;
+  const [jumpRequest, setJumpRequest] = React.useState<CodeEditorJumpRequest | null>(null);
   const activeComplexityHighlights = React.useMemo(
     () => activeTab
       ? complexityHighlightsForFile(
@@ -581,6 +593,12 @@ function ModuleSourceEditorWorkspace({
 
     updateTab(activePath, (tab) => ({ ...tab, source }));
   }, [activePath, updateTab]);
+  const jumpToComplexityHighlight = React.useCallback((highlight: ComplexityHighlight) => {
+    setJumpRequest({
+      line: highlight.startLine,
+      token: Date.now(),
+    });
+  }, []);
 
   if (!activeTab) {
     return (
@@ -592,8 +610,8 @@ function ModuleSourceEditorWorkspace({
 
   return (
     <section className="grid h-full min-h-0 animate-in fade-in slide-in-from-right-3 duration-200 grid-rows-[auto_auto_minmax(0,1fr)] bg-[var(--app-window)]">
-      <header className="grid min-h-[58px] min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--app-border)] px-3">
-        <div className="flex min-w-0 items-end gap-1 overflow-x-auto pt-2">
+      <header className="grid h-[58px] min-h-[58px] min-w-0 grid-cols-[minmax(0,1fr)_112px] items-stretch border-b border-[color:var(--app-border)]">
+        <div className="flex min-w-0 items-end gap-1 overflow-x-auto px-3 pt-2">
           {editorTabs.map((tab) => {
             const path = tab.selectedModule.moveModule.filePath;
             const tabIsDirty = tab.source !== tab.savedSource;
@@ -630,12 +648,15 @@ function ModuleSourceEditorWorkspace({
             );
           })}
         </div>
-        <AnalyzerStatusBadge
-          complexFunctionCount={activeComplexityHighlights.length}
-          diagnostic={analysisDiagnostic?.message ?? null}
-          error={analysisError}
-          isAnalyzing={isAnalyzing}
-        />
+        <div className="flex h-full min-w-0 items-center justify-end px-3 pt-2">
+          <AnalyzerResultsMenu
+            diagnostic={analysisDiagnostic?.message ?? null}
+            error={analysisError}
+            highlights={activeComplexityHighlights}
+            isAnalyzing={isAnalyzing}
+            onSelectHighlight={jumpToComplexityHighlight}
+          />
+        </div>
       </header>
 
       {activeTab.error ? (
@@ -658,6 +679,7 @@ function ModuleSourceEditorWorkspace({
         >
           <CodeEditor
             complexityHighlights={activeComplexityHighlights}
+            jumpRequest={jumpRequest}
             key={activePath}
             language={activeTab.preview.language || "move"}
             value={activeTab.source}
@@ -685,16 +707,18 @@ function createModuleEditorTab(selectedModule: SelectedMoveModule): ModuleEditor
   };
 }
 
-function AnalyzerStatusBadge({
-  complexFunctionCount,
+function AnalyzerResultsMenu({
   diagnostic,
   error,
+  highlights,
   isAnalyzing,
+  onSelectHighlight,
 }: {
-  complexFunctionCount: number;
   diagnostic: string | null;
   error: string | null;
+  highlights: ComplexityHighlight[];
   isAnalyzing: boolean;
+  onSelectHighlight: (highlight: ComplexityHighlight) => void;
 }) {
   if (isAnalyzing) {
     return (
@@ -719,18 +743,48 @@ function AnalyzerStatusBadge({
     );
   }
 
-  if (complexFunctionCount === 0) {
+  if (highlights.length === 0) {
     return null;
   }
 
   return (
-    <Badge
-      className="shrink-0 border-amber-500/25 bg-amber-500/10 text-[11px] font-semibold text-amber-300"
-      title={`${complexFunctionCount} complex ${complexFunctionCount === 1 ? "function" : "functions"} highlighted`}
-      variant="secondary"
-    >
-      {complexFunctionCount} complex
-    </Badge>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 text-[11px] font-semibold text-amber-300 outline-none transition hover:border-amber-400/45 hover:bg-amber-500/15 focus-visible:ring-[3px] focus-visible:ring-amber-400/20"
+          title={`${highlights.length} complex ${highlights.length === 1 ? "function" : "functions"} highlighted`}
+          type="button"
+        >
+          {highlights.length} complex
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80 border-[color:var(--app-border)] bg-[var(--app-elevated)] p-1">
+        <DropdownMenuLabel className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Scan Results
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="bg-[var(--app-border)]" />
+        {highlights.map((highlight) => (
+          <DropdownMenuItem
+            className="grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md px-2.5 py-2 focus:bg-[var(--app-subtle)]"
+            key={complexityHighlightKey(highlight)}
+            onSelect={() => onSelectHighlight(highlight)}
+          >
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-semibold text-foreground">
+                {functionNameFromTarget(highlight.target)}
+              </span>
+              <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                Lines {highlight.startLine}-{highlight.endLine}
+              </span>
+            </span>
+            <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-300">
+              {highlight.score}
+              {highlight.threshold == null ? "" : ` / ${highlight.threshold}`}
+            </span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -922,7 +976,8 @@ function complexityHighlightsForFile(
         target: metric.target,
         threshold: metric.metric.threshold,
       };
-    });
+    })
+    .sort((left, right) => left.startLine - right.startLine || left.target.localeCompare(right.target));
 }
 
 function complexFunctionCountsByModule(
@@ -1016,6 +1071,16 @@ function moduleFilePathForMetric(
 
 function moduleNameFromTarget(target: string) {
   return target.split("::")[0] ?? target;
+}
+
+function functionNameFromTarget(target: string) {
+  const parts = target.split("::");
+
+  return parts[parts.length - 1] || target;
+}
+
+function complexityHighlightKey(highlight: ComplexityHighlight) {
+  return `${highlight.target}:${highlight.startLine}-${highlight.endLine}:${highlight.score}`;
 }
 
 function editorFilePathForAnalysisFile(movePackage: MovePackage, filePath: string) {
