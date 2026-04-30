@@ -156,7 +156,9 @@
 
   input,
   textarea,
-  [contenteditable="true"] {
+  [contenteditable="true"],
+  .cm-editor,
+  .cm-editor * {
     -webkit-user-select: text;
     user-select: text;
   }

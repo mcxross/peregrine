@@ -9,7 +9,6 @@ import { yaml } from "@codemirror/lang-yaml";
 import {
   bracketMatching,
   defaultHighlightStyle,
-  foldGutter,
   indentOnInput,
   StreamLanguage,
   syntaxHighlighting,
@@ -87,7 +86,6 @@ export function CodeEditor({ language, value, onChange }: CodeEditorProps) {
 function editorExtensions(language: string, onChange: (value: string) => void) {
   return [
     lineNumbers(),
-    foldGutter(),
     history(),
     drawSelection(),
     indentOnInput(),
@@ -97,7 +95,6 @@ function editorExtensions(language: string, onChange: (value: string) => void) {
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
     keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
     editorTheme,
-    EditorView.lineWrapping,
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         onChange(update.state.doc.toString());
