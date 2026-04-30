@@ -134,6 +134,52 @@ export type PackageDependencyEdge = {
   dependencyKind: string;
 };
 
+export type AnalysisSeverity = "info" | "warning" | "error";
+
+export type AnalysisSpan = {
+  startLine: number;
+  endLine: number;
+};
+
+export type AnalysisMetric = {
+  name: string;
+  value: number;
+  threshold: number | null;
+};
+
+export type AnalysisFinding = {
+  ruleId: string;
+  rulesetId: string;
+  severity: AnalysisSeverity;
+  message: string;
+  file: string;
+  span: AnalysisSpan | null;
+  metric: AnalysisMetric | null;
+};
+
+export type AnalysisRuleMetric = {
+  rulesetId: string;
+  ruleId: string;
+  target: string;
+  file: string | null;
+  span: AnalysisSpan | null;
+  metric: AnalysisMetric;
+};
+
+export type AnalysisDiagnostic = {
+  level: string;
+  source: string;
+  message: string;
+};
+
+export type AnalysisReport = {
+  findings: AnalysisFinding[];
+  metrics: AnalysisRuleMetric[];
+  loadedRulesets: string[];
+  loadedPlugins: string[];
+  diagnostics: AnalysisDiagnostic[];
+};
+
 export type CommandOutput = {
   status: number | null;
   stdout: string;
@@ -276,6 +322,16 @@ export async function runSecurityScript(
     packagePath,
     scriptPath,
   }, options);
+}
+
+export async function analyzeMovePackage(
+  packageTree: PackageTree,
+  packagePath: string,
+) {
+  return invoke<AnalysisReport>("analyze_move_package", {
+    rootPath: packageTree.rootPath,
+    packagePath,
+  });
 }
 
 export async function checkSuiCli() {

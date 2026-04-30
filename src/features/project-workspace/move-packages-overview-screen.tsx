@@ -1,14 +1,19 @@
 import { Box, FileCode2, FileText, Folder, Package, SquarePen, X } from "lucide-react";
 import React from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
+  AnalysisFinding,
+  AnalysisReport,
+  AnalysisRuleMetric,
   FilePreview,
   MoveModule,
   MovePackage,
   PackageTree,
 } from "@/features/empty-project/filesystem-tree";
-import { loadFilePreview } from "@/features/empty-project/filesystem-tree";
+import { analyzeMovePackage, loadFilePreview } from "@/features/empty-project/filesystem-tree";
+import type { ComplexityHighlight } from "@/features/project-workspace/code-editor";
 import {
   ModuleSignatureScreen,
   type SelectedMoveModule,
@@ -19,6 +24,8 @@ const TREE_PANE_DEFAULT_WIDTH = 460;
 const TREE_PANE_MIN_WIDTH = 320;
 const TREE_PANE_MAX_WIDTH = 760;
 const DETAIL_PANE_MIN_WIDTH = 420;
+const COMPLEXITY_RULESET_ID = "complexity";
+const FUNCTION_COMPLEXITY_RULE_ID = "FunctionComplexity";
 const CodeEditor = React.lazy(() =>
   import("@/features/project-workspace/code-editor").then((module) => ({
     default: module.CodeEditor,
@@ -72,12 +79,56 @@ export function MovePackagesOverviewScreen({
   const [isEditorMode, setIsEditorMode] = React.useState(false);
   const [editorTabs, setEditorTabs] = React.useState<ModuleEditorTab[]>([]);
   const [activeEditorPath, setActiveEditorPath] = React.useState<string | null>(null);
+  const [analysisReport, setAnalysisReport] = React.useState<AnalysisReport | null>(null);
+  const [analysisError, setAnalysisError] = React.useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = React.useState(false);
 
   React.useEffect(() => {
     setEditorTabs([]);
     setActiveEditorPath(null);
     setIsEditorMode(false);
+    setAnalysisReport(null);
+    setAnalysisError(null);
+    setIsAnalyzing(false);
   }, [movePackage?.manifestPath, packageTree.rootPath]);
+
+  React.useEffect(() => {
+    if (!isEditorMode || !movePackage) {
+      return;
+    }
+
+    let isCurrent = true;
+
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+
+    analyzeMovePackage(packageTree, movePackage.path)
+      .then((report) => {
+        if (isCurrent) {
+          setAnalysisReport(report);
+        }
+      })
+      .catch((reason: unknown) => {
+        if (isCurrent) {
+          setAnalysisReport(null);
+          setAnalysisError(errorMessage(reason, "Could not analyze this Move package."));
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsAnalyzing(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isEditorMode, movePackage, packageTree]);
+
+  const complexFunctionCounts = React.useMemo(
+    () => (movePackage ? complexFunctionCountsByModule(analysisReport, movePackage) : new Map<string, number>()),
+    [analysisReport, movePackage],
+  );
 
   React.useEffect(() => {
     if (!isResizing) {
@@ -153,6 +204,7 @@ export function MovePackagesOverviewScreen({
           <ScrollArea className="min-h-0 select-none">
             <div className="grid gap-3 p-5">
               <PackageCard
+                complexFunctionCounts={complexFunctionCounts}
                 isRoot={movePackage.name === rootPackage}
                 isEditorMode={isEditorMode}
                 movePackage={movePackage}
@@ -204,7 +256,10 @@ export function MovePackagesOverviewScreen({
               {isEditorMode ? (
                 <ModuleSourceEditorWorkspace
                   activeEditorPath={activeEditorPath}
+                  analysisError={analysisError}
+                  analysisReport={analysisReport}
                   editorTabs={editorTabs}
+                  isAnalyzing={isAnalyzing}
                   onActiveEditorPathChange={setActiveEditorPath}
                   onClearSelectedModule={onClearSelectedModule}
                   onEditorTabsChange={setEditorTabs}
@@ -232,6 +287,7 @@ export function MovePackagesOverviewScreen({
 }
 
 function PackageCard({
+  complexFunctionCounts,
   isEditorMode,
   isRoot,
   movePackage,
@@ -239,6 +295,7 @@ function PackageCard({
   onToggleEditorMode,
   selectedModulePath,
 }: {
+  complexFunctionCounts: Map<string, number>;
   isEditorMode: boolean;
   isRoot: boolean;
   movePackage: MovePackage;
@@ -286,6 +343,7 @@ function PackageCard({
         {movePackage.modules.length ? (
           <div className="mt-3 max-w-[640px]">
             <ModuleTreeRows
+              complexFunctionCounts={complexFunctionCounts}
               nodes={moduleTree}
               onSelectModule={(moveModule) => onSelectModule(movePackage, moveModule)}
               selectedModulePath={selectedModulePath}
@@ -300,11 +358,13 @@ function PackageCard({
 }
 
 function ModuleTreeRows({
+  complexFunctionCounts,
   depth = 0,
   nodes,
   onSelectModule,
   selectedModulePath,
 }: {
+  complexFunctionCounts: Map<string, number>;
   depth?: number;
   nodes: ModuleTreeNode[];
   onSelectModule: (moveModule: MoveModule) => void;
@@ -320,6 +380,7 @@ function ModuleTreeRows({
             <React.Fragment key={node.path}>
               <DirectoryRow depth={depth} isLast={isLast} node={node} />
               <ModuleTreeRows
+                complexFunctionCounts={complexFunctionCounts}
                 depth={depth + 1}
                 nodes={node.children}
                 onSelectModule={onSelectModule}
@@ -334,6 +395,7 @@ function ModuleTreeRows({
             depth={depth}
             isLast={isLast}
             key={node.module.filePath}
+            complexFunctionCount={complexFunctionCounts.get(node.module.filePath) ?? 0}
             moveModule={node.module}
             onSelect={() => onSelectModule(node.module)}
             selected={selectedModulePath === node.module.filePath}
@@ -384,7 +446,10 @@ function DirectoryRow({
 
 function ModuleSourceEditorWorkspace({
   activeEditorPath,
+  analysisError,
+  analysisReport,
   editorTabs,
+  isAnalyzing,
   onActiveEditorPathChange,
   onClearSelectedModule,
   onEditorTabsChange,
@@ -392,7 +457,10 @@ function ModuleSourceEditorWorkspace({
   packageTree,
 }: {
   activeEditorPath: string | null;
+  analysisError: string | null;
+  analysisReport: AnalysisReport | null;
   editorTabs: ModuleEditorTab[];
+  isAnalyzing: boolean;
   onActiveEditorPathChange: (path: string | null) => void;
   onClearSelectedModule: () => void;
   onEditorTabsChange: React.Dispatch<React.SetStateAction<ModuleEditorTab[]>>;
@@ -403,6 +471,19 @@ function ModuleSourceEditorWorkspace({
     ?? editorTabs[0]
     ?? null;
   const activePath = activeTab?.selectedModule.moveModule.filePath ?? null;
+  const activeComplexityHighlights = React.useMemo(
+    () => activeTab
+      ? complexityHighlightsForFile(
+          analysisReport,
+          activeTab.selectedModule.movePackage,
+          activeTab.selectedModule.moveModule.filePath,
+        )
+      : [],
+    [activeTab, analysisReport],
+  );
+  const analysisDiagnostic = analysisReport?.diagnostics.find(
+    (diagnostic) => diagnostic.level === "error",
+  ) ?? analysisReport?.diagnostics[0] ?? null;
 
   const updateTab = React.useCallback((
     path: string,
@@ -511,7 +592,7 @@ function ModuleSourceEditorWorkspace({
 
   return (
     <section className="grid h-full min-h-0 animate-in fade-in slide-in-from-right-3 duration-200 grid-rows-[auto_auto_minmax(0,1fr)] bg-[var(--app-window)]">
-      <header className="grid min-h-[58px] min-w-0 grid-cols-1 items-center border-b border-[color:var(--app-border)] px-3">
+      <header className="grid min-h-[58px] min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--app-border)] px-3">
         <div className="flex min-w-0 items-end gap-1 overflow-x-auto pt-2">
           {editorTabs.map((tab) => {
             const path = tab.selectedModule.moveModule.filePath;
@@ -549,6 +630,12 @@ function ModuleSourceEditorWorkspace({
             );
           })}
         </div>
+        <AnalyzerStatusBadge
+          complexFunctionCount={activeComplexityHighlights.length}
+          diagnostic={analysisDiagnostic?.message ?? null}
+          error={analysisError}
+          isAnalyzing={isAnalyzing}
+        />
       </header>
 
       {activeTab.error ? (
@@ -570,6 +657,7 @@ function ModuleSourceEditorWorkspace({
           }
         >
           <CodeEditor
+            complexityHighlights={activeComplexityHighlights}
             key={activePath}
             language={activeTab.preview.language || "move"}
             value={activeTab.source}
@@ -597,13 +685,64 @@ function createModuleEditorTab(selectedModule: SelectedMoveModule): ModuleEditor
   };
 }
 
+function AnalyzerStatusBadge({
+  complexFunctionCount,
+  diagnostic,
+  error,
+  isAnalyzing,
+}: {
+  complexFunctionCount: number;
+  diagnostic: string | null;
+  error: string | null;
+  isAnalyzing: boolean;
+}) {
+  if (isAnalyzing) {
+    return (
+      <Badge
+        className="shrink-0 border-sky-500/20 bg-sky-500/10 text-[11px] font-semibold text-sky-300"
+        variant="secondary"
+      >
+        Analyzing
+      </Badge>
+    );
+  }
+
+  if (error || diagnostic) {
+    return (
+      <Badge
+        className="max-w-40 shrink-0 border-red-500/25 bg-red-500/10 text-[11px] font-semibold text-red-300"
+        title={error ?? diagnostic ?? undefined}
+        variant="secondary"
+      >
+        Analyzer issue
+      </Badge>
+    );
+  }
+
+  if (complexFunctionCount === 0) {
+    return null;
+  }
+
+  return (
+    <Badge
+      className="shrink-0 border-amber-500/25 bg-amber-500/10 text-[11px] font-semibold text-amber-300"
+      title={`${complexFunctionCount} complex ${complexFunctionCount === 1 ? "function" : "functions"} highlighted`}
+      variant="secondary"
+    >
+      {complexFunctionCount} complex
+    </Badge>
+  );
+}
+
 function ModuleRow({
+  complexFunctionCount,
   depth = 0,
   isLast,
   moveModule,
   onSelect,
   selected,
 }: {
+  complexFunctionCount: number;
   depth?: number;
   isLast: boolean;
   moveModule: MoveModule;
@@ -641,7 +780,18 @@ function ModuleRow({
       >
         <FileCode2 className="size-5 justify-self-center text-muted-foreground" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{moveModule.name}</div>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="min-w-0 truncate text-sm font-medium">{moveModule.name}</div>
+            {complexFunctionCount > 0 ? (
+              <Badge
+                className="max-w-28 border-amber-500/25 bg-amber-500/10 px-1.5 py-0 text-[10px] font-semibold text-amber-300"
+                title={`${complexFunctionCount} complex ${complexFunctionCount === 1 ? "function" : "functions"}`}
+                variant="secondary"
+              >
+                {complexFunctionCount} complex
+              </Badge>
+            ) : null}
+          </div>
           <div className="mt-0.5 truncate text-xs text-muted-foreground">
             {moduleSurfaceLabel(moveModule)}
           </div>
@@ -744,4 +894,160 @@ function moduleSurfaceLabel(moveModule: MoveModule) {
   const functions = functionCount === 1 ? "1 function" : `${functionCount} functions`;
 
   return `${structs} / ${functions}`;
+}
+
+function complexityHighlightsForFile(
+  report: AnalysisReport | null,
+  movePackage: MovePackage,
+  filePath: string,
+): ComplexityHighlight[] {
+  if (!report) {
+    return [];
+  }
+
+  const packageFilePath = packageRelativeFilePath(filePath, movePackage);
+  const findings = functionComplexityFindings(report);
+
+  return complexFunctionMetrics(report)
+    .filter((metric) => normalizeFilePath(metric.file) === packageFilePath && metric.span)
+    .map((metric) => {
+      const finding = findingForMetric(findings, metric);
+
+      return {
+        endLine: metric.span?.endLine ?? 1,
+        message: finding?.message,
+        score: metric.metric.value,
+        severity: finding?.severity ?? "warning",
+        startLine: metric.span?.startLine ?? 1,
+        target: metric.target,
+        threshold: metric.metric.threshold,
+      };
+    });
+}
+
+function complexFunctionCountsByModule(
+  report: AnalysisReport | null,
+  movePackage: MovePackage,
+) {
+  const counts = new Map<string, number>();
+
+  if (!report) {
+    return counts;
+  }
+
+  for (const metric of complexFunctionMetrics(report)) {
+    const filePath = moduleFilePathForMetric(metric, movePackage);
+
+    if (filePath) {
+      counts.set(filePath, (counts.get(filePath) ?? 0) + 1);
+    }
+  }
+
+  return counts;
+}
+
+function complexFunctionMetrics(report: AnalysisReport) {
+  const findings = functionComplexityFindings(report);
+
+  return report.metrics.filter((metric) => {
+    if (
+      metric.rulesetId !== COMPLEXITY_RULESET_ID ||
+      metric.ruleId !== FUNCTION_COMPLEXITY_RULE_ID ||
+      metric.metric.name !== "complexity" ||
+      !metric.file ||
+      !metric.span
+    ) {
+      return false;
+    }
+
+    if (metric.metric.threshold == null) {
+      return Boolean(findingForMetric(findings, metric));
+    }
+
+    return metric.metric.value > metric.metric.threshold;
+  });
+}
+
+function functionComplexityFindings(report: AnalysisReport) {
+  return report.findings.filter(
+    (finding) =>
+      finding.rulesetId === COMPLEXITY_RULESET_ID &&
+      finding.ruleId === FUNCTION_COMPLEXITY_RULE_ID,
+  );
+}
+
+function findingForMetric(
+  findings: AnalysisFinding[],
+  metric: AnalysisRuleMetric,
+) {
+  return findings.find(
+    (finding) =>
+      normalizeFilePath(finding.file) === normalizeFilePath(metric.file) &&
+      spansEqual(finding.span, metric.span),
+  );
+}
+
+function spansEqual(
+  left: AnalysisFinding["span"],
+  right: AnalysisRuleMetric["span"],
+) {
+  return Boolean(
+    left &&
+    right &&
+    left.startLine === right.startLine &&
+    left.endLine === right.endLine,
+  );
+}
+
+function moduleFilePathForMetric(
+  metric: AnalysisRuleMetric,
+  movePackage: MovePackage,
+) {
+  const analysisFile = normalizeFilePath(metric.file);
+  const moduleName = moduleNameFromTarget(metric.target);
+  const matchingModule = movePackage.modules.find(
+    (moveModule) =>
+      moveModule.name === moduleName &&
+      packageRelativeFilePath(moveModule.filePath, movePackage) === analysisFile,
+  );
+
+  return matchingModule?.filePath ?? editorFilePathForAnalysisFile(movePackage, analysisFile);
+}
+
+function moduleNameFromTarget(target: string) {
+  return target.split("::")[0] ?? target;
+}
+
+function editorFilePathForAnalysisFile(movePackage: MovePackage, filePath: string) {
+  const packagePath = packagePathPrefix(movePackage);
+
+  return packagePath ? `${packagePath}/${filePath}` : filePath;
+}
+
+function packageRelativeFilePath(filePath: string, movePackage: MovePackage) {
+  const normalizedPath = normalizeFilePath(filePath);
+  const packagePath = packagePathPrefix(movePackage);
+  const packagePathWithSlash = packagePath ? `${packagePath}/` : "";
+
+  return packagePathWithSlash && normalizedPath.startsWith(packagePathWithSlash)
+    ? normalizedPath.slice(packagePathWithSlash.length)
+    : normalizedPath;
+}
+
+function packagePathPrefix(movePackage: MovePackage) {
+  const packagePath = normalizeFilePath(movePackage.path);
+
+  return packagePath === "." ? "" : packagePath;
+}
+
+function normalizeFilePath(filePath: string | null | undefined) {
+  return (filePath ?? "").replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, "");
+}
+
+function errorMessage(reason: unknown, fallback: string) {
+  if (reason instanceof Error) {
+    return reason.message;
+  }
+
+  return typeof reason === "string" ? reason : fallback;
 }
