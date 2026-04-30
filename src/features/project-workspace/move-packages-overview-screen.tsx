@@ -1,4 +1,4 @@
-import { Box, FileCode2, FileText, Package, Save, SquarePen, X } from "lucide-react";
+import { Box, FileCode2, FileText, Folder, Package, Save, SquarePen, X } from "lucide-react";
 import React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,20 @@ type ModuleEditorTab = {
   source: string;
   status: "error" | "idle" | "loaded" | "loading";
 };
+
+type ModuleTreeNode =
+  | {
+      children: ModuleTreeNode[];
+      name: string;
+      path: string;
+      type: "directory";
+    }
+  | {
+      module: MoveModule;
+      name: string;
+      path: string;
+      type: "module";
+    };
 
 export function MovePackagesOverviewScreen({
   activeMovePackage,
@@ -236,6 +250,8 @@ function PackageCard({
   onToggleEditorMode: () => void;
   selectedModulePath: string | null;
 }) {
+  const moduleTree = React.useMemo(() => buildModuleTree(movePackage.modules), [movePackage.modules]);
+
   return (
     <section className="min-w-0 select-none">
       <div className="grid min-w-0 grid-cols-[24px_minmax(0,1fr)_32px] items-center gap-3">
@@ -273,21 +289,100 @@ function PackageCard({
 
         {movePackage.modules.length ? (
           <div className="mt-3 max-w-[640px]">
-            {movePackage.modules.map((moveModule, index) => (
-              <ModuleRow
-                isLast={index === movePackage.modules.length - 1}
-                key={moveModule.filePath}
-                moveModule={moveModule}
-                onSelect={() => onSelectModule(movePackage, moveModule)}
-                selected={selectedModulePath === moveModule.filePath}
-              />
-            ))}
+            <ModuleTreeRows
+              nodes={moduleTree}
+              onSelectModule={(moveModule) => onSelectModule(movePackage, moveModule)}
+              selectedModulePath={selectedModulePath}
+            />
           </div>
         ) : (
           <p className="mt-2 text-sm text-muted-foreground">No modules in sources/.</p>
         )}
       </div>
     </section>
+  );
+}
+
+function ModuleTreeRows({
+  depth = 0,
+  nodes,
+  onSelectModule,
+  selectedModulePath,
+}: {
+  depth?: number;
+  nodes: ModuleTreeNode[];
+  onSelectModule: (moveModule: MoveModule) => void;
+  selectedModulePath: string | null;
+}) {
+  return (
+    <>
+      {nodes.map((node, index) => {
+        const isLast = index === nodes.length - 1;
+
+        if (node.type === "directory") {
+          return (
+            <React.Fragment key={node.path}>
+              <DirectoryRow depth={depth} isLast={isLast} node={node} />
+              <ModuleTreeRows
+                depth={depth + 1}
+                nodes={node.children}
+                onSelectModule={onSelectModule}
+                selectedModulePath={selectedModulePath}
+              />
+            </React.Fragment>
+          );
+        }
+
+        return (
+          <ModuleRow
+            depth={depth}
+            isLast={isLast}
+            key={node.module.filePath}
+            moveModule={node.module}
+            onSelect={() => onSelectModule(node.module)}
+            selected={selectedModulePath === node.module.filePath}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function DirectoryRow({
+  depth,
+  isLast,
+  node,
+}: {
+  depth: number;
+  isLast: boolean;
+  node: Extract<ModuleTreeNode, { type: "directory" }>;
+}) {
+  const gutterWidth = 40 + depth * 28;
+  const branchLeft = 12 + depth * 28;
+
+  return (
+    <div
+      className="grid min-h-[48px] select-none"
+      style={{ gridTemplateColumns: `${gutterWidth}px minmax(0, 1fr)` }}
+    >
+      <div className="relative" aria-hidden="true">
+        <span
+          className={cn(
+            "absolute top-0 w-px bg-[var(--app-border)]",
+            isLast ? "h-[24px]" : "bottom-0",
+          )}
+          style={{ left: branchLeft }}
+        />
+        <span
+          className="absolute top-[24px] h-px w-7 bg-[var(--app-border)]"
+          style={{ left: branchLeft }}
+        />
+      </div>
+      <div className="mb-1.5 grid min-w-0 grid-cols-[24px_minmax(0,1fr)] items-center gap-3 rounded-md px-3 py-2 text-left text-muted-foreground">
+        <Folder className="size-5 justify-self-center text-muted-foreground" aria-hidden="true" />
+        <div className="min-w-0 truncate text-sm font-medium text-foreground">{node.name}</div>
+      </div>
+    </div>
   );
 }
 
@@ -551,26 +646,38 @@ function createModuleEditorTab(selectedModule: SelectedMoveModule): ModuleEditor
 }
 
 function ModuleRow({
+  depth = 0,
   isLast,
   moveModule,
   onSelect,
   selected,
 }: {
+  depth?: number;
   isLast: boolean;
   moveModule: MoveModule;
   onSelect: () => void;
   selected: boolean;
 }) {
+  const gutterWidth = 40 + depth * 28;
+  const branchLeft = 12 + depth * 28;
+
   return (
-    <div className="grid min-h-[66px] select-none grid-cols-[40px_minmax(0,1fr)]">
+    <div
+      className="grid min-h-[66px] select-none"
+      style={{ gridTemplateColumns: `${gutterWidth}px minmax(0, 1fr)` }}
+    >
       <div className="relative" aria-hidden="true">
         <span
           className={cn(
-            "absolute left-3 top-0 w-px bg-[var(--app-border)]",
+            "absolute top-0 w-px bg-[var(--app-border)]",
             isLast ? "h-[29px]" : "bottom-0",
           )}
+          style={{ left: branchLeft }}
         />
-        <span className="absolute left-3 top-[29px] h-px w-7 bg-[var(--app-border)]" />
+        <span
+          className="absolute top-[29px] h-px w-7 bg-[var(--app-border)]"
+          style={{ left: branchLeft }}
+        />
       </div>
       <button
         className={cn(
@@ -590,6 +697,73 @@ function ModuleRow({
       </button>
     </div>
   );
+}
+
+function buildModuleTree(modules: MoveModule[]): ModuleTreeNode[] {
+  const rootNodes: ModuleTreeNode[] = [];
+
+  for (const moveModule of modules) {
+    const parts = moduleTreePathParts(moveModule);
+    const moduleName = parts.at(-1)?.replace(/\.move$/i, "") || moveModule.name;
+    let currentLevel = rootNodes;
+    let currentPath = "";
+
+    for (const directoryName of parts.slice(0, -1)) {
+      currentPath = currentPath ? `${currentPath}/${directoryName}` : directoryName;
+      let directoryNode = currentLevel.find(
+        (node): node is Extract<ModuleTreeNode, { type: "directory" }> =>
+          node.type === "directory" && node.name === directoryName,
+      );
+
+      if (!directoryNode) {
+        directoryNode = {
+          children: [],
+          name: directoryName,
+          path: currentPath,
+          type: "directory",
+        };
+        currentLevel.push(directoryNode);
+        sortModuleTreeNodes(currentLevel);
+      }
+
+      currentLevel = directoryNode.children;
+    }
+
+    currentLevel.push({
+      module: moveModule,
+      name: moduleName,
+      path: moveModule.filePath,
+      type: "module",
+    });
+    sortModuleTreeNodes(currentLevel);
+  }
+
+  return rootNodes;
+}
+
+function sortModuleTreeNodes(nodes: ModuleTreeNode[]) {
+  nodes.sort((left, right) => {
+    if (left.type !== right.type) {
+      return left.type === "directory" ? -1 : 1;
+    }
+
+    return left.name.localeCompare(right.name) || left.path.localeCompare(right.path);
+  });
+}
+
+function moduleTreePathParts(moveModule: MoveModule) {
+  const normalized = moveModule.filePath.replace(/\\/g, "/");
+  const sourcesIndex = normalized.lastIndexOf("/sources/");
+  const pathUnderSources = sourcesIndex >= 0
+    ? normalized.slice(sourcesIndex + "/sources/".length)
+    : normalized.replace(/^sources\//, "");
+  const parts = pathUnderSources.split("/").filter(Boolean);
+
+  if (parts.length) {
+    return parts;
+  }
+
+  return [`${moveModule.name}.move`];
 }
 
 function orderedPackages(packages: MovePackage[], rootPackage: string | null) {
