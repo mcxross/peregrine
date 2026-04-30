@@ -3,6 +3,7 @@ mod config;
 mod model;
 mod parser;
 mod plugins;
+mod project;
 pub mod rules;
 
 pub use analyzer::{Analyzer, Rule, RuleSet, RuleSetProvider};
@@ -14,4 +15,10 @@ pub use model::{
 pub use plugins::{
     PluginAnalyzeInput, PluginAnalyzeOutput, PluginManifest, PluginManifestInput,
     PluginRuleManifest, PluginRuleSetManifest, WasmPluginHost,
+};
+pub use project::{
+    discover_move_project, AdminControlFinding, CapabilityFinding, ExternalCallFinding,
+    MoveFunctionSignature, MoveModule, MovePackage, MovePackageSurface, MoveProject,
+    MoveStructField, MoveStructSignature, ObjectOwnershipFinding, PackageDependencyEdge,
+    PackageDependencyGraph, PackageDependencyNode, PublicPackageRelationship,
 };

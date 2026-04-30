@@ -1,10 +1,11 @@
 mod file_preview;
-mod move_project;
 
 use base64::{engine::general_purpose, Engine};
 use file_preview::{build_file_preview, FilePreview};
-use move_project::{discover_move_project, MovePackage, PackageDependencyGraph};
-use peregrine_static_analysis::{AnalysisConfig, AnalysisReport, Analyzer};
+use peregrine_static_analysis::{
+    discover_move_project, AnalysisConfig, AnalysisReport, Analyzer, MovePackage,
+    PackageDependencyGraph,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
@@ -1087,14 +1088,14 @@ fn build_package_tree(root_path: String) -> Result<PackageTree, String> {
     collect_paths(&root, &root, &mut paths)?;
     paths.sort_by(|left, right| compare_tree_paths(left, right));
 
-    let (move_packages, dependency_graph) = discover_move_project(&root);
+    let move_project = discover_move_project(&root);
 
     Ok(PackageTree {
         root_path: root.to_string_lossy().into_owned(),
         root_name,
         paths,
-        move_packages,
-        dependency_graph,
+        move_packages: move_project.packages,
+        dependency_graph: move_project.dependency_graph,
     })
 }
 
