@@ -33,10 +33,10 @@ export function ModuleSignatureScreen({
 
   return (
     <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-[var(--app-window)]">
-      <header className="flex min-w-0 items-center justify-between gap-4 border-b border-[color:var(--app-border)] px-6 py-2.5">
+      <header className="flex min-w-0 items-center justify-between gap-4 border-b border-[color:var(--app-border)] px-6 pb-3.5 pt-4">
         <div className="min-w-0">
           <h2 className="truncate text-xl font-semibold leading-6">{moveModule.name}</h2>
-          <p className="mt-0.5 truncate text-xs leading-5 text-muted-foreground">
+          <p className="mt-1 truncate text-xs leading-5 text-muted-foreground">
             {movePackage.name} / {moveModule.filePath}
           </p>
         </div>
