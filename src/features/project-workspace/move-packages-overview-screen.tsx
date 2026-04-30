@@ -1,4 +1,5 @@
 import { Box, FileCode2, Package } from "lucide-react";
+import React from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
@@ -11,6 +12,11 @@ import {
   type SelectedMoveModule,
 } from "@/features/project-workspace/module-signature-screen";
 import { cn } from "@/lib/utils";
+
+const TREE_PANE_DEFAULT_WIDTH = 460;
+const TREE_PANE_MIN_WIDTH = 320;
+const TREE_PANE_MAX_WIDTH = 760;
+const DETAIL_PANE_MIN_WIDTH = 420;
 
 type MovePackagesOverviewScreenProps = {
   activeMovePackage: MovePackage | null;
@@ -29,24 +35,57 @@ export function MovePackagesOverviewScreen({
 }: MovePackagesOverviewScreenProps) {
   const rootPackage = packageTree.dependencyGraph.root;
   const movePackage = activeMovePackage ?? orderedPackages(packageTree.movePackages, rootPackage)[0] ?? null;
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const [treePaneWidth, setTreePaneWidth] = React.useState(TREE_PANE_DEFAULT_WIDTH);
+  const [isResizing, setIsResizing] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isResizing) {
+      return;
+    }
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+    };
+  }, [isResizing]);
+
+  const resizeTreePane = React.useCallback((clientX: number) => {
+    const bounds = containerRef.current?.getBoundingClientRect();
+
+    if (!bounds) {
+      return;
+    }
+
+    const maxWidth = Math.max(
+      TREE_PANE_MIN_WIDTH,
+      Math.min(TREE_PANE_MAX_WIDTH, bounds.width - DETAIL_PANE_MIN_WIDTH),
+    );
+    const nextWidth = Math.min(maxWidth, Math.max(TREE_PANE_MIN_WIDTH, clientX - bounds.left));
+    setTreePaneWidth(nextWidth);
+  }, []);
 
   return (
     <section className="grid h-full min-h-0 bg-[var(--app-window)]">
       {movePackage ? (
         <div
+          ref={containerRef}
           className={cn(
             "grid min-h-0",
-            selectedModule
-              ? "grid-cols-[minmax(300px,38%)_minmax(0,1fr)]"
-              : "grid-cols-1",
+            !selectedModule && "grid-cols-1",
           )}
+          style={
+            selectedModule
+              ? { gridTemplateColumns: `${treePaneWidth}px 6px minmax(0, 1fr)` }
+              : undefined
+          }
         >
-          <ScrollArea
-            className={cn(
-              "min-h-0",
-              selectedModule && "border-r border-[color:var(--app-border)]",
-            )}
-          >
+          <ScrollArea className="min-h-0">
             <div className="grid gap-3 p-5">
               <PackageCard
                 isRoot={movePackage.name === rootPackage}
@@ -56,6 +95,40 @@ export function MovePackagesOverviewScreen({
               />
             </div>
           </ScrollArea>
+
+          {selectedModule ? (
+            <div
+              aria-label="Resize module tree"
+              aria-orientation="vertical"
+              className={cn(
+                "group relative cursor-col-resize border-r border-[color:var(--app-border)]",
+                isResizing && "border-primary/50",
+              )}
+              onPointerCancel={() => setIsResizing(false)}
+              onPointerDown={(event) => {
+                event.currentTarget.setPointerCapture(event.pointerId);
+                setIsResizing(true);
+                resizeTreePane(event.clientX);
+              }}
+              onPointerMove={(event) => {
+                if (isResizing) {
+                  resizeTreePane(event.clientX);
+                }
+              }}
+              onPointerUp={(event) => {
+                event.currentTarget.releasePointerCapture(event.pointerId);
+                setIsResizing(false);
+              }}
+              role="separator"
+            >
+              <span
+                className={cn(
+                  "absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-primary/45",
+                  isResizing && "bg-primary/70",
+                )}
+              />
+            </div>
+          ) : null}
 
           {selectedModule ? (
             <div className="min-h-0">
