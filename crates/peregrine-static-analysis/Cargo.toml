@@ -1,0 +1,19 @@
+[package]
+name = "peregrine-static-analysis"
+version = "0.1.0"
+edition = "2021"
+description = "Static analysis engine for Move packages used by Peregrine"
+
+[dependencies]
+globset = "0.4"
+move-command-line-common = { git = "https://github.com/MystenLabs/sui", rev = "d5364733440fc66fee02ccfb1ee7b6e4b61bb1b0" }
+move-compiler = { git = "https://github.com/MystenLabs/sui", rev = "d5364733440fc66fee02ccfb1ee7b6e4b61bb1b0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+walkdir = "2"
+wasmtime = "28"
+
+[dev-dependencies]
+tempfile = "3"
+wat = "1"

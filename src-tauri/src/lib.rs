@@ -4,6 +4,7 @@ mod move_project;
 use base64::{engine::general_purpose, Engine};
 use file_preview::{build_file_preview, FilePreview};
 use move_project::{discover_move_project, MovePackage, PackageDependencyGraph};
+use peregrine_static_analysis::{AnalysisConfig, AnalysisReport, Analyzer};
 use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
@@ -282,6 +283,30 @@ async fn run_security_script(
     })
     .await
     .map_err(|error| format!("Could not join security script task: {error}"))?
+}
+
+#[tauri::command]
+async fn analyze_move_package(
+    root_path: String,
+    package_path: String,
+) -> Result<AnalysisReport, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let package_root = resolve_package_child_path(&root_path, &package_path)?;
+
+        if !package_root.is_dir() {
+            return Err("Selected package path is not a directory.".to_string());
+        }
+
+        if !package_root.join("Move.toml").is_file() {
+            return Err("Selected package does not contain a Move.toml file.".to_string());
+        }
+
+        let config = AnalysisConfig::load_from_package(&package_root)?;
+
+        Ok(Analyzer::new().analyze_package(package_root, config))
+    })
+    .await
+    .map_err(|error| format!("Could not join Move analysis task: {error}"))?
 }
 
 #[tauri::command]
@@ -1265,6 +1290,7 @@ pub fn run() {
             build_move_package,
             run_security_command,
             run_security_script,
+            analyze_move_package,
             check_sui_cli,
             list_ollama_models,
             chat_with_ollama,
