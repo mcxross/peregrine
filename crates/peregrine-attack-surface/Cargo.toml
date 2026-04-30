@@ -1,0 +1,11 @@
+[package]
+name = "peregrine-attack-surface"
+version = "0.1.0"
+edition = "2021"
+description = "Attack surface inventory and heuristic findings for Sui Move packages used by Peregrine"
+
+[dependencies]
+peregrine-move-model = { path = "../peregrine-move-model" }
+peregrine-object-lifecycle = { path = "../peregrine-object-lifecycle" }
+serde = { version = "1", features = ["derive"] }
+

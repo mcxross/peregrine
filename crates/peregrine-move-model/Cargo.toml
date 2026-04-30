@@ -1,0 +1,12 @@
+[package]
+name = "peregrine-move-model"
+version = "0.1.0"
+edition = "2021"
+description = "Sui Move package discovery and parser-backed source model for Peregrine"
+
+[dependencies]
+move-command-line-common = { git = "https://github.com/MystenLabs/sui", rev = "d5364733440fc66fee02ccfb1ee7b6e4b61bb1b0" }
+move-compiler = { git = "https://github.com/MystenLabs/sui", rev = "d5364733440fc66fee02ccfb1ee7b6e4b61bb1b0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
