@@ -1,7 +1,6 @@
-import { Box, FileCode2, FileText, Folder, Package, Save, SquarePen, X } from "lucide-react";
+import { Box, FileCode2, FileText, Folder, Package, SquarePen, X } from "lucide-react";
 import React from "react";
 
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
   FilePreview,
@@ -9,10 +8,7 @@ import type {
   MovePackage,
   PackageTree,
 } from "@/features/empty-project/filesystem-tree";
-import {
-  loadFilePreview,
-  saveTextFile,
-} from "@/features/empty-project/filesystem-tree";
+import { loadFilePreview } from "@/features/empty-project/filesystem-tree";
 import {
   ModuleSignatureScreen,
   type SelectedMoveModule,
@@ -407,7 +403,6 @@ function ModuleSourceEditorWorkspace({
     ?? editorTabs[0]
     ?? null;
   const activePath = activeTab?.selectedModule.moveModule.filePath ?? null;
-  const isDirty = activeTab ? activeTab.source !== activeTab.savedSource : false;
 
   const updateTab = React.useCallback((
     path: string,
@@ -465,39 +460,6 @@ function ModuleSourceEditorWorkspace({
       });
   }, [activeTab, packageTree, updateTab]);
 
-  const saveModule = React.useCallback(async () => {
-    if (!activeTab || !isDirty || activeTab.isSaving) {
-      return;
-    }
-
-    const filePath = activeTab.selectedModule.moveModule.filePath;
-    updateTab(filePath, (tab) => ({ ...tab, error: null, isSaving: true }));
-
-    try {
-      const nextPreview = await saveTextFile(packageTree, filePath, activeTab.source);
-
-      if (nextPreview.kind !== "text") {
-        throw new Error("The saved module could not be reopened as text.");
-      }
-
-      updateTab(filePath, (tab) => ({
-        ...tab,
-        error: null,
-        isSaving: false,
-        preview: nextPreview,
-        savedSource: nextPreview.source,
-        source: nextPreview.source,
-        status: "loaded",
-      }));
-    } catch (reason) {
-      updateTab(filePath, (tab) => ({
-        ...tab,
-        error: reason instanceof Error ? reason.message : "Could not save this module.",
-        isSaving: false,
-      }));
-    }
-  }, [activeTab, isDirty, packageTree, updateTab]);
-
   const activateTab = React.useCallback((tab: ModuleEditorTab) => {
     const filePath = tab.selectedModule.moveModule.filePath;
     onActiveEditorPathChange(filePath);
@@ -549,7 +511,7 @@ function ModuleSourceEditorWorkspace({
 
   return (
     <section className="grid h-full min-h-0 animate-in fade-in slide-in-from-right-3 duration-200 grid-rows-[auto_auto_minmax(0,1fr)] bg-[var(--app-window)]">
-      <header className="grid min-h-[58px] min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-[color:var(--app-border)] px-3">
+      <header className="grid min-h-[58px] min-w-0 grid-cols-1 items-center border-b border-[color:var(--app-border)] px-3">
         <div className="flex min-w-0 items-end gap-1 overflow-x-auto pt-2">
           {editorTabs.map((tab) => {
             const path = tab.selectedModule.moveModule.filePath;
@@ -587,16 +549,6 @@ function ModuleSourceEditorWorkspace({
             );
           })}
         </div>
-        <Button
-          disabled={!isDirty || activeTab.isSaving || activeTab.status !== "loaded"}
-          onClick={saveModule}
-          size="xs"
-          type="button"
-          variant="ghost"
-        >
-          <Save className="size-3.5" aria-hidden="true" />
-          {activeTab.isSaving ? "Saving" : "Save"}
-        </Button>
       </header>
 
       {activeTab.error ? (
