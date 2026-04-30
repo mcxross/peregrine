@@ -1,6 +1,5 @@
 import { Box, FileCode2, Package } from "lucide-react";
 
-import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
   MoveModule,
@@ -48,7 +47,7 @@ export function MovePackagesOverviewScreen({
               selectedModule && "border-r border-[color:var(--app-border)]",
             )}
           >
-            <div className="grid gap-3 p-4">
+            <div className="grid gap-3 p-5">
               <PackageCard
                 isRoot={movePackage.name === rootPackage}
                 movePackage={movePackage}
@@ -88,9 +87,9 @@ function PackageCard({
   selectedModulePath: string | null;
 }) {
   return (
-    <Card className="min-w-0 gap-0 rounded-md p-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <Package className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    <section className="min-w-0">
+      <div className="grid min-w-0 grid-cols-[24px_minmax(0,1fr)] items-center gap-3">
+        <Package className="size-5 justify-self-center text-muted-foreground" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="truncate text-base font-semibold">{movePackage.name}</h2>
@@ -100,22 +99,20 @@ function PackageCard({
               </span>
             ) : null}
           </div>
-          <p className="mt-1 truncate text-sm text-muted-foreground">
-            {movePackage.path || "."}
-          </p>
         </div>
       </div>
 
-      <div className="mt-4 border-l border-[color:var(--app-border)] pl-5">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Box className="size-4 shrink-0" aria-hidden="true" />
+      <div className="mt-5">
+        <div className="grid grid-cols-[24px_minmax(0,1fr)] items-center gap-3 text-sm text-muted-foreground">
+          <Box className="size-5 justify-self-center" aria-hidden="true" />
           <span>{moduleCountLabel(movePackage.modules)}</span>
         </div>
 
         {movePackage.modules.length ? (
-          <div className="mt-3 grid max-w-xl gap-2">
-            {movePackage.modules.map((moveModule) => (
+          <div className="mt-3 max-w-[640px]">
+            {movePackage.modules.map((moveModule, index) => (
               <ModuleRow
+                isLast={index === movePackage.modules.length - 1}
                 key={moveModule.filePath}
                 moveModule={moveModule}
                 onSelect={() => onSelectModule(movePackage, moveModule)}
@@ -127,36 +124,49 @@ function PackageCard({
           <p className="mt-2 text-sm text-muted-foreground">No modules in sources/.</p>
         )}
       </div>
-    </Card>
+    </section>
   );
 }
 
 function ModuleRow({
+  isLast,
   moveModule,
   onSelect,
   selected,
 }: {
+  isLast: boolean;
   moveModule: MoveModule;
   onSelect: () => void;
   selected: boolean;
 }) {
   return (
-    <button
-      className={cn(
-        "flex min-w-0 items-center gap-3 rounded-md bg-[var(--app-subtle)] px-3 py-2.5 text-left hover:bg-accent hover:text-accent-foreground",
-        selected && "bg-accent text-accent-foreground ring-1 ring-ring/35",
-      )}
-      onClick={onSelect}
-      type="button"
-    >
-      <FileCode2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{moveModule.name}</div>
-        <div className="mt-0.5 truncate text-xs text-muted-foreground">
-          {moduleSurfaceLabel(moveModule)}
-        </div>
+    <div className="grid min-h-[66px] grid-cols-[40px_minmax(0,1fr)]">
+      <div className="relative" aria-hidden="true">
+        <span
+          className={cn(
+            "absolute left-3 top-0 w-px bg-[var(--app-border)]",
+            isLast ? "h-[29px]" : "bottom-0",
+          )}
+        />
+        <span className="absolute left-3 top-[29px] h-px w-7 bg-[var(--app-border)]" />
       </div>
-    </button>
+      <button
+        className={cn(
+          "mb-1.5 grid min-w-0 grid-cols-[24px_minmax(0,1fr)] items-center gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-[var(--app-subtle)] hover:text-foreground",
+          selected && "bg-[var(--app-subtle)] text-foreground ring-1 ring-ring/25",
+        )}
+        onClick={onSelect}
+        type="button"
+      >
+        <FileCode2 className="size-5 justify-self-center text-muted-foreground" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium">{moveModule.name}</div>
+          <div className="mt-0.5 truncate text-xs text-muted-foreground">
+            {moduleSurfaceLabel(moveModule)}
+          </div>
+        </div>
+      </button>
+    </div>
   );
 }
 
