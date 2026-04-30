@@ -104,7 +104,7 @@ export function MovePackagesOverviewScreen({
   }, [movePackage?.manifestPath, packageTree.rootPath]);
 
   React.useEffect(() => {
-    if (!isEditorMode || !movePackage) {
+    if (!movePackage) {
       return;
     }
 
@@ -134,7 +134,7 @@ export function MovePackagesOverviewScreen({
     return () => {
       isCurrent = false;
     };
-  }, [isEditorMode, movePackage, packageTree]);
+  }, [movePackage, packageTree]);
 
   const complexFunctionCounts = React.useMemo(
     () => (movePackage ? complexFunctionCountsByModule(analysisReport, movePackage) : new Map<string, number>()),
