@@ -6,7 +6,6 @@ import {
   Maximize2,
   Minimize2,
   RefreshCw,
-  Sparkles,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -337,16 +336,7 @@ export function AiFloatingWindow({
   }
 
   if (!isOpen) {
-    return (
-      <button
-        className="ai-liquid-launcher absolute bottom-9 right-5 z-30 flex h-10 items-center gap-2 rounded-[14px] px-3 text-sm font-medium text-foreground transition"
-        onClick={() => onOpenChange(true)}
-        type="button"
-      >
-        <Sparkles className="size-4 text-primary" aria-hidden="true" />
-        Ask AI
-      </button>
-    );
+    return null;
   }
 
   return (

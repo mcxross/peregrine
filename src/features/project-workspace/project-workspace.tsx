@@ -21,7 +21,6 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -153,7 +152,6 @@ export function ProjectWorkspace({
             setActiveSurfaceDetail(null);
             setSelectedModule(null);
           }}
-          onOpenAi={() => setIsAiOpen(true)}
           onWorkspaceTabChange={(tab) => {
             setActiveSurfaceDetail(null);
             onWorkspaceTabChange(tab);
@@ -200,6 +198,8 @@ export function ProjectWorkspace({
       ) : (
         <CollapsedPanelRail
           label="Open inspector"
+          isAiOpen={isAiOpen}
+          onToggleAi={activeMovePackage ? () => setIsAiOpen((current) => !current) : undefined}
           side="right"
           onOpen={() => setIsRightPanelOpen(true)}
         />
@@ -284,7 +284,6 @@ function SecuritySidebar({
   activeWorkspaceTab,
   loadAssessment,
   packageTree,
-  onOpenAi,
   onSelectPackage,
   onSelectSurfaceDetail,
   onWorkspaceTabChange,
@@ -294,7 +293,6 @@ function SecuritySidebar({
   activeWorkspaceTab: WorkspaceTab;
   loadAssessment: PackageLoadAssessment | null;
   packageTree: PackageTree;
-  onOpenAi: () => void;
   onSelectPackage: (movePackage: MovePackage) => void;
   onSelectSurfaceDetail: (detail: SurfaceDetailKind) => void;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
@@ -383,24 +381,6 @@ function SecuritySidebar({
           ))}
         </SidebarSection>
 
-        <Card className="mt-4 gap-0 rounded-md p-3">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-primary">
-            <span>AI Copilot</span>
-            <Sparkles className="size-3.5" aria-hidden="true" />
-          </div>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Ask anything about your Move package security.
-          </p>
-          <Button
-            className="mt-3 h-9 w-full text-foreground"
-            onClick={onOpenAi}
-            type="button"
-            variant="outline"
-          >
-            <Sparkles className="size-4 text-chart-4" aria-hidden="true" />
-            Open Copilot
-          </Button>
-        </Card>
         </div>
       </ScrollArea>
 
@@ -770,12 +750,16 @@ function InspectorPanel({
 }
 
 function CollapsedPanelRail({
+  isAiOpen = false,
   label,
   onOpen,
+  onToggleAi,
   side,
 }: {
+  isAiOpen?: boolean;
   label: string;
   onOpen: () => void;
+  onToggleAi?: () => void;
   side: "left" | "right";
 }) {
   const Icon = side === "left" ? PanelLeftOpen : ScanEye;
@@ -791,7 +775,7 @@ function CollapsedPanelRail({
     >
       <div
         className={cn(
-          "flex h-12 items-center justify-center",
+          "flex min-h-12 flex-col items-center gap-3 px-1.5 py-2",
           side === "left" && "border-b border-[color:var(--app-border)]",
         )}
       >
@@ -805,6 +789,22 @@ function CollapsedPanelRail({
         >
           <Icon className="size-4" aria-hidden="true" />
         </Button>
+        {side === "right" && onToggleAi ? (
+          <Button
+            aria-label={isAiOpen ? "Hide AI" : "Ask AI"}
+            aria-pressed={isAiOpen}
+            className={cn(
+              "size-8 text-muted-foreground hover:text-foreground",
+              isAiOpen && "bg-[var(--app-elevated)] text-primary",
+            )}
+            onClick={onToggleAi}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            <Sparkles className="size-4 text-primary" aria-hidden="true" />
+          </Button>
+        ) : null}
       </div>
     </aside>
   );
