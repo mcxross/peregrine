@@ -78,6 +78,7 @@ export function MovePackagesOverviewScreen({
           className={cn(
             "grid min-h-0",
             !selectedModule && "grid-cols-1",
+            isResizing && "select-none",
           )}
           style={
             selectedModule
@@ -85,7 +86,7 @@ export function MovePackagesOverviewScreen({
               : undefined
           }
         >
-          <ScrollArea className="min-h-0">
+          <ScrollArea className="min-h-0 select-none">
             <div className="grid gap-3 p-5">
               <PackageCard
                 isRoot={movePackage.name === rootPackage}
@@ -105,7 +106,9 @@ export function MovePackagesOverviewScreen({
                 isResizing && "border-primary/50",
               )}
               onPointerCancel={() => setIsResizing(false)}
+              onDragStart={(event) => event.preventDefault()}
               onPointerDown={(event) => {
+                event.preventDefault();
                 event.currentTarget.setPointerCapture(event.pointerId);
                 setIsResizing(true);
                 resizeTreePane(event.clientX);
@@ -160,7 +163,7 @@ function PackageCard({
   selectedModulePath: string | null;
 }) {
   return (
-    <section className="min-w-0">
+    <section className="min-w-0 select-none">
       <div className="grid min-w-0 grid-cols-[24px_minmax(0,1fr)] items-center gap-3">
         <Package className="size-5 justify-self-center text-muted-foreground" aria-hidden="true" />
         <div className="min-w-0 flex-1">
@@ -213,7 +216,7 @@ function ModuleRow({
   selected: boolean;
 }) {
   return (
-    <div className="grid min-h-[66px] grid-cols-[40px_minmax(0,1fr)]">
+    <div className="grid min-h-[66px] select-none grid-cols-[40px_minmax(0,1fr)]">
       <div className="relative" aria-hidden="true">
         <span
           className={cn(
@@ -225,7 +228,7 @@ function ModuleRow({
       </div>
       <button
         className={cn(
-          "mb-1.5 grid min-w-0 grid-cols-[24px_minmax(0,1fr)] items-center gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-[var(--app-subtle)] hover:text-foreground",
+          "mb-1.5 grid min-w-0 select-none grid-cols-[24px_minmax(0,1fr)] items-center gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-[var(--app-subtle)] hover:text-foreground",
           selected && "bg-[var(--app-subtle)] text-foreground ring-1 ring-ring/25",
         )}
         onClick={onSelect}

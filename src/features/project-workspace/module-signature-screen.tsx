@@ -1,4 +1,4 @@
-import { Box, ChevronDown, FileCode2, X } from "lucide-react";
+import { Box, Check, ChevronDown, Copy, FileCode2, X } from "lucide-react";
 import React from "react";
 
 import type {
@@ -83,11 +83,7 @@ export function ModuleSignatureScreen({
                         )}
                       </div>
                     </div>
-                    <pre className="mt-3 overflow-auto rounded-md bg-[var(--app-subtle)] p-3 text-xs leading-5 [font-family:'JetBrains_Mono','JetBrains_Mono_NL','JetBrains_Mono_NF',ui-monospace,SFMono-Regular,'SF_Mono',Menlo,Monaco,Consolas,'Liberation_Mono',monospace]">
-                      <code>
-                        <HighlightedMoveSignature source={signature.signature} />
-                      </code>
-                    </pre>
+                    <SignatureCodeBlock source={signature.signature} />
                   </article>
                 ))}
               </div>
@@ -167,17 +163,65 @@ function FunctionSignatureCard({
           ) : null}
         </div>
       </button>
-      <pre className="mt-3 max-h-[420px] overflow-auto rounded-md bg-[var(--app-subtle)] p-3 text-xs leading-5 [font-family:'JetBrains_Mono','JetBrains_Mono_NL','JetBrains_Mono_NF',ui-monospace,SFMono-Regular,'SF_Mono',Menlo,Monaco,Consolas,'Liberation_Mono',monospace]">
-        <code>
-          <HighlightedMoveSignature source={source} />
-        </code>
-      </pre>
+      <SignatureCodeBlock maxHeight source={source} />
     </article>
   );
 }
 
 function functionKey(signature: { name: string; signature: string }) {
   return `${signature.name}-${signature.signature}`;
+}
+
+function SignatureCodeBlock({
+  maxHeight,
+  source,
+}: {
+  maxHeight?: boolean;
+  source: string;
+}) {
+  const [copied, setCopied] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!copied) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setCopied(false), 1200);
+
+    return () => window.clearTimeout(timeout);
+  }, [copied]);
+
+  const copySource = React.useCallback(async () => {
+    await navigator.clipboard.writeText(source);
+    setCopied(true);
+  }, [source]);
+
+  return (
+    <div className="group relative mt-3">
+      <pre
+        className={cn(
+          "select-text overflow-auto rounded-md bg-[var(--app-subtle)] py-3 pl-3 pr-10 text-xs leading-5 [font-family:'JetBrains_Mono','JetBrains_Mono_NL','JetBrains_Mono_NF',ui-monospace,SFMono-Regular,'SF_Mono',Menlo,Monaco,Consolas,'Liberation_Mono',monospace]",
+          maxHeight && "max-h-[420px]",
+        )}
+      >
+        <code className="select-text">
+          <HighlightedMoveSignature source={source} />
+        </code>
+      </pre>
+      <button
+        aria-label="Copy signature"
+        className="absolute right-2 top-2 inline-flex size-6 select-none items-center justify-center rounded text-muted-foreground opacity-70 transition hover:bg-background/35 hover:text-foreground hover:opacity-100"
+        onClick={copySource}
+        type="button"
+      >
+        {copied ? (
+          <Check className="size-3.5 text-emerald-300" aria-hidden="true" />
+        ) : (
+          <Copy className="size-3.5" aria-hidden="true" />
+        )}
+      </button>
+    </div>
+  );
 }
 
 function HighlightedMoveSignature({ source }: { source: string }) {
