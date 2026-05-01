@@ -1,32 +1,11 @@
 use std::path::Path;
 
-use crate::{
-    config::{AnalysisConfig, RuleConfig},
-    model::{AnalysisContext, AnalysisDiagnostic, AnalysisReport, Finding, RuleMetric},
-    parser::parse_package,
-    plugins::WasmPluginHost,
-    rules::complexity::ComplexityRuleSetProvider,
+use peregrine_analysis_core::{
+    AnalysisConfig, AnalysisDiagnostic, AnalysisReport, RuleSetProvider,
 };
+use peregrine_complexity_rules::ComplexityRuleSetProvider;
 
-pub trait Rule: Send + Sync {
-    fn id(&self) -> &'static str;
-    fn analyze(&self, context: &AnalysisContext, config: &RuleConfig) -> RuleOutcome;
-}
-
-pub trait RuleSet: Send + Sync {
-    fn id(&self) -> &'static str;
-    fn rules(&self) -> Vec<Box<dyn Rule>>;
-}
-
-pub trait RuleSetProvider: Send + Sync {
-    fn rule_sets(&self) -> Vec<Box<dyn RuleSet>>;
-}
-
-#[derive(Debug, Default)]
-pub struct RuleOutcome {
-    pub findings: Vec<Finding>,
-    pub metrics: Vec<RuleMetric>,
-}
+use crate::{parser::parse_package, plugins::WasmPluginHost};
 
 pub struct Analyzer {
     providers: Vec<Box<dyn RuleSetProvider>>,

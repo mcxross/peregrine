@@ -217,4 +217,3 @@ pub(crate) fn relative_path(root: &Path, path: &Path) -> Option<String> {
             .join("/"),
     )
 }
-

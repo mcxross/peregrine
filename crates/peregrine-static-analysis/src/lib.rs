@@ -1,16 +1,35 @@
 mod analyzer;
-mod config;
-mod model;
 mod parser;
 mod plugins;
 mod project;
-pub mod rules;
 
-pub use analyzer::{Analyzer, Rule, RuleSet, RuleSetProvider};
-pub use config::{AnalysisConfig, AnalysisSection, PluginConfig, RuleConfig, RuleSetConfig};
-pub use model::{
+pub mod config {
+    pub use peregrine_analysis_core::{
+        AnalysisConfig, AnalysisSection, PluginConfig, RuleConfig, RuleSetConfig,
+    };
+}
+
+pub mod model {
+    pub use peregrine_analysis_core::{
+        AnalysisContext, AnalysisDiagnostic, AnalysisReport, Finding, Metric, ParsedFunction,
+        ParsedModule, RuleMetric, Severity, SourceFile, Span,
+    };
+}
+
+pub mod rules {
+    pub mod complexity {
+        pub use peregrine_complexity_rules::*;
+    }
+}
+
+pub use analyzer::Analyzer;
+pub use peregrine_analysis_core::{
+    AnalysisConfig, AnalysisSection, PluginConfig, RuleConfig, RuleSetConfig,
+};
+pub use peregrine_analysis_core::{
     AnalysisContext, AnalysisDiagnostic, AnalysisReport, Finding, Metric, ParsedFunction,
-    ParsedModule, RuleMetric, Severity, SourceFile, Span,
+    ParsedModule, Rule, RuleMetric, RuleOutcome, RuleSet, RuleSetProvider, Severity, SourceFile,
+    Span,
 };
 pub use plugins::{
     PluginAnalyzeInput, PluginAnalyzeOutput, PluginManifest, PluginManifestInput,

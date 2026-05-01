@@ -1,0 +1,10 @@
+[package]
+name = "peregrine-analysis-core"
+version = "0.1.0"
+edition = "2021"
+description = "Shared analyzer contracts, config, reports, and findings for Peregrine analysis crates"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+

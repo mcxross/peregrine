@@ -8,6 +8,11 @@ description = "Static analysis engine for Move packages used by Peregrine"
 globset = "0.4"
 move-command-line-common = { git = "https://github.com/MystenLabs/sui", rev = "d5364733440fc66fee02ccfb1ee7b6e4b61bb1b0" }
 move-compiler = { git = "https://github.com/MystenLabs/sui", rev = "d5364733440fc66fee02ccfb1ee7b6e4b61bb1b0" }
+peregrine-analysis-core = { path = "../peregrine-analysis-core" }
+peregrine-attack-surface = { path = "../peregrine-attack-surface" }
+peregrine-complexity-rules = { path = "../peregrine-complexity-rules" }
+peregrine-move-model = { path = "../peregrine-move-model" }
+peregrine-object-lifecycle = { path = "../peregrine-object-lifecycle" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"

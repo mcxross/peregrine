@@ -1,16 +1,19 @@
-mod dependency_graph;
-mod object_lifecycle;
-mod source_parser;
-mod surface;
-
-use dependency_graph::build_package_dependency_graph;
+use peregrine_attack_surface::package_surface;
+use peregrine_move_model::{discover_move_project_model, MovePackageModel};
 use serde::Serialize;
-use source_parser::discover_modules;
-use std::{
-    fs,
-    path::{Path, PathBuf},
+use std::path::Path;
+
+pub use peregrine_attack_surface::{
+    AdminControlFinding, CapabilityFinding, ExternalCallFinding, MovePackageSurface,
+    ObjectOwnershipFinding, PublicPackageRelationship,
 };
-use surface::package_surface;
+pub use peregrine_move_model::{
+    MoveFunctionSignature, MoveModule, MoveStructField, MoveStructSignature, PackageDependencyEdge,
+    PackageDependencyGraph, PackageDependencyNode,
+};
+pub use peregrine_object_lifecycle::{
+    ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleRisk, ObjectLifecycleStage,
+};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,328 +32,37 @@ pub struct MovePackage {
     pub modules: Vec<MoveModule>,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MovePackageSurface {
-    pub entry_function_count: usize,
-    pub capability_count: usize,
-    pub shared_object_count: usize,
-    pub address_owned_object_count: usize,
-    pub immutable_object_count: usize,
-    pub wrapped_object_count: usize,
-    pub party_object_count: usize,
-    pub admin_control_count: usize,
-    pub external_call_count: usize,
-    pub public_package_relationship_count: usize,
-    pub capability_structs: Vec<String>,
-    pub capability_findings: Vec<CapabilityFinding>,
-    pub shared_object_structs: Vec<String>,
-    pub object_lifecycle_maps: Vec<ObjectLifecycleMap>,
-    pub object_ownership_findings: Vec<ObjectOwnershipFinding>,
-    pub admin_control_findings: Vec<AdminControlFinding>,
-    pub external_call_findings: Vec<ExternalCallFinding>,
-    pub public_package_relationships: Vec<PublicPackageRelationship>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ObjectLifecycleMap {
-    pub type_name: String,
-    pub module_name: String,
-    pub qualified_name: String,
-    pub file_path: String,
-    pub abilities: Vec<String>,
-    pub is_capability_like: bool,
-    pub stages: Vec<ObjectLifecycleStage>,
-    pub touched_by: Vec<ObjectLifecycleFunctionRef>,
-    pub risks: Vec<ObjectLifecycleRisk>,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct ObjectLifecycleStage {
-    pub kind: String,
-    pub functions: Vec<ObjectLifecycleFunctionRef>,
-    pub evidence: Vec<String>,
-}
-
-#[derive(Serialize, Clone, Eq, PartialEq, Ord, PartialOrd)]
-#[serde(rename_all = "camelCase")]
-pub struct ObjectLifecycleFunctionRef {
-    pub module_name: String,
-    pub function_name: String,
-    pub qualified_name: String,
-    pub file_path: String,
-    pub visibility: String,
-    pub is_entry: bool,
-    pub is_transaction_callable: bool,
-    pub direct: bool,
-    pub call_path: Vec<String>,
-    pub evidence: Vec<String>,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct ObjectLifecycleRisk {
-    pub kind: String,
-    pub severity: String,
-    pub message: String,
-    pub evidence: Vec<String>,
-    pub functions: Vec<ObjectLifecycleFunctionRef>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CapabilityFinding {
-    pub type_name: String,
-    pub module_name: String,
-    pub qualified_name: String,
-    pub confidence: String,
-    pub evidence: Vec<String>,
-    pub protected_functions: Vec<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ObjectOwnershipFinding {
-    pub type_name: String,
-    pub module_name: String,
-    pub qualified_name: String,
-    pub ownership_kind: String,
-    pub confidence: String,
-    pub evidence: Vec<String>,
-    pub related_functions: Vec<String>,
-    pub wrapped_types: Vec<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AdminControlFinding {
-    pub function_name: String,
-    pub module_name: String,
-    pub qualified_name: String,
-    pub confidence: String,
-    pub evidence: Vec<String>,
-    pub guarding_types: Vec<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExternalCallFinding {
-    pub caller_module: String,
-    pub caller_function: String,
-    pub target_module: String,
-    pub target_function: String,
-    pub target: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PublicPackageRelationship {
-    pub source_module: String,
-    pub source_function: String,
-    pub target_module: String,
-    pub target_function: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MoveModule {
-    pub name: String,
-    pub address: Option<String>,
-    pub file_path: String,
-    pub attributes: Vec<String>,
-    pub structs: Vec<MoveStructSignature>,
-    pub functions: Vec<MoveFunctionSignature>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MoveStructSignature {
-    pub name: String,
-    pub abilities: Vec<String>,
-    pub fields: Vec<MoveStructField>,
-    pub signature: String,
-    pub attributes: Vec<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MoveStructField {
-    pub name: String,
-    pub type_name: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MoveFunctionSignature {
-    pub name: String,
-    pub visibility: String,
-    pub is_entry: bool,
-    pub is_transaction_callable: bool,
-    pub signature: String,
-    pub body: Option<String>,
-    pub attributes: Vec<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PackageDependencyGraph {
-    pub root: Option<String>,
-    pub nodes: Vec<PackageDependencyNode>,
-    pub edges: Vec<PackageDependencyEdge>,
-    pub summary_path: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PackageDependencyNode {
-    pub id: String,
-    pub address: Option<String>,
-    pub module_count: usize,
-    pub public_function_count: usize,
-    pub entry_function_count: usize,
-    pub is_root: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PackageDependencyEdge {
-    pub source: String,
-    pub target: String,
-    pub dependency_count: usize,
-    pub dependency_kind: String,
-}
-
 pub fn discover_move_project(root: &Path) -> MoveProject {
-    let mut manifest_paths = Vec::new();
-
-    collect_move_manifests(root, root, &mut manifest_paths);
-    manifest_paths.sort();
-
-    let packages = manifest_paths
+    let model = discover_move_project_model(root);
+    let packages = model
+        .packages
         .into_iter()
-        .filter_map(|manifest_path| build_move_package(root, &manifest_path))
+        .map(build_move_package)
         .collect::<Vec<_>>();
-    let graph = build_package_dependency_graph(root, &packages);
 
     MoveProject {
         packages,
-        dependency_graph: graph,
+        dependency_graph: model.dependency_graph,
     }
 }
 
-fn collect_move_manifests(root: &Path, directory: &Path, manifest_paths: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(directory) else {
-        return;
-    };
+fn build_move_package(model: MovePackageModel) -> MovePackage {
+    let surface = package_surface(&model.modules);
 
-    for entry in entries.filter_map(Result::ok) {
-        let path = entry.path();
-        let Ok(file_type) = entry.file_type() else {
-            continue;
-        };
-
-        if file_type.is_dir() {
-            collect_move_manifests(root, &path, manifest_paths);
-            continue;
-        }
-
-        if file_type.is_file() && entry.file_name() == "Move.toml" && path.starts_with(root) {
-            manifest_paths.push(path);
-        }
-    }
-}
-
-pub(crate) fn root_package_name(packages: &[MovePackage]) -> Option<String> {
-    packages
-        .iter()
-        .find(|move_package| move_package.path.is_empty())
-        .or_else(|| packages.first())
-        .map(|move_package| move_package.name.clone())
-}
-
-fn build_move_package(root: &Path, manifest_path: &Path) -> Option<MovePackage> {
-    let package_root = manifest_path.parent()?;
-    let manifest = fs::read_to_string(manifest_path).ok()?;
-    let name = package_name(&manifest).unwrap_or_else(|| {
-        package_root
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("Move package")
-            .to_string()
-    });
-    let path = relative_path(root, package_root)?;
-    let manifest_path = relative_path(root, manifest_path)?;
-    let mut modules = discover_modules(root, package_root);
-
-    modules.sort_by(|left, right| {
-        left.name
-            .cmp(&right.name)
-            .then_with(|| left.file_path.cmp(&right.file_path))
-    });
-    let surface = package_surface(&modules);
-
-    Some(MovePackage {
-        name,
-        path,
-        manifest_path,
+    MovePackage {
+        name: model.name,
+        path: model.path,
+        manifest_path: model.manifest_path,
         surface,
-        modules,
-    })
-}
-
-fn package_name(manifest: &str) -> Option<String> {
-    let mut in_package_section = false;
-
-    for line in manifest.lines() {
-        let line = line.split('#').next().unwrap_or("").trim();
-
-        if line.starts_with('[') && line.ends_with(']') {
-            in_package_section = line == "[package]";
-            continue;
-        }
-
-        if !in_package_section {
-            continue;
-        }
-
-        let Some((key, value)) = line.split_once('=') else {
-            continue;
-        };
-
-        if key.trim() != "name" {
-            continue;
-        }
-
-        return Some(
-            value
-                .trim()
-                .trim_matches('"')
-                .trim_matches('\'')
-                .to_string(),
-        );
+        modules: model.modules,
     }
-
-    None
-}
-
-pub(crate) fn relative_path(root: &Path, path: &Path) -> Option<String> {
-    Some(
-        path.strip_prefix(root)
-            .ok()?
-            .components()
-            .map(|component| component.as_os_str().to_str())
-            .collect::<Option<Vec<_>>>()?
-            .join("/"),
-    )
 }
 
 #[cfg(test)]
 mod tests {
-    use super::source_parser::parse_module_declarations;
-    use super::surface::package_surface;
     use super::*;
+    use peregrine_attack_surface::package_surface;
+    use peregrine_move_model::parse_module_declarations;
     use std::fs;
     use tempfile::tempdir;
 

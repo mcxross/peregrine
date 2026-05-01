@@ -3582,12 +3582,59 @@ dependencies = [
 ]
 
 [[package]]
+name = "peregrine-analysis-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml 0.8.23",
+]
+
+[[package]]
+name = "peregrine-attack-surface"
+version = "0.1.0"
+dependencies = [
+ "peregrine-move-model",
+ "peregrine-object-lifecycle",
+ "serde",
+]
+
+[[package]]
+name = "peregrine-complexity-rules"
+version = "0.1.0"
+dependencies = [
+ "peregrine-analysis-core",
+]
+
+[[package]]
+name = "peregrine-move-model"
+version = "0.1.0"
+dependencies = [
+ "move-command-line-common",
+ "move-compiler",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "peregrine-object-lifecycle"
+version = "0.1.0"
+dependencies = [
+ "peregrine-move-model",
+ "serde",
+]
+
+[[package]]
 name = "peregrine-static-analysis"
 version = "0.1.0"
 dependencies = [
  "globset",
  "move-command-line-common",
  "move-compiler",
+ "peregrine-analysis-core",
+ "peregrine-attack-surface",
+ "peregrine-complexity-rules",
+ "peregrine-move-model",
+ "peregrine-object-lifecycle",
  "serde",
  "serde_json",
  "toml 0.8.23",

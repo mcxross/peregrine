@@ -1,0 +1,12 @@
+[package]
+name = "peregrine-complexity-rules"
+version = "0.1.0"
+edition = "2021"
+description = "Complexity ruleset for Peregrine's Move static analysis engine"
+
+[dependencies]
+peregrine-analysis-core = { path = "../peregrine-analysis-core" }
+
+[dev-dependencies]
+toml = "0.8"
+

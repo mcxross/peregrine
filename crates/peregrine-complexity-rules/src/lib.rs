@@ -1,9 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::{
-    analyzer::{Rule, RuleOutcome, RuleSet, RuleSetProvider},
-    config::RuleConfig,
-    model::{AnalysisContext, Finding, Metric, ParsedFunction, ParsedModule, RuleMetric, Severity},
+use peregrine_analysis_core::{
+    AnalysisContext, Finding, Metric, ParsedFunction, ParsedModule, Rule, RuleConfig, RuleMetric,
+    RuleOutcome, RuleSet, RuleSetProvider, Severity,
 };
 
 const RULESET_ID: &str = "complexity";
@@ -295,122 +294,53 @@ fn sanitize_source(source: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        config::{AnalysisConfig, RuleSetConfig},
-        Analyzer,
-    };
-    use std::{collections::BTreeMap, fs};
-    use tempfile::TempDir;
+    use peregrine_analysis_core::{AnalysisConfig, RuleConfig, SourceFile, Span};
+    use std::path::PathBuf;
 
     #[test]
     fn simple_function_has_base_complexity() {
-        let package = move_package(
-            r#"
-module demo::m {
-    fun id(): u64 { 1 }
-}
-"#,
+        assert_eq!(
+            function_complexity_score(&test_function("id", "fun id() { 1 }")),
+            1
         );
-        let report = Analyzer::new().analyze_package(package.path(), AnalysisConfig::default());
-        let metric = report
-            .metrics
-            .iter()
-            .find(|metric| metric.rule_id == FUNCTION_RULE_ID && metric.target == "m::id")
-            .expect("function metric");
-
-        assert_eq!(metric.metric.value, 1);
     }
 
     #[test]
     fn counts_move_specific_complexity() {
-        let package = move_package(
-            r#"
-module demo::m {
-    public entry fun mutate<T>(flag: bool, ctx: &mut TxContext) {
-        if (flag && true) {
-            assert!(flag, 0);
-            transfer::share_object(object::new(ctx));
-        } else if (!flag || false) {
-            loop { abort 1 }
+        let function = ParsedFunction {
+            module_name: "m".to_string(),
+            name: "mutate".to_string(),
+            visibility: "public".to_string(),
+            is_entry: true,
+            is_transaction_callable: true,
+            signature: "public entry fun mutate<T>(flag: bool, ctx: &mut TxContext)".to_string(),
+            body: r#"
+public entry fun mutate<T>(flag: bool, ctx: &mut TxContext) {
+    if (flag && true) {
+        assert!(flag, 0);
+        transfer::share_object(object::new(ctx));
+    } else if (!flag || false) {
+        loop { abort 1 }
+    };
+}
+"#
+            .to_string(),
+            file: "sources/m.move".to_string(),
+            span: Some(Span {
+                start_line: 1,
+                end_line: 9,
+            }),
+            type_parameter_count: 1,
         };
-    }
-}
-"#,
-        );
-        let report = Analyzer::new().analyze_package(package.path(), AnalysisConfig::default());
-        let metric = report
-            .metrics
-            .iter()
-            .find(|metric| metric.rule_id == FUNCTION_RULE_ID && metric.target == "m::mutate")
-            .expect("function metric");
 
-        assert_eq!(metric.metric.value, 14);
-    }
-
-    #[test]
-    fn modern_module_label_parses_without_module_block_and_ignores_method_aliases() {
-        let package = move_package(
-            r#"
-module demo::modern;
-
-public struct Counter has copy, drop { value: u64 }
-public use fun value as Counter.value;
-
-public macro fun inspect<T>(value: T, f: |T|) {
-    f(value)
-}
-
-public entry fun run(flag: bool) {
-    if (flag) {
-        assert!(flag, 0)
-    }
-}
-"#,
-        );
-        let report = Analyzer::new().analyze_package(package.path(), AnalysisConfig::default());
-        let targets = report
-            .metrics
-            .iter()
-            .filter(|metric| metric.rule_id == FUNCTION_RULE_ID)
-            .map(|metric| metric.target.as_str())
-            .collect::<Vec<_>>();
-
-        assert!(targets.contains(&"modern::inspect"));
-        assert!(targets.contains(&"modern::run"));
-        assert!(!targets.contains(&"modern::value"));
-    }
-
-    #[test]
-    fn legacy_module_blocks_parse_multiple_modules_in_one_file() {
-        let package = move_package(
-            r#"
-module demo::first {
-    fun a() { if (true) {} }
-}
-
-module demo::second {
-    public fun b() { while (false) {} }
-}
-"#,
-        );
-        let report = Analyzer::new().analyze_package(package.path(), AnalysisConfig::default());
-        let targets = report
-            .metrics
-            .iter()
-            .filter(|metric| metric.rule_id == FUNCTION_RULE_ID)
-            .map(|metric| metric.target.as_str())
-            .collect::<Vec<_>>();
-
-        assert!(targets.contains(&"first::a"));
-        assert!(targets.contains(&"second::b"));
+        assert_eq!(function_complexity_score(&function), 14);
     }
 
     #[test]
     fn comments_strings_and_escaped_keywords_do_not_add_complexity() {
-        let package = move_package(
+        let function = test_function(
+            "simple",
             r#"
-module demo::m;
-
 fun simple() {
     // if while loop match assert! abort && || transfer::share_object(object::new(ctx))
     /* if (true) { abort 1 } */
@@ -420,42 +350,34 @@ fun simple() {
 }
 "#,
         );
-        let report = Analyzer::new().analyze_package(package.path(), AnalysisConfig::default());
-        let metric = report
-            .metrics
-            .iter()
-            .find(|metric| metric.rule_id == FUNCTION_RULE_ID && metric.target == "m::simple")
-            .expect("function metric");
 
-        assert_eq!(metric.metric.value, 1);
+        assert_eq!(function_complexity_score(&function), 1);
     }
 
     #[test]
     fn function_threshold_emits_finding() {
-        let package = move_package(
-            r#"
-module demo::m {
-    fun complicated() {
+        let context = context(vec![ParsedModule {
+            name: "m".to_string(),
+            address: Some("demo".to_string()),
+            file: "sources/m.move".to_string(),
+            functions: vec![test_function(
+                "complicated",
+                r#"
+fun complicated() {
         if (true) {};
         if (true) {};
-    }
 }
 "#,
-        );
-        let mut config = AnalysisConfig::default();
-        config
-            .analysis
-            .rulesets
-            .get_mut(RULESET_ID)
-            .unwrap()
-            .rules
-            .get_mut(FUNCTION_RULE_ID)
-            .unwrap()
-            .threshold = Some(2);
+            )],
+        }]);
+        let config = RuleConfig {
+            threshold: Some(2),
+            ..RuleConfig::default()
+        };
 
-        let report = Analyzer::new().analyze_package(package.path(), config);
+        let outcome = FunctionComplexityRule.analyze(&context, &config);
 
-        assert!(report
+        assert!(outcome
             .findings
             .iter()
             .any(|finding| finding.rule_id == FUNCTION_RULE_ID));
@@ -463,104 +385,26 @@ module demo::m {
 
     #[test]
     fn module_threshold_emits_finding() {
-        let package = move_package(
-            r#"
-module demo::m {
-    fun a() { if (true) {} }
-    fun b() { if (true) {} }
-}
-"#,
-        );
-        let mut config = AnalysisConfig::default();
-        config
-            .analysis
-            .rulesets
-            .get_mut(RULESET_ID)
-            .unwrap()
-            .rules
-            .get_mut(MODULE_RULE_ID)
-            .unwrap()
-            .threshold = Some(3);
+        let context = context(vec![ParsedModule {
+            name: "m".to_string(),
+            address: Some("demo".to_string()),
+            file: "sources/m.move".to_string(),
+            functions: vec![
+                test_function("a", "fun a() { if (true) {} }"),
+                test_function("b", "fun b() { if (true) {} }"),
+            ],
+        }]);
+        let config = RuleConfig {
+            threshold: Some(3),
+            ..RuleConfig::default()
+        };
 
-        let report = Analyzer::new().analyze_package(package.path(), config);
+        let outcome = ModuleComplexityRule.analyze(&context, &config);
 
-        assert!(report
+        assert!(outcome
             .findings
             .iter()
             .any(|finding| finding.rule_id == MODULE_RULE_ID));
-    }
-
-    #[test]
-    fn inactive_rules_are_honored() {
-        let package = move_package(
-            r#"
-module demo::m {
-    fun complicated() {
-        if (true) {};
-        if (true) {};
-    }
-}
-"#,
-        );
-        let mut config = AnalysisConfig::default();
-        config
-            .analysis
-            .rulesets
-            .get_mut(RULESET_ID)
-            .unwrap()
-            .rules
-            .get_mut(FUNCTION_RULE_ID)
-            .unwrap()
-            .active = Some(false);
-
-        let report = Analyzer::new().analyze_package(package.path(), config);
-
-        assert!(!report
-            .metrics
-            .iter()
-            .any(|metric| metric.rule_id == FUNCTION_RULE_ID));
-    }
-
-    #[test]
-    fn custom_thresholds_from_config_are_honored() {
-        let package = move_package(
-            r#"
-module demo::m {
-    public entry fun almost_simple() { if (true) {} }
-}
-"#,
-        );
-        let config = toml::from_str::<AnalysisConfig>(
-            r#"
-[analysis.rulesets.complexity]
-active = true
-
-[analysis.rulesets.complexity.FunctionComplexity]
-active = true
-threshold = 100
-entry_threshold = 2
-"#,
-        )
-        .expect("config should parse");
-
-        let report = Analyzer::new().analyze_package(package.path(), config);
-
-        assert!(report
-            .findings
-            .iter()
-            .any(|finding| finding.rule_id == FUNCTION_RULE_ID));
-    }
-
-    fn move_package(source: &str) -> TempDir {
-        let temp = tempfile::tempdir().expect("temp package");
-        fs::write(
-            temp.path().join("Move.toml"),
-            "[package]\nname = \"demo\"\nversion = \"0.0.1\"\n",
-        )
-        .expect("manifest");
-        fs::create_dir_all(temp.path().join("sources")).expect("sources dir");
-        fs::write(temp.path().join("sources/m.move"), source).expect("source");
-        temp
     }
 
     #[test]
@@ -574,30 +418,73 @@ entry_threshold = 2
     }
 
     #[test]
-    fn ruleset_config_can_disable_everything() {
-        let package = move_package(
+    fn custom_entry_threshold_from_config_is_honored() {
+        let config = toml::from_str::<AnalysisConfig>(
             r#"
-module demo::m {
-    fun complicated() {
-        if (true) {};
-    }
-}
+[analysis.rulesets.complexity]
+active = true
+
+[analysis.rulesets.complexity.FunctionComplexity]
+active = true
+threshold = 100
+entry_threshold = 2
 "#,
-        );
-        let mut rulesets = BTreeMap::new();
-        rulesets.insert(
-            RULESET_ID.to_string(),
-            RuleSetConfig {
-                active: Some(false),
-                rules: BTreeMap::new(),
-            },
-        );
-        let mut config = AnalysisConfig::default();
-        config.analysis.rulesets = rulesets;
+        )
+        .expect("config should parse");
+        let ruleset = config.analysis.rulesets.get(RULESET_ID).unwrap();
+        let rule_config = ruleset.rule_config(FUNCTION_RULE_ID);
+        let context = context(vec![ParsedModule {
+            name: "m".to_string(),
+            address: Some("demo".to_string()),
+            file: "sources/m.move".to_string(),
+            functions: vec![ParsedFunction {
+                is_entry: true,
+                is_transaction_callable: true,
+                visibility: "public".to_string(),
+                signature: "public entry fun almost_simple()".to_string(),
+                type_parameter_count: 0,
+                ..test_function(
+                    "almost_simple",
+                    "public entry fun almost_simple() { if (true) {} }",
+                )
+            }],
+        }]);
 
-        let report = Analyzer::new().analyze_package(package.path(), config);
+        let outcome = FunctionComplexityRule.analyze(&context, &rule_config);
 
-        assert!(report.loaded_rulesets.is_empty());
-        assert!(report.metrics.is_empty());
+        assert!(outcome
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == FUNCTION_RULE_ID));
+    }
+
+    fn test_function(name: &str, body: &str) -> ParsedFunction {
+        ParsedFunction {
+            module_name: "m".to_string(),
+            name: name.to_string(),
+            visibility: "private".to_string(),
+            is_entry: false,
+            is_transaction_callable: false,
+            signature: format!("fun {name}()"),
+            body: body.to_string(),
+            file: "sources/m.move".to_string(),
+            span: Some(Span {
+                start_line: 1,
+                end_line: body.lines().count().max(1),
+            }),
+            type_parameter_count: 0,
+        }
+    }
+
+    fn context(modules: Vec<ParsedModule>) -> AnalysisContext {
+        AnalysisContext {
+            package_path: PathBuf::from("/workspace"),
+            source_files: vec![SourceFile {
+                path: "sources/m.move".to_string(),
+                contents: String::new(),
+            }],
+            modules,
+            config: AnalysisConfig::default(),
+        }
     }
 }
