@@ -3603,6 +3603,7 @@ name = "peregrine-complexity-rules"
 version = "0.1.0"
 dependencies = [
  "peregrine-analysis-core",
+ "toml 0.8.23",
 ]
 
 [[package]]
@@ -3613,6 +3614,7 @@ dependencies = [
  "move-compiler",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -3637,9 +3639,11 @@ dependencies = [
  "peregrine-object-lifecycle",
  "serde",
  "serde_json",
+ "tempfile",
  "toml 0.8.23",
  "walkdir",
  "wasmtime",
+ "wat",
 ]
 
 [[package]]

@@ -1,12 +1,11 @@
 [package]
 name = "peregrine-complexity-rules"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "Complexity ruleset for Peregrine's Move static analysis engine"
 
 [dependencies]
-peregrine-analysis-core = { path = "../peregrine-analysis-core" }
+peregrine-analysis-core = { workspace = true }
 
 [dev-dependencies]
-toml = "0.8"
-
+toml = { workspace = true }

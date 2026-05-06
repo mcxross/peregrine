@@ -1,24 +1,24 @@
 [package]
 name = "peregrine-static-analysis"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "Static analysis engine for Move packages used by Peregrine"
 
 [dependencies]
-globset = "0.4"
-move-command-line-common = { git = "https://github.com/MystenLabs/sui", rev = "d5364733440fc66fee02ccfb1ee7b6e4b61bb1b0" }
-move-compiler = { git = "https://github.com/MystenLabs/sui", rev = "d5364733440fc66fee02ccfb1ee7b6e4b61bb1b0" }
-peregrine-analysis-core = { path = "../peregrine-analysis-core" }
-peregrine-attack-surface = { path = "../peregrine-attack-surface" }
-peregrine-complexity-rules = { path = "../peregrine-complexity-rules" }
-peregrine-move-model = { path = "../peregrine-move-model" }
-peregrine-object-lifecycle = { path = "../peregrine-object-lifecycle" }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-toml = "0.8"
-walkdir = "2"
-wasmtime = "28"
+globset = { workspace = true }
+move-command-line-common = { workspace = true }
+move-compiler = { workspace = true }
+peregrine-analysis-core = { workspace = true }
+peregrine-attack-surface = { workspace = true }
+peregrine-complexity-rules = { workspace = true }
+peregrine-move-model = { workspace = true }
+peregrine-object-lifecycle = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+walkdir = { workspace = true }
+wasmtime = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3"
-wat = "1"
+tempfile = { workspace = true }
+wat = { workspace = true }
