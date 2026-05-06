@@ -17,8 +17,8 @@ edition = "2021"
 [workspace.dependencies]
 base64 = "0.22"
 globset = "0.4"
-move-command-line-common = { git = "https://github.com/MystenLabs/sui", rev = "d5364733440fc66fee02ccfb1ee7b6e4b61bb1b0" }
-move-compiler = { git = "https://github.com/MystenLabs/sui", rev = "d5364733440fc66fee02ccfb1ee7b6e4b61bb1b0" }
+move-command-line-common = { git = "https://github.com/mcxross/sui", branch = "testnet" }
+move-compiler = { git = "https://github.com/mcxross/sui", branch = "testnet" }
 peregrine-analysis-core = { path = "crates/peregrine-analysis-core" }
 peregrine-attack-surface = { path = "crates/peregrine-attack-surface" }
 peregrine-complexity-rules = { path = "crates/peregrine-complexity-rules" }
