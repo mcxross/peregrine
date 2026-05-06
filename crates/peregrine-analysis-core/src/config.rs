@@ -93,6 +93,7 @@ impl Default for AnalysisSection {
     fn default() -> Self {
         let mut rulesets = BTreeMap::new();
         let mut complexity_rules = BTreeMap::new();
+        let mut sui_rules = BTreeMap::new();
 
         complexity_rules.insert(
             "FunctionComplexity".to_string(),
@@ -117,6 +118,33 @@ impl Default for AnalysisSection {
             RuleSetConfig {
                 active: Some(true),
                 rules: complexity_rules,
+            },
+        );
+        for rule_id in [
+            "BoolJudgement",
+            "InfiniteLoop",
+            "PrecisionLoss",
+            "TypeConversion",
+            "UncheckedReturn",
+            "UnusedConst",
+            "UnusedPrivateFunction",
+            "UnusedStruct",
+        ] {
+            sui_rules.insert(
+                rule_id.to_string(),
+                RuleConfig {
+                    active: Some(true),
+                    threshold: None,
+                    entry_threshold: None,
+                    extra: BTreeMap::new(),
+                },
+            );
+        }
+        rulesets.insert(
+            "sui".to_string(),
+            RuleSetConfig {
+                active: Some(true),
+                rules: sui_rules,
             },
         );
 

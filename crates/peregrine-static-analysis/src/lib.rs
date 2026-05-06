@@ -2,6 +2,7 @@ mod analyzer;
 mod parser;
 mod plugins;
 mod project;
+pub mod sui;
 
 pub mod config {
     pub use peregrine_analysis_core::{
@@ -19,6 +20,10 @@ pub mod model {
 pub mod rules {
     pub mod complexity {
         pub use peregrine_complexity_rules::*;
+    }
+
+    pub mod sui {
+        pub use crate::sui::*;
     }
 }
 

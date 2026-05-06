@@ -5,7 +5,7 @@ use peregrine_analysis_core::{
 };
 use peregrine_complexity_rules::ComplexityRuleSetProvider;
 
-use crate::{parser::parse_package, plugins::WasmPluginHost};
+use crate::{parser::parse_package, plugins::WasmPluginHost, sui::SuiRuleSetProvider};
 
 pub struct Analyzer {
     providers: Vec<Box<dyn RuleSetProvider>>,
@@ -21,7 +21,10 @@ impl Default for Analyzer {
 impl Analyzer {
     pub fn new() -> Self {
         Self {
-            providers: vec![Box::new(ComplexityRuleSetProvider)],
+            providers: vec![
+                Box::new(ComplexityRuleSetProvider),
+                Box::new(SuiRuleSetProvider),
+            ],
             plugin_host: WasmPluginHost::default(),
         }
     }
@@ -85,5 +88,48 @@ impl Analyzer {
         report.loaded_plugins.sort();
         report.loaded_plugins.dedup();
         report
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn default_analyzer_loads_sui_ruleset_for_move_package() {
+        let temp = tempdir().expect("tempdir");
+        fs::write(
+            temp.path().join("Move.toml"),
+            r#"
+[package]
+name = "demo"
+"#,
+        )
+        .expect("manifest");
+        fs::create_dir_all(temp.path().join("sources")).expect("sources");
+        fs::write(
+            temp.path().join("sources/m.move"),
+            r#"
+module demo::m;
+
+public fun flags(flag: bool) {
+    if (flag == true) {};
+}
+"#,
+        )
+        .expect("source");
+
+        let report = Analyzer::new().analyze_package(temp.path(), AnalysisConfig::default());
+
+        assert!(report
+            .loaded_rulesets
+            .iter()
+            .any(|ruleset| ruleset == "sui"));
+        assert!(report
+            .findings
+            .iter()
+            .any(|finding| { finding.ruleset_id == "sui" && finding.rule_id == "BoolJudgement" }));
     }
 }
