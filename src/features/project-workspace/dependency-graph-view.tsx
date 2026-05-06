@@ -18,7 +18,7 @@ import "@xyflow/react/dist/style.css";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import React from "react";
-import { Download } from "lucide-react";
+import { Download, Maximize2, Minimize2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -81,7 +81,26 @@ export function DependencyGraphView({
   packageName = "",
 }: DependencyGraphViewProps) {
   const [hoveredNodeId, setHoveredNodeId] = React.useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
   const renderGraph = focusedPackageGraph(graph, packageName);
+
+  React.useEffect(() => {
+    if (!isFullscreen) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsFullscreen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isFullscreen]);
 
   if (!renderGraph.summaryPath) {
     return (
@@ -152,10 +171,18 @@ export function DependencyGraphView({
       type: "dependency",
     };
   });
-  const flowKey = `${renderGraph.root ?? "graph"}-${flowNodes.length}-${flowEdges.length}`;
+  const flowKey = `${renderGraph.root ?? "graph"}-${flowNodes.length}-${flowEdges.length}-${isFullscreen ? "fullscreen" : "inline"}`;
 
   return (
-    <div className={`${className} relative overflow-hidden border-[color:var(--app-border)] bg-[var(--app-surface)]`}>
+    <div
+      className={[
+        className,
+        "relative overflow-hidden border-[color:var(--app-border)] bg-[var(--app-surface)]",
+        isFullscreen
+          ? "fixed bottom-3 left-3 right-3 top-[calc(58px+0.75rem)] z-[90] rounded-lg border bg-[var(--app-window)] shadow-2xl shadow-black/60"
+          : "",
+      ].join(" ")}
+    >
       <ReactFlow
         key={flowKey}
         colorMode="dark"
@@ -179,9 +206,14 @@ export function DependencyGraphView({
           showInteractive={false}
         />
       </ReactFlow>
+      {isFullscreen ? (
+        <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-md border border-[color:var(--app-border)] bg-background/88 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground shadow-sm backdrop-blur">
+          Dependency Graph · Fullscreen
+        </div>
+      ) : null}
       <Button
         aria-label="Download graph as 4K PNG"
-        className="absolute right-3 top-3 z-20 size-8 border border-[color:var(--app-border)] bg-background/90 text-muted-foreground shadow-sm backdrop-blur hover:bg-[var(--app-elevated)] hover:text-foreground"
+        className="absolute right-12 top-3 z-20 size-8 border border-[color:var(--app-border)] bg-background/90 text-muted-foreground shadow-sm backdrop-blur hover:bg-[var(--app-elevated)] hover:text-foreground"
         onClick={handleDownload}
         size="icon-sm"
         title="Download graph as 4K PNG"
@@ -189,6 +221,21 @@ export function DependencyGraphView({
         variant="ghost"
       >
         <Download className="size-4" aria-hidden="true" />
+      </Button>
+      <Button
+        aria-label={isFullscreen ? "Exit fullscreen dependency graph" : "Open dependency graph fullscreen"}
+        className="absolute right-3 top-3 z-20 size-8 border border-[color:var(--app-border)] bg-background/90 text-muted-foreground shadow-sm backdrop-blur hover:bg-[var(--app-elevated)] hover:text-foreground"
+        onClick={() => setIsFullscreen((current) => !current)}
+        size="icon-sm"
+        title={isFullscreen ? "Exit fullscreen" : "Open fullscreen"}
+        type="button"
+        variant="ghost"
+      >
+        {isFullscreen ? (
+          <Minimize2 className="size-4" aria-hidden="true" />
+        ) : (
+          <Maximize2 className="size-4" aria-hidden="true" />
+        )}
       </Button>
       <div className="pointer-events-none absolute left-3 top-3 rounded-md border border-[color:var(--app-border)] bg-background/80 px-2.5 py-2 text-[11px] leading-tight text-muted-foreground shadow-sm backdrop-blur">
         <div className="font-medium text-foreground">Immediate module dependencies</div>

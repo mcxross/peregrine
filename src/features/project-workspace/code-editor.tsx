@@ -97,6 +97,10 @@ export function CodeEditor({
       return;
     }
 
+    console.info("[CodeEditor] creating editor", {
+      language,
+      sourceLength: value.length,
+    });
     const editor = new EditorView({
       parent: hostRef.current,
       state: EditorState.create({
@@ -113,6 +117,9 @@ export function CodeEditor({
     });
 
     return () => {
+      console.info("[CodeEditor] destroying editor", {
+        language,
+      });
       editor.destroy();
       editorRef.current = null;
     };
@@ -150,10 +157,20 @@ export function CodeEditor({
     const editor = editorRef.current;
 
     if (!editor || !jumpRequest) {
+      if (jumpRequest && !editor) {
+        console.warn("[CodeEditor] jump requested before editor was ready", jumpRequest);
+      }
       return;
     }
 
-    const line = editor.state.doc.line(clampLineNumber(jumpRequest.line, editor.state.doc.lines));
+    const clampedLine = clampLineNumber(jumpRequest.line, editor.state.doc.lines);
+    console.info("[CodeEditor] applying jump request", {
+      clampedLine,
+      lineCount: editor.state.doc.lines,
+      requestedLine: jumpRequest.line,
+      token: jumpRequest.token,
+    });
+    const line = editor.state.doc.line(clampedLine);
 
     editor.dispatch({
       selection: { anchor: line.from },

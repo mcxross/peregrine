@@ -1,7 +1,11 @@
+mod call_graph;
 mod dependency_graph;
+mod graph_builder;
 mod source_parser;
+mod type_graph;
 
 use dependency_graph::build_package_dependency_graph;
+use graph_builder::build_move_graphs;
 use serde::Serialize;
 use source_parser::discover_modules;
 use std::{
@@ -9,13 +13,28 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub use call_graph::{
+    MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode, MoveSourceSpan, MoveUnresolvedCall,
+};
 pub use source_parser::parse_module_declarations;
+pub use type_graph::{
+    MoveTypeGraph, MoveTypeGraphEdge, MoveTypeGraphNode, MoveTypeParameter, MoveUnresolvedType,
+};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveProjectModel {
     pub packages: Vec<MovePackageModel>,
     pub dependency_graph: PackageDependencyGraph,
+    pub call_graph: MoveCallGraph,
+    pub type_graph: MoveTypeGraph,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveProjectGraphs {
+    pub call_graph: MoveCallGraph,
+    pub type_graph: MoveTypeGraph,
 }
 
 #[derive(Serialize)]
@@ -97,21 +116,100 @@ pub struct PackageDependencyEdge {
 }
 
 pub fn discover_move_project_model(root: &Path) -> MoveProjectModel {
+    discover_move_project_model_with_graphs(root, true)
+}
+
+pub fn discover_move_project_model_fast(root: &Path) -> MoveProjectModel {
+    discover_move_project_model_with_graphs(root, false)
+}
+
+pub fn discover_move_project_model_shallow(root: &Path) -> MoveProjectModel {
+    let packages = discover_move_packages(root, false);
+    let dependency_graph = shallow_dependency_graph(&packages);
+
+    MoveProjectModel {
+        packages,
+        dependency_graph,
+        call_graph: MoveCallGraph::default(),
+        type_graph: MoveTypeGraph::default(),
+    }
+}
+
+fn shallow_dependency_graph(packages: &[MovePackageModel]) -> PackageDependencyGraph {
+    let root = root_package_name(packages);
+
+    PackageDependencyGraph {
+        root: root.clone(),
+        nodes: root
+            .map(|id| {
+                vec![PackageDependencyNode {
+                    id,
+                    address: None,
+                    module_count: 0,
+                    public_function_count: 0,
+                    entry_function_count: 0,
+                    is_root: true,
+                }]
+            })
+            .unwrap_or_default(),
+        edges: Vec::new(),
+        summary_path: None,
+    }
+}
+
+pub fn discover_move_project_graphs(root: &Path) -> MoveProjectGraphs {
+    let packages = discover_move_packages(root, false);
+    let (call_graph, type_graph) = build_move_graphs(root, &packages);
+
+    MoveProjectGraphs {
+        call_graph,
+        type_graph,
+    }
+}
+
+pub fn discover_move_project_graphs_for_package(
+    root: &Path,
+    package_path: &str,
+) -> MoveProjectGraphs {
+    let manifest_path = root.join(package_path).join("Move.toml");
+    let packages = build_move_package(root, &manifest_path, false)
+        .map(|package| vec![package])
+        .unwrap_or_else(|| discover_move_packages(root, false));
+    let (call_graph, type_graph) = build_move_graphs(root, &packages);
+
+    MoveProjectGraphs {
+        call_graph,
+        type_graph,
+    }
+}
+
+fn discover_move_project_model_with_graphs(root: &Path, include_graphs: bool) -> MoveProjectModel {
+    let packages = discover_move_packages(root, true);
+    let dependency_graph = build_package_dependency_graph(root, &packages);
+    let (call_graph, type_graph) = if include_graphs {
+        build_move_graphs(root, &packages)
+    } else {
+        (MoveCallGraph::default(), MoveTypeGraph::default())
+    };
+
+    MoveProjectModel {
+        packages,
+        dependency_graph,
+        call_graph,
+        type_graph,
+    }
+}
+
+fn discover_move_packages(root: &Path, include_modules: bool) -> Vec<MovePackageModel> {
     let mut manifest_paths = Vec::new();
 
     collect_move_manifests(root, root, &mut manifest_paths);
     manifest_paths.sort();
 
-    let packages = manifest_paths
+    manifest_paths
         .into_iter()
-        .filter_map(|manifest_path| build_move_package(root, &manifest_path))
-        .collect::<Vec<_>>();
-    let graph = build_package_dependency_graph(root, &packages);
-
-    MoveProjectModel {
-        packages,
-        dependency_graph: graph,
-    }
+        .filter_map(|manifest_path| build_move_package(root, &manifest_path, include_modules))
+        .collect::<Vec<_>>()
 }
 
 fn collect_move_manifests(root: &Path, directory: &Path, manifest_paths: &mut Vec<PathBuf>) {
@@ -126,6 +224,10 @@ fn collect_move_manifests(root: &Path, directory: &Path, manifest_paths: &mut Ve
         };
 
         if file_type.is_dir() {
+            if should_skip_project_discovery_dir(&path) {
+                continue;
+            }
+
             collect_move_manifests(root, &path, manifest_paths);
             continue;
         }
@@ -136,6 +238,26 @@ fn collect_move_manifests(root: &Path, directory: &Path, manifest_paths: &mut Ve
     }
 }
 
+fn should_skip_project_discovery_dir(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+
+    matches!(
+        name,
+        ".git"
+            | ".next"
+            | ".sui"
+            | ".turbo"
+            | "build"
+            | "coverage"
+            | "dist"
+            | "node_modules"
+            | "package_summaries"
+            | "target"
+    )
+}
+
 pub(crate) fn root_package_name(packages: &[MovePackageModel]) -> Option<String> {
     packages
         .iter()
@@ -144,7 +266,11 @@ pub(crate) fn root_package_name(packages: &[MovePackageModel]) -> Option<String>
         .map(|move_package| move_package.name.clone())
 }
 
-fn build_move_package(root: &Path, manifest_path: &Path) -> Option<MovePackageModel> {
+fn build_move_package(
+    root: &Path,
+    manifest_path: &Path,
+    include_modules: bool,
+) -> Option<MovePackageModel> {
     let package_root = manifest_path.parent()?;
     let manifest = fs::read_to_string(manifest_path).ok()?;
     let name = package_name(&manifest).unwrap_or_else(|| {
@@ -156,7 +282,11 @@ fn build_move_package(root: &Path, manifest_path: &Path) -> Option<MovePackageMo
     });
     let path = relative_path(root, package_root)?;
     let manifest_path = relative_path(root, manifest_path)?;
-    let mut modules = discover_modules(root, package_root);
+    let mut modules = if include_modules {
+        discover_modules(root, package_root)
+    } else {
+        Vec::new()
+    };
 
     modules.sort_by(|left, right| {
         left.name

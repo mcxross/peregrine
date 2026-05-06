@@ -5,9 +5,17 @@ export type PackageTree = {
   activePackageManifestPath?: string | null;
   rootPath: string;
   rootName: string;
+  isDetailed: boolean;
   paths: string[];
   movePackages: MovePackage[];
   dependencyGraph: PackageDependencyGraph;
+  callGraph: MoveCallGraph;
+  typeGraph: MoveTypeGraph;
+};
+
+export type MoveProjectGraphs = {
+  callGraph: MoveCallGraph;
+  typeGraph: MoveTypeGraph;
 };
 
 export type MovePackage = {
@@ -188,6 +196,121 @@ export type PackageDependencyEdge = {
   dependencyKind: string;
 };
 
+export type MoveSourceSpan = {
+  filePath: string;
+  startLine: number;
+  endLine: number;
+  startByte: number;
+  endByte: number;
+};
+
+export type MoveCallGraph = {
+  nodes: MoveCallGraphNode[];
+  edges: MoveCallGraphEdge[];
+  unresolvedCalls: MoveUnresolvedCall[];
+};
+
+export type MoveCallGraphNode = {
+  id: string;
+  packageName: string | null;
+  packagePath: string | null;
+  address: string | null;
+  moduleName: string;
+  functionName: string;
+  qualifiedName: string;
+  filePath: string | null;
+  visibility: string;
+  isEntry: boolean;
+  isTransactionCallable: boolean;
+  attributes: string[];
+  signature: string | null;
+  span: MoveSourceSpan | null;
+  isExternal: boolean;
+  source: string;
+};
+
+export type MoveCallGraphEdge = {
+  source: string;
+  target: string;
+  callKind: string;
+  confidence: string;
+  callCount: number;
+  rawTarget: string;
+  typeArguments: string[];
+  sourceSpans: MoveSourceSpan[];
+  isExternal: boolean;
+  isResolved: boolean;
+};
+
+export type MoveUnresolvedCall = {
+  source: string;
+  rawTarget: string;
+  callKind: string;
+  filePath: string;
+  spans: MoveSourceSpan[];
+  reason: string;
+};
+
+export type MoveTypeGraph = {
+  nodes: MoveTypeGraphNode[];
+  edges: MoveTypeGraphEdge[];
+  unresolvedTypes: MoveUnresolvedType[];
+};
+
+export type MoveTypeGraphNode = {
+  id: string;
+  kind: string;
+  packageName: string | null;
+  packagePath: string | null;
+  address: string | null;
+  canonicalAddress: string | null;
+  moduleName: string | null;
+  name: string;
+  qualifiedName: string;
+  filePath: string | null;
+  abilities: string[];
+  typeParameters: MoveTypeParameter[];
+  attributes: string[];
+  span: MoveSourceSpan | null;
+  source: string;
+  isExternal: boolean;
+};
+
+export type MoveTypeParameter = {
+  name: string;
+  abilities: string[];
+  isPhantom: boolean;
+};
+
+export type MoveTypeGraphEdge = {
+  source: string;
+  target: string;
+  relationship: string;
+  fieldName: string | null;
+  variantName: string | null;
+  functionName: string | null;
+  parameterName: string | null;
+  typeArgumentIndex: number | null;
+  isMutable: boolean;
+  isReference: boolean;
+  typeExpression: string | null;
+  declaringTypeId: string | null;
+  declaringFieldName: string | null;
+  typeArgumentName: string | null;
+  sourceSpans: MoveSourceSpan[];
+  confidence: string;
+  evidence: string[];
+};
+
+export type MoveUnresolvedType = {
+  source: string;
+  rawType: string;
+  context: string;
+  filePath: string;
+  spans: MoveSourceSpan[];
+  reason: string;
+};
+
 export type AnalysisSeverity = "info" | "warning" | "error";
 
 export type AnalysisSpan = {
@@ -307,6 +430,20 @@ export type FilePreview =
 
 export async function loadPackageTree(rootPath: string): Promise<PackageTree> {
   return invoke<PackageTree>("load_package_tree", { rootPath });
+}
+
+export async function loadPackageTreeDetails(rootPath: string): Promise<PackageTree> {
+  return invoke<PackageTree>("load_package_tree_details", { rootPath });
+}
+
+export async function loadMoveGraphs(
+  rootPath: string,
+  packagePath?: string,
+): Promise<MoveProjectGraphs> {
+  return invoke<MoveProjectGraphs>("load_move_graphs", {
+    packagePath: packagePath ?? null,
+    rootPath,
+  });
 }
 
 export function isDirectoryPath(path: string) {

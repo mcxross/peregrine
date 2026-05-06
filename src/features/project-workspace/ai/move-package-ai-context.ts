@@ -21,6 +21,8 @@ export async function buildMovePackageAiContext({
   const sections = [
     packageOverviewContext(packageTree, movePackage),
     dependencyContext(packageTree.dependencyGraph),
+    callGraphContext(packageTree.callGraph, movePackage),
+    typeGraphContext(packageTree.typeGraph, movePackage),
     surfaceContext(movePackage.surface),
     moduleSignatureContext(movePackage.modules),
     await sourceContext(packageTree, movePackage.modules),
@@ -59,6 +61,60 @@ function dependencyContext(graph: PackageDependencyGraph) {
     ...emptyAware(nodes, "No dependency nodes found."),
     "Edges:",
     ...emptyAware(edges, "No dependency edges found."),
+  ].join("\n");
+}
+
+function callGraphContext(
+  graph: PackageTree["callGraph"],
+  movePackage: MovePackage,
+) {
+  const packagePath = movePackage.path || ".";
+  const localNodes = graph.nodes.filter((node) => node.packagePath === movePackage.path);
+  const localNodeIds = new Set(localNodes.map((node) => node.id));
+  const edges = graph.edges
+    .filter((edge) => localNodeIds.has(edge.source))
+    .slice(0, 48)
+    .map((edge) => {
+      const target = graph.nodes.find((node) => node.id === edge.target);
+      const targetLabel = target?.qualifiedName ?? edge.rawTarget;
+
+      return `- ${edge.rawTarget} -> ${targetLabel}: ${edge.callCount} ${edge.callKind}, ${edge.isResolved ? "resolved" : "unresolved"}${edge.isExternal ? ", external" : ""}`;
+    });
+
+  return [
+    "# Call Graph",
+    `Package path: ${packagePath}`,
+    `Functions: ${localNodes.length}`,
+    `Edges: ${graph.edges.filter((edge) => localNodeIds.has(edge.source)).length}`,
+    `Unresolved calls: ${graph.unresolvedCalls.filter((call) => localNodeIds.has(call.source)).length}`,
+    ...emptyAware(edges, "No call edges found for this package."),
+  ].join("\n");
+}
+
+function typeGraphContext(
+  graph: PackageTree["typeGraph"],
+  movePackage: MovePackage,
+) {
+  const packagePath = movePackage.path || ".";
+  const localNodes = graph.nodes.filter((node) => node.packagePath === movePackage.path);
+  const localTypeIds = new Set(localNodes.map((node) => node.id));
+  const edges = graph.edges
+    .filter((edge) => localTypeIds.has(edge.source) || localTypeIds.has(edge.target))
+    .slice(0, 48)
+    .map((edge) => {
+      const source = graph.nodes.find((node) => node.id === edge.source);
+      const target = graph.nodes.find((node) => node.id === edge.target);
+
+      return `- ${source?.qualifiedName ?? edge.source} -> ${target?.qualifiedName ?? edge.target}: ${edge.relationship}${edge.fieldName ? ` field=${edge.fieldName}` : ""}${edge.parameterName ? ` param=${edge.parameterName}` : ""}`;
+    });
+
+  return [
+    "# Type Graph",
+    `Package path: ${packagePath}`,
+    `Types: ${localNodes.length}`,
+    `Edges: ${graph.edges.filter((edge) => localTypeIds.has(edge.source) || localTypeIds.has(edge.target)).length}`,
+    `Unresolved types: ${graph.unresolvedTypes.length}`,
+    ...emptyAware(edges, "No type edges found for this package."),
   ].join("\n");
 }
 

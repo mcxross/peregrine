@@ -46,6 +46,7 @@ import { MovePackagesOverviewScreen } from "@/features/project-workspace/move-pa
 import { assessmentSidebarItems } from "@/features/project-workspace/package-load-assessment-cards";
 import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
 import type { SelectedMoveModule } from "@/features/project-workspace/module-signature-screen";
+import type { TypeGraphSourceLocation } from "@/features/project-workspace/type-graph-view";
 import {
   SurfaceDetailScreen,
   type SurfaceDetailKind,
@@ -80,6 +81,69 @@ export type OpenFileTab = {
   status: "idle" | "loading" | "loaded" | "error";
 };
 
+export type SourceJumpRequest = TypeGraphSourceLocation & {
+  token: number;
+};
+
+type WorkspaceErrorBoundaryProps = {
+  children: React.ReactNode;
+  resetKey: string;
+};
+
+type WorkspaceErrorBoundaryState = {
+  error: Error | null;
+  info: React.ErrorInfo | null;
+};
+
+class WorkspaceErrorBoundary extends React.Component<WorkspaceErrorBoundaryProps, WorkspaceErrorBoundaryState> {
+  state: WorkspaceErrorBoundaryState = {
+    error: null,
+    info: null,
+  };
+
+  static getDerivedStateFromError(error: Error): WorkspaceErrorBoundaryState {
+    return { error, info: null };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[ProjectWorkspace] render error boundary caught crash", {
+      componentStack: info.componentStack,
+      error,
+      message: error.message,
+      stack: error.stack,
+    });
+    this.setState({ info });
+  }
+
+  componentDidUpdate(previousProps: WorkspaceErrorBoundaryProps) {
+    if (previousProps.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: null, info: null });
+    }
+  }
+
+  render() {
+    if (!this.state.error) {
+      return this.props.children;
+    }
+
+    return (
+      <div className="grid h-full min-h-0 place-items-center bg-[var(--app-window)] px-6">
+        <div className="max-w-xl rounded-md border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-100">
+          <div className="font-semibold">Workspace render error</div>
+          <p className="mt-2 text-xs leading-5 text-red-100/80">
+            {this.state.error.message || "An unknown render error occurred."}
+          </p>
+          {this.state.info?.componentStack ? (
+            <pre className="mt-3 max-h-44 overflow-auto whitespace-pre-wrap rounded border border-red-500/20 bg-black/25 p-2 text-[10px] leading-4 text-red-100/70">
+              {this.state.info.componentStack}
+            </pre>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+}
+
 export function ProjectWorkspace({
   activePackageManifestPath,
   activeWorkspaceTab,
@@ -97,6 +161,7 @@ export function ProjectWorkspace({
   const [isAiOpen, setIsAiOpen] = React.useState(true);
   const [selectedModule, setSelectedModule] = React.useState<SelectedMoveModule | null>(null);
   const [activeSurfaceDetail, setActiveSurfaceDetail] = React.useState<SurfaceDetailKind | null>(null);
+  const [sourceJumpRequest, setSourceJumpRequest] = React.useState<SourceJumpRequest | null>(null);
   const activeMovePackage =
     packageTree.movePackages.length === 1
       ? packageTree.movePackages[0]
@@ -125,6 +190,78 @@ export function ProjectWorkspace({
       setIsRightPanelOpen(false);
     }
   }, [activeWorkspaceTab]);
+
+  React.useEffect(() => {
+    const onError = (event: ErrorEvent) => {
+      console.error("[ProjectWorkspace] uncaught browser error", {
+        colno: event.colno,
+        error: event.error,
+        filename: event.filename,
+        lineno: event.lineno,
+        message: event.message,
+      });
+    };
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error("[ProjectWorkspace] unhandled promise rejection", {
+        reason: event.reason,
+      });
+    };
+
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    };
+  }, []);
+
+  const openSourceLocation = React.useCallback(
+    (location: TypeGraphSourceLocation) => {
+      console.info("[ProjectWorkspace] source jump requested", {
+        activePackageManifestPath,
+        location,
+        packages: packageTree.movePackages.map((movePackage) => ({
+          manifestPath: movePackage.manifestPath,
+          moduleCount: movePackage.modules.length,
+          name: movePackage.name,
+          path: movePackage.path,
+        })),
+      });
+      const match = findSourceModule(packageTree.movePackages, location);
+
+      if (!match) {
+        console.warn("[ProjectWorkspace] source jump has no matching module", {
+          location,
+          modulePaths: packageTree.movePackages.flatMap((movePackage) =>
+            movePackage.modules.map((moveModule) => ({
+              filePath: moveModule.filePath,
+              module: moveModule.name,
+              packagePath: movePackage.path,
+            })),
+          ),
+        });
+        return;
+      }
+
+      console.info("[ProjectWorkspace] source jump matched module", {
+        filePath: match.moveModule.filePath,
+        line: location.line,
+        module: match.moveModule.name,
+        package: match.movePackage.name,
+      });
+      setActiveSurfaceDetail(null);
+      setSelectedModule({ moveModule: match.moveModule, movePackage: match.movePackage });
+      onActivePackageManifestPathChange(match.movePackage.manifestPath);
+      setSourceJumpRequest({
+        filePath: match.moveModule.filePath,
+        line: location.line,
+        token: Date.now(),
+      });
+      onWorkspaceTabChange("Explore");
+    },
+    [activePackageManifestPath, onActivePackageManifestPathChange, onWorkspaceTabChange, packageTree.movePackages],
+  );
 
   return (
     <div
@@ -163,22 +300,27 @@ export function ProjectWorkspace({
         className="relative grid min-h-0 overflow-hidden border-r border-[color:var(--app-border)] bg-[var(--app-window)]"
         style={{ gridTemplateRows: `minmax(0, 1fr) ${workspaceStatusBarHeight}px` }}
       >
-        <WorkspaceMainPanel
-          activeWorkspaceTab={activeWorkspaceTab}
-          activeSurfaceDetail={activeSurfaceDetail}
-          activeMovePackage={activeMovePackage}
-          loadAssessment={loadAssessment}
-          packageTree={packageTree}
-          packageName={packageName}
-          selectedModule={selectedModule}
-          onCommandLog={onCommandLog}
-          onProjectSelected={onProjectSelected}
-          onClearSelectedModule={() => setSelectedModule(null)}
-          onSelectModule={(movePackage, moveModule) => {
-            setActiveSurfaceDetail(null);
-            setSelectedModule({ moveModule, movePackage });
-          }}
-        />
+        <WorkspaceErrorBoundary
+          resetKey={`${activeWorkspaceTab}:${activePackageManifestPath ?? ""}:${sourceJumpRequest?.token ?? "no-source-jump"}`}
+        >
+          <WorkspaceMainPanel
+            activeWorkspaceTab={activeWorkspaceTab}
+            activeSurfaceDetail={activeSurfaceDetail}
+            activeMovePackage={activeMovePackage}
+            packageTree={packageTree}
+            packageName={packageName}
+            selectedModule={selectedModule}
+            onCommandLog={onCommandLog}
+            onProjectSelected={onProjectSelected}
+            onClearSelectedModule={() => setSelectedModule(null)}
+            onOpenSourceLocation={openSourceLocation}
+            onSelectModule={(movePackage, moveModule) => {
+              setActiveSurfaceDetail(null);
+              setSelectedModule({ moveModule, movePackage });
+            }}
+            sourceJumpRequest={sourceJumpRequest}
+          />
+        </WorkspaceErrorBoundary>
         <BuildLogSheet
           bottomInset={workspaceStatusBarHeight}
           isOpen={buildLogSheet.isOpen}
@@ -221,26 +363,28 @@ function WorkspaceMainPanel({
   activeWorkspaceTab,
   activeSurfaceDetail,
   activeMovePackage,
-  loadAssessment,
   onClearSelectedModule,
+  onOpenSourceLocation,
   onSelectModule,
   packageTree,
   packageName,
   selectedModule,
+  sourceJumpRequest,
   onProjectSelected,
   onCommandLog,
 }: {
   activeWorkspaceTab: WorkspaceTab;
   activeSurfaceDetail: SurfaceDetailKind | null;
   activeMovePackage: MovePackage | null;
-  loadAssessment: PackageLoadAssessment | null;
   onClearSelectedModule: () => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
+  onOpenSourceLocation: (location: TypeGraphSourceLocation) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
   onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
   packageTree: PackageTree;
   packageName: string;
   selectedModule: SelectedMoveModule | null;
+  sourceJumpRequest: SourceJumpRequest | null;
 }) {
   if (activeSurfaceDetail) {
     return <SurfaceDetailScreen detail={activeSurfaceDetail} movePackage={activeMovePackage} />;
@@ -254,6 +398,7 @@ function WorkspaceMainPanel({
         onClearSelectedModule={onClearSelectedModule}
         onSelectModule={onSelectModule}
         selectedModule={selectedModule}
+        sourceJumpRequest={sourceJumpRequest}
       />
     );
   }
@@ -271,9 +416,20 @@ function WorkspaceMainPanel({
 
   return (
     <DependencyGraphScreen
+      activeMovePackage={activeMovePackage}
+      callGraph={packageTree.callGraph}
       graph={packageTree.dependencyGraph}
-      loadAssessment={loadAssessment}
+      onMoveGraphsLoaded={(graphs) =>
+        onProjectSelected({
+          ...packageTree,
+          callGraph: graphs.callGraph,
+          typeGraph: graphs.typeGraph,
+        })
+      }
+      onOpenSourceLocation={onOpenSourceLocation}
       packageName={packageName}
+      rootPath={packageTree.rootPath}
+      typeGraph={packageTree.typeGraph}
     />
   );
 }
@@ -817,6 +973,44 @@ function compactPath(path: string) {
   }
 
   return path;
+}
+
+function findSourceModule(
+  movePackages: MovePackage[],
+  location: TypeGraphSourceLocation,
+) {
+  for (const movePackage of movePackages) {
+    const moveModule = movePackage.modules.find((module) =>
+      sameSourcePath(module.filePath, location.filePath, movePackage.path),
+    );
+
+    if (moveModule) {
+      return { moveModule, movePackage };
+    }
+  }
+
+  return null;
+}
+
+function sameSourcePath(moduleFilePath: string, requestedFilePath: string, packagePath: string) {
+  const normalizedModulePath = normalizeFilePath(moduleFilePath);
+  const normalizedRequestedPath = normalizeFilePath(requestedFilePath);
+  const normalizedPackagePath = normalizeFilePath(packagePath);
+  const requestedRelativeToPackage =
+    normalizedPackagePath && normalizedRequestedPath.startsWith(`${normalizedPackagePath}/`)
+      ? normalizedRequestedPath.slice(normalizedPackagePath.length + 1)
+      : normalizedRequestedPath;
+
+  return (
+    normalizedModulePath === normalizedRequestedPath
+    || normalizedModulePath === requestedRelativeToPackage
+    || normalizedModulePath.endsWith(`/${requestedRelativeToPackage}`)
+    || requestedRelativeToPackage.endsWith(`/${normalizedModulePath}`)
+  );
+}
+
+function normalizeFilePath(filePath: string | null | undefined) {
+  return (filePath ?? "").replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, "");
 }
 
 function packagePathLabel(movePackage: MovePackage, packageTree: PackageTree) {

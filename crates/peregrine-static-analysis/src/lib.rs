@@ -36,9 +36,13 @@ pub use plugins::{
     PluginRuleManifest, PluginRuleSetManifest, WasmPluginHost,
 };
 pub use project::{
-    discover_move_project, AdminControlFinding, CapabilityFinding, ExternalCallFinding,
+    discover_move_project, discover_move_project_fast, discover_move_project_shallow,
+    discover_project_graphs, discover_project_graphs_for_package, AdminControlFinding,
+    CapabilityFinding, ExternalCallFinding, MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode,
     MoveFunctionSignature, MoveModule, MovePackage, MovePackageSurface, MoveProject,
-    MoveStructField, MoveStructSignature, ObjectLifecycleFunctionRef, ObjectLifecycleMap,
-    ObjectLifecycleRisk, ObjectLifecycleStage, ObjectOwnershipFinding, PackageDependencyEdge,
-    PackageDependencyGraph, PackageDependencyNode, PublicPackageRelationship,
+    MoveProjectGraphs, MoveSourceSpan, MoveStructField, MoveStructSignature, MoveTypeGraph,
+    MoveTypeGraphEdge, MoveTypeGraphNode, MoveUnresolvedCall, MoveUnresolvedType,
+    ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleRisk, ObjectLifecycleStage,
+    ObjectOwnershipFinding, PackageDependencyEdge, PackageDependencyGraph, PackageDependencyNode,
+    PublicPackageRelationship,
 };

@@ -28,3 +28,4 @@ crates/*/Cargo.lock
 .vscode
 AGENT.md
 .superstack
+docs

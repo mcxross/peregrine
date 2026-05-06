@@ -25,6 +25,7 @@ import type {
   CodeEditorJumpRequest,
   ComplexityHighlight,
 } from "@/features/project-workspace/code-editor";
+import type { SourceJumpRequest } from "@/features/project-workspace/project-workspace";
 import {
   ModuleSignatureScreen,
   type SelectedMoveModule,
@@ -49,6 +50,7 @@ type MovePackagesOverviewScreenProps = {
   onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
   packageTree: PackageTree;
   selectedModule: SelectedMoveModule | null;
+  sourceJumpRequest?: SourceJumpRequest | null;
 };
 
 type ModuleEditorTab = {
@@ -81,6 +83,7 @@ export function MovePackagesOverviewScreen({
   onSelectModule,
   packageTree,
   selectedModule,
+  sourceJumpRequest = null,
 }: MovePackagesOverviewScreenProps) {
   const rootPackage = packageTree.dependencyGraph.root;
   const movePackage = activeMovePackage ?? orderedPackages(packageTree.movePackages, rootPackage)[0] ?? null;
@@ -93,6 +96,7 @@ export function MovePackagesOverviewScreen({
   const [analysisReport, setAnalysisReport] = React.useState<AnalysisReport | null>(null);
   const [analysisError, setAnalysisError] = React.useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+  const processedSourceJumpKeyRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     setEditorTabs([]);
@@ -101,6 +105,7 @@ export function MovePackagesOverviewScreen({
     setAnalysisReport(null);
     setAnalysisError(null);
     setIsAnalyzing(false);
+    processedSourceJumpKeyRef.current = null;
   }, [movePackage?.manifestPath, packageTree.rootPath]);
 
   React.useEffect(() => {
@@ -183,6 +188,10 @@ export function MovePackagesOverviewScreen({
       const existingTab = current.find((tab) => tab.selectedModule.moveModule.filePath === filePath);
 
       if (existingTab) {
+        if (sameSelectedModule(existingTab.selectedModule, selectedModule)) {
+          return current;
+        }
+
         return current.map((tab) =>
           tab.selectedModule.moveModule.filePath === filePath
             ? { ...tab, selectedModule }
@@ -193,6 +202,69 @@ export function MovePackagesOverviewScreen({
       return [...current, createModuleEditorTab(selectedModule)];
     });
   }, [isEditorMode, selectedModule]);
+
+  React.useEffect(() => {
+    if (!sourceJumpRequest || !movePackage) {
+      return;
+    }
+
+    const jumpKey = sourceJumpRequestKey(sourceJumpRequest);
+
+    if (processedSourceJumpKeyRef.current === jumpKey) {
+      console.debug("[MovePackagesOverview] source jump already processed", {
+        key: jumpKey,
+        request: sourceJumpRequest,
+      });
+      return;
+    }
+
+    console.info("[MovePackagesOverview] source jump received", {
+      activePackage: movePackage.name,
+      activePackagePath: movePackage.path,
+      request: sourceJumpRequest,
+    });
+    const matchingModule = movePackage.modules.find((moveModule) =>
+      sameSourcePath(moveModule.filePath, sourceJumpRequest.filePath, movePackage.path),
+    );
+
+    if (!matchingModule) {
+      console.warn("[MovePackagesOverview] source jump did not match active package modules", {
+        activePackage: movePackage.name,
+        modulePaths: movePackage.modules.map((moveModule) => moveModule.filePath),
+        request: sourceJumpRequest,
+      });
+      return;
+    }
+
+    processedSourceJumpKeyRef.current = jumpKey;
+    console.info("[MovePackagesOverview] opening editor for source jump", {
+      line: sourceJumpRequest.line,
+      module: matchingModule.name,
+      path: matchingModule.filePath,
+      token: sourceJumpRequest.token,
+    });
+    const nextSelectedModule = { moveModule: matchingModule, movePackage };
+    setIsEditorMode(true);
+    setActiveEditorPath(matchingModule.filePath);
+    setEditorTabs((current) => {
+      const existing = current.find((tab) => tab.selectedModule.moveModule.filePath === matchingModule.filePath);
+
+      if (existing) {
+        if (sameSelectedModule(existing.selectedModule, nextSelectedModule)) {
+          return current;
+        }
+
+        return current.map((tab) =>
+          tab.selectedModule.moveModule.filePath === matchingModule.filePath
+            ? { ...tab, selectedModule: nextSelectedModule }
+            : tab,
+        );
+      }
+
+      return [...current, createModuleEditorTab(nextSelectedModule)];
+    });
+    onSelectModule(movePackage, matchingModule);
+  }, [movePackage, onSelectModule, sourceJumpRequest]);
 
   const hasDetailPane = Boolean(selectedModule) || (isEditorMode && editorTabs.length > 0);
 
@@ -276,6 +348,7 @@ export function MovePackagesOverviewScreen({
                   onEditorTabsChange={setEditorTabs}
                   onSelectModule={onSelectModule}
                   packageTree={packageTree}
+                  sourceJumpRequest={sourceJumpRequest}
                 />
               ) : (
                 selectedModule ? (
@@ -466,6 +539,7 @@ function ModuleSourceEditorWorkspace({
   onEditorTabsChange,
   onSelectModule,
   packageTree,
+  sourceJumpRequest,
 }: {
   activeEditorPath: string | null;
   analysisError: string | null;
@@ -477,12 +551,14 @@ function ModuleSourceEditorWorkspace({
   onEditorTabsChange: React.Dispatch<React.SetStateAction<ModuleEditorTab[]>>;
   onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
   packageTree: PackageTree;
+  sourceJumpRequest: SourceJumpRequest | null;
 }) {
   const activeTab = editorTabs.find((tab) => tab.selectedModule.moveModule.filePath === activeEditorPath)
     ?? editorTabs[0]
     ?? null;
   const activePath = activeTab?.selectedModule.moveModule.filePath ?? null;
   const [jumpRequest, setJumpRequest] = React.useState<CodeEditorJumpRequest | null>(null);
+  const processedEditorJumpKeyRef = React.useRef<string | null>(null);
   const activeComplexityHighlights = React.useMemo(
     () => activeTab
       ? complexityHighlightsForFile(
@@ -526,6 +602,12 @@ function ModuleSourceEditorWorkspace({
 
     loadFilePreview(packageTree, filePath)
       .then((nextPreview) => {
+        console.info("[ModuleSourceEditorWorkspace] file preview loaded", {
+          filePath,
+          kind: nextPreview.kind,
+          language: nextPreview.kind === "text" ? nextPreview.language : null,
+          sourceLength: nextPreview.kind === "text" ? nextPreview.source.length : null,
+        });
         if (nextPreview.kind !== "text") {
           updateTab(filePath, (tab) => ({
             ...tab,
@@ -545,6 +627,10 @@ function ModuleSourceEditorWorkspace({
         }));
       })
       .catch((reason: unknown) => {
+        console.error("[ModuleSourceEditorWorkspace] file preview failed", {
+          filePath,
+          reason,
+        });
         updateTab(filePath, (tab) => ({
           ...tab,
           error: reason instanceof Error ? reason.message : "Could not load this module.",
@@ -599,6 +685,51 @@ function ModuleSourceEditorWorkspace({
       token: Date.now(),
     });
   }, []);
+
+  React.useEffect(() => {
+    if (!sourceJumpRequest || !activeTab) {
+      return;
+    }
+
+    const jumpKey = sourceJumpRequestKey(sourceJumpRequest);
+
+    if (processedEditorJumpKeyRef.current === jumpKey) {
+      console.debug("[ModuleSourceEditorWorkspace] editor jump already dispatched", {
+        activePath: activeTab.selectedModule.moveModule.filePath,
+        key: jumpKey,
+      });
+      return;
+    }
+
+    console.info("[ModuleSourceEditorWorkspace] applying source jump", {
+      activePath: activeTab.selectedModule.moveModule.filePath,
+      activePackagePath: activeTab.selectedModule.movePackage.path,
+      request: sourceJumpRequest,
+      status: activeTab.status,
+    });
+    if (!sameSourcePath(
+      activeTab.selectedModule.moveModule.filePath,
+      sourceJumpRequest.filePath,
+      activeTab.selectedModule.movePackage.path,
+    )) {
+      console.warn("[ModuleSourceEditorWorkspace] source jump active tab mismatch", {
+        activePath: activeTab.selectedModule.moveModule.filePath,
+        request: sourceJumpRequest,
+      });
+      return;
+    }
+
+    processedEditorJumpKeyRef.current = jumpKey;
+    console.info("[ModuleSourceEditorWorkspace] dispatching editor jump", {
+      line: sourceJumpRequest.line,
+      path: activeTab.selectedModule.moveModule.filePath,
+      token: sourceJumpRequest.token,
+    });
+    setJumpRequest({
+      line: sourceJumpRequest.line,
+      token: sourceJumpRequest.token,
+    });
+  }, [activeTab, sourceJumpRequest]);
 
   if (!activeTab) {
     return (
@@ -705,6 +836,17 @@ function createModuleEditorTab(selectedModule: SelectedMoveModule): ModuleEditor
     source: "",
     status: "idle",
   };
+}
+
+function sourceJumpRequestKey(request: SourceJumpRequest) {
+  return `${request.token}:${request.filePath}:${request.line}`;
+}
+
+function sameSelectedModule(left: SelectedMoveModule, right: SelectedMoveModule) {
+  return (
+    left.moveModule.filePath === right.moveModule.filePath
+    && left.movePackage.manifestPath === right.movePackage.manifestPath
+  );
 }
 
 function AnalyzerResultsMenu({
@@ -1097,6 +1239,23 @@ function packageRelativeFilePath(filePath: string, movePackage: MovePackage) {
   return packagePathWithSlash && normalizedPath.startsWith(packagePathWithSlash)
     ? normalizedPath.slice(packagePathWithSlash.length)
     : normalizedPath;
+}
+
+function sameSourcePath(moduleFilePath: string, requestedFilePath: string, packagePath: string) {
+  const normalizedModulePath = normalizeFilePath(moduleFilePath);
+  const normalizedRequestedPath = normalizeFilePath(requestedFilePath);
+  const normalizedPackagePath = normalizeFilePath(packagePath);
+  const requestedRelativeToPackage =
+    normalizedPackagePath && normalizedRequestedPath.startsWith(`${normalizedPackagePath}/`)
+      ? normalizedRequestedPath.slice(normalizedPackagePath.length + 1)
+      : normalizedRequestedPath;
+
+  return (
+    normalizedModulePath === normalizedRequestedPath
+    || normalizedModulePath === requestedRelativeToPackage
+    || normalizedModulePath.endsWith(`/${requestedRelativeToPackage}`)
+    || requestedRelativeToPackage.endsWith(`/${normalizedModulePath}`)
+  );
 }
 
 function packagePathPrefix(movePackage: MovePackage) {

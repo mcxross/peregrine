@@ -8,11 +8,27 @@ import {
   type SelectedMoveModule,
 } from "@/features/project-workspace/module-signature-screen";
 import { cn } from "@/lib/utils";
-import type { PackageDependencyGraph } from "@/features/empty-project/filesystem-tree";
+import type {
+  MoveCallGraph,
+  MoveTypeGraph,
+  PackageDependencyGraph,
+} from "@/features/empty-project/filesystem-tree";
 
 const PreviewRenderer = React.lazy(() =>
   import("@/features/project-workspace/preview-renderer"),
 );
+
+const EMPTY_TYPE_GRAPH: MoveTypeGraph = {
+  edges: [],
+  nodes: [],
+  unresolvedTypes: [],
+};
+
+const EMPTY_CALL_GRAPH: MoveCallGraph = {
+  edges: [],
+  nodes: [],
+  unresolvedCalls: [],
+};
 
 type EditorTabsProps = {
   packageName: string;
@@ -97,7 +113,13 @@ export function EditorTabs({
         selectedModule ? (
           <ModuleSignatureScreen selectedModule={selectedModule} />
         ) : (
-          <DependencyGraphScreen graph={dependencyGraph} packageName={packageName} />
+          <DependencyGraphScreen
+            activeMovePackage={null}
+            callGraph={EMPTY_CALL_GRAPH}
+            graph={dependencyGraph}
+            packageName={packageName}
+            typeGraph={EMPTY_TYPE_GRAPH}
+          />
         )
       )}
     </section>

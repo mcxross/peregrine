@@ -3,8 +3,9 @@ mod file_preview;
 use base64::{engine::general_purpose, Engine};
 use file_preview::{build_file_preview, FilePreview};
 use peregrine_static_analysis::{
-    discover_move_project, AnalysisConfig, AnalysisReport, Analyzer, MovePackage,
-    PackageDependencyGraph,
+    discover_move_project_fast, discover_move_project_shallow, discover_project_graphs,
+    discover_project_graphs_for_package, AnalysisConfig, AnalysisReport, Analyzer, MoveCallGraph,
+    MovePackage, MoveProjectGraphs, MoveTypeGraph, PackageDependencyGraph,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -39,9 +40,12 @@ fn greet(name: &str) -> String {
 struct PackageTree {
     root_path: String,
     root_name: String,
+    is_detailed: bool,
     paths: Vec<String>,
     move_packages: Vec<MovePackage>,
     dependency_graph: PackageDependencyGraph,
+    call_graph: MoveCallGraph,
+    type_graph: MoveTypeGraph,
 }
 
 #[derive(Serialize)]
@@ -175,9 +179,30 @@ struct OllamaStreamError {
 
 #[tauri::command]
 async fn load_package_tree(root_path: String) -> Result<PackageTree, String> {
-    tauri::async_runtime::spawn_blocking(move || build_package_tree(root_path))
+    tauri::async_runtime::spawn_blocking(move || {
+        build_package_tree(root_path, PackageTreeMode::Shallow)
+    })
+    .await
+    .map_err(|error| format!("Could not join package tree task: {error}"))?
+}
+
+#[tauri::command]
+async fn load_package_tree_details(root_path: String) -> Result<PackageTree, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        build_package_tree(root_path, PackageTreeMode::Detailed)
+    })
+    .await
+    .map_err(|error| format!("Could not join package detail task: {error}"))?
+}
+
+#[tauri::command]
+async fn load_move_graphs(
+    root_path: String,
+    package_path: Option<String>,
+) -> Result<MoveProjectGraphs, String> {
+    tauri::async_runtime::spawn_blocking(move || build_move_graphs(root_path, package_path))
         .await
-        .map_err(|error| format!("Could not join package tree task: {error}"))?
+        .map_err(|error| format!("Could not join Move graph task: {error}"))?
 }
 
 #[tauri::command]
@@ -1073,7 +1098,13 @@ fn resolve_package_script_path(package_root: &Path, script_path: &str) -> Result
     Ok(script_path)
 }
 
-fn build_package_tree(root_path: String) -> Result<PackageTree, String> {
+#[derive(Clone, Copy)]
+enum PackageTreeMode {
+    Detailed,
+    Shallow,
+}
+
+fn build_package_tree(root_path: String, mode: PackageTreeMode) -> Result<PackageTree, String> {
     let root = PathBuf::from(&root_path);
     let root = root
         .canonicalize()
@@ -1088,15 +1119,47 @@ fn build_package_tree(root_path: String) -> Result<PackageTree, String> {
     collect_paths(&root, &root, &mut paths)?;
     paths.sort_by(|left, right| compare_tree_paths(left, right));
 
-    let move_project = discover_move_project(&root);
+    let move_project = match mode {
+        PackageTreeMode::Detailed => discover_move_project_fast(&root),
+        PackageTreeMode::Shallow => discover_move_project_shallow(&root),
+    };
 
     Ok(PackageTree {
         root_path: root.to_string_lossy().into_owned(),
         root_name,
+        is_detailed: matches!(mode, PackageTreeMode::Detailed),
         paths,
         move_packages: move_project.packages,
         dependency_graph: move_project.dependency_graph,
+        call_graph: move_project.call_graph,
+        type_graph: move_project.type_graph,
     })
+}
+
+fn build_move_graphs(
+    root_path: String,
+    package_path: Option<String>,
+) -> Result<MoveProjectGraphs, String> {
+    let root = PathBuf::from(&root_path)
+        .canonicalize()
+        .map_err(|error| format!("Could not read package directory {root_path}: {error}"))?;
+
+    if let Some(package_path) = package_path {
+        let package_root = root.join(&package_path).canonicalize().map_err(|error| {
+            format!(
+                "Could not read Move package {}: {error}",
+                root.join(&package_path).display()
+            )
+        })?;
+
+        if !package_root.starts_with(&root) {
+            return Err("Move package must be inside the opened project.".to_string());
+        }
+
+        return Ok(discover_project_graphs_for_package(&root, &package_path));
+    }
+
+    Ok(discover_project_graphs(&root))
 }
 
 fn collect_paths(root: &Path, directory: &Path, paths: &mut Vec<String>) -> Result<(), String> {
@@ -1130,6 +1193,10 @@ fn collect_paths(root: &Path, directory: &Path, paths: &mut Vec<String>) -> Resu
         };
 
         if file_type.is_dir() {
+            if should_skip_tree_directory(&path) {
+                continue;
+            }
+
             paths.push(format!("{relative_path}/"));
             collect_paths(root, &path, paths)?;
         } else {
@@ -1138,6 +1205,26 @@ fn collect_paths(root: &Path, directory: &Path, paths: &mut Vec<String>) -> Resu
     }
 
     Ok(())
+}
+
+fn should_skip_tree_directory(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+
+    matches!(
+        name,
+        ".git"
+            | ".next"
+            | ".sui"
+            | ".turbo"
+            | "build"
+            | "coverage"
+            | "dist"
+            | "node_modules"
+            | "package_summaries"
+            | "target"
+    )
 }
 
 fn compare_dir_entries(left: &fs::DirEntry, right: &fs::DirEntry) -> std::cmp::Ordering {
@@ -1285,6 +1372,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             load_package_tree,
+            load_package_tree_details,
+            load_move_graphs,
             load_file_preview,
             save_text_file,
             save_graph_png,

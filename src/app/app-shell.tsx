@@ -6,6 +6,7 @@ import { Workspace } from "@/app/workspace";
 import {
   buildMovePackage,
   loadPackageTree,
+  loadPackageTreeDetails,
   type MovePackage,
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
@@ -14,11 +15,7 @@ import type {
   BuildLogSheetController,
   BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
-import {
-  packageLoadAssessmentKey,
-  runPackageLoadAssessment,
-  type PackageLoadAssessment,
-} from "@/features/project-workspace/package-load-assessment";
+import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
 import { defaultLayoutSettings } from "@/layout/layout-store";
 import { titlebarHeight } from "@/layout/window-chrome";
 import { SettingsScreen } from "@/screens/settings-screen";
@@ -43,10 +40,10 @@ export function AppShell({
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
   const [isRescanning, setIsRescanning] = useState(false);
   const [lastScannedAt, setLastScannedAt] = useState<number | null>(null);
-  const [loadAssessment, setLoadAssessment] = useState<PackageLoadAssessment | null>(null);
-  const activeLoadAssessmentKeyRef = useRef<string | null>(null);
+  const loadAssessment: PackageLoadAssessment | null = null;
   const currentCommandLogIdRef = useRef<number | null>(null);
-  const lastAutoAssessmentKeyRef = useRef<string | null>(null);
+  const detailHydratedRootRef = useRef<string | null>(null);
+  const latestPackageTreeRef = useRef<PackageTree | null>(packageTree);
   const layout = defaultLayoutSettings;
   const isSettings = screen === "settings";
   const showSidebar = isSettings;
@@ -64,12 +61,79 @@ export function AppShell({
   );
 
   useEffect(() => {
+    latestPackageTreeRef.current = packageTree;
+  }, [packageTree]);
+
+  useEffect(() => {
     setActivePackageManifestPath(packageTree?.activePackageManifestPath ?? null);
     setBuildRuns([]);
     setIsBuildSheetOpen(false);
     setLastScannedAt(packageTree ? Date.now() : null);
-    setLoadAssessment(null);
   }, [packageTree?.rootPath, packageTree?.activePackageManifestPath]);
+
+  useEffect(() => {
+    if (!packageTree) {
+      detailHydratedRootRef.current = null;
+      return;
+    }
+
+    if (packageTree.isDetailed) {
+      if (detailHydratedRootRef.current === packageTree.rootPath) {
+        detailHydratedRootRef.current = null;
+      }
+      return;
+    }
+
+    if (detailHydratedRootRef.current === packageTree.rootPath) {
+      return;
+    }
+
+    detailHydratedRootRef.current = packageTree.rootPath;
+
+    const timer = window.setTimeout(() => {
+      void loadPackageTreeDetails(packageTree.rootPath)
+        .then((detailedPackageTree) => {
+          const latestPackageTree = latestPackageTreeRef.current;
+
+          if (detailHydratedRootRef.current === detailedPackageTree.rootPath) {
+            detailHydratedRootRef.current = null;
+          }
+
+          if (!latestPackageTree || latestPackageTree.rootPath !== detailedPackageTree.rootPath) {
+            return;
+          }
+
+          handleProjectSelected({
+            ...detailedPackageTree,
+            activePackageManifestPath:
+              latestPackageTree.activePackageManifestPath
+              ?? activePackageManifestPath
+              ?? detailedPackageTree.activePackageManifestPath
+              ?? null,
+            callGraph: hasCallGraphPayload(latestPackageTree)
+              ? latestPackageTree.callGraph
+              : detailedPackageTree.callGraph,
+            typeGraph: hasTypeGraphPayload(latestPackageTree)
+              ? latestPackageTree.typeGraph
+              : detailedPackageTree.typeGraph,
+          });
+        })
+        .catch((error) => {
+          if (detailHydratedRootRef.current === packageTree.rootPath) {
+            detailHydratedRootRef.current = null;
+          }
+          console.error("Could not hydrate package details.", error);
+        });
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+
+      if (detailHydratedRootRef.current === packageTree.rootPath) {
+        detailHydratedRootRef.current = null;
+      }
+    };
+  }, [activePackageManifestPath, handleProjectSelected, packageTree]);
 
   const showCommandLog = useCallback((run: BuildLogRun, options?: BuildLogUpdateOptions) => {
     const shouldReset = options?.reset === true;
@@ -83,31 +147,6 @@ export function AppShell({
       setIsBuildSheetOpen(true);
     }
   }, []);
-
-  useEffect(() => {
-    if (!packageTree || !activeMovePackage) {
-      activeLoadAssessmentKeyRef.current = null;
-      return;
-    }
-
-    const assessmentKey = packageLoadAssessmentKey(packageTree, activeMovePackage);
-
-    if (lastAutoAssessmentKeyRef.current === assessmentKey) {
-      return;
-    }
-
-    lastAutoAssessmentKeyRef.current = assessmentKey;
-    activeLoadAssessmentKeyRef.current = assessmentKey;
-
-    void runPackageLoadAssessment({
-      isCurrent: () => activeLoadAssessmentKeyRef.current === assessmentKey,
-      movePackage: activeMovePackage,
-      onAssessmentChange: setLoadAssessment,
-      onCommandLog: showCommandLog,
-      onProjectSelected: handleProjectSelected,
-      packageTree,
-    });
-  }, [activeMovePackage, handleProjectSelected, packageTree, showCommandLog]);
 
   const rescanProject = useCallback(async () => {
     if (!packageTree || isRescanning) {
@@ -303,6 +342,18 @@ function packagePathLabel(movePackage: MovePackage, packageTree: PackageTree) {
   }
 
   return `${packageTree.rootPath}/${movePackage.path}`;
+}
+
+function hasCallGraphPayload(packageTree: PackageTree) {
+  return packageTree.callGraph.nodes.length > 0
+    || packageTree.callGraph.edges.length > 0
+    || packageTree.callGraph.unresolvedCalls.length > 0;
+}
+
+function hasTypeGraphPayload(packageTree: PackageTree) {
+  return packageTree.typeGraph.nodes.length > 0
+    || packageTree.typeGraph.edges.length > 0
+    || packageTree.typeGraph.unresolvedTypes.length > 0;
 }
 
 function upsertLogRun(runs: BuildLogRun[], nextRun: BuildLogRun) {

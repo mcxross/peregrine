@@ -1,5 +1,9 @@
 use peregrine_attack_surface::package_surface;
-use peregrine_move_model::{discover_move_project_model, MovePackageModel};
+use peregrine_move_model::{
+    discover_move_project_graphs, discover_move_project_graphs_for_package,
+    discover_move_project_model, discover_move_project_model_fast,
+    discover_move_project_model_shallow, MovePackageModel,
+};
 use serde::Serialize;
 use std::path::Path;
 
@@ -8,8 +12,10 @@ pub use peregrine_attack_surface::{
     ObjectOwnershipFinding, PublicPackageRelationship,
 };
 pub use peregrine_move_model::{
-    MoveFunctionSignature, MoveModule, MoveStructField, MoveStructSignature, PackageDependencyEdge,
-    PackageDependencyGraph, PackageDependencyNode,
+    MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode, MoveFunctionSignature, MoveModule,
+    MoveProjectGraphs, MoveSourceSpan, MoveStructField, MoveStructSignature, MoveTypeGraph,
+    MoveTypeGraphEdge, MoveTypeGraphNode, MoveUnresolvedCall, MoveUnresolvedType,
+    PackageDependencyEdge, PackageDependencyGraph, PackageDependencyNode,
 };
 pub use peregrine_object_lifecycle::{
     ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleRisk, ObjectLifecycleStage,
@@ -20,6 +26,8 @@ pub use peregrine_object_lifecycle::{
 pub struct MoveProject {
     pub packages: Vec<MovePackage>,
     pub dependency_graph: PackageDependencyGraph,
+    pub call_graph: MoveCallGraph,
+    pub type_graph: MoveTypeGraph,
 }
 
 #[derive(Serialize)]
@@ -34,6 +42,28 @@ pub struct MovePackage {
 
 pub fn discover_move_project(root: &Path) -> MoveProject {
     let model = discover_move_project_model(root);
+    build_move_project(model)
+}
+
+pub fn discover_move_project_fast(root: &Path) -> MoveProject {
+    let model = discover_move_project_model_fast(root);
+    build_move_project(model)
+}
+
+pub fn discover_move_project_shallow(root: &Path) -> MoveProject {
+    let model = discover_move_project_model_shallow(root);
+    build_move_project(model)
+}
+
+pub fn discover_project_graphs(root: &Path) -> MoveProjectGraphs {
+    discover_move_project_graphs(root)
+}
+
+pub fn discover_project_graphs_for_package(root: &Path, package_path: &str) -> MoveProjectGraphs {
+    discover_move_project_graphs_for_package(root, package_path)
+}
+
+fn build_move_project(model: peregrine_move_model::MoveProjectModel) -> MoveProject {
     let packages = model
         .packages
         .into_iter()
@@ -43,6 +73,8 @@ pub fn discover_move_project(root: &Path) -> MoveProject {
     MoveProject {
         packages,
         dependency_graph: model.dependency_graph,
+        call_graph: model.call_graph,
+        type_graph: model.type_graph,
     }
 }
 
