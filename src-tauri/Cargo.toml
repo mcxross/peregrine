@@ -23,3 +23,4 @@ pulldown-cmark = { workspace = true }
 syntect = { workspace = true }
 reqwest = { workspace = true }
 peregrine-static-analysis = { workspace = true }
+peregrine-sui-adapter = { workspace = true }

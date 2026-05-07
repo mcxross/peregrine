@@ -7,6 +7,7 @@ members = [
   "crates/peregrine-move-model",
   "crates/peregrine-object-lifecycle",
   "crates/peregrine-static-analysis",
+  "crates/peregrine-sui-adapter",
 ]
 resolver = "2"
 
@@ -15,6 +16,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
+clap = { version = "4.6.1", features = ["derive"] }
 base64 = "0.22"
 globset = "0.4"
 move-command-line-common = { git = "https://github.com/mcxross/sui", branch = "testnet" }
@@ -25,17 +27,25 @@ peregrine-complexity-rules = { path = "crates/peregrine-complexity-rules" }
 peregrine-move-model = { path = "crates/peregrine-move-model" }
 peregrine-object-lifecycle = { path = "crates/peregrine-object-lifecycle" }
 peregrine-static-analysis = { path = "crates/peregrine-static-analysis" }
+peregrine-sui-adapter = { path = "crates/peregrine-sui-adapter" }
 pulldown-cmark = "0.12"
 reqwest = { version = "0.13.2", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sui = { git = "https://github.com/mcxross/sui", branch = "testnet", package = "sui" }
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tempfile = "3"
+tokio = { version = "=1.49.0", features = ["rt-multi-thread"] }
 toml = "0.8"
 walkdir = "2"
 wasmtime = "28"
 wat = "1"
+
+[patch.crates-io]
+async-graphql = { git = "https://github.com/amnn/async-graphql", branch = "v7.0.1-react-18-graphiql-4" }
+async-graphql-axum = { git = "https://github.com/amnn/async-graphql", branch = "v7.0.1-react-18-graphiql-4" }
+async-graphql-value = { git = "https://github.com/amnn/async-graphql", branch = "v7.0.1-react-18-graphiql-4" }

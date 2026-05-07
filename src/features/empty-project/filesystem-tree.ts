@@ -375,6 +375,7 @@ type CommandOutputChunk = {
 };
 
 const COMMAND_OUTPUT_EVENT = "command-output";
+const SUI_ADAPTER_SETTINGS_CHANGED_EVENT = "sui-adapter-settings-changed";
 
 export type SecurityCommandKind =
   | "move-coverage"
@@ -389,10 +390,29 @@ export type SecurityCommandKind =
   | "publish-testnet"
   | "publish-mainnet";
 
-export type SuiCliStatus = {
+export type SuiAdapterStatus = {
   installed: boolean;
   version: string | null;
   installHint: string | null;
+  activeSource: SuiAdapterSource | null;
+  preferredSource: SuiAdapterSource;
+  resolvedPath: string | null;
+  bundled: SuiAdapterSourceStatus;
+  system: SuiAdapterSourceStatus;
+};
+
+export type SuiAdapterSource = "bundled" | "system";
+
+export type SuiAdapterSettings = {
+  source: SuiAdapterSource;
+};
+
+export type SuiAdapterSourceStatus = {
+  source: SuiAdapterSource;
+  available: boolean;
+  version: string | null;
+  path: string | null;
+  error: string | null;
 };
 
 export type FilePreview =
@@ -525,8 +545,24 @@ export async function analyzeMovePackage(
   });
 }
 
-export async function checkSuiCli() {
-  return invoke<SuiCliStatus>("check_sui_cli");
+export async function checkSuiAdapter() {
+  return invoke<SuiAdapterStatus>("check_sui_adapter");
+}
+
+export async function getSuiAdapterSettings() {
+  return invoke<SuiAdapterSettings>("get_sui_adapter_settings");
+}
+
+export async function saveSuiAdapterSettings(settings: SuiAdapterSettings) {
+  return invoke<SuiAdapterSettings>("save_sui_adapter_settings", { settings });
+}
+
+export async function listenSuiAdapterSettingsChanged(
+  onSettingsChanged: (settings: SuiAdapterSettings) => void,
+) {
+  return listen<SuiAdapterSettings>(SUI_ADAPTER_SETTINGS_CHANGED_EVENT, (event) => {
+    onSettingsChanged(event.payload);
+  });
 }
 
 async function invokeCommandOutput(

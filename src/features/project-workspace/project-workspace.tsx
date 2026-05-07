@@ -30,9 +30,12 @@ import type {
   MoveModule,
   MovePackage,
   PackageTree,
-  SuiCliStatus,
+  SuiAdapterStatus,
 } from "@/features/empty-project/filesystem-tree";
-import { checkSuiCli } from "@/features/empty-project/filesystem-tree";
+import {
+  checkSuiAdapter,
+  listenSuiAdapterSettingsChanged,
+} from "@/features/empty-project/filesystem-tree";
 import { AiFloatingWindow } from "@/features/project-workspace/ai/ai-floating-window";
 import {
   BuildLogSheet,
@@ -455,29 +458,40 @@ function SecuritySidebar({
 }) {
   const surfaceItems = packageSurfaceItems(activeMovePackage);
   const validationItems = assessmentSidebarItems(loadAssessment);
-  const [suiCliStatus, setSuiCliStatus] = React.useState<SuiCliStatus | null>(null);
+  const [suiAdapterStatus, setSuiAdapterStatus] = React.useState<SuiAdapterStatus | null>(null);
 
   React.useEffect(() => {
     let isMounted = true;
+    let cleanupSettingsListener: (() => void) | null = null;
 
-    checkSuiCli()
-      .then((status) => {
-        if (isMounted) {
-          setSuiCliStatus(status);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setSuiCliStatus({
-            installed: false,
-            installHint: "Install the Sui CLI and make sure `sui` is on PATH.",
-            version: null,
-          });
-        }
-      });
+    const refreshSuiAdapterStatus = () =>
+      checkSuiAdapter()
+        .then((status) => {
+          if (isMounted) {
+            setSuiAdapterStatus(status);
+          }
+        })
+        .catch(() => {
+          if (isMounted) {
+            setSuiAdapterStatus(missingSuiAdapterStatus());
+          }
+        });
+
+    void refreshSuiAdapterStatus();
+    listenSuiAdapterSettingsChanged(() => {
+      void refreshSuiAdapterStatus();
+    }).then((cleanup) => {
+      if (!isMounted) {
+        cleanup();
+        return;
+      }
+
+      cleanupSettingsListener = cleanup;
+    });
 
     return () => {
       isMounted = false;
+      cleanupSettingsListener?.();
     };
   }, []);
 
@@ -540,14 +554,20 @@ function SecuritySidebar({
         </div>
       </ScrollArea>
 
-      <SuiCliFooter status={suiCliStatus} />
+      <SuiAdapterFooter status={suiAdapterStatus} />
     </aside>
   );
 }
 
-function SuiCliFooter({ status }: { status: SuiCliStatus | null }) {
+function SuiAdapterFooter({ status }: { status: SuiAdapterStatus | null }) {
   const isInstalled = status?.installed ?? false;
-  const versionLabel = status?.version ? `v${status.version}` : status ? "Install Sui CLI" : "Checking...";
+  const source = status?.activeSource ?? status?.preferredSource ?? null;
+  const sourceLabel = source === "system" ? "User" : source === "bundled" ? "Bundled crate" : "Sui";
+  const versionLabel = status?.version
+    ? `${sourceLabel} v${status.version}`
+    : status
+      ? sourceLabel
+      : "Checking...";
 
   return (
     <div
@@ -565,11 +585,36 @@ function SuiCliFooter({ status }: { status: SuiCliStatus | null }) {
         )}
         variant="secondary"
       >
-        {status ? (isInstalled ? "Installed" : "Missing") : "Checking"}
+        {status ? (isInstalled ? "Ready" : "Missing") : "Checking"}
       </Badge>
       <span className="min-w-0 truncate text-right">{versionLabel}</span>
     </div>
   );
+}
+
+function missingSuiAdapterStatus(): SuiAdapterStatus {
+  return {
+    activeSource: null,
+    bundled: {
+      available: false,
+      error: "Bundled Sui crate status is unavailable.",
+      path: null,
+      source: "bundled",
+      version: null,
+    },
+    installHint: "Sui CLI status is unavailable.",
+    installed: false,
+    preferredSource: "bundled",
+    resolvedPath: null,
+    system: {
+      available: false,
+      error: "User installed Sui CLI status is unavailable.",
+      path: null,
+      source: "system",
+      version: null,
+    },
+    version: null,
+  };
 }
 
 function LastScannedStatus({ scannedAt }: { scannedAt: number | null }) {

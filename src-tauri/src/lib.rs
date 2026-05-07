@@ -7,24 +7,30 @@ use peregrine_static_analysis::{
     discover_project_graphs_for_package, AnalysisConfig, AnalysisReport, Analyzer, MoveCallGraph,
     MovePackage, MoveProjectGraphs, MoveTypeGraph, PackageDependencyGraph,
 };
+use peregrine_sui_adapter::{
+    SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus, SuiExecutionTarget,
+    SuiPackageCommand,
+};
 use serde::{Deserialize, Serialize};
 use std::{
-    env, fs,
+    fs,
     io::Read,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::mpsc,
     thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::Duration,
 };
 use tauri::{
     menu::{AboutMetadata, Menu, MenuItemBuilder, PredefinedMenuItem, Submenu},
-    Emitter,
+    Emitter, Manager,
 };
 
 const OPEN_SETTINGS_MENU_ID: &str = "open-settings";
 const OPEN_SETTINGS_EVENT: &str = "open-settings";
 const COMMAND_OUTPUT_EVENT: &str = "command-output";
+const SUI_ADAPTER_SETTINGS_CHANGED_EVENT: &str = "sui-adapter-settings-changed";
+const SUI_ADAPTER_SETTINGS_FILE: &str = "sui-adapter-settings.json";
 const OLLAMA_CHAT_STREAM_EVENT: &str = "ollama-chat-stream";
 const OLLAMA_BASE_URL: &str = "http://127.0.0.1:11434";
 const OLLAMA_FALLBACK_BASE_URL: &str = "http://localhost:11434";
@@ -62,14 +68,6 @@ struct CommandOutputChunk {
     stream_id: String,
     stream: &'static str,
     chunk: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SuiCliStatus {
-    installed: bool,
-    version: Option<String>,
-    install_hint: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -152,13 +150,6 @@ struct OllamaTagsApiResponse {
 #[serde(rename_all = "camelCase")]
 struct OllamaModel {
     name: String,
-}
-
-struct PackageCommand {
-    program: &'static str,
-    args: Vec<String>,
-    display: String,
-    temp_pubfile_path: Option<PathBuf>,
 }
 
 #[derive(Clone)]
@@ -258,10 +249,12 @@ async fn build_move_package(
     stream_id: Option<String>,
 ) -> Result<CommandOutput, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let sui = sui_adapter(&app)?;
         run_package_command(
             &root_path,
             &package_path,
-            package_command("move-build")?,
+            sui.package_command("move-build")
+                .map_err(|error| error.to_string())?,
             command_output_stream(app, stream_id),
         )
     })
@@ -278,7 +271,10 @@ async fn run_security_command(
     stream_id: Option<String>,
 ) -> Result<CommandOutput, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let command = package_command(&command_kind)?;
+        let sui = sui_adapter(&app)?;
+        let command = sui
+            .package_command(&command_kind)
+            .map_err(|error| error.to_string())?;
 
         run_package_command(
             &root_path,
@@ -336,42 +332,32 @@ async fn analyze_move_package(
 }
 
 #[tauri::command]
-async fn check_sui_cli() -> Result<SuiCliStatus, String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        let output = match Command::new("sui").arg("--version").output() {
-            Ok(output) => output,
-            Err(_) => {
-                return Ok(SuiCliStatus {
-                    installed: false,
-                    version: None,
-                    install_hint: Some(
-                        "Install the Sui CLI and make sure `sui` is on PATH.".to_string(),
-                    ),
-                });
-            }
-        };
+async fn check_sui_adapter(app: tauri::AppHandle) -> Result<SuiAdapterStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || Ok(sui_adapter(&app)?.status()))
+        .await
+        .map_err(|error| format!("Could not join Sui adapter check task: {error}"))?
+}
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let version_source = stdout
-            .lines()
-            .chain(stderr.lines())
-            .map(str::trim)
-            .find(|line| !line.is_empty())
-            .unwrap_or("");
+#[tauri::command]
+async fn get_sui_adapter_settings(app: tauri::AppHandle) -> Result<SuiAdapterSettings, String> {
+    tauri::async_runtime::spawn_blocking(move || load_sui_adapter_settings(&app))
+        .await
+        .map_err(|error| format!("Could not join Sui adapter settings load task: {error}"))?
+}
 
-        Ok(SuiCliStatus {
-            installed: output.status.success(),
-            version: parse_sui_version(version_source),
-            install_hint: if output.status.success() {
-                None
-            } else {
-                Some("Install the Sui CLI and make sure `sui` is on PATH.".to_string())
-            },
-        })
+#[tauri::command]
+async fn save_sui_adapter_settings(
+    app: tauri::AppHandle,
+    settings: SuiAdapterSettings,
+) -> Result<SuiAdapterSettings, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        store_sui_adapter_settings(&app, &settings)?;
+        let _ = app.emit(SUI_ADAPTER_SETTINGS_CHANGED_EVENT, &settings);
+
+        Ok(settings)
     })
     .await
-    .map_err(|error| format!("Could not join Sui CLI check task: {error}"))?
+    .map_err(|error| format!("Could not join Sui adapter settings save task: {error}"))?
 }
 
 #[tauri::command]
@@ -527,16 +513,67 @@ async fn stream_chat_with_ollama(
     Err(error)
 }
 
-fn parse_sui_version(source: &str) -> Option<String> {
-    source
-        .split_whitespace()
-        .find(|token| {
-            token
-                .chars()
-                .next()
-                .is_some_and(|character| character.is_ascii_digit())
-        })
-        .map(|version| version.trim_start_matches('v').to_string())
+fn sui_adapter(app: &tauri::AppHandle) -> Result<SuiAdapter, String> {
+    Ok(SuiAdapter::new(
+        load_sui_adapter_settings(app)?,
+        SuiAdapterEnvironment::new(),
+    ))
+}
+
+fn load_sui_adapter_settings(app: &tauri::AppHandle) -> Result<SuiAdapterSettings, String> {
+    let path = sui_adapter_settings_path(app)?;
+
+    if !path.is_file() {
+        return Ok(SuiAdapterSettings::default());
+    }
+
+    let contents = fs::read_to_string(&path).map_err(|error| {
+        format!(
+            "Could not read Sui adapter settings {}: {error}",
+            path.display()
+        )
+    })?;
+
+    serde_json::from_str(&contents).map_err(|error| {
+        format!(
+            "Could not parse Sui adapter settings {}: {error}",
+            path.display()
+        )
+    })
+}
+
+fn store_sui_adapter_settings(
+    app: &tauri::AppHandle,
+    settings: &SuiAdapterSettings,
+) -> Result<(), String> {
+    let path = sui_adapter_settings_path(app)?;
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "Could not create Sui adapter settings directory {}: {error}",
+                parent.display()
+            )
+        })?;
+    }
+
+    let contents = serde_json::to_string_pretty(settings)
+        .map_err(|error| format!("Could not serialize Sui adapter settings: {error}"))?;
+
+    fs::write(&path, format!("{contents}\n")).map_err(|error| {
+        format!(
+            "Could not write Sui adapter settings {}: {error}",
+            path.display()
+        )
+    })
+}
+
+fn sui_adapter_settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_config_dir()
+        .map_err(|error| format!("Could not resolve app config directory: {error}"))?
+        .join(SUI_ADAPTER_SETTINGS_FILE))
 }
 
 fn ollama_client() -> Result<reqwest::Client, String> {
@@ -781,109 +818,10 @@ fn emit_ollama_event(app: &tauri::AppHandle, stream_id: &str, kind: &'static str
     );
 }
 
-fn package_command(command_kind: &str) -> Result<PackageCommand, String> {
-    match command_kind {
-        "move-build" => Ok(PackageCommand {
-            program: "sui",
-            args: command_args(&["move", "build"]),
-            display: "sui move build".to_string(),
-            temp_pubfile_path: None,
-        }),
-        "move-test" => Ok(PackageCommand {
-            program: "sui",
-            args: command_args(&["move", "test"]),
-            display: "sui move test".to_string(),
-            temp_pubfile_path: None,
-        }),
-        "move-coverage" => Ok(PackageCommand {
-            program: "sui",
-            args: command_args(&["move", "test", "--coverage"]),
-            display: "sui move test --coverage".to_string(),
-            temp_pubfile_path: None,
-        }),
-        "move-fuzz" => Ok(PackageCommand {
-            program: "sui",
-            args: command_args(&["move", "test", "--rand-num-iters", "256"]),
-            display: "sui move test --rand-num-iters 256".to_string(),
-            temp_pubfile_path: None,
-        }),
-        "publish-dry-run-localnet" => publish_dry_run_command("localnet"),
-        "publish-dry-run-devnet" => publish_dry_run_command("devnet"),
-        "publish-dry-run-testnet" => publish_dry_run_command("testnet"),
-        "publish-dry-run-mainnet" => publish_dry_run_command("mainnet"),
-        "publish-localnet" => Ok(PackageCommand {
-            program: "sui",
-            args: command_args(&["client", "publish", "--client.env", "localnet", "."]),
-            display: "sui client publish --client.env localnet .".to_string(),
-            temp_pubfile_path: None,
-        }),
-        "publish-devnet" => Ok(PackageCommand {
-            program: "sui",
-            args: command_args(&["client", "publish", "--client.env", "devnet", "."]),
-            display: "sui client publish --client.env devnet .".to_string(),
-            temp_pubfile_path: None,
-        }),
-        "publish-testnet" => Ok(PackageCommand {
-            program: "sui",
-            args: command_args(&["client", "publish", "--client.env", "testnet", "."]),
-            display: "sui client publish --client.env testnet .".to_string(),
-            temp_pubfile_path: None,
-        }),
-        "publish-mainnet" => Ok(PackageCommand {
-            program: "sui",
-            args: command_args(&["client", "publish", "--client.env", "mainnet", "."]),
-            display: "sui client publish --client.env mainnet .".to_string(),
-            temp_pubfile_path: None,
-        }),
-        _ => Err(format!("Unsupported security command: {command_kind}")),
-    }
-}
-
-fn command_args(args: &[&str]) -> Vec<String> {
-    args.iter().map(|arg| (*arg).to_string()).collect()
-}
-
-fn publish_dry_run_command(environment: &str) -> Result<PackageCommand, String> {
-    let pubfile_path = temp_publish_file_path(environment);
-    let pubfile_display = pubfile_path.to_string_lossy().into_owned();
-    let args = vec![
-        "client".to_string(),
-        "publish".to_string(),
-        "--dry-run".to_string(),
-        "--client.env".to_string(),
-        environment.to_string(),
-        "--pubfile-path".to_string(),
-        pubfile_display.clone(),
-        ".".to_string(),
-    ];
-
-    Ok(PackageCommand {
-        program: "sui",
-        display: format!(
-            "sui client publish --dry-run --client.env {environment} --pubfile-path {} .",
-            pubfile_display
-        ),
-        args,
-        temp_pubfile_path: Some(pubfile_path),
-    })
-}
-
-fn temp_publish_file_path(environment: &str) -> PathBuf {
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or_default();
-
-    env::temp_dir().join(format!(
-        "peregrine-publish-dry-run-{environment}-{}-{timestamp}.toml",
-        std::process::id()
-    ))
-}
-
 fn run_package_command(
     root_path: &str,
     package_path: &str,
-    command: PackageCommand,
+    command: SuiPackageCommand,
     stream: Option<CommandOutputStream>,
 ) -> Result<CommandOutput, String> {
     let package_root = resolve_package_child_path(root_path, package_path)?;
@@ -896,21 +834,85 @@ fn run_package_command(
         return Err("Selected package does not contain a Move.toml file.".to_string());
     }
 
-    let mut process = Command::new(command.program);
-    let output = run_configured_command(
-        configure_plain_command_output(process.args(&command.args).current_dir(&package_root)),
-        stream,
-    )
-    .map_err(|error| {
-        format!(
-            "Could not execute `{}` in {}: {error}",
-            command.display,
-            package_root.display()
-        )
-    })?;
+    let output = match &command.execution {
+        SuiExecutionTarget::Bundled => run_bundled_package_command(&command, &package_root, stream)
+            .map_err(|error| {
+                format!(
+                    "Could not execute bundled `{}` for {}: {error}",
+                    command.display,
+                    package_root.display()
+                )
+            })?,
+        SuiExecutionTarget::System { executable } => {
+            let mut process = Command::new(executable);
+            run_configured_command(
+                configure_plain_command_output(
+                    process.args(&command.args).current_dir(&package_root),
+                ),
+                stream,
+            )
+            .map_err(|error| {
+                format!(
+                    "Could not execute `{}` in {}: {error}",
+                    command.display,
+                    package_root.display()
+                )
+            })?
+        }
+    };
     cleanup_temp_pubfile(command.temp_pubfile_path.as_deref());
 
     Ok(output)
+}
+
+fn run_bundled_package_command(
+    command: &SuiPackageCommand,
+    package_root: &Path,
+    stream: Option<CommandOutputStream>,
+) -> Result<CommandOutput, String> {
+    let mut stdout = format!(
+        "Running bundled Sui crate from the linked app dependency: {}\n",
+        command.display
+    );
+
+    emit_command_output_chunk(stream.as_ref(), "stdout", &stdout);
+
+    let output = command
+        .run_bundled_blocking(package_root)
+        .map_err(|error| error.to_string())?;
+
+    emit_command_output_chunk(stream.as_ref(), "stdout", &output.stdout);
+    emit_command_output_chunk(stream.as_ref(), "stderr", &output.stderr);
+    stdout.push_str(&output.stdout);
+
+    Ok(CommandOutput {
+        status: output.status,
+        stdout,
+        stderr: output.stderr,
+    })
+}
+
+fn emit_command_output_chunk(
+    stream: Option<&CommandOutputStream>,
+    stream_name: &'static str,
+    chunk: impl AsRef<str>,
+) {
+    let chunk = chunk.as_ref();
+
+    if chunk.is_empty() {
+        return;
+    }
+
+    if let Some(stream) = stream {
+        let _ = stream.app.emit(
+            COMMAND_OUTPUT_EVENT,
+            CommandOutputChunk {
+                stream_id: stream.stream_id.clone(),
+                stream: stream_name,
+                chunk: chunk.to_string(),
+            },
+        );
+    }
 }
 
 fn configure_plain_command_output(command: &mut Command) -> &mut Command {
@@ -1381,7 +1383,9 @@ pub fn run() {
             run_security_command,
             run_security_script,
             analyze_move_package,
-            check_sui_cli,
+            check_sui_adapter,
+            get_sui_adapter_settings,
+            save_sui_adapter_settings,
             list_ollama_models,
             chat_with_ollama,
             preload_ollama_model,
