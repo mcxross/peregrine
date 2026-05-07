@@ -230,12 +230,13 @@ const TYPE_GRAPH_LENSES: Array<{
 const TYPE_GRAPH_SCOPES: Array<{
   id: TypeGraphScope;
   label: string;
+  shortLabel: string;
 }> = [
-  { id: "oneHop", label: "1-hop" },
-  { id: "twoHop", label: "2-hop" },
-  { id: "module", label: "Module" },
-  { id: "package", label: "Package" },
-  { id: "custom", label: "Query" },
+  { id: "oneHop", label: "1-hop", shortLabel: "1" },
+  { id: "twoHop", label: "2-hop", shortLabel: "2" },
+  { id: "module", label: "Module", shortLabel: "Mod" },
+  { id: "package", label: "Package", shortLabel: "Pkg" },
+  { id: "custom", label: "Query", shortLabel: "Q" },
 ];
 
 const LOCAL_COLOR = "#38bdf8";
@@ -625,9 +626,9 @@ export function TypeGraphView({
           : "grid-cols-[minmax(0,1fr)_2.75rem]",
       )}
     >
-      <div className="grid min-h-0 grid-rows-[52px_minmax(0,1fr)] overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
+      <div className="grid min-h-0 grid-rows-[40px_minmax(0,1fr)] overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
         <TypeGraphLensTabs activeLens={lens} onLensChange={setLens} />
-        <div className="relative min-h-0 bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.18)_1px,transparent_0)] [background-size:18px_18px]">
+        <div className="type-graph-canvas relative min-h-0 bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.18)_1px,transparent_0)] [background-size:18px_18px]">
           <ReactFlow
             colorMode="dark"
             edgeTypes={EDGE_TYPES}
@@ -668,19 +669,21 @@ export function TypeGraphView({
             />
           </ReactFlow>
 
-          <TypeGraphCanvasHeader
-            lens={lens}
-            packageName={packageName}
-            renderGraph={renderGraph}
-            scope={scope}
-            selectedEdge={selectedEdge}
-          />
-          <TypeGraphScopeControls
-            customQuery={customQuery}
-            onCustomQueryChange={setCustomQuery}
-            onScopeChange={setScope}
-            scope={scope}
-          />
+          <div className="type-graph-footer pointer-events-none absolute bottom-3 left-3 right-3 z-10 flex flex-nowrap items-end justify-between gap-2">
+            <TypeGraphCanvasHeader
+              lens={lens}
+              packageName={packageName}
+              renderGraph={renderGraph}
+              scope={scope}
+              selectedEdge={selectedEdge}
+            />
+            <TypeGraphScopeControls
+              customQuery={customQuery}
+              onCustomQueryChange={setCustomQuery}
+              onScopeChange={setScope}
+              scope={scope}
+            />
+          </div>
           <TypeGraphLegend />
           <TypeGraphModeState
             lens={lens}
@@ -743,25 +746,28 @@ function TypeGraphLensTabs({
   onLensChange: (lens: TypeGraphLens) => void;
 }) {
   return (
-    <header className="min-w-0 overflow-x-auto border-b border-[color:var(--app-border)] bg-[var(--app-panel)]">
+    <header className="min-w-0 overflow-x-auto border-b border-[color:var(--app-border)] bg-[color-mix(in_oklch,var(--app-chrome)_82%,transparent)] backdrop-blur-sm">
       <div className="grid min-w-[35rem] grid-cols-5">
         {TYPE_GRAPH_LENSES.map((lens) => (
           <button
             aria-pressed={activeLens === lens.id}
             className={cn(
-              "grid min-w-0 content-center gap-0.5 border-r border-[color:var(--app-border)] px-3 text-center transition hover:bg-[var(--app-subtle)]",
+              "relative grid min-w-0 content-center gap-0.5 border-r border-[color:var(--app-border)] px-2 pb-1 pt-1.5 text-center transition hover:bg-[var(--app-subtle)]",
               activeLens === lens.id
-                ? "bg-sky-500/10 text-sky-200 shadow-[inset_0_0_0_1px_rgba(14,165,233,0.45)]"
+                ? "bg-sky-500/10 text-sky-100 after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-sky-400/70"
                 : "text-muted-foreground",
             )}
             key={lens.id}
             onClick={() => onLensChange(lens.id)}
             type="button"
           >
-            <span className="truncate text-xs font-semibold leading-4 text-foreground">
+            <span className={cn(
+              "truncate text-[11px] font-semibold leading-3.5",
+              activeLens === lens.id ? "text-sky-50" : "text-foreground/85",
+            )}>
               {lens.label}
             </span>
-            <span className="truncate text-[10px] leading-3 text-muted-foreground">
+            <span className="truncate text-[9px] leading-3 text-muted-foreground/80">
               {lens.caption}
             </span>
           </button>
@@ -813,28 +819,28 @@ function TypeGraphCanvasHeader({
     : 0;
 
   return (
-    <div className="pointer-events-auto absolute bottom-3 left-3 z-10 max-w-[min(34rem,calc(100%-6rem))]">
-      <div className="inline-flex max-w-full items-center gap-1.5 rounded border border-[color:var(--app-border)] bg-background/45 px-2 py-1 text-[10px] font-medium text-muted-foreground/75 shadow-sm backdrop-blur-[2px]">
+    <div className="type-graph-footer-summary pointer-events-auto min-w-0 flex-[1_1_auto]">
+      <div className="type-graph-footer-summary-chip inline-flex max-w-full items-center gap-1.5 rounded border border-[color:var(--app-border)] bg-background/45 px-2 py-1 text-[10px] font-medium text-muted-foreground/75 shadow-sm backdrop-blur-[2px]">
         <span className="text-foreground/70">{lensLabel}</span>
         <span className="text-muted-foreground/45">·</span>
-        <span>{selectedFieldName ? `field ${selectedFieldName}` : selectedTargetReferences ? `target ${renderGraph.selectedLabel}` : scopeLabel}</span>
-        <span className="text-muted-foreground/45">·</span>
-        <span className="min-w-0 truncate text-muted-foreground/80">
+        <span className="type-graph-footer-scope whitespace-nowrap">{selectedFieldName ? `field ${selectedFieldName}` : selectedTargetReferences ? `target ${renderGraph.selectedLabel}` : scopeLabel}</span>
+        <span className="type-graph-footer-detail-separator text-muted-foreground/45">·</span>
+        <span className="type-graph-footer-detail min-w-0 truncate text-muted-foreground/80">
           {selectedFieldName && selectedFieldType
             ? selectedFieldType
             : selectedTargetReferences
               ? `referenced by ${pluralize(selectedTargetReferences, "field")}`
               : `centered on ${renderGraph.selectedLabel ?? packageName}`}
         </span>
-        <span className="hidden text-muted-foreground/45 sm:inline">·</span>
-        <span className="hidden whitespace-nowrap text-muted-foreground/60 sm:inline">
+        <span className="type-graph-footer-count-separator text-muted-foreground/45">·</span>
+        <span className="type-graph-footer-count whitespace-nowrap text-muted-foreground/60">
           {selectedEdge ? edgeConfidence(selectedEdge) : `${nodeCount} nodes / ${edgeCount} edges`}
         </span>
         {selectedPartialSource ? (
           <>
-            <span className="hidden text-muted-foreground/45 md:inline">·</span>
+            <span className="type-graph-footer-partial-separator text-muted-foreground/45">·</span>
             <span
-              className="hidden whitespace-nowrap text-amber-200/90 md:inline"
+              className="type-graph-footer-partial whitespace-nowrap text-amber-200/90"
               title="Partial source means some local nodes or relationships do not have full file and line metadata yet."
             >
               partial source
@@ -858,23 +864,24 @@ function TypeGraphScopeControls({
   scope: TypeGraphScope;
 }) {
   return (
-    <div className="pointer-events-auto absolute bottom-3 right-3 z-10 flex max-w-[min(30rem,calc(100%-6rem))] flex-wrap items-center justify-end gap-1 rounded border border-[color:var(--app-border)] bg-background/45 p-1 shadow-sm backdrop-blur-[2px]">
+    <div className="type-graph-scope-controls pointer-events-auto flex max-w-full flex-[0_0_auto] flex-nowrap items-center justify-end gap-1 rounded border border-[color:var(--app-border)] bg-background/45 p-1 shadow-sm backdrop-blur-[2px]">
       {TYPE_GRAPH_SCOPES.map((item) => (
         <button
           aria-pressed={scope === item.id}
           className={cn(
-            "h-6 rounded px-2 text-[10px] font-semibold text-muted-foreground/75 transition hover:bg-[var(--app-subtle)] hover:text-foreground",
+            "h-6 shrink-0 rounded px-2 text-[10px] font-semibold text-muted-foreground/75 transition hover:bg-[var(--app-subtle)] hover:text-foreground",
             scope === item.id && "bg-sky-500/12 text-sky-200/90",
           )}
           key={item.id}
           onClick={() => onScopeChange(item.id)}
           type="button"
         >
-          {item.label}
+          <span className="type-graph-scope-label-full">{item.label}</span>
+          <span className="type-graph-scope-label-short hidden">{item.shortLabel}</span>
         </button>
       ))}
       {scope === "custom" ? (
-        <label className="ml-1 grid h-6 min-w-40 grid-cols-[14px_minmax(0,1fr)] items-center gap-1 rounded border border-[color:var(--app-border)] bg-background/50 px-2">
+        <label className="ml-1 grid h-6 min-w-0 max-w-full grid-cols-[14px_minmax(0,1fr)] items-center gap-1 rounded border border-[color:var(--app-border)] bg-background/50 px-2 sm:w-40">
           <Search className="size-3 text-muted-foreground/70" aria-hidden="true" />
           <input
             className="min-w-0 bg-transparent text-[10px] text-foreground outline-none placeholder:text-muted-foreground/70"

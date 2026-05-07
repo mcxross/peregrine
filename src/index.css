@@ -179,6 +179,45 @@
   background: color-mix(in oklch, var(--app-elevated) 84%, transparent);
 }
 
+.type-graph-canvas {
+  container-type: inline-size;
+}
+
+@container (max-width: 720px) {
+  .type-graph-footer-detail,
+  .type-graph-footer-detail-separator,
+  .type-graph-footer-count,
+  .type-graph-footer-count-separator,
+  .type-graph-footer-partial,
+  .type-graph-footer-partial-separator {
+    display: none;
+  }
+}
+
+@container (max-width: 560px) {
+  .type-graph-footer {
+    justify-content: flex-end;
+  }
+
+  .type-graph-footer-summary {
+    display: none;
+  }
+}
+
+@container (max-width: 380px) {
+  .type-graph-scope-controls button {
+    padding-inline: 0.375rem;
+  }
+
+  .type-graph-scope-label-full {
+    display: none;
+  }
+
+  .type-graph-scope-label-short {
+    display: inline;
+  }
+}
+
 .ai-liquid-panel {
   position: relative;
   isolation: isolate;
