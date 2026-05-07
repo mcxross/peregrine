@@ -32,6 +32,7 @@ const OPEN_SETTINGS_EVENT: &str = "open-settings";
 const CLOSE_PROJECT_MENU_ID: &str = "close-project";
 const CLOSE_PROJECT_EVENT: &str = "close-project";
 const COMMAND_OUTPUT_EVENT: &str = "command-output";
+const BUNDLED_SUI_HELPER_ARG: &str = "--peregrine-bundled-sui";
 const PROJECT_METADATA_DIRECTORY: &str = ".peregrine";
 const PROJECT_METADATA_FILE: &str = "metadata.json";
 const SUI_ADAPTER_SETTINGS_CHANGED_EVENT: &str = "sui-adapter-settings-changed";
@@ -978,26 +979,24 @@ fn run_bundled_package_command(
     package_root: &Path,
     stream: Option<CommandOutputStream>,
 ) -> Result<CommandOutput, String> {
-    let mut stdout = format!(
+    let header = format!(
         "Running bundled Sui crate from the linked app dependency: {}\n",
         command.display
     );
 
-    emit_command_output_chunk(stream.as_ref(), "stdout", &stdout);
+    emit_command_output_chunk(stream.as_ref(), "stdout", &header);
 
-    let output = command
-        .run_bundled_blocking(package_root)
-        .map_err(|error| error.to_string())?;
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let mut process = Command::new(executable);
+    process
+        .arg(BUNDLED_SUI_HELPER_ARG)
+        .args(command.bundled_args_for_package(package_root));
 
-    emit_command_output_chunk(stream.as_ref(), "stdout", &output.stdout);
-    emit_command_output_chunk(stream.as_ref(), "stderr", &output.stderr);
-    stdout.push_str(&output.stdout);
+    let mut output = run_configured_command(&mut process, stream)?;
+    output.stdout = format!("{header}{}", output.stdout);
 
-    Ok(CommandOutput {
-        status: output.status,
-        stdout,
-        stderr: output.stderr,
-    })
+    Ok(output)
 }
 
 fn emit_command_output_chunk(

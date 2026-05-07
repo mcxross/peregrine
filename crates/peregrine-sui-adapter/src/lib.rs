@@ -24,3 +24,10 @@ pub use status::{SuiAdapterSourceStatus, SuiAdapterStatus};
 
 #[cfg(test)]
 mod tests;
+
+pub fn run_bundled_sui_blocking<I>(args: I) -> Result<SuiCommandOutput, SuiAdapterError>
+where
+    I: IntoIterator<Item = std::ffi::OsString>,
+{
+    bundled::run_blocking(args.into_iter().collect())
+}

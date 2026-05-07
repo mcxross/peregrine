@@ -42,8 +42,10 @@ type TitlebarProps = {
   hasWorkspace?: boolean;
   onBuildPackage?: () => void;
   onRescanProject?: () => void;
+  onTestPackage?: () => void;
   onToggleLeftPanel?: () => void;
   rescanActionState?: WorkspaceActionState;
+  testActionState?: WorkspaceActionState;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
 };
 
@@ -54,8 +56,10 @@ export function Titlebar({
   hasWorkspace = true,
   onBuildPackage,
   onRescanProject,
+  onTestPackage,
   onToggleLeftPanel,
   rescanActionState,
+  testActionState,
 }: TitlebarProps) {
   const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
     if (event.button !== 0) {
@@ -111,8 +115,20 @@ export function Titlebar({
               <WorkspaceActionButton
                 action={action}
                 key={action.label}
-                state={action.id === "build" ? buildActionState : undefined}
-                onClick={action.id === "build" ? onBuildPackage : undefined}
+                state={
+                  action.id === "build"
+                    ? buildActionState
+                    : action.id === "test"
+                      ? testActionState
+                      : undefined
+                }
+                onClick={
+                  action.id === "build"
+                    ? onBuildPackage
+                    : action.id === "test"
+                      ? onTestPackage
+                      : undefined
+                }
               />
             ))}
           </div>

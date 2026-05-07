@@ -10,6 +10,7 @@ import {
   loadPackageTree,
   loadPackageTreeDetails,
   loadProjectMetadata,
+  runSecurityCommand,
   saveProjectMetadata,
   type MovePackage,
   type PackageTree,
@@ -75,6 +76,7 @@ export function AppShell({
     [activePackageManifestPath, packageTree],
   );
   const isBuildRunning = buildRuns.some((run) => run.state === "running");
+  const isCommandRunning = isBuildRunning;
   const isDependencyGraphLoading = Boolean(
     packageTree && (!packageTree.isDetailed || (launchBuild && launchBuild.state !== "error")),
   );
@@ -389,7 +391,7 @@ export function AppShell({
   }, [activePackageManifestPath, handleProjectSelected, isRescanning, packageTree]);
 
   const runBuild = useCallback(async () => {
-    if (!packageTree || !activeMovePackage || isBuildRunning) {
+    if (!packageTree || !activeMovePackage || isCommandRunning) {
       return;
     }
 
@@ -471,7 +473,67 @@ export function AppShell({
         })),
       );
     }
-  }, [activeMovePackage, handleProjectSelected, isBuildRunning, packageTree]);
+  }, [activeMovePackage, handleProjectSelected, isCommandRunning, packageTree]);
+
+  const runTests = useCallback(async () => {
+    if (!packageTree || !activeMovePackage || isCommandRunning) {
+      return;
+    }
+
+    const startedAt = new Date();
+    const workingDirectory = packagePathLabel(activeMovePackage, packageTree);
+    const nextRun: BuildLogRun = {
+      canRerun: false,
+      command: "sui move test",
+      error: null,
+      finishedAt: null,
+      id: startedAt.getTime(),
+      output: null,
+      packageName: activeMovePackage.name,
+      packagePath: activeMovePackage.path || ".",
+      runningText: "Running Move tests...",
+      startedAt,
+      state: "running",
+      title: "Move tests",
+      workingDirectory,
+    };
+
+    currentCommandLogIdRef.current = nextRun.id;
+    setBuildRuns([nextRun]);
+    setIsBuildSheetOpen(true);
+
+    try {
+      const output = await runSecurityCommand(packageTree, activeMovePackage.path, "move-test", {
+        streamId: nextRun.id,
+        onOutput: (output) => {
+          setBuildRuns((current) =>
+            updateLogRun(current, nextRun.id, (run) =>
+              run.state === "running" ? { ...run, output } : run,
+            ),
+          );
+        },
+      });
+      const state = output.status === 0 ? "success" : "error";
+
+      setBuildRuns((current) =>
+        updateLogRun(current, nextRun.id, (run) => ({
+          ...run,
+          finishedAt: new Date(),
+          output,
+          state,
+        })),
+      );
+    } catch (error) {
+      setBuildRuns((current) =>
+        updateLogRun(current, nextRun.id, (run) => ({
+          ...run,
+          error: getCommandErrorMessage(error, "Could not run `sui move test`."),
+          finishedAt: new Date(),
+          state: "error",
+        })),
+      );
+    }
+  }, [activeMovePackage, isCommandRunning, packageTree]);
   const buildLogSheet = useMemo<BuildLogSheetController>(
     () => ({
       isOpen: isBuildSheetOpen,
@@ -491,7 +553,7 @@ export function AppShell({
         activeWorkspaceTab={activeWorkspaceTab}
         buildActionState={{
           disabled: !activeMovePackage,
-          running: isBuildRunning,
+          running: isCommandRunning,
         }}
         rescanActionState={{
           disabled: !packageTree,
@@ -502,7 +564,12 @@ export function AppShell({
         hasWorkspace={!isSettings && Boolean(packageTree)}
         onBuildPackage={runBuild}
         onRescanProject={rescanProject}
+        onTestPackage={runTests}
         onToggleLeftPanel={() => setIsLeftPanelOpen((isOpen) => !isOpen)}
+        testActionState={{
+          disabled: !activeMovePackage,
+          running: isCommandRunning,
+        }}
         onWorkspaceTabChange={setActiveWorkspaceTab}
       />
 
@@ -680,9 +747,13 @@ function updateLogRun(
 }
 
 function getBuildErrorMessage(error: unknown) {
+  return getCommandErrorMessage(error, "Could not run `sui move build`.");
+}
+
+function getCommandErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error) {
     return error.message;
   }
 
-  return typeof error === "string" ? error : "Could not run `sui move build`.";
+  return typeof error === "string" ? error : fallback;
 }
