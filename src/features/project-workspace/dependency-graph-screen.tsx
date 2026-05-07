@@ -40,6 +40,7 @@ type DependencyGraphScreenProps = {
   activeMovePackage: MovePackage | null;
   callGraph: MoveCallGraph;
   graph: PackageDependencyGraph;
+  isDependencyGraphLoading?: boolean;
   onMoveGraphsLoaded?: (graphs: MoveProjectGraphs) => void;
   onOpenSourceLocation?: (location: TypeGraphSourceLocation) => void;
   packageName: string;
@@ -51,6 +52,7 @@ export function DependencyGraphScreen({
   activeMovePackage,
   callGraph,
   graph,
+  isDependencyGraphLoading = false,
   onMoveGraphsLoaded,
   onOpenSourceLocation,
   packageName,
@@ -249,11 +251,15 @@ export function DependencyGraphScreen({
         ) : (
           <div className="h-full min-h-0 animate-in fade-in slide-in-from-left-2 duration-150">
             <React.Suspense fallback={<GraphLoadingState />}>
-              <DependencyGraphView
-                className="h-full rounded-md border"
-                graph={graph}
-                packageName={packageName}
-              />
+              {isDependencyGraphLoading && !graph.summaryPath ? (
+                <GraphLoadingState label="Loading dependency graph..." />
+              ) : (
+                <DependencyGraphView
+                  className="h-full rounded-md border"
+                  graph={graph}
+                  packageName={packageName}
+                />
+              )}
             </React.Suspense>
           </div>
         )}

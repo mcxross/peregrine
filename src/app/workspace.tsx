@@ -14,6 +14,7 @@ type WorkspaceProps = {
   activePackageManifestPath: string | null;
   buildLogSheet: BuildLogSheetController;
   isLeftPanelOpen: boolean;
+  isDependencyGraphLoading?: boolean;
   lastScannedAt: number | null;
   loadAssessment: PackageLoadAssessment | null;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
@@ -27,6 +28,7 @@ export function Workspace({
   activeWorkspaceTab,
   activePackageManifestPath,
   buildLogSheet,
+  isDependencyGraphLoading = false,
   isLeftPanelOpen,
   lastScannedAt,
   loadAssessment,
@@ -42,6 +44,7 @@ export function Workspace({
         activeWorkspaceTab={activeWorkspaceTab}
         activePackageManifestPath={activePackageManifestPath}
         buildLogSheet={buildLogSheet}
+        isDependencyGraphLoading={isDependencyGraphLoading}
         isLeftPanelOpen={isLeftPanelOpen}
         lastScannedAt={lastScannedAt}
         loadAssessment={loadAssessment}

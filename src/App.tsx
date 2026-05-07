@@ -9,13 +9,23 @@ function App() {
   const [packageTree, setPackageTree] = React.useState<PackageTree | null>(null);
 
   React.useEffect(() => {
-    let unlisten: (() => void) | undefined;
+    let unlistenSettings: (() => void) | undefined;
+    let unlistenCloseProject: (() => void) | undefined;
 
     listen(OPEN_SETTINGS_EVENT, () => setScreen("settings")).then((cleanup) => {
-      unlisten = cleanup;
+      unlistenSettings = cleanup;
+    });
+    listen(CLOSE_PROJECT_EVENT, () => {
+      setPackageTree(null);
+      setScreen("workspace");
+    }).then((cleanup) => {
+      unlistenCloseProject = cleanup;
     });
 
-    return () => unlisten?.();
+    return () => {
+      unlistenSettings?.();
+      unlistenCloseProject?.();
+    };
   }, []);
 
   return (
@@ -29,5 +39,6 @@ function App() {
 }
 
 const OPEN_SETTINGS_EVENT = "open-settings";
+const CLOSE_PROJECT_EVENT = "close-project";
 
 export default App;

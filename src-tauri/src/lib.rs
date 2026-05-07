@@ -29,6 +29,8 @@ use tauri::{
 
 const OPEN_SETTINGS_MENU_ID: &str = "open-settings";
 const OPEN_SETTINGS_EVENT: &str = "open-settings";
+const CLOSE_PROJECT_MENU_ID: &str = "close-project";
+const CLOSE_PROJECT_EVENT: &str = "close-project";
 const COMMAND_OUTPUT_EVENT: &str = "command-output";
 const PROJECT_METADATA_DIRECTORY: &str = ".peregrine";
 const PROJECT_METADATA_FILE: &str = "metadata.json";
@@ -1401,6 +1403,9 @@ fn app_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let settings = MenuItemBuilder::with_id(OPEN_SETTINGS_MENU_ID, "Settings...")
         .accelerator("Cmd+,")
         .build(app)?;
+    let close_project = MenuItemBuilder::with_id(CLOSE_PROJECT_MENU_ID, "Close Project")
+        .accelerator("Cmd+Shift+W")
+        .build(app)?;
 
     let window_menu = Submenu::with_items(
         app,
@@ -1439,7 +1444,11 @@ fn app_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
                 app,
                 "File",
                 true,
-                &[&PredefinedMenuItem::close_window(app, None)?],
+                &[
+                    &close_project,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::close_window(app, None)?,
+                ],
             )?,
             &Submenu::with_items(
                 app,
@@ -1474,6 +1483,8 @@ pub fn run() {
         .on_menu_event(|app, event| {
             if event.id().as_ref() == OPEN_SETTINGS_MENU_ID {
                 let _ = app.emit(OPEN_SETTINGS_EVENT, ());
+            } else if event.id().as_ref() == CLOSE_PROJECT_MENU_ID {
+                let _ = app.emit(CLOSE_PROJECT_EVENT, ());
             }
         })
         .plugin(tauri_plugin_dialog::init())

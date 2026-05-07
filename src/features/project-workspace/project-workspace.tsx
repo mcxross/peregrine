@@ -59,6 +59,7 @@ type ProjectWorkspaceProps = {
   activeWorkspaceTab: WorkspaceTab;
   activePackageManifestPath: string | null;
   buildLogSheet: BuildLogSheetController;
+  isDependencyGraphLoading?: boolean;
   isLeftPanelOpen: boolean;
   lastScannedAt: number | null;
   loadAssessment: PackageLoadAssessment | null;
@@ -146,6 +147,7 @@ export function ProjectWorkspace({
   activePackageManifestPath,
   activeWorkspaceTab,
   buildLogSheet,
+  isDependencyGraphLoading = false,
   isLeftPanelOpen,
   lastScannedAt,
   loadAssessment,
@@ -305,6 +307,7 @@ export function ProjectWorkspace({
             activeWorkspaceTab={activeWorkspaceTab}
             activeSurfaceDetail={activeSurfaceDetail}
             activeMovePackage={activeMovePackage}
+            isDependencyGraphLoading={isDependencyGraphLoading}
             packageTree={packageTree}
             packageName={packageName}
             selectedModule={selectedModule}
@@ -361,6 +364,7 @@ function WorkspaceMainPanel({
   activeWorkspaceTab,
   activeSurfaceDetail,
   activeMovePackage,
+  isDependencyGraphLoading,
   onClearSelectedModule,
   onOpenSourceLocation,
   onSelectModule,
@@ -374,6 +378,7 @@ function WorkspaceMainPanel({
   activeWorkspaceTab: WorkspaceTab;
   activeSurfaceDetail: SurfaceDetailKind | null;
   activeMovePackage: MovePackage | null;
+  isDependencyGraphLoading: boolean;
   onClearSelectedModule: () => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onOpenSourceLocation: (location: TypeGraphSourceLocation) => void;
@@ -417,6 +422,7 @@ function WorkspaceMainPanel({
       activeMovePackage={activeMovePackage}
       callGraph={packageTree.callGraph}
       graph={packageTree.dependencyGraph}
+      isDependencyGraphLoading={isDependencyGraphLoading}
       onMoveGraphsLoaded={(graphs) =>
         onProjectSelected({
           ...packageTree,

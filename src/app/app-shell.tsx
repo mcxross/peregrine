@@ -75,6 +75,9 @@ export function AppShell({
     [activePackageManifestPath, packageTree],
   );
   const isBuildRunning = buildRuns.some((run) => run.state === "running");
+  const isDependencyGraphLoading = Boolean(
+    packageTree && (!packageTree.isDetailed || (launchBuild && launchBuild.state !== "error")),
+  );
   const handleProjectSelected = useCallback(
     (nextPackageTree: PackageTree) => {
       onProjectSelected(nextPackageTree);
@@ -513,6 +516,7 @@ export function AppShell({
               activeWorkspaceTab={activeWorkspaceTab}
               activePackageManifestPath={activePackageManifestPath}
               buildLogSheet={buildLogSheet}
+              isDependencyGraphLoading={isDependencyGraphLoading}
               isLeftPanelOpen={isLeftPanelOpen}
               lastScannedAt={lastScannedAt}
               loadAssessment={loadAssessment}
