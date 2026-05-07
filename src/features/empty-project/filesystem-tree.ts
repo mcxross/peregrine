@@ -13,6 +13,15 @@ export type PackageTree = {
   typeGraph: MoveTypeGraph;
 };
 
+export type ProjectMetadata = {
+  version: number;
+  builds: Record<string, ProjectBuildMetadata>;
+};
+
+export type ProjectBuildMetadata = {
+  lastSuccessfulBuildAt?: number | null;
+};
+
 export type MoveProjectGraphs = {
   callGraph: MoveCallGraph;
   typeGraph: MoveTypeGraph;
@@ -555,6 +564,14 @@ export async function getSuiAdapterSettings() {
 
 export async function saveSuiAdapterSettings(settings: SuiAdapterSettings) {
   return invoke<SuiAdapterSettings>("save_sui_adapter_settings", { settings });
+}
+
+export async function loadProjectMetadata(rootPath: string) {
+  return invoke<ProjectMetadata>("load_project_metadata", { rootPath });
+}
+
+export async function saveProjectMetadata(rootPath: string, metadata: ProjectMetadata) {
+  return invoke<ProjectMetadata>("save_project_metadata", { rootPath, metadata });
 }
 
 export async function listenSuiAdapterSettingsChanged(

@@ -13,6 +13,7 @@ use peregrine_sui_adapter::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     fs,
     io::Read,
     path::{Path, PathBuf},
@@ -29,6 +30,8 @@ use tauri::{
 const OPEN_SETTINGS_MENU_ID: &str = "open-settings";
 const OPEN_SETTINGS_EVENT: &str = "open-settings";
 const COMMAND_OUTPUT_EVENT: &str = "command-output";
+const PROJECT_METADATA_DIRECTORY: &str = ".peregrine";
+const PROJECT_METADATA_FILE: &str = "metadata.json";
 const SUI_ADAPTER_SETTINGS_CHANGED_EVENT: &str = "sui-adapter-settings-changed";
 const SUI_ADAPTER_SETTINGS_FILE: &str = "sui-adapter-settings.json";
 const OLLAMA_CHAT_STREAM_EVENT: &str = "ollama-chat-stream";
@@ -68,6 +71,34 @@ struct CommandOutputChunk {
     stream_id: String,
     stream: &'static str,
     chunk: String,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ProjectMetadata {
+    #[serde(default = "default_project_metadata_version")]
+    version: u32,
+    #[serde(default)]
+    builds: HashMap<String, ProjectBuildMetadata>,
+}
+
+impl Default for ProjectMetadata {
+    fn default() -> Self {
+        Self {
+            version: default_project_metadata_version(),
+            builds: HashMap::new(),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+struct ProjectBuildMetadata {
+    last_successful_build_at: Option<u64>,
+}
+
+fn default_project_metadata_version() -> u32 {
+    1
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -361,6 +392,26 @@ async fn save_sui_adapter_settings(
 }
 
 #[tauri::command]
+async fn load_project_metadata(root_path: String) -> Result<ProjectMetadata, String> {
+    tauri::async_runtime::spawn_blocking(move || read_project_metadata(&root_path))
+        .await
+        .map_err(|error| format!("Could not join project metadata load task: {error}"))?
+}
+
+#[tauri::command]
+async fn save_project_metadata(
+    root_path: String,
+    metadata: ProjectMetadata,
+) -> Result<ProjectMetadata, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        write_project_metadata(&root_path, &metadata)?;
+        Ok(metadata)
+    })
+    .await
+    .map_err(|error| format!("Could not join project metadata save task: {error}"))?
+}
+
+#[tauri::command]
 async fn list_ollama_models() -> Result<Vec<OllamaModel>, String> {
     let client = ollama_client()?;
     let body = send_ollama_request(&client, "/api/tags", "model list", |client, url| {
@@ -574,6 +625,61 @@ fn sui_adapter_settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> 
         .app_config_dir()
         .map_err(|error| format!("Could not resolve app config directory: {error}"))?
         .join(SUI_ADAPTER_SETTINGS_FILE))
+}
+
+fn read_project_metadata(root_path: &str) -> Result<ProjectMetadata, String> {
+    let path = project_metadata_path(root_path)?;
+
+    if !path.exists() {
+        return Ok(ProjectMetadata::default());
+    }
+
+    let contents = fs::read_to_string(&path).map_err(|error| {
+        format!(
+            "Could not read project metadata {}: {error}",
+            path.display()
+        )
+    })?;
+
+    serde_json::from_str(&contents).map_err(|error| {
+        format!(
+            "Could not parse project metadata {}: {error}",
+            path.display()
+        )
+    })
+}
+
+fn write_project_metadata(root_path: &str, metadata: &ProjectMetadata) -> Result<(), String> {
+    let path = project_metadata_path(root_path)?;
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "Could not create project metadata directory {}: {error}",
+                parent.display()
+            )
+        })?;
+    }
+
+    let contents = serde_json::to_string_pretty(metadata)
+        .map_err(|error| format!("Could not serialize project metadata: {error}"))?;
+
+    fs::write(&path, format!("{contents}\n")).map_err(|error| {
+        format!(
+            "Could not write project metadata {}: {error}",
+            path.display()
+        )
+    })
+}
+
+fn project_metadata_path(root_path: &str) -> Result<PathBuf, String> {
+    let root = PathBuf::from(root_path)
+        .canonicalize()
+        .map_err(|error| format!("Could not read package directory {root_path}: {error}"))?;
+
+    Ok(root
+        .join(PROJECT_METADATA_DIRECTORY)
+        .join(PROJECT_METADATA_FILE))
 }
 
 fn ollama_client() -> Result<reqwest::Client, String> {
@@ -1218,6 +1324,7 @@ fn should_skip_tree_directory(path: &Path) -> bool {
         name,
         ".git"
             | ".next"
+            | ".peregrine"
             | ".sui"
             | ".turbo"
             | "build"
@@ -1386,6 +1493,8 @@ pub fn run() {
             check_sui_adapter,
             get_sui_adapter_settings,
             save_sui_adapter_settings,
+            load_project_metadata,
+            save_project_metadata,
             list_ollama_models,
             chat_with_ollama,
             preload_ollama_model,

@@ -9,8 +9,11 @@ import {
   buildMovePackage,
   loadPackageTree,
   loadPackageTreeDetails,
+  loadProjectMetadata,
+  saveProjectMetadata,
   type MovePackage,
   type PackageTree,
+  type ProjectMetadata,
 } from "@/features/empty-project/filesystem-tree";
 import type {
   BuildLogRun,
@@ -23,7 +26,6 @@ import { titlebarHeight } from "@/layout/window-chrome";
 import { SettingsScreen } from "@/screens/settings-screen";
 
 const BUILD_FRESHNESS_WINDOW_MS = 3 * 60 * 1000;
-const LAUNCH_BUILD_TIMESTAMPS_STORAGE_KEY = "peregrine.launchBuild.successTimestamps.v1";
 const LAUNCH_BUILD_STATUS_MESSAGES = [
   "Preparing Sui environment...",
   "Compiling Move packages...",
@@ -175,150 +177,168 @@ export function AppShell({
       return;
     }
 
-    const launchBuildKey = projectBuildKey(packageTree, activeMovePackage);
+    let isCancelled = false;
+    const launchBuildKey = projectBuildRuntimeKey(packageTree, activeMovePackage);
+    const packageMetadataKey = projectPackageMetadataKey(activeMovePackage);
 
     if (launchBuildKeysRef.current.has(launchBuildKey)) {
       return;
     }
 
-    const lastSuccessfulBuildAt = lastSuccessfulLaunchBuildAt(launchBuildKey);
-
-    if (lastSuccessfulBuildAt && Date.now() - lastSuccessfulBuildAt < BUILD_FRESHNESS_WINDOW_MS) {
-      return;
-    }
-
     launchBuildKeysRef.current.add(launchBuildKey);
-    launchBuildMessageIndexRef.current = 0;
 
-    const startedAt = new Date();
-    const runId = startedAt.getTime();
-    const workingDirectory = packagePathLabel(activeMovePackage, packageTree);
-    const nextRun: BuildLogRun = {
-      canRerun: false,
-      command: "sui move build",
-      error: null,
-      finishedAt: null,
-      id: runId,
-      metadata: [{ label: "Trigger", value: "Project launch" }],
-      output: null,
-      packageName: activeMovePackage.name,
-      packagePath: activeMovePackage.path || ".",
-      runningText: LAUNCH_BUILD_STATUS_MESSAGES[0],
-      startedAt,
-      state: "running",
-      title: "Launch build",
-      workingDirectory,
-    };
-
-    currentCommandLogIdRef.current = nextRun.id;
-    setBuildRuns((current) => upsertLogRun(current, nextRun));
-    setLaunchBuild({
-      key: launchBuildKey,
-      message: LAUNCH_BUILD_STATUS_MESSAGES[0],
-      packageName: activeMovePackage.name,
-      runId,
-      state: "running",
-    });
-
-    const messageTimer = window.setInterval(() => {
-      launchBuildMessageIndexRef.current =
-        (launchBuildMessageIndexRef.current + 1) % LAUNCH_BUILD_STATUS_MESSAGES.length;
-      const message = LAUNCH_BUILD_STATUS_MESSAGES[launchBuildMessageIndexRef.current];
-
-      setLaunchBuild((current) =>
-        current?.key === launchBuildKey && current.state === "running"
-          ? { ...current, message }
-          : current,
-      );
-      setBuildRuns((current) =>
-        updateLogRun(current, runId, (run) =>
-          run.state === "running" ? { ...run, runningText: message } : run,
-        ),
-      );
-    }, 2_800);
-
-    void buildMovePackage(packageTree, activeMovePackage.path, {
-      streamId: runId,
-      onOutput: (output) => {
-        setBuildRuns((current) =>
-          updateLogRun(current, runId, (run) =>
-            run.state === "running" ? { ...run, output } : run,
-          ),
-        );
-      },
-    })
-      .then(async (output) => {
-        const state = output.status === 0 ? "success" : "error";
-
-        if (state === "success") {
-          rememberSuccessfulLaunchBuild(launchBuildKey, Date.now());
+    void loadProjectMetadata(packageTree.rootPath)
+      .catch((error) => {
+        console.warn("Could not load project metadata; running launch build.", error);
+        return defaultProjectMetadata();
+      })
+      .then((metadata) => {
+        if (isCancelled) {
+          launchBuildKeysRef.current.delete(launchBuildKey);
+          return;
         }
 
-        setBuildRuns((current) =>
-          updateLogRun(current, runId, (run) => ({
-            ...run,
-            finishedAt: new Date(),
-            output,
-            state,
-          })),
-        );
+        const lastSuccessfulBuildAt =
+          metadata.builds[packageMetadataKey]?.lastSuccessfulBuildAt ?? null;
 
-        setLaunchBuild((current) =>
-          current?.key === launchBuildKey
-            ? {
-                ...current,
-                message: state === "success" ? "Project build completed." : "Project build failed.",
-                state,
-              }
-            : current,
-        );
+        if (lastSuccessfulBuildAt && Date.now() - lastSuccessfulBuildAt < BUILD_FRESHNESS_WINDOW_MS) {
+          launchBuildKeysRef.current.delete(launchBuildKey);
+          return;
+        }
 
-        if (state === "success" && latestPackageTreeRef.current?.rootPath === packageTree.rootPath) {
-          try {
-            const rescannedPackageTree = await loadPackageTree(packageTree.rootPath);
-            const latestPackageTree = latestPackageTreeRef.current;
+        launchBuildMessageIndexRef.current = 0;
 
-            if (!latestPackageTree || latestPackageTree.rootPath !== packageTree.rootPath) {
-              return;
+        const startedAt = new Date();
+        const runId = startedAt.getTime();
+        const workingDirectory = packagePathLabel(activeMovePackage, packageTree);
+        const nextRun: BuildLogRun = {
+          canRerun: false,
+          command: "sui move build",
+          error: null,
+          finishedAt: null,
+          id: runId,
+          metadata: [{ label: "Trigger", value: "Project launch" }],
+          output: null,
+          packageName: activeMovePackage.name,
+          packagePath: activeMovePackage.path || ".",
+          runningText: LAUNCH_BUILD_STATUS_MESSAGES[0],
+          startedAt,
+          state: "running",
+          title: "Launch build",
+          workingDirectory,
+        };
+
+        currentCommandLogIdRef.current = nextRun.id;
+        setBuildRuns((current) => upsertLogRun(current, nextRun));
+        setLaunchBuild({
+          key: launchBuildKey,
+          message: LAUNCH_BUILD_STATUS_MESSAGES[0],
+          packageName: activeMovePackage.name,
+          runId,
+          state: "running",
+        });
+
+        const messageTimer = window.setInterval(() => {
+          launchBuildMessageIndexRef.current =
+            (launchBuildMessageIndexRef.current + 1) % LAUNCH_BUILD_STATUS_MESSAGES.length;
+          const message = LAUNCH_BUILD_STATUS_MESSAGES[launchBuildMessageIndexRef.current];
+
+          setLaunchBuild((current) =>
+            current?.key === launchBuildKey && current.state === "running"
+              ? { ...current, message }
+              : current,
+          );
+          setBuildRuns((current) =>
+            updateLogRun(current, runId, (run) =>
+              run.state === "running" ? { ...run, runningText: message } : run,
+            ),
+          );
+        }, 2_800);
+
+        void buildMovePackage(packageTree, activeMovePackage.path, {
+          streamId: runId,
+          onOutput: (output) => {
+            setBuildRuns((current) =>
+              updateLogRun(current, runId, (run) =>
+                run.state === "running" ? { ...run, output } : run,
+              ),
+            );
+          },
+        })
+          .then(async (output) => {
+            const state = output.status === 0 ? "success" : "error";
+
+            if (state === "success") {
+              await rememberSuccessfulLaunchBuild(packageTree.rootPath, packageMetadataKey, Date.now());
             }
 
-            const activePackageManifestPath =
-              rescannedPackageTree.movePackages.some(
-                (movePackage) => movePackage.manifestPath === activeMovePackage.manifestPath,
-              )
-                ? activeMovePackage.manifestPath
-                : rescannedPackageTree.movePackages[0]?.manifestPath ?? null;
+            setBuildRuns((current) =>
+              updateLogRun(current, runId, (run) => ({
+                ...run,
+                finishedAt: new Date(),
+                output,
+                state,
+              })),
+            );
 
-            handleProjectSelected({
-              ...rescannedPackageTree,
-              activePackageManifestPath,
-            });
-          } catch (error) {
-            console.error("Could not rescan package after launch build.", error);
-          }
-        }
-      })
-      .catch((error) => {
-        setBuildRuns((current) =>
-          updateLogRun(current, runId, (run) => ({
-            ...run,
-            error: getBuildErrorMessage(error),
-            finishedAt: new Date(),
-            state: "error",
-          })),
-        );
-        setLaunchBuild((current) =>
-          current?.key === launchBuildKey
-            ? { ...current, message: "Project build failed.", state: "error" }
-            : current,
-        );
-      })
-      .finally(() => {
-        window.clearInterval(messageTimer);
+            setLaunchBuild((current) =>
+              current?.key === launchBuildKey
+                ? {
+                    ...current,
+                    message: state === "success" ? "Project build completed." : "Project build failed.",
+                    state,
+                  }
+                : current,
+            );
+
+            if (state === "success" && latestPackageTreeRef.current?.rootPath === packageTree.rootPath) {
+              try {
+                const rescannedPackageTree = await loadPackageTree(packageTree.rootPath);
+                const latestPackageTree = latestPackageTreeRef.current;
+
+                if (!latestPackageTree || latestPackageTree.rootPath !== packageTree.rootPath) {
+                  return;
+                }
+
+                const activePackageManifestPath =
+                  rescannedPackageTree.movePackages.some(
+                    (movePackage) => movePackage.manifestPath === activeMovePackage.manifestPath,
+                  )
+                    ? activeMovePackage.manifestPath
+                    : rescannedPackageTree.movePackages[0]?.manifestPath ?? null;
+
+                handleProjectSelected({
+                  ...rescannedPackageTree,
+                  activePackageManifestPath,
+                });
+              } catch (error) {
+                console.error("Could not rescan package after launch build.", error);
+              }
+            }
+          })
+          .catch((error) => {
+            setBuildRuns((current) =>
+              updateLogRun(current, runId, (run) => ({
+                ...run,
+                error: getBuildErrorMessage(error),
+                finishedAt: new Date(),
+                state: "error",
+              })),
+            );
+            setLaunchBuild((current) =>
+              current?.key === launchBuildKey
+                ? { ...current, message: "Project build failed.", state: "error" }
+                : current,
+            );
+          })
+          .finally(() => {
+            window.clearInterval(messageTimer);
+            launchBuildKeysRef.current.delete(launchBuildKey);
+          });
       });
 
     return () => {
-      window.clearInterval(messageTimer);
+      isCancelled = true;
     };
   }, [activeMovePackage, handleProjectSelected, packageTree]);
 
@@ -404,7 +424,11 @@ export function AppShell({
       const state = output.status === 0 ? "success" : "error";
 
       if (state === "success") {
-        rememberSuccessfulLaunchBuild(projectBuildKey(packageTree, activeMovePackage), Date.now());
+        await rememberSuccessfulLaunchBuild(
+          packageTree.rootPath,
+          projectPackageMetadataKey(activeMovePackage),
+          Date.now(),
+        );
       }
 
       setBuildRuns((current) =>
@@ -584,50 +608,41 @@ function packagePathLabel(movePackage: MovePackage, packageTree: PackageTree) {
   return `${packageTree.rootPath}/${movePackage.path}`;
 }
 
-function projectBuildKey(packageTree: PackageTree, movePackage: MovePackage) {
+function projectBuildRuntimeKey(packageTree: PackageTree, movePackage: MovePackage) {
   return `${packageTree.rootPath}::${movePackage.manifestPath || movePackage.path || "."}`;
 }
 
-function lastSuccessfulLaunchBuildAt(buildKey: string) {
-  return readLaunchBuildTimestamps()[buildKey] ?? null;
+function projectPackageMetadataKey(movePackage: MovePackage) {
+  return movePackage.manifestPath || movePackage.path || ".";
 }
 
-function rememberSuccessfulLaunchBuild(buildKey: string, timestamp: number) {
-  const timestamps = readLaunchBuildTimestamps();
-  timestamps[buildKey] = timestamp;
-
+async function rememberSuccessfulLaunchBuild(
+  rootPath: string,
+  packageKey: string,
+  timestamp: number,
+) {
   try {
-    window.localStorage.setItem(
-      LAUNCH_BUILD_TIMESTAMPS_STORAGE_KEY,
-      JSON.stringify(timestamps),
-    );
+    const metadata = await loadProjectMetadata(rootPath);
+    await saveProjectMetadata(rootPath, {
+      ...metadata,
+      builds: {
+        ...metadata.builds,
+        [packageKey]: {
+          ...metadata.builds[packageKey],
+          lastSuccessfulBuildAt: timestamp,
+        },
+      },
+    });
   } catch (error) {
-    console.warn("Could not store launch build timestamp.", error);
+    console.warn("Could not store project build metadata.", error);
   }
 }
 
-function readLaunchBuildTimestamps(): Record<string, number> {
-  try {
-    const rawValue = window.localStorage.getItem(LAUNCH_BUILD_TIMESTAMPS_STORAGE_KEY);
-
-    if (!rawValue) {
-      return {};
-    }
-
-    const parsedValue = JSON.parse(rawValue) as unknown;
-
-    if (!parsedValue || typeof parsedValue !== "object") {
-      return {};
-    }
-
-    return Object.fromEntries(
-      Object.entries(parsedValue)
-        .filter(([, value]) => typeof value === "number" && Number.isFinite(value)),
-    ) as Record<string, number>;
-  } catch (error) {
-    console.warn("Could not read launch build timestamps.", error);
-    return {};
-  }
+function defaultProjectMetadata(): ProjectMetadata {
+  return {
+    builds: {},
+    version: 1,
+  };
 }
 
 function hasCallGraphPayload(packageTree: PackageTree) {
