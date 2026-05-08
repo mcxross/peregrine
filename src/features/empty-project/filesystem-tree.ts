@@ -531,6 +531,17 @@ export async function runSecurityCommand(
   }, options);
 }
 
+export async function runMovyFuzz(
+  packageTree: PackageTree,
+  packagePath: string,
+  options?: CommandOutputStreamOptions,
+) {
+  return invokeCommandOutput("run_movy_fuzz", {
+    rootPath: packageTree.rootPath,
+    packagePath,
+  }, options);
+}
+
 export async function runSecurityScript(
   packageTree: PackageTree,
   packagePath: string,

@@ -5,6 +5,7 @@ members = [
   "crates/peregrine-attack-surface",
   "crates/peregrine-complexity-rules",
   "crates/peregrine-move-model",
+  "crates/peregrine-movy-fuzz-adapter",
   "crates/peregrine-object-lifecycle",
   "crates/peregrine-static-analysis",
   "crates/peregrine-sui-adapter",
@@ -19,12 +20,14 @@ edition = "2021"
 clap = { version = "4.6.1", features = ["derive"] }
 base64 = "0.22"
 globset = "0.4"
-move-command-line-common = { git = "https://github.com/mcxross/sui", branch = "testnet" }
-move-compiler = { git = "https://github.com/mcxross/sui", branch = "testnet" }
+move-command-line-common = { path = "../oss/sui/external-crates/move/crates/move-command-line-common" }
+move-compiler = { path = "../oss/sui/external-crates/move/crates/move-compiler" }
+movy = { path = "../oss/movy/crates/movy", default-features = false, features = ["sui-fuzz"] }
 peregrine-analysis-core = { path = "crates/peregrine-analysis-core" }
 peregrine-attack-surface = { path = "crates/peregrine-attack-surface" }
 peregrine-complexity-rules = { path = "crates/peregrine-complexity-rules" }
 peregrine-move-model = { path = "crates/peregrine-move-model" }
+peregrine-movy-fuzz-adapter = { path = "crates/peregrine-movy-fuzz-adapter" }
 peregrine-object-lifecycle = { path = "crates/peregrine-object-lifecycle" }
 peregrine-static-analysis = { path = "crates/peregrine-static-analysis" }
 peregrine-sui-adapter = { path = "crates/peregrine-sui-adapter" }
@@ -32,7 +35,7 @@ pulldown-cmark = "0.12"
 reqwest = { version = "0.13.2", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sui = { git = "https://github.com/mcxross/sui", branch = "testnet", package = "sui" }
+sui = { path = "../oss/sui/crates/sui", package = "sui" }
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
@@ -49,3 +52,4 @@ wat = "1"
 async-graphql = { git = "https://github.com/amnn/async-graphql", branch = "v7.0.1-react-18-graphiql-4" }
 async-graphql-axum = { git = "https://github.com/amnn/async-graphql", branch = "v7.0.1-react-18-graphiql-4" }
 async-graphql-value = { git = "https://github.com/amnn/async-graphql", branch = "v7.0.1-react-18-graphiql-4" }
+core2 = { path = "vendor/core2-0.4.0" }

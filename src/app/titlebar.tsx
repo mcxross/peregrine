@@ -37,10 +37,12 @@ import {
 type TitlebarProps = {
   activeWorkspaceTab?: WorkspaceTab;
   buildActionState?: WorkspaceActionState;
+  fuzzActionState?: WorkspaceActionState;
   isLeftPanelOpen?: boolean;
   layout: LayoutSettings;
   hasWorkspace?: boolean;
   onBuildPackage?: () => void;
+  onFuzzPackage?: () => void;
   onRescanProject?: () => void;
   onTestPackage?: () => void;
   onToggleLeftPanel?: () => void;
@@ -51,10 +53,12 @@ type TitlebarProps = {
 
 export function Titlebar({
   buildActionState,
+  fuzzActionState,
   isLeftPanelOpen = true,
   layout,
   hasWorkspace = true,
   onBuildPackage,
+  onFuzzPackage,
   onRescanProject,
   onTestPackage,
   onToggleLeftPanel,
@@ -120,14 +124,18 @@ export function Titlebar({
                     ? buildActionState
                     : action.id === "test"
                       ? testActionState
-                      : undefined
+                      : action.id === "fuzzing"
+                        ? fuzzActionState
+                        : undefined
                 }
                 onClick={
                   action.id === "build"
                     ? onBuildPackage
                     : action.id === "test"
                       ? onTestPackage
-                      : undefined
+                      : action.id === "fuzzing"
+                        ? onFuzzPackage
+                        : undefined
                 }
               />
             ))}

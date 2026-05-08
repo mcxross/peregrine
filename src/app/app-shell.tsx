@@ -10,6 +10,7 @@ import {
   loadPackageTree,
   loadPackageTreeDetails,
   loadProjectMetadata,
+  runMovyFuzz,
   runSecurityCommand,
   saveProjectMetadata,
   type MovePackage,
@@ -534,6 +535,69 @@ export function AppShell({
       );
     }
   }, [activeMovePackage, isCommandRunning, packageTree]);
+
+  const runFuzz = useCallback(async () => {
+    if (!packageTree || !activeMovePackage || isCommandRunning) {
+      return;
+    }
+
+    const startedAt = new Date();
+    const workingDirectory = packagePathLabel(activeMovePackage, packageTree);
+    const nextRun: BuildLogRun = {
+      canRerun: false,
+      command: "movy fuzz public-functions",
+      error: null,
+      finishedAt: null,
+      id: startedAt.getTime(),
+      metadata: [{ label: "Scope", value: "Public functions only" }],
+      output: null,
+      packageName: activeMovePackage.name,
+      packagePath: activeMovePackage.path || ".",
+      runningText: "Deploying package into Movy's executor...",
+      startedAt,
+      state: "running",
+      title: "Movy fuzzing",
+      workingDirectory,
+    };
+
+    currentCommandLogIdRef.current = nextRun.id;
+    setBuildRuns([nextRun]);
+    setIsBuildSheetOpen(true);
+
+    try {
+      const output = await runMovyFuzz(packageTree, activeMovePackage.path, {
+        streamId: nextRun.id,
+        onOutput: (output) => {
+          setBuildRuns((current) =>
+            updateLogRun(current, nextRun.id, (run) =>
+              run.state === "running"
+                ? { ...run, output, runningText: "Running Movy fuzzing..." }
+                : run,
+            ),
+          );
+        },
+      });
+      const state = output.status === 0 ? "success" : "error";
+
+      setBuildRuns((current) =>
+        updateLogRun(current, nextRun.id, (run) => ({
+          ...run,
+          finishedAt: new Date(),
+          output,
+          state,
+        })),
+      );
+    } catch (error) {
+      setBuildRuns((current) =>
+        updateLogRun(current, nextRun.id, (run) => ({
+          ...run,
+          error: getCommandErrorMessage(error, "Could not run Movy fuzzing."),
+          finishedAt: new Date(),
+          state: "error",
+        })),
+      );
+    }
+  }, [activeMovePackage, isCommandRunning, packageTree]);
   const buildLogSheet = useMemo<BuildLogSheetController>(
     () => ({
       isOpen: isBuildSheetOpen,
@@ -563,10 +627,15 @@ export function AppShell({
         layout={layout}
         hasWorkspace={!isSettings && Boolean(packageTree)}
         onBuildPackage={runBuild}
+        onFuzzPackage={runFuzz}
         onRescanProject={rescanProject}
         onTestPackage={runTests}
         onToggleLeftPanel={() => setIsLeftPanelOpen((isOpen) => !isOpen)}
         testActionState={{
+          disabled: !activeMovePackage,
+          running: isCommandRunning,
+        }}
+        fuzzActionState={{
           disabled: !activeMovePackage,
           running: isCommandRunning,
         }}

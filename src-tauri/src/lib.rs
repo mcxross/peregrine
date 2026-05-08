@@ -2,6 +2,7 @@ mod file_preview;
 
 use base64::{engine::general_purpose, Engine};
 use file_preview::{build_file_preview, FilePreview};
+use peregrine_movy_fuzz_adapter::{run_movy_fuzz as run_movy_fuzz_adapter, MovyFuzzOptions};
 use peregrine_static_analysis::{
     discover_move_project_fast, discover_move_project_shallow, discover_project_graphs,
     discover_project_graphs_for_package, AnalysisConfig, AnalysisReport, Analyzer, MoveCallGraph,
@@ -319,6 +320,53 @@ async fn run_security_command(
     })
     .await
     .map_err(|error| format!("Could not join security command task: {error}"))?
+}
+
+#[tauri::command]
+async fn run_movy_fuzz(
+    app: tauri::AppHandle,
+    root_path: String,
+    package_path: String,
+    stream_id: Option<String>,
+) -> Result<CommandOutput, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let stream = command_output_stream(app, stream_id);
+        let header =
+            "Deploying package into Movy's local Sui executor and starting Movy fuzzing...\n";
+        emit_command_output_chunk(stream.as_ref(), "stdout", header);
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|error| format!("Could not create Movy fuzz runtime: {error}"))?;
+
+        match runtime.block_on(run_movy_fuzz_adapter(
+            &root_path,
+            &package_path,
+            MovyFuzzOptions::default(),
+        )) {
+            Ok(run) => {
+                let stdout = format!("{header}{}\n", run.stdout);
+                emit_command_output_chunk(stream.as_ref(), "stdout", &format!("{}\n", run.stdout));
+                Ok(CommandOutput {
+                    status: Some(0),
+                    stdout,
+                    stderr: String::new(),
+                })
+            }
+            Err(error) => {
+                let stderr = format!("{error}\n");
+                emit_command_output_chunk(stream.as_ref(), "stderr", &stderr);
+                Ok(CommandOutput {
+                    status: Some(1),
+                    stdout: header.to_string(),
+                    stderr,
+                })
+            }
+        }
+    })
+    .await
+    .map_err(|error| format!("Could not join Movy fuzz task: {error}"))?
 }
 
 #[tauri::command]
@@ -1498,6 +1546,7 @@ pub fn run() {
             save_graph_png,
             build_move_package,
             run_security_command,
+            run_movy_fuzz,
             run_security_script,
             analyze_move_package,
             check_sui_adapter,

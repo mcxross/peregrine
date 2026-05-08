@@ -1,0 +1,14 @@
+[package]
+name = "peregrine-movy-fuzz-adapter"
+version.workspace = true
+edition.workspace = true
+description = "Peregrine adapter for Movy core fuzzing against Sui Move packages"
+
+[dependencies]
+movy = { workspace = true }
+serde = { workspace = true }
+tempfile = { workspace = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
