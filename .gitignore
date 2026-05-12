@@ -29,3 +29,4 @@ crates/*/Cargo.lock
 AGENT.md
 .superstack
 docs
+ARCHITECTURE.md

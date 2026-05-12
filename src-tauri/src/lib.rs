@@ -335,7 +335,7 @@ async fn run_movy_fuzz(
             "Deploying package into Movy's local Sui executor and starting Movy fuzzing...\n";
         emit_command_output_chunk(stream.as_ref(), "stdout", header);
 
-        let runtime = tokio::runtime::Builder::new_current_thread()
+        let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .map_err(|error| format!("Could not create Movy fuzz runtime: {error}"))?;
