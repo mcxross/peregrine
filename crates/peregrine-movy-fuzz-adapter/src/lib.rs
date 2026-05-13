@@ -1,10 +1,14 @@
 use movy::sui::fuzz::{fuzz_local_package, LocalPackageFuzzArgs, LocalPackageFuzzResult};
 use serde::Serialize;
 use std::{
+    any::Any,
     fs,
     path::{Component, Path, PathBuf},
+    thread,
 };
 use walkdir::{DirEntry, WalkDir};
+
+const MOVY_FUZZ_THREAD_STACK_SIZE: usize = 128 * 1024 * 1024;
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,6 +40,8 @@ pub struct MovyFuzzManifest {
     pub package_path: String,
     pub temp_package_root: String,
     pub deployed_package_id: String,
+    pub network: String,
+    pub graphql_url: String,
     pub package_names: Vec<String>,
     pub public_function_count: usize,
     pub target_functions: Vec<String>,
@@ -52,6 +58,8 @@ impl MovyFuzzManifest {
             "Mode: Movy executor fuzzing".to_string(),
             format!("Package: {}", self.package_path),
             format!("Deployed package: {}", self.deployed_package_id),
+            format!("Network: {}", self.network),
+            format!("GraphQL: {}", self.graphql_url),
             format!("Seed: {}", self.seed),
             format!("Time limit: {}s", self.time_limit_seconds),
             format!("Public targets: {}", self.public_function_count),
@@ -81,14 +89,18 @@ pub enum MovyFuzzAdapterError {
     Io(String),
     InvalidPackage(String),
     Movy(String),
+    Runtime(String),
+    Panic(String),
 }
 
 impl std::fmt::Display for MovyFuzzAdapterError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Io(message) | Self::InvalidPackage(message) | Self::Movy(message) => {
-                formatter.write_str(message)
-            }
+            Self::Io(message)
+            | Self::InvalidPackage(message)
+            | Self::Movy(message)
+            | Self::Runtime(message)
+            | Self::Panic(message) => formatter.write_str(message),
         }
     }
 }
@@ -96,6 +108,52 @@ impl std::fmt::Display for MovyFuzzAdapterError {
 impl std::error::Error for MovyFuzzAdapterError {}
 
 type AdapterResult<T> = Result<T, MovyFuzzAdapterError>;
+
+pub fn run_movy_fuzz_blocking(
+    project_root: impl AsRef<Path>,
+    package_path: &str,
+    options: MovyFuzzOptions,
+) -> AdapterResult<MovyFuzzRun> {
+    let project_root = project_root.as_ref().to_path_buf();
+    let package_path = package_path.to_owned();
+
+    let worker = thread::Builder::new()
+        .name("peregrine-movy-fuzz".to_string())
+        .stack_size(MOVY_FUZZ_THREAD_STACK_SIZE)
+        .spawn(move || {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .thread_name("peregrine-movy-fuzz-runtime")
+                .thread_stack_size(MOVY_FUZZ_THREAD_STACK_SIZE)
+                .build()
+                .map_err(|error| {
+                    MovyFuzzAdapterError::Runtime(format!(
+                        "Could not create Movy fuzz runtime: {error}"
+                    ))
+                })?;
+
+            runtime.block_on(run_movy_fuzz(project_root, &package_path, options))
+        })
+        .map_err(|error| {
+            MovyFuzzAdapterError::Runtime(format!(
+                "Could not start Movy fuzz worker thread: {error}"
+            ))
+        })?;
+
+    worker.join().map_err(panic_payload_to_error)?
+}
+
+fn panic_payload_to_error(payload: Box<dyn Any + Send + 'static>) -> MovyFuzzAdapterError {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        return MovyFuzzAdapterError::Panic(format!("Movy fuzz worker panicked: {message}"));
+    }
+
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return MovyFuzzAdapterError::Panic(format!("Movy fuzz worker panicked: {message}"));
+    }
+
+    MovyFuzzAdapterError::Panic("Movy fuzz worker panicked".to_string())
+}
 
 pub async fn run_movy_fuzz(
     project_root: impl AsRef<Path>,
@@ -152,6 +210,8 @@ fn build_manifest(
         package_path: display_package_path(package_relative_path),
         temp_package_root: temp_package_root.to_string_lossy().into_owned(),
         deployed_package_id: result.package_id.to_string(),
+        network: result.network.clone(),
+        graphql_url: result.graphql_url.clone(),
         package_names: result.package_names.clone(),
         public_function_count: result.target_functions.len(),
         target_functions: result.target_functions.clone(),

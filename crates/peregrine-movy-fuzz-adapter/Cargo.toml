@@ -8,6 +8,7 @@ description = "Peregrine adapter for Movy core fuzzing against Sui Move packages
 movy = { workspace = true }
 serde = { workspace = true }
 tempfile = { workspace = true }
+tokio = { workspace = true }
 walkdir = { workspace = true }
 
 [dev-dependencies]

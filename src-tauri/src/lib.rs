@@ -2,7 +2,6 @@ mod file_preview;
 
 use base64::{engine::general_purpose, Engine};
 use file_preview::{build_file_preview, FilePreview};
-use peregrine_movy_fuzz_adapter::{run_movy_fuzz as run_movy_fuzz_adapter, MovyFuzzOptions};
 use peregrine_static_analysis::{
     discover_move_project_fast, discover_move_project_shallow, discover_project_graphs,
     discover_project_graphs_for_package, AnalysisConfig, AnalysisReport, Analyzer, MoveCallGraph,
@@ -34,6 +33,7 @@ const CLOSE_PROJECT_MENU_ID: &str = "close-project";
 const CLOSE_PROJECT_EVENT: &str = "close-project";
 const COMMAND_OUTPUT_EVENT: &str = "command-output";
 const BUNDLED_SUI_HELPER_ARG: &str = "--peregrine-bundled-sui";
+const MOVY_FUZZ_HELPER_ARG: &str = "--peregrine-movy-fuzz";
 const PROJECT_METADATA_DIRECTORY: &str = ".peregrine";
 const PROJECT_METADATA_FILE: &str = "metadata.json";
 const SUI_ADAPTER_SETTINGS_CHANGED_EVENT: &str = "sui-adapter-settings-changed";
@@ -330,43 +330,36 @@ async fn run_movy_fuzz(
     stream_id: Option<String>,
 ) -> Result<CommandOutput, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let stream = command_output_stream(app, stream_id);
-        let header =
-            "Deploying package into Movy's local Sui executor and starting Movy fuzzing...\n";
-        emit_command_output_chunk(stream.as_ref(), "stdout", header);
-
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .map_err(|error| format!("Could not create Movy fuzz runtime: {error}"))?;
-
-        match runtime.block_on(run_movy_fuzz_adapter(
+        run_movy_fuzz_worker(
             &root_path,
             &package_path,
-            MovyFuzzOptions::default(),
-        )) {
-            Ok(run) => {
-                let stdout = format!("{header}{}\n", run.stdout);
-                emit_command_output_chunk(stream.as_ref(), "stdout", &format!("{}\n", run.stdout));
-                Ok(CommandOutput {
-                    status: Some(0),
-                    stdout,
-                    stderr: String::new(),
-                })
-            }
-            Err(error) => {
-                let stderr = format!("{error}\n");
-                emit_command_output_chunk(stream.as_ref(), "stderr", &stderr);
-                Ok(CommandOutput {
-                    status: Some(1),
-                    stdout: header.to_string(),
-                    stderr,
-                })
-            }
-        }
+            command_output_stream(app, stream_id),
+        )
     })
     .await
     .map_err(|error| format!("Could not join Movy fuzz task: {error}"))?
+}
+
+fn run_movy_fuzz_worker(
+    root_path: &str,
+    package_path: &str,
+    stream: Option<CommandOutputStream>,
+) -> Result<CommandOutput, String> {
+    let header = "Deploying package into Movy's local Sui executor and starting Movy fuzzing...\n";
+    emit_command_output_chunk(stream.as_ref(), "stdout", header);
+
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let mut process = Command::new(executable);
+    process
+        .arg(MOVY_FUZZ_HELPER_ARG)
+        .arg(root_path)
+        .arg(package_path);
+
+    let mut output = run_configured_command(configure_plain_command_output(&mut process), stream)?;
+    output.stdout = format!("{header}{}", output.stdout);
+
+    Ok(output)
 }
 
 #[tauri::command]
