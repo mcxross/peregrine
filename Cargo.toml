@@ -3,6 +3,7 @@ members = [
   "src-tauri",
   "crates/peregrine-analysis-core",
   "crates/peregrine-attack-surface",
+  "crates/peregrine-bytecode-view",
   "crates/peregrine-complexity-rules",
   "crates/peregrine-move-model",
   "crates/peregrine-movy-fuzz-adapter",
@@ -21,10 +22,15 @@ clap = { version = "4.6.1", features = ["derive"] }
 base64 = "0.22"
 globset = "0.4"
 move-command-line-common = { path = "../oss/sui/external-crates/move/crates/move-command-line-common" }
+move-binary-format = { path = "../oss/sui/external-crates/move/crates/move-binary-format" }
+move-bytecode-source-map = { path = "../oss/sui/external-crates/move/crates/move-bytecode-source-map" }
 move-compiler = { path = "../oss/sui/external-crates/move/crates/move-compiler" }
+move-disassembler = { path = "../oss/sui/external-crates/move/crates/move-disassembler" }
+move-ir-types = { path = "../oss/sui/external-crates/move/crates/move-ir-types" }
 movy = { path = "../oss/movy/crates/movy", default-features = false, features = ["sui-fuzz"] }
 peregrine-analysis-core = { path = "crates/peregrine-analysis-core" }
 peregrine-attack-surface = { path = "crates/peregrine-attack-surface" }
+peregrine-bytecode-view = { path = "crates/peregrine-bytecode-view" }
 peregrine-complexity-rules = { path = "crates/peregrine-complexity-rules" }
 peregrine-move-model = { path = "crates/peregrine-move-model" }
 peregrine-movy-fuzz-adapter = { path = "crates/peregrine-movy-fuzz-adapter" }

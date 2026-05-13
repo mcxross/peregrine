@@ -168,6 +168,7 @@ const workspaceTabs = [
   "Overview",
   "Explore",
   "Execution",
+  "Bytecode",
   "Attack Surface",
   "Tests",
   "Fuzzing",

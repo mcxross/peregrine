@@ -2,6 +2,7 @@ mod file_preview;
 
 use base64::{engine::general_purpose, Engine};
 use file_preview::{build_file_preview, FilePreview};
+use peregrine_bytecode_view::{load_package_bytecode, MoveBytecodePackageView};
 use peregrine_static_analysis::{
     discover_move_project_fast, discover_move_project_shallow, discover_project_graphs,
     discover_project_graphs_for_package, discover_state_access_graph_for_function, AnalysisConfig,
@@ -427,6 +428,29 @@ async fn analyze_move_package(
     })
     .await
     .map_err(|error| format!("Could not join Move analysis task: {error}"))?
+}
+
+#[tauri::command]
+async fn load_move_bytecode_view(
+    root_path: String,
+    package_path: String,
+    package_name: String,
+) -> Result<MoveBytecodePackageView, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let package_root = resolve_package_child_path(&root_path, &package_path)?;
+
+        if !package_root.is_dir() {
+            return Err("Selected package path is not a directory.".to_string());
+        }
+
+        if !package_root.join("Move.toml").is_file() {
+            return Err("Selected package does not contain a Move.toml file.".to_string());
+        }
+
+        load_package_bytecode(package_root, &package_name)
+    })
+    .await
+    .map_err(|error| format!("Could not join bytecode view task: {error}"))?
 }
 
 #[tauri::command]
@@ -1597,6 +1621,7 @@ pub fn run() {
             run_movy_fuzz,
             run_security_script,
             analyze_move_package,
+            load_move_bytecode_view,
             check_sui_adapter,
             get_sui_adapter_settings,
             save_sui_adapter_settings,

@@ -11572,6 +11572,7 @@ name = "peregrine"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "peregrine-bytecode-view",
  "peregrine-movy-fuzz-adapter",
  "peregrine-static-analysis",
  "peregrine-sui-adapter",
@@ -11602,6 +11603,18 @@ dependencies = [
  "peregrine-move-model",
  "peregrine-object-lifecycle",
  "serde",
+]
+
+[[package]]
+name = "peregrine-bytecode-view"
+version = "0.1.0"
+dependencies = [
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-disassembler",
+ "move-ir-types",
+ "serde",
+ "walkdir",
 ]
 
 [[package]]

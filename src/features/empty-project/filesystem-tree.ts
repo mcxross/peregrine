@@ -328,6 +328,85 @@ export type MoveStateAccessGraph = {
   unresolvedAccesses: MoveUnresolvedStateAccess[];
 };
 
+export type MoveBytecodePackageView = {
+  packageName: string;
+  packagePath: string;
+  buildPath: string;
+  moduleCount: number;
+  functionCount: number;
+  instructionCount: number;
+  structCount: number;
+  constantCount: number;
+  dependencyCount: number;
+  sourceMapCount: number;
+  modules: MoveBytecodeModuleView[];
+};
+
+export type MoveBytecodeModuleView = {
+  name: string;
+  address: string;
+  packageName: string;
+  isDependency: boolean;
+  bytecodePath: string;
+  sourceMapPath: string | null;
+  sourcePath: string | null;
+  byteSize: number;
+  version: number;
+  functionCount: number;
+  instructionCount: number;
+  structCount: number;
+  constantCount: number;
+  importCount: number;
+  friendCount: number;
+  functions: MoveBytecodeFunctionView[];
+  imports: string[];
+  disassembly: string;
+};
+
+export type MoveBytecodeFunctionView = {
+  name: string;
+  visibility: string;
+  isEntry: boolean;
+  instructionCount: number;
+  localCount: number;
+  acquires: string[];
+  instructions: MoveBytecodeInstructionView[];
+  controlFlow: MoveBytecodeControlFlowView;
+};
+
+export type MoveBytecodeInstructionView = {
+  offset: number;
+  opcode: string;
+  detail: string;
+  source: MoveBytecodeSourceSpan | null;
+};
+
+export type MoveBytecodeControlFlowView = {
+  blocks: MoveBytecodeBasicBlockView[];
+  edges: MoveBytecodeControlFlowEdgeView[];
+};
+
+export type MoveBytecodeBasicBlockView = {
+  id: string;
+  label: string;
+  startOffset: number;
+  endOffset: number;
+  instructionOffsets: number[];
+};
+
+export type MoveBytecodeControlFlowEdgeView = {
+  source: string;
+  target: string;
+  sourceOffset: number;
+  targetOffset: number;
+  kind: string;
+};
+
+export type MoveBytecodeSourceSpan = {
+  startByte: number;
+  endByte: number;
+};
+
 export type MoveStateAccessGraphNode = {
   id: string;
   kind: "function" | "stateType" | "field" | string;
@@ -533,6 +612,17 @@ export async function loadMoveStateAccessGraph(
     moduleName,
     packagePath,
     rootPath,
+  });
+}
+
+export async function loadMoveBytecodeView(
+  packageTree: PackageTree,
+  movePackage: MovePackage,
+): Promise<MoveBytecodePackageView> {
+  return invoke<MoveBytecodePackageView>("load_move_bytecode_view", {
+    rootPath: packageTree.rootPath,
+    packagePath: movePackage.path,
+    packageName: movePackage.name,
   });
 }
 

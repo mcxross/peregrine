@@ -26,3 +26,4 @@ tokio = { workspace = true }
 peregrine-static-analysis = { workspace = true }
 peregrine-sui-adapter = { workspace = true }
 peregrine-movy-fuzz-adapter = { workspace = true }
+peregrine-bytecode-view = { workspace = true }

@@ -2,6 +2,7 @@ import React from "react";
 import {
   Boxes,
   Box,
+  Binary,
   Check,
   ChevronDown,
   Gauge,
@@ -38,6 +39,7 @@ import {
   type BuildLogSheetController,
   type BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
+import { BytecodeViewScreen } from "@/features/project-workspace/bytecode-view-screen";
 import { DependencyGraphScreen } from "@/features/project-workspace/dependency-graph-screen";
 import { ExecutionBuilderScreen } from "@/features/project-workspace/execution-builder-screen";
 import { MovePackagesOverviewScreen } from "@/features/project-workspace/move-packages-overview-screen";
@@ -169,6 +171,14 @@ export function ProjectWorkspace({
           (movePackage) => movePackage.manifestPath === activePackageManifestPath,
         ) ?? null;
   const packageName = activeMovePackage?.name || packageTree.rootName || packageTree.movePackages[0]?.name || "savings_personal";
+  const hasInspectorColumn = activeWorkspaceTab !== "Bytecode";
+  const workspaceColumns = isLeftPanelOpen
+    ? hasInspectorColumn
+      ? `${workspaceSidebarWidth}px minmax(0, 1fr) ${isRightPanelOpen ? "clamp(360px, 24vw, 400px)" : "44px"}`
+      : `${workspaceSidebarWidth}px minmax(0, 1fr)`
+    : hasInspectorColumn
+      ? `minmax(0, 1fr) ${isRightPanelOpen ? "clamp(360px, 24vw, 400px)" : "44px"}`
+      : "minmax(0, 1fr)";
 
   React.useEffect(() => {
     setSelectedModule(null);
@@ -186,7 +196,7 @@ export function ProjectWorkspace({
   }, [activeMovePackage]);
 
   React.useEffect(() => {
-    if (activeWorkspaceTab === "Overview" || activeWorkspaceTab === "Execution") {
+    if (activeWorkspaceTab === "Overview" || activeWorkspaceTab === "Execution" || activeWorkspaceTab === "Bytecode") {
       setIsRightPanelOpen(false);
     }
   }, [activeWorkspaceTab]);
@@ -272,9 +282,7 @@ export function ProjectWorkspace({
     <div
       className="relative grid h-full min-h-0 overflow-hidden bg-[var(--app-window)] text-foreground"
       style={{
-        gridTemplateColumns: isLeftPanelOpen
-          ? `${workspaceSidebarWidth}px minmax(0, 1fr) ${isRightPanelOpen ? "clamp(360px, 24vw, 400px)" : "44px"}`
-          : `minmax(0, 1fr) ${isRightPanelOpen ? "clamp(360px, 24vw, 400px)" : "44px"}`,
+        gridTemplateColumns: workspaceColumns,
       }}
     >
       {isLeftPanelOpen ? (
@@ -339,19 +347,21 @@ export function ProjectWorkspace({
         </footer>
       </main>
 
-      {isRightPanelOpen ? (
-        <InspectorPanel
-          onCollapse={() => setIsRightPanelOpen(false)}
-        />
-      ) : (
-        <CollapsedPanelRail
-          label="Open inspector"
-          isAiOpen={isAiOpen}
-          onToggleAi={activeMovePackage ? () => setIsAiOpen((current) => !current) : undefined}
-          side="right"
-          onOpen={() => setIsRightPanelOpen(true)}
-        />
-      )}
+      {hasInspectorColumn ? (
+        isRightPanelOpen ? (
+          <InspectorPanel
+            onCollapse={() => setIsRightPanelOpen(false)}
+          />
+        ) : (
+          <CollapsedPanelRail
+            label="Open inspector"
+            isAiOpen={isAiOpen}
+            onToggleAi={activeMovePackage ? () => setIsAiOpen((current) => !current) : undefined}
+            side="right"
+            onOpen={() => setIsRightPanelOpen(true)}
+          />
+        )
+      ) : null}
 
       {activeMovePackage ? (
         <AiFloatingWindow
@@ -417,6 +427,15 @@ function WorkspaceMainPanel({
         activeMovePackage={activeMovePackage}
         onCommandLog={onCommandLog}
         onProjectSelected={onProjectSelected}
+        packageTree={packageTree}
+      />
+    );
+  }
+
+  if (activeWorkspaceTab === "Bytecode") {
+    return (
+      <BytecodeViewScreen
+        activeMovePackage={activeMovePackage}
         packageTree={packageTree}
       />
     );
@@ -493,6 +512,12 @@ function SecuritySidebar({
             icon={Workflow}
             label="Execution"
             onClick={() => onWorkspaceTabChange("Execution")}
+          />
+          <SidebarItem
+            active={activeWorkspaceTab === "Bytecode" && !activeSurfaceDetail}
+            icon={Binary}
+            label="Bytecode"
+            onClick={() => onWorkspaceTabChange("Bytecode")}
           />
         </SidebarSection>
 
