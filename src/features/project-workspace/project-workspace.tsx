@@ -193,6 +193,11 @@ export function ProjectWorkspace({
 
   React.useEffect(() => {
     const onError = (event: ErrorEvent) => {
+      if (isResizeObserverLoopWarning(event.message)) {
+        event.preventDefault();
+        return;
+      }
+
       console.error("[ProjectWorkspace] uncaught browser error", {
         colno: event.colno,
         error: event.error,
@@ -428,6 +433,7 @@ function WorkspaceMainPanel({
           ...packageTree,
           callGraph: graphs.callGraph,
           typeGraph: graphs.typeGraph,
+          stateAccessGraph: graphs.stateAccessGraph,
         })
       }
       onOpenSourceLocation={onOpenSourceLocation}
@@ -913,6 +919,13 @@ function CollapsedPanelRail({
         ) : null}
       </div>
     </aside>
+  );
+}
+
+function isResizeObserverLoopWarning(message: string) {
+  return (
+    message === "ResizeObserver loop completed with undelivered notifications." ||
+    message === "ResizeObserver loop limit exceeded"
   );
 }
 

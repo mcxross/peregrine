@@ -42,12 +42,14 @@ pub use plugins::{
 };
 pub use project::{
     discover_move_project, discover_move_project_fast, discover_move_project_shallow,
-    discover_project_graphs, discover_project_graphs_for_package, AdminControlFinding,
-    CapabilityFinding, ExternalCallFinding, MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode,
+    discover_project_graphs, discover_project_graphs_for_package,
+    discover_state_access_graph_for_function, AdminControlFinding, CapabilityFinding,
+    ExternalCallFinding, MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode,
     MoveFunctionSignature, MoveModule, MovePackage, MovePackageSurface, MoveProject,
-    MoveProjectGraphs, MoveSourceSpan, MoveStructField, MoveStructSignature, MoveTypeGraph,
-    MoveTypeGraphEdge, MoveTypeGraphNode, MoveUnresolvedCall, MoveUnresolvedType,
-    ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleRisk, ObjectLifecycleStage,
-    ObjectOwnershipFinding, PackageDependencyEdge, PackageDependencyGraph, PackageDependencyNode,
-    PublicPackageRelationship,
+    MoveProjectGraphs, MoveSourceSpan, MoveStateAccessGraph, MoveStateAccessGraphEdge,
+    MoveStateAccessGraphNode, MoveStructField, MoveStructSignature, MoveTypeGraph,
+    MoveTypeGraphEdge, MoveTypeGraphNode, MoveUnresolvedCall, MoveUnresolvedStateAccess,
+    MoveUnresolvedType, ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleRisk,
+    ObjectLifecycleStage, ObjectOwnershipFinding, PackageDependencyEdge, PackageDependencyGraph,
+    PackageDependencyNode, PublicPackageRelationship,
 };

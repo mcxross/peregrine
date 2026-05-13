@@ -2,7 +2,8 @@ use peregrine_attack_surface::package_surface;
 use peregrine_move_model::{
     discover_move_project_graphs, discover_move_project_graphs_for_package,
     discover_move_project_model, discover_move_project_model_fast,
-    discover_move_project_model_shallow, MovePackageModel,
+    discover_move_project_model_shallow, discover_move_state_access_graph_for_function,
+    MovePackageModel,
 };
 use serde::Serialize;
 use std::path::Path;
@@ -13,9 +14,10 @@ pub use peregrine_attack_surface::{
 };
 pub use peregrine_move_model::{
     MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode, MoveFunctionSignature, MoveModule,
-    MoveProjectGraphs, MoveSourceSpan, MoveStructField, MoveStructSignature, MoveTypeGraph,
-    MoveTypeGraphEdge, MoveTypeGraphNode, MoveUnresolvedCall, MoveUnresolvedType,
-    PackageDependencyEdge, PackageDependencyGraph, PackageDependencyNode,
+    MoveProjectGraphs, MoveSourceSpan, MoveStateAccessGraph, MoveStateAccessGraphEdge,
+    MoveStateAccessGraphNode, MoveStructField, MoveStructSignature, MoveTypeGraph,
+    MoveTypeGraphEdge, MoveTypeGraphNode, MoveUnresolvedCall, MoveUnresolvedStateAccess,
+    MoveUnresolvedType, PackageDependencyEdge, PackageDependencyGraph, PackageDependencyNode,
 };
 pub use peregrine_object_lifecycle::{
     ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleRisk, ObjectLifecycleStage,
@@ -28,6 +30,7 @@ pub struct MoveProject {
     pub dependency_graph: PackageDependencyGraph,
     pub call_graph: MoveCallGraph,
     pub type_graph: MoveTypeGraph,
+    pub state_access_graph: MoveStateAccessGraph,
 }
 
 #[derive(Serialize)]
@@ -63,6 +66,22 @@ pub fn discover_project_graphs_for_package(root: &Path, package_path: &str) -> M
     discover_move_project_graphs_for_package(root, package_path)
 }
 
+pub fn discover_state_access_graph_for_function(
+    root: &Path,
+    package_path: &str,
+    address: Option<String>,
+    module_name: &str,
+    function_name: &str,
+) -> MoveStateAccessGraph {
+    discover_move_state_access_graph_for_function(
+        root,
+        package_path,
+        address,
+        module_name,
+        function_name,
+    )
+}
+
 fn build_move_project(model: peregrine_move_model::MoveProjectModel) -> MoveProject {
     let packages = model
         .packages
@@ -75,6 +94,7 @@ fn build_move_project(model: peregrine_move_model::MoveProjectModel) -> MoveProj
         dependency_graph: model.dependency_graph,
         call_graph: model.call_graph,
         type_graph: model.type_graph,
+        state_access_graph: model.state_access_graph,
     }
 }
 

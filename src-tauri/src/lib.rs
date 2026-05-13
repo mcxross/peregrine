@@ -4,8 +4,9 @@ use base64::{engine::general_purpose, Engine};
 use file_preview::{build_file_preview, FilePreview};
 use peregrine_static_analysis::{
     discover_move_project_fast, discover_move_project_shallow, discover_project_graphs,
-    discover_project_graphs_for_package, AnalysisConfig, AnalysisReport, Analyzer, MoveCallGraph,
-    MovePackage, MoveProjectGraphs, MoveTypeGraph, PackageDependencyGraph,
+    discover_project_graphs_for_package, discover_state_access_graph_for_function, AnalysisConfig,
+    AnalysisReport, Analyzer, MoveCallGraph, MovePackage, MoveProjectGraphs, MoveStateAccessGraph,
+    MoveTypeGraph, PackageDependencyGraph,
 };
 use peregrine_sui_adapter::{
     SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus, SuiExecutionTarget,
@@ -59,6 +60,7 @@ struct PackageTree {
     dependency_graph: PackageDependencyGraph,
     call_graph: MoveCallGraph,
     type_graph: MoveTypeGraph,
+    state_access_graph: MoveStateAccessGraph,
 }
 
 #[derive(Serialize)]
@@ -229,6 +231,27 @@ async fn load_move_graphs(
     tauri::async_runtime::spawn_blocking(move || build_move_graphs(root_path, package_path))
         .await
         .map_err(|error| format!("Could not join Move graph task: {error}"))?
+}
+
+#[tauri::command]
+async fn load_move_state_access_graph(
+    root_path: String,
+    package_path: String,
+    module_address: Option<String>,
+    module_name: String,
+    function_name: String,
+) -> Result<MoveStateAccessGraph, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        build_move_state_access_graph(
+            root_path,
+            package_path,
+            module_address,
+            module_name,
+            function_name,
+        )
+    })
+    .await
+    .map_err(|error| format!("Could not join Move state graph task: {error}"))?
 }
 
 #[tauri::command]
@@ -1283,7 +1306,38 @@ fn build_package_tree(root_path: String, mode: PackageTreeMode) -> Result<Packag
         dependency_graph: move_project.dependency_graph,
         call_graph: move_project.call_graph,
         type_graph: move_project.type_graph,
+        state_access_graph: move_project.state_access_graph,
     })
+}
+
+fn build_move_state_access_graph(
+    root_path: String,
+    package_path: String,
+    module_address: Option<String>,
+    module_name: String,
+    function_name: String,
+) -> Result<MoveStateAccessGraph, String> {
+    let root = PathBuf::from(&root_path)
+        .canonicalize()
+        .map_err(|error| format!("Could not read package directory {root_path}: {error}"))?;
+    let package_root = root.join(&package_path).canonicalize().map_err(|error| {
+        format!(
+            "Could not read Move package {}: {error}",
+            root.join(&package_path).display()
+        )
+    })?;
+
+    if !package_root.starts_with(&root) {
+        return Err("Move package must be inside the opened project.".to_string());
+    }
+
+    Ok(discover_state_access_graph_for_function(
+        &root,
+        &package_path,
+        module_address,
+        &module_name,
+        &function_name,
+    ))
 }
 
 fn build_move_graphs(
@@ -1534,6 +1588,7 @@ pub fn run() {
             load_package_tree,
             load_package_tree_details,
             load_move_graphs,
+            load_move_state_access_graph,
             load_file_preview,
             save_text_file,
             save_graph_png,

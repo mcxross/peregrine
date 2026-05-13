@@ -4,6 +4,10 @@ use crate::{
         external_function_id, finish_call_graph, function_id, unresolved_call_id, MoveCallGraph,
         MoveCallGraphEdge, MoveCallGraphNode, MoveSourceSpan, MoveUnresolvedCall,
     },
+    state_access_graph::{
+        finish_state_access_graph, state_field_id, MoveStateAccessGraph, MoveStateAccessGraphEdge,
+        MoveStateAccessGraphNode, MoveUnresolvedStateAccess,
+    },
     type_graph::{
         builtin_type_id, external_type_id, finish_type_graph, type_id, type_parameter_id,
         MoveTypeGraph, MoveTypeGraphEdge, MoveTypeGraphNode, MoveTypeParameter, MoveUnresolvedType,
@@ -28,7 +32,7 @@ use move_compiler::{
 use serde::Deserialize;
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     fs,
     path::{Path, PathBuf},
     sync::Arc,
@@ -43,7 +47,7 @@ const COPY_DROP_STORE_ABILITIES: &[&str] = &["copy", "drop", "store"];
 pub(crate) fn build_move_graphs(
     root: &Path,
     packages: &[MovePackageModel],
-) -> (MoveCallGraph, MoveTypeGraph) {
+) -> (MoveCallGraph, MoveTypeGraph, MoveStateAccessGraph) {
     let modules = parse_source_modules(root, packages);
     let mut builder = GraphBuilder::default();
 
@@ -51,6 +55,28 @@ pub(crate) fn build_move_graphs(
     builder.collect_source_relationships(&modules);
     builder.enrich_from_summaries(root, packages);
     builder.finish()
+}
+
+pub(crate) struct MoveStateAccessGraphTarget {
+    pub package_path: String,
+    pub address: Option<String>,
+    pub module_name: String,
+    pub function_name: String,
+    pub max_call_depth: usize,
+}
+
+pub(crate) fn build_move_state_access_graph(
+    root: &Path,
+    packages: &[MovePackageModel],
+    target: MoveStateAccessGraphTarget,
+) -> MoveStateAccessGraph {
+    let modules = parse_source_modules(root, packages);
+    let mut builder = GraphBuilder::default();
+
+    builder.index_source_modules(&modules);
+    builder.collect_source_type_relationships(&modules);
+    builder.collect_reachable_function_state_relationships(&modules, &target);
+    builder.finish_state_access_graph()
 }
 
 #[derive(Clone)]
@@ -101,6 +127,7 @@ struct FunctionContext {
     function_id: String,
     function_name: String,
     type_parameters: BTreeMap<String, String>,
+    local_state_types: BTreeMap<String, String>,
 }
 
 #[derive(Clone)]
@@ -160,6 +187,24 @@ struct UnresolvedTypeKey {
     reason: String,
 }
 
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+struct StateAccessEdgeKey {
+    source: String,
+    target: String,
+    access_kind: String,
+    field_name: Option<String>,
+    via_function: Option<String>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+struct UnresolvedStateAccessKey {
+    source: String,
+    raw_target: String,
+    access_kind: String,
+    file_path: String,
+    reason: String,
+}
+
 #[derive(Default)]
 struct GraphBuilder {
     call_nodes: BTreeMap<String, MoveCallGraphNode>,
@@ -168,6 +213,9 @@ struct GraphBuilder {
     type_nodes: BTreeMap<String, MoveTypeGraphNode>,
     type_edges: BTreeMap<TypeEdgeKey, MoveTypeGraphEdge>,
     unresolved_types: BTreeMap<UnresolvedTypeKey, MoveUnresolvedType>,
+    state_nodes: BTreeMap<String, MoveStateAccessGraphNode>,
+    state_edges: BTreeMap<StateAccessEdgeKey, MoveStateAccessGraphEdge>,
+    unresolved_state_accesses: BTreeMap<UnresolvedStateAccessKey, MoveUnresolvedStateAccess>,
     function_exact: BTreeMap<(Option<String>, String, String), String>,
     function_by_module_member: BTreeMap<(String, String), BTreeSet<String>>,
     type_exact: BTreeMap<(Option<String>, String, String), String>,
@@ -270,6 +318,8 @@ impl GraphBuilder {
             .entry((module.module_name.clone(), node.function_name.clone()))
             .or_default()
             .insert(id.clone());
+        self.state_nodes
+            .insert(id.clone(), state_node_from_call_node(&node));
         self.call_nodes.insert(id, node);
     }
 
@@ -321,6 +371,10 @@ impl GraphBuilder {
             .entry((module.module_name.clone(), name))
             .or_default()
             .insert(id.clone());
+        if is_state_type_node(&node) {
+            self.state_nodes
+                .insert(id.clone(), state_node_from_type_node(&node, "stateType"));
+        }
         self.type_nodes.insert(id, node);
     }
 
@@ -372,6 +426,10 @@ impl GraphBuilder {
             .entry((module.module_name.clone(), name))
             .or_default()
             .insert(id.clone());
+        if is_state_type_node(&node) {
+            self.state_nodes
+                .insert(id.clone(), state_node_from_type_node(&node, "stateType"));
+        }
         self.type_nodes.insert(id, node);
     }
 
@@ -400,6 +458,115 @@ impl GraphBuilder {
                     is_external: false,
                 });
         }
+    }
+
+    fn collect_source_type_relationships(&mut self, modules: &[SourceModule]) {
+        for module in modules {
+            let mut module_context = module_context(module);
+            module_context.aliases = module_aliases(&module.module, &module_context.address);
+
+            for member in &module.module.members {
+                match member {
+                    ModuleMember::Struct(move_struct) => {
+                        self.collect_struct(&module_context, move_struct);
+                    }
+                    ModuleMember::Enum(move_enum) => {
+                        self.collect_enum(&module_context, move_enum);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    fn collect_reachable_function_state_relationships(
+        &mut self,
+        modules: &[SourceModule],
+        target: &MoveStateAccessGraphTarget,
+    ) {
+        let function_index = self.source_functions_by_id(modules);
+        let Some(start_id) = self.resolve_target_function_id(target) else {
+            return;
+        };
+        let mut visited = BTreeSet::new();
+        let mut queue = VecDeque::from([(start_id, 0usize)]);
+
+        while let Some((function_id, depth)) = queue.pop_front() {
+            if !visited.insert(function_id.clone()) {
+                continue;
+            }
+
+            let Some((module, function)) = function_index.get(&function_id).cloned() else {
+                continue;
+            };
+            self.collect_function(&module, &function);
+
+            if depth >= target.max_call_depth {
+                continue;
+            }
+
+            let callees = self
+                .call_edges
+                .values()
+                .filter(|edge| edge.source == function_id && edge.is_resolved && !edge.is_external)
+                .map(|edge| edge.target.clone())
+                .collect::<Vec<_>>();
+
+            for callee in callees {
+                if !visited.contains(&callee) && function_index.contains_key(&callee) {
+                    queue.push_back((callee, depth + 1));
+                }
+            }
+        }
+    }
+
+    fn source_functions_by_id(
+        &self,
+        modules: &[SourceModule],
+    ) -> BTreeMap<String, (ModuleContext, Function)> {
+        let mut functions = BTreeMap::new();
+
+        for module in modules {
+            let mut module_context = module_context(module);
+            module_context.aliases = module_aliases(&module.module, &module_context.address);
+
+            for member in &module.module.members {
+                let ModuleMember::Function(function) = member else {
+                    continue;
+                };
+                let function_name = function.name.0.value.to_string();
+                let Some(function_id) = self.resolve_exact_function(
+                    module_context.address.as_deref(),
+                    &module_context.module_name,
+                    &function_name,
+                ) else {
+                    continue;
+                };
+
+                functions.insert(function_id, (module_context.clone(), function.clone()));
+            }
+        }
+
+        functions
+    }
+
+    fn resolve_target_function_id(&self, target: &MoveStateAccessGraphTarget) -> Option<String> {
+        self.call_nodes
+            .values()
+            .find(|node| {
+                node.package_path.as_deref() == Some(target.package_path.as_str())
+                    && node.address.as_deref() == target.address.as_deref()
+                    && node.module_name == target.module_name
+                    && node.function_name == target.function_name
+            })
+            .map(|node| node.id.clone())
+            .or_else(|| {
+                self.resolve_exact_function(
+                    target.address.as_deref(),
+                    &target.module_name,
+                    &target.function_name,
+                )
+            })
     }
 
     fn collect_function(&mut self, module: &ModuleContext, function: &Function) {
@@ -469,20 +636,43 @@ impl GraphBuilder {
             type_parameters,
         };
 
+        let mut local_state_types = BTreeMap::new();
+
         for (_, parameter, parameter_type) in &function.signature.parameters {
-            self.record_type_usage(
+            let parameter_name = parameter.0.value.to_string();
+            let parameter_uses = self.record_type_usage(
                 &type_context,
                 parameter_type,
                 TypeUsageInput {
                     relationship: "parameter".to_string(),
-                    parameter_name: Some(parameter.0.value.to_string()),
+                    parameter_name: Some(parameter_name.clone()),
                     function_name: Some(function_name.clone()),
                     ..TypeUsageInput::default()
                 },
             );
+            self.record_state_type_accesses(
+                &function_id,
+                parameter_uses.clone(),
+                state_access_kind_for_parameter_type(parameter_type),
+                Some(parameter_name.clone()),
+                None,
+                source_span(
+                    &module.source,
+                    &module.file_path,
+                    parameter_type.loc.start() as usize,
+                    parameter_type.loc.end() as usize,
+                ),
+                vec![format!(
+                    "Function parameter `{parameter_name}` exposes package state to this call."
+                )],
+            );
+
+            if let Some(state_type_id) = self.first_state_type_id(&parameter_uses) {
+                local_state_types.insert(parameter_name, state_type_id);
+            }
         }
 
-        self.record_type_usage(
+        let return_uses = self.record_type_usage(
             &type_context,
             &function.signature.return_type,
             TypeUsageInput {
@@ -491,15 +681,30 @@ impl GraphBuilder {
                 ..TypeUsageInput::default()
             },
         );
+        self.record_state_type_accesses(
+            &function_id,
+            return_uses,
+            "return",
+            None,
+            None,
+            source_span(
+                &module.source,
+                &module.file_path,
+                function.signature.return_type.loc.start() as usize,
+                function.signature.return_type.loc.end() as usize,
+            ),
+            vec!["Function return type can move package state to the caller.".to_string()],
+        );
 
         if let FunctionBody_::Defined(sequence) = &function.body.value {
-            let function_context = FunctionContext {
+            let mut function_context = FunctionContext {
                 module: module.clone(),
                 function_id,
                 function_name,
                 type_parameters: type_context.type_parameters.clone(),
+                local_state_types,
             };
-            self.traverse_sequence(&function_context, &module.aliases, sequence);
+            self.traverse_sequence(&mut function_context, &module.aliases, sequence);
         }
     }
 
@@ -567,8 +772,9 @@ impl GraphBuilder {
             type_parameters.insert(type_parameter.name.value.to_string(), id);
         }
 
+        let is_state_struct = self.is_state_type(&struct_id);
         let type_context = TypeContext {
-            owner_id: struct_id,
+            owner_id: struct_id.clone(),
             owner_name: Some(name),
             module: module.clone(),
             type_parameters,
@@ -577,28 +783,36 @@ impl GraphBuilder {
         match &move_struct.fields {
             StructFields::Named(fields) => {
                 for (_, field, field_type) in fields {
+                    let field_name = field.0.value.to_string();
                     self.record_type_usage(
                         &type_context,
                         field_type,
                         TypeUsageInput {
                             relationship: "field".to_string(),
-                            field_name: Some(field.0.value.to_string()),
+                            field_name: Some(field_name.clone()),
                             ..TypeUsageInput::default()
                         },
                     );
+                    if is_state_struct {
+                        self.ensure_state_field_node(&struct_id, &field_name);
+                    }
                 }
             }
             StructFields::Positional(fields) => {
                 for (index, (_, field_type)) in fields.iter().enumerate() {
+                    let field_name = index.to_string();
                     self.record_type_usage(
                         &type_context,
                         field_type,
                         TypeUsageInput {
                             relationship: "field".to_string(),
-                            field_name: Some(index.to_string()),
+                            field_name: Some(field_name.clone()),
                             ..TypeUsageInput::default()
                         },
                     );
+                    if is_state_struct {
+                        self.ensure_state_field_node(&struct_id, &field_name);
+                    }
                 }
             }
             StructFields::Native(_) => {}
@@ -715,7 +929,7 @@ impl GraphBuilder {
 
     fn traverse_sequence(
         &mut self,
-        function: &FunctionContext,
+        function: &mut FunctionContext,
         aliases: &AliasScope,
         sequence: &Sequence,
     ) {
@@ -736,7 +950,7 @@ impl GraphBuilder {
                 SequenceItem_::Declare(bindings, annotation) => {
                     self.traverse_bind_list(function, &scoped_aliases, &bindings.value);
                     if let Some(annotation) = annotation {
-                        self.record_function_type_usage(
+                        let uses = self.record_function_type_usage(
                             function,
                             annotation,
                             TypeUsageInput {
@@ -745,12 +959,13 @@ impl GraphBuilder {
                                 ..TypeUsageInput::default()
                             },
                         );
+                        self.bind_first_state_type(function, &bindings.value, &uses);
                     }
                 }
                 SequenceItem_::Bind(bindings, annotation, exp) => {
                     self.traverse_bind_list(function, &scoped_aliases, &bindings.value);
                     if let Some(annotation) = annotation {
-                        self.record_function_type_usage(
+                        let uses = self.record_function_type_usage(
                             function,
                             annotation,
                             TypeUsageInput {
@@ -759,6 +974,11 @@ impl GraphBuilder {
                                 ..TypeUsageInput::default()
                             },
                         );
+                        self.bind_first_state_type(function, &bindings.value, &uses);
+                    } else if let Some(state_type_id) =
+                        self.state_type_id_from_exp(function, &scoped_aliases, exp)
+                    {
+                        self.bind_state_type(function, &bindings.value, &state_type_id);
                     }
                     self.traverse_exp(function, &scoped_aliases, exp);
                 }
@@ -772,7 +992,7 @@ impl GraphBuilder {
 
     fn traverse_bind_list(
         &mut self,
-        function: &FunctionContext,
+        function: &mut FunctionContext,
         aliases: &AliasScope,
         bindings: &[Bind],
     ) {
@@ -781,27 +1001,45 @@ impl GraphBuilder {
         }
     }
 
-    fn traverse_bind(&mut self, function: &FunctionContext, aliases: &AliasScope, bind: &Bind) {
+    fn traverse_bind(&mut self, function: &mut FunctionContext, aliases: &AliasScope, bind: &Bind) {
         match &bind.value {
             Bind_::Var(_, _) => {}
             Bind_::Unpack(name, bindings) => {
-                self.record_construct_or_destructure(
+                let span = source_span(
+                    &function.module.source,
+                    &function.module.file_path,
+                    bind.loc.start() as usize,
+                    bind.loc.end() as usize,
+                );
+                let destructured_type_id = self.record_construct_or_destructure(
                     function,
                     aliases,
                     name,
                     "destructuring",
-                    source_span(
-                        &function.module.source,
-                        &function.module.file_path,
-                        bind.loc.start() as usize,
-                        bind.loc.end() as usize,
-                    ),
+                    span.clone(),
                     None,
                 );
                 match bindings {
                     move_compiler::parser::ast::FieldBindings::Named(fields) => {
                         for field in fields {
-                            if let move_compiler::parser::ast::Ellipsis::Binder((_, bind)) = field {
+                            if let move_compiler::parser::ast::Ellipsis::Binder((
+                                field_name,
+                                bind,
+                            )) = field
+                            {
+                                if let Some(type_id) = destructured_type_id.as_deref() {
+                                    self.record_state_field_access(
+                                        function,
+                                        type_id,
+                                        &field_name.0.value.to_string(),
+                                        "read",
+                                        span.clone(),
+                                        vec![format!(
+                                            "Destructuring reads field `{}` from package state.",
+                                            field_name.0.value
+                                        )],
+                                    );
+                                }
                                 self.traverse_bind(function, aliases, bind);
                             }
                         }
@@ -818,36 +1056,73 @@ impl GraphBuilder {
         }
     }
 
-    fn traverse_exp(&mut self, function: &FunctionContext, aliases: &AliasScope, exp: &Exp) {
+    fn traverse_exp(&mut self, function: &mut FunctionContext, aliases: &AliasScope, exp: &Exp) {
         match &exp.value {
-            Exp_::Value(_) | Exp_::Name(_) | Exp_::Unit | Exp_::Spec(_) | Exp_::UnresolvedError => {
+            Exp_::Value(_) | Exp_::Unit | Exp_::Spec(_) | Exp_::UnresolvedError => {}
+            Exp_::Name(name) => self.record_name_state_access(
+                function,
+                name,
+                "read",
+                source_span(
+                    &function.module.source,
+                    &function.module.file_path,
+                    exp.loc.start() as usize,
+                    exp.loc.end() as usize,
+                ),
+            ),
+            Exp_::Move(_, inner) => {
+                self.traverse_state_target_exp(function, aliases, inner, "move")
             }
-            Exp_::Move(_, inner)
-            | Exp_::Copy(_, inner)
-            | Exp_::Parens(inner)
+            Exp_::Copy(_, inner) => {
+                self.traverse_state_target_exp(function, aliases, inner, "copy")
+            }
+            Exp_::Borrow(is_mutable, inner) => self.traverse_state_target_exp(
+                function,
+                aliases,
+                inner,
+                if *is_mutable {
+                    "borrowMut"
+                } else {
+                    "borrowImm"
+                },
+            ),
+            Exp_::Parens(inner)
             | Exp_::Dereference(inner)
             | Exp_::UnaryExp(_, inner)
-            | Exp_::Borrow(_, inner)
             | Exp_::DotUnresolved(_, inner) => self.traverse_exp(function, aliases, inner),
             Exp_::Call(name, arguments) => {
                 self.record_call(function, aliases, name, exp, &arguments.value, "direct");
             }
             Exp_::Pack(name, fields) => {
-                self.record_construct_or_destructure(
+                let span = source_span(
+                    &function.module.source,
+                    &function.module.file_path,
+                    exp.loc.start() as usize,
+                    exp.loc.end() as usize,
+                );
+                let constructed_type_id = self.record_construct_or_destructure(
                     function,
                     aliases,
                     name,
                     "construction",
-                    source_span(
-                        &function.module.source,
-                        &function.module.file_path,
-                        exp.loc.start() as usize,
-                        exp.loc.end() as usize,
-                    ),
+                    span.clone(),
                     Some(function.function_name.clone()),
                 );
 
-                for (_, field_exp) in fields {
+                for (field_name, field_exp) in fields {
+                    if let Some(type_id) = constructed_type_id.as_deref() {
+                        self.record_state_field_access(
+                            function,
+                            type_id,
+                            &field_name.0.value.to_string(),
+                            "write",
+                            span.clone(),
+                            vec![format!(
+                                "Construction writes field `{}` on package state.",
+                                field_name.0.value
+                            )],
+                        );
+                    }
                     self.traverse_exp(function, aliases, field_exp);
                 }
             }
@@ -942,7 +1217,7 @@ impl GraphBuilder {
                 }
             }
             Exp_::Assign(left, right) => {
-                self.traverse_exp(function, aliases, left);
+                self.traverse_state_target_exp(function, aliases, left, "write");
                 self.traverse_exp(function, aliases, right);
             }
             Exp_::Abort(value) | Exp_::Return(_, value) | Exp_::Break(_, value) => {
@@ -951,7 +1226,21 @@ impl GraphBuilder {
                 }
             }
             Exp_::Continue(_) => {}
-            Exp_::Dot(receiver, _, _) => self.traverse_exp(function, aliases, receiver),
+            Exp_::Dot(receiver, _, field) => {
+                self.record_field_access_from_receiver(
+                    function,
+                    receiver,
+                    &field.value.to_string(),
+                    "read",
+                    source_span(
+                        &function.module.source,
+                        &function.module.file_path,
+                        exp.loc.start() as usize,
+                        exp.loc.end() as usize,
+                    ),
+                );
+                self.traverse_exp(function, aliases, receiver);
+            }
             Exp_::DotCall(receiver, _, method, is_macro, type_arguments, arguments) => {
                 self.traverse_exp(function, aliases, receiver);
                 self.record_dot_call(
@@ -999,7 +1288,7 @@ impl GraphBuilder {
 
     fn traverse_match_pattern(
         &mut self,
-        function: &FunctionContext,
+        function: &mut FunctionContext,
         aliases: &AliasScope,
         pattern: &MatchPattern,
     ) {
@@ -1026,22 +1315,38 @@ impl GraphBuilder {
                 }
             }
             MatchPattern_::FieldConstructor(name, fields) => {
-                self.record_construct_or_destructure(
+                let span = source_span(
+                    &function.module.source,
+                    &function.module.file_path,
+                    pattern.loc.start() as usize,
+                    pattern.loc.end() as usize,
+                );
+                let destructured_type_id = self.record_construct_or_destructure(
                     function,
                     aliases,
                     name,
                     "destructuring",
-                    source_span(
-                        &function.module.source,
-                        &function.module.file_path,
-                        pattern.loc.start() as usize,
-                        pattern.loc.end() as usize,
-                    ),
+                    span.clone(),
                     Some(function.function_name.clone()),
                 );
 
                 for field in &fields.value {
-                    if let move_compiler::parser::ast::Ellipsis::Binder((_, pattern)) = field {
+                    if let move_compiler::parser::ast::Ellipsis::Binder((field_name, pattern)) =
+                        field
+                    {
+                        if let Some(type_id) = destructured_type_id.as_deref() {
+                            self.record_state_field_access(
+                                function,
+                                type_id,
+                                &field_name.0.value.to_string(),
+                                "read",
+                                span.clone(),
+                                vec![format!(
+                                    "Match destructuring reads field `{}` from package state.",
+                                    field_name.0.value
+                                )],
+                            );
+                        }
                         self.traverse_match_pattern(function, aliases, pattern);
                     }
                 }
@@ -1057,7 +1362,7 @@ impl GraphBuilder {
 
     fn record_call(
         &mut self,
-        function: &FunctionContext,
+        function: &mut FunctionContext,
         aliases: &AliasScope,
         name: &NameAccessChain,
         exp: &Exp,
@@ -1095,14 +1400,26 @@ impl GraphBuilder {
             ResolvedCall::Local(target_id) => {
                 self.record_call_edge(CallEdgeInput {
                     source: function.function_id.clone(),
-                    target: target_id,
+                    target: target_id.clone(),
                     call_kind: call_kind.to_string(),
                     confidence: "high".to_string(),
-                    raw_target,
+                    raw_target: raw_target.clone(),
                     type_arguments,
-                    span,
+                    span: span.clone(),
                     is_external: false,
                     is_resolved: true,
+                });
+                self.record_state_edge(StateAccessEdgeInput {
+                    source: function.function_id.clone(),
+                    target: target_id.clone(),
+                    access_kind: "call".to_string(),
+                    via_function: Some(target_id),
+                    span,
+                    confidence: "high".to_string(),
+                    evidence: vec![format!(
+                        "Function call `{raw_target}` can propagate state access."
+                    )],
+                    ..StateAccessEdgeInput::default()
                 });
             }
             ResolvedCall::External(target) => {
@@ -1150,7 +1467,7 @@ impl GraphBuilder {
 
     fn record_dot_call(
         &mut self,
-        function: &FunctionContext,
+        function: &mut FunctionContext,
         aliases: &AliasScope,
         method: &Name,
         is_macro: bool,
@@ -1192,14 +1509,26 @@ impl GraphBuilder {
             ) {
                 self.record_call_edge(CallEdgeInput {
                     source: function.function_id.clone(),
-                    target: target_id,
+                    target: target_id.clone(),
                     call_kind: call_kind.to_string(),
                     confidence: "high".to_string(),
-                    raw_target,
+                    raw_target: raw_target.clone(),
                     type_arguments: type_argument_sources,
-                    span,
+                    span: span.clone(),
                     is_external: false,
                     is_resolved: true,
+                });
+                self.record_state_edge(StateAccessEdgeInput {
+                    source: function.function_id.clone(),
+                    target: target_id.clone(),
+                    access_kind: "call".to_string(),
+                    via_function: Some(target_id),
+                    span,
+                    confidence: "high".to_string(),
+                    evidence: vec![format!(
+                        "Method call `{raw_target}` can propagate state access."
+                    )],
+                    ..StateAccessEdgeInput::default()
                 });
             } else {
                 let target_id = self.ensure_external_call_node(target, &raw_target, "source");
@@ -1257,7 +1586,7 @@ impl GraphBuilder {
         relationship: &str,
         span: MoveSourceSpan,
         function_name: Option<String>,
-    ) {
+    ) -> Option<String> {
         let type_context = TypeContext {
             owner_id: function.function_id.clone(),
             owner_name: Some(function.function_name.clone()),
@@ -1265,19 +1594,34 @@ impl GraphBuilder {
             type_parameters: function.type_parameters.clone(),
         };
 
-        if let Some(type_use) =
-            self.resolve_type_apply(&type_context, aliases, name, span.clone(), relationship)
-        {
-            self.record_type_edge(TypeEdgeInput {
-                source: function.function_id.clone(),
-                target: type_use.id,
-                relationship: relationship.to_string(),
-                function_name,
-                span,
-                confidence: "syntactic".to_string(),
-                ..TypeEdgeInput::default()
-            });
-        }
+        let type_use =
+            self.resolve_type_apply(&type_context, aliases, name, span.clone(), relationship)?;
+        let type_id = type_use.id.clone();
+        self.record_type_edge(TypeEdgeInput {
+            source: function.function_id.clone(),
+            target: type_use.id,
+            relationship: relationship.to_string(),
+            function_name,
+            span: span.clone(),
+            confidence: "syntactic".to_string(),
+            ..TypeEdgeInput::default()
+        });
+        self.record_state_type_accesses(
+            &function.function_id,
+            vec![TypeUse {
+                id: type_id.clone(),
+            }],
+            if relationship == "construction" {
+                "write"
+            } else {
+                "read"
+            },
+            None,
+            None,
+            span,
+            vec![format!("AST {relationship} touches package state type.")],
+        );
+        Some(type_id)
     }
 
     fn record_function_type_usage(
@@ -1285,7 +1629,7 @@ impl GraphBuilder {
         function: &FunctionContext,
         type_: &Type,
         input: TypeUsageInput,
-    ) {
+    ) -> Vec<TypeUse> {
         let type_context = TypeContext {
             owner_id: function.function_id.clone(),
             owner_name: Some(function.function_name.clone()),
@@ -1293,7 +1637,7 @@ impl GraphBuilder {
             type_parameters: function.type_parameters.clone(),
         };
 
-        self.record_type_usage(&type_context, type_, input);
+        self.record_type_usage(&type_context, type_, input)
     }
 
     fn record_type_usage(
@@ -1443,6 +1787,307 @@ impl GraphBuilder {
                 .collect(),
             Type_::Unit | Type_::UnresolvedError => Vec::new(),
         }
+    }
+
+    fn first_state_type_id(&self, uses: &[TypeUse]) -> Option<String> {
+        uses.iter().find_map(|type_use| {
+            self.is_state_type(&type_use.id)
+                .then(|| type_use.id.clone())
+        })
+    }
+
+    fn record_state_type_accesses(
+        &mut self,
+        function_id: &str,
+        uses: Vec<TypeUse>,
+        access_kind: &str,
+        field_name: Option<String>,
+        via_function: Option<String>,
+        span: MoveSourceSpan,
+        evidence: Vec<String>,
+    ) {
+        for type_use in uses {
+            if !self.ensure_state_type_node(&type_use.id) {
+                continue;
+            }
+
+            self.record_state_edge(StateAccessEdgeInput {
+                source: function_id.to_string(),
+                target: type_use.id,
+                access_kind: access_kind.to_string(),
+                field_name: field_name.clone(),
+                via_function: via_function.clone(),
+                span: span.clone(),
+                confidence: "syntactic".to_string(),
+                evidence: evidence.clone(),
+            });
+        }
+    }
+
+    fn record_state_field_access(
+        &mut self,
+        function: &FunctionContext,
+        type_id: &str,
+        field_name: &str,
+        access_kind: &str,
+        span: MoveSourceSpan,
+        evidence: Vec<String>,
+    ) {
+        let Some(field_id) = self.ensure_state_field_node(type_id, field_name) else {
+            return;
+        };
+
+        self.record_state_edge(StateAccessEdgeInput {
+            source: function.function_id.clone(),
+            target: field_id,
+            access_kind: access_kind.to_string(),
+            field_name: Some(field_name.to_string()),
+            via_function: None,
+            span,
+            confidence: "syntactic".to_string(),
+            evidence,
+        });
+    }
+
+    fn record_field_access_from_receiver(
+        &mut self,
+        function: &FunctionContext,
+        receiver: &Exp,
+        field_name: &str,
+        access_kind: &str,
+        span: MoveSourceSpan,
+    ) {
+        if let Some(type_id) = self.local_state_type_from_exp(function, receiver) {
+            self.record_state_field_access(
+                function,
+                &type_id,
+                field_name,
+                access_kind,
+                span,
+                vec![format!(
+                    "Field `{field_name}` is accessed through a local value with package state type."
+                )],
+            );
+        }
+    }
+
+    fn traverse_state_target_exp(
+        &mut self,
+        function: &mut FunctionContext,
+        aliases: &AliasScope,
+        exp: &Exp,
+        access_kind: &str,
+    ) {
+        self.record_exp_state_access(function, exp, access_kind);
+
+        match &exp.value {
+            Exp_::Dot(receiver, _, _) => self.traverse_exp(function, aliases, receiver),
+            Exp_::Name(_) => {}
+            Exp_::Parens(inner) | Exp_::Dereference(inner) => {
+                self.traverse_state_target_exp(function, aliases, inner, access_kind);
+            }
+            _ => self.traverse_exp(function, aliases, exp),
+        }
+    }
+
+    fn record_exp_state_access(
+        &mut self,
+        function: &FunctionContext,
+        exp: &Exp,
+        access_kind: &str,
+    ) {
+        let span = source_span(
+            &function.module.source,
+            &function.module.file_path,
+            exp.loc.start() as usize,
+            exp.loc.end() as usize,
+        );
+
+        match &exp.value {
+            Exp_::Name(name) => self.record_name_state_access(function, name, access_kind, span),
+            Exp_::Dot(receiver, _, field) => self.record_field_access_from_receiver(
+                function,
+                receiver,
+                &field.value.to_string(),
+                access_kind,
+                span,
+            ),
+            Exp_::Parens(inner) | Exp_::Dereference(inner) => {
+                self.record_exp_state_access(function, inner, access_kind);
+            }
+            _ => {}
+        }
+    }
+
+    fn record_name_state_access(
+        &mut self,
+        function: &FunctionContext,
+        name: &NameAccessChain,
+        access_kind: &str,
+        span: MoveSourceSpan,
+    ) {
+        let Some(local_name) = name_access_local_name(name) else {
+            return;
+        };
+        let Some(type_id) = function.local_state_types.get(&local_name).cloned() else {
+            return;
+        };
+
+        self.record_state_type_accesses(
+            &function.function_id,
+            vec![TypeUse { id: type_id }],
+            access_kind,
+            None,
+            None,
+            span,
+            vec![format!(
+                "Local `{local_name}` has a package state type in this function."
+            )],
+        );
+    }
+
+    fn local_state_type_from_exp(&self, function: &FunctionContext, exp: &Exp) -> Option<String> {
+        match &exp.value {
+            Exp_::Name(name) => name_access_local_name(name)
+                .and_then(|local_name| function.local_state_types.get(&local_name).cloned()),
+            Exp_::Parens(inner) | Exp_::Dereference(inner) => {
+                self.local_state_type_from_exp(function, inner)
+            }
+            _ => None,
+        }
+    }
+
+    fn bind_first_state_type(
+        &self,
+        function: &mut FunctionContext,
+        bindings: &[Bind],
+        uses: &[TypeUse],
+    ) {
+        if let Some(state_type_id) = self.first_state_type_id(uses) {
+            self.bind_state_type(function, bindings, &state_type_id);
+        }
+    }
+
+    fn bind_state_type(
+        &self,
+        function: &mut FunctionContext,
+        bindings: &[Bind],
+        state_type_id: &str,
+    ) {
+        for binding in bindings {
+            if let Bind_::Var(_, name) = &binding.value {
+                function
+                    .local_state_types
+                    .insert(name.0.value.to_string(), state_type_id.to_string());
+            }
+        }
+    }
+
+    fn state_type_id_from_exp(
+        &mut self,
+        function: &FunctionContext,
+        aliases: &AliasScope,
+        exp: &Exp,
+    ) -> Option<String> {
+        let Exp_::Pack(name, _) = &exp.value else {
+            return None;
+        };
+        let type_context = TypeContext {
+            owner_id: function.function_id.clone(),
+            owner_name: Some(function.function_name.clone()),
+            module: function.module.clone(),
+            type_parameters: function.type_parameters.clone(),
+        };
+        let type_use = self.resolve_type_apply(
+            &type_context,
+            aliases,
+            name,
+            source_span(
+                &function.module.source,
+                &function.module.file_path,
+                exp.loc.start() as usize,
+                exp.loc.end() as usize,
+            ),
+            "localBinding",
+        )?;
+
+        self.is_state_type(&type_use.id).then_some(type_use.id)
+    }
+
+    fn is_state_type(&self, type_id: &str) -> bool {
+        self.type_nodes.get(type_id).is_some_and(is_state_type_node)
+    }
+
+    fn ensure_state_type_node(&mut self, type_id: &str) -> bool {
+        if self.state_nodes.contains_key(type_id) {
+            return true;
+        }
+
+        let Some(node) = self.type_nodes.get(type_id).cloned() else {
+            return false;
+        };
+        if !is_state_type_node(&node) {
+            return false;
+        }
+
+        self.state_nodes.insert(
+            type_id.to_string(),
+            state_node_from_type_node(&node, "stateType"),
+        );
+        true
+    }
+
+    fn ensure_state_field_node(&mut self, type_id: &str, field_name: &str) -> Option<String> {
+        if !self.ensure_state_type_node(type_id) {
+            return None;
+        }
+
+        let type_node = self.type_nodes.get(type_id)?.clone();
+        let id = state_field_id(type_id, field_name);
+        self.state_nodes
+            .entry(id.clone())
+            .or_insert_with(|| MoveStateAccessGraphNode {
+                id: id.clone(),
+                kind: "field".to_string(),
+                package_name: type_node.package_name.clone(),
+                package_path: type_node.package_path.clone(),
+                address: type_node.address.clone(),
+                module_name: type_node.module_name.clone(),
+                name: field_name.to_string(),
+                qualified_name: format!("{}.{}", type_node.qualified_name, field_name),
+                file_path: type_node.file_path.clone(),
+                abilities: Vec::new(),
+                span: None,
+                is_external: type_node.is_external,
+                source: type_node.source.clone(),
+            });
+        Some(id)
+    }
+
+    fn record_state_edge(&mut self, input: StateAccessEdgeInput) {
+        let key = StateAccessEdgeKey {
+            source: input.source.clone(),
+            target: input.target.clone(),
+            access_kind: input.access_kind.clone(),
+            field_name: input.field_name.clone(),
+            via_function: input.via_function.clone(),
+        };
+        let edge = self
+            .state_edges
+            .entry(key)
+            .or_insert_with(|| MoveStateAccessGraphEdge {
+                source: input.source,
+                target: input.target,
+                access_kind: input.access_kind,
+                field_name: input.field_name,
+                via_function: input.via_function,
+                source_spans: Vec::new(),
+                confidence: input.confidence,
+                evidence: Vec::new(),
+            });
+
+        edge.source_spans.push(input.span);
+        edge.evidence.extend(input.evidence);
     }
 
     fn resolve_call_target(
@@ -2279,7 +2924,7 @@ impl GraphBuilder {
         uses
     }
 
-    fn finish(self) -> (MoveCallGraph, MoveTypeGraph) {
+    fn finish(self) -> (MoveCallGraph, MoveTypeGraph, MoveStateAccessGraph) {
         (
             finish_call_graph(
                 self.call_nodes.into_values().collect(),
@@ -2291,6 +2936,19 @@ impl GraphBuilder {
                 self.type_edges.into_values().collect(),
                 self.unresolved_types.into_values().collect(),
             ),
+            finish_state_access_graph(
+                self.state_nodes.into_values().collect(),
+                self.state_edges.into_values().collect(),
+                self.unresolved_state_accesses.into_values().collect(),
+            ),
+        )
+    }
+
+    fn finish_state_access_graph(self) -> MoveStateAccessGraph {
+        finish_state_access_graph(
+            self.state_nodes.into_values().collect(),
+            self.state_edges.into_values().collect(),
+            self.unresolved_state_accesses.into_values().collect(),
         )
     }
 }
@@ -2366,6 +3024,18 @@ struct TypeEdgeInput {
     declaring_type_id: Option<String>,
     declaring_field_name: Option<String>,
     type_argument_name: Option<String>,
+    span: MoveSourceSpan,
+    confidence: String,
+    evidence: Vec<String>,
+}
+
+#[derive(Default)]
+struct StateAccessEdgeInput {
+    source: String,
+    target: String,
+    access_kind: String,
+    field_name: Option<String>,
+    via_function: Option<String>,
     span: MoveSourceSpan,
     confidence: String,
     evidence: Vec<String>,
@@ -2717,6 +3387,15 @@ fn name_access_to_string(name: &NameAccessChain) -> String {
         .join("::")
 }
 
+fn name_access_local_name(name: &NameAccessChain) -> Option<String> {
+    let parts = name_access_parts(name);
+
+    match parts.as_slice() {
+        [single] => Some(single.name.clone()),
+        _ => None,
+    }
+}
+
 fn name_access_type_arguments<'a>(name: &'a NameAccessChain, source: &str) -> Vec<String> {
     name_access_types(name)
         .into_iter()
@@ -2767,6 +3446,66 @@ fn function_visibility_name(visibility: &Visibility) -> String {
         Visibility::Internal => "private",
     }
     .to_string()
+}
+
+fn state_access_kind_for_parameter_type(type_: &Type) -> &'static str {
+    match &type_.value {
+        Type_::Ref(true, _) => "borrowMut",
+        Type_::Ref(false, _) => "borrowImm",
+        Type_::Multiple(types) => types
+            .iter()
+            .find_map(|type_| match state_access_kind_for_parameter_type(type_) {
+                "move" => None,
+                access_kind => Some(access_kind),
+            })
+            .unwrap_or("move"),
+        _ => "move",
+    }
+}
+
+fn is_state_type_node(node: &MoveTypeGraphNode) -> bool {
+    !node.is_external
+        && matches!(node.kind.as_str(), "struct" | "enum")
+        && node
+            .abilities
+            .iter()
+            .any(|ability| matches!(ability.as_str(), "key" | "store"))
+}
+
+fn state_node_from_call_node(node: &MoveCallGraphNode) -> MoveStateAccessGraphNode {
+    MoveStateAccessGraphNode {
+        id: node.id.clone(),
+        kind: "function".to_string(),
+        package_name: node.package_name.clone(),
+        package_path: node.package_path.clone(),
+        address: node.address.clone(),
+        module_name: Some(node.module_name.clone()),
+        name: node.function_name.clone(),
+        qualified_name: node.qualified_name.clone(),
+        file_path: node.file_path.clone(),
+        abilities: Vec::new(),
+        span: node.span.clone(),
+        is_external: node.is_external,
+        source: node.source.clone(),
+    }
+}
+
+fn state_node_from_type_node(node: &MoveTypeGraphNode, kind: &str) -> MoveStateAccessGraphNode {
+    MoveStateAccessGraphNode {
+        id: node.id.clone(),
+        kind: kind.to_string(),
+        package_name: node.package_name.clone(),
+        package_path: node.package_path.clone(),
+        address: node.address.clone(),
+        module_name: node.module_name.clone(),
+        name: node.name.clone(),
+        qualified_name: node.qualified_name.clone(),
+        file_path: node.file_path.clone(),
+        abilities: node.abilities.clone(),
+        span: node.span.clone(),
+        is_external: node.is_external,
+        source: node.source.clone(),
+    }
 }
 
 fn ability_name(ability: &Ability_) -> &'static str {

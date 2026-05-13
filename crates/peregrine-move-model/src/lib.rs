@@ -2,10 +2,11 @@ mod call_graph;
 mod dependency_graph;
 mod graph_builder;
 mod source_parser;
+mod state_access_graph;
 mod type_graph;
 
 use dependency_graph::build_package_dependency_graph;
-use graph_builder::build_move_graphs;
+use graph_builder::{build_move_graphs, build_move_state_access_graph, MoveStateAccessGraphTarget};
 use serde::Serialize;
 use source_parser::discover_modules;
 use std::{
@@ -17,6 +18,10 @@ pub use call_graph::{
     MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode, MoveSourceSpan, MoveUnresolvedCall,
 };
 pub use source_parser::parse_module_declarations;
+pub use state_access_graph::{
+    MoveStateAccessGraph, MoveStateAccessGraphEdge, MoveStateAccessGraphNode,
+    MoveUnresolvedStateAccess,
+};
 pub use type_graph::{
     MoveTypeGraph, MoveTypeGraphEdge, MoveTypeGraphNode, MoveTypeParameter, MoveUnresolvedType,
 };
@@ -28,6 +33,7 @@ pub struct MoveProjectModel {
     pub dependency_graph: PackageDependencyGraph,
     pub call_graph: MoveCallGraph,
     pub type_graph: MoveTypeGraph,
+    pub state_access_graph: MoveStateAccessGraph,
 }
 
 #[derive(Serialize)]
@@ -35,6 +41,7 @@ pub struct MoveProjectModel {
 pub struct MoveProjectGraphs {
     pub call_graph: MoveCallGraph,
     pub type_graph: MoveTypeGraph,
+    pub state_access_graph: MoveStateAccessGraph,
 }
 
 #[derive(Serialize)]
@@ -132,6 +139,7 @@ pub fn discover_move_project_model_shallow(root: &Path) -> MoveProjectModel {
         dependency_graph,
         call_graph: MoveCallGraph::default(),
         type_graph: MoveTypeGraph::default(),
+        state_access_graph: MoveStateAccessGraph::default(),
     }
 }
 
@@ -159,11 +167,12 @@ fn shallow_dependency_graph(packages: &[MovePackageModel]) -> PackageDependencyG
 
 pub fn discover_move_project_graphs(root: &Path) -> MoveProjectGraphs {
     let packages = discover_move_packages(root, false);
-    let (call_graph, type_graph) = build_move_graphs(root, &packages);
+    let (call_graph, type_graph, state_access_graph) = build_move_graphs(root, &packages);
 
     MoveProjectGraphs {
         call_graph,
         type_graph,
+        state_access_graph,
     }
 }
 
@@ -175,21 +184,51 @@ pub fn discover_move_project_graphs_for_package(
     let packages = build_move_package(root, &manifest_path, false)
         .map(|package| vec![package])
         .unwrap_or_else(|| discover_move_packages(root, false));
-    let (call_graph, type_graph) = build_move_graphs(root, &packages);
+    let (call_graph, type_graph, state_access_graph) = build_move_graphs(root, &packages);
 
     MoveProjectGraphs {
         call_graph,
         type_graph,
+        state_access_graph,
     }
+}
+
+pub fn discover_move_state_access_graph_for_function(
+    root: &Path,
+    package_path: &str,
+    address: Option<String>,
+    module_name: &str,
+    function_name: &str,
+) -> MoveStateAccessGraph {
+    let manifest_path = root.join(package_path).join("Move.toml");
+    let packages = build_move_package(root, &manifest_path, false)
+        .map(|package| vec![package])
+        .unwrap_or_else(|| discover_move_packages(root, false));
+
+    build_move_state_access_graph(
+        root,
+        &packages,
+        MoveStateAccessGraphTarget {
+            package_path: package_path.to_string(),
+            address,
+            module_name: module_name.to_string(),
+            function_name: function_name.to_string(),
+            max_call_depth: 4,
+        },
+    )
 }
 
 fn discover_move_project_model_with_graphs(root: &Path, include_graphs: bool) -> MoveProjectModel {
     let packages = discover_move_packages(root, true);
     let dependency_graph = build_package_dependency_graph(root, &packages);
-    let (call_graph, type_graph) = if include_graphs {
+    let (call_graph, type_graph, state_access_graph) = if include_graphs {
         build_move_graphs(root, &packages)
     } else {
-        (MoveCallGraph::default(), MoveTypeGraph::default())
+        (
+            MoveCallGraph::default(),
+            MoveTypeGraph::default(),
+            MoveStateAccessGraph::default(),
+        )
     };
 
     MoveProjectModel {
@@ -197,6 +236,7 @@ fn discover_move_project_model_with_graphs(root: &Path, include_graphs: bool) ->
         dependency_graph,
         call_graph,
         type_graph,
+        state_access_graph,
     }
 }
 
@@ -346,4 +386,74 @@ pub(crate) fn relative_path(root: &Path, path: &Path) -> Option<String> {
             .collect::<Option<Vec<_>>>()?
             .join("/"),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn state_access_graph_tracks_state_types_and_fields_from_ast() {
+        let temp = tempdir().expect("tempdir");
+        fs::write(
+            temp.path().join("Move.toml"),
+            r#"
+[package]
+name = "state_pkg"
+"#,
+        )
+        .expect("manifest");
+        fs::create_dir_all(temp.path().join("sources")).expect("sources");
+        fs::write(
+            temp.path().join("sources/vault.move"),
+            r#"
+module state_pkg::vault;
+
+public struct Vault has key, store {
+    id: UID,
+    balance: u64,
+}
+
+public fun deposit(vault: &mut Vault, amount: u64) {
+    vault.balance = vault.balance + amount;
+}
+
+public fun route(vault: &mut Vault, amount: u64) {
+    deposit(vault, amount);
+}
+"#,
+        )
+        .expect("module");
+
+        let project = discover_move_project_model(temp.path());
+        let graph = project.state_access_graph;
+        let deposit_id = "function::state_pkg::vault::deposit";
+        let route_id = "function::state_pkg::vault::route";
+        let vault_type = graph
+            .nodes
+            .iter()
+            .find(|node| node.qualified_name == "state_pkg::vault::Vault")
+            .expect("Vault state type");
+        let balance_field = graph
+            .nodes
+            .iter()
+            .find(|node| node.qualified_name == "state_pkg::vault::Vault.balance")
+            .expect("Vault.balance state field");
+
+        assert!(graph.edges.iter().any(|edge| {
+            edge.source == deposit_id
+                && edge.target == vault_type.id
+                && edge.access_kind == "borrowMut"
+        }));
+        assert!(graph.edges.iter().any(|edge| {
+            edge.source == deposit_id
+                && edge.target == balance_field.id
+                && edge.access_kind == "write"
+        }));
+        assert!(graph.edges.iter().any(|edge| {
+            edge.source == route_id && edge.target == deposit_id && edge.access_kind == "call"
+        }));
+    }
 }

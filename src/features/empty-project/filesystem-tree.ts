@@ -11,6 +11,7 @@ export type PackageTree = {
   dependencyGraph: PackageDependencyGraph;
   callGraph: MoveCallGraph;
   typeGraph: MoveTypeGraph;
+  stateAccessGraph: MoveStateAccessGraph;
 };
 
 export type ProjectMetadata = {
@@ -25,6 +26,7 @@ export type ProjectBuildMetadata = {
 export type MoveProjectGraphs = {
   callGraph: MoveCallGraph;
   typeGraph: MoveTypeGraph;
+  stateAccessGraph: MoveStateAccessGraph;
 };
 
 export type MovePackage = {
@@ -320,6 +322,48 @@ export type MoveUnresolvedType = {
   reason: string;
 };
 
+export type MoveStateAccessGraph = {
+  nodes: MoveStateAccessGraphNode[];
+  edges: MoveStateAccessGraphEdge[];
+  unresolvedAccesses: MoveUnresolvedStateAccess[];
+};
+
+export type MoveStateAccessGraphNode = {
+  id: string;
+  kind: "function" | "stateType" | "field" | string;
+  packageName: string | null;
+  packagePath: string | null;
+  address: string | null;
+  moduleName: string | null;
+  name: string;
+  qualifiedName: string;
+  filePath: string | null;
+  abilities: string[];
+  span: MoveSourceSpan | null;
+  isExternal: boolean;
+  source: string;
+};
+
+export type MoveStateAccessGraphEdge = {
+  source: string;
+  target: string;
+  accessKind: string;
+  fieldName: string | null;
+  viaFunction: string | null;
+  sourceSpans: MoveSourceSpan[];
+  confidence: string;
+  evidence: string[];
+};
+
+export type MoveUnresolvedStateAccess = {
+  source: string;
+  rawTarget: string;
+  accessKind: string;
+  filePath: string;
+  spans: MoveSourceSpan[];
+  reason: string;
+};
+
 export type AnalysisSeverity = "info" | "warning" | "error";
 
 export type AnalysisSpan = {
@@ -471,6 +515,23 @@ export async function loadMoveGraphs(
 ): Promise<MoveProjectGraphs> {
   return invoke<MoveProjectGraphs>("load_move_graphs", {
     packagePath: packagePath ?? null,
+    rootPath,
+  });
+}
+
+
+export async function loadMoveStateAccessGraph(
+  rootPath: string,
+  packagePath: string,
+  moduleAddress: string | null,
+  moduleName: string,
+  functionName: string,
+): Promise<MoveStateAccessGraph> {
+  return invoke<MoveStateAccessGraph>("load_move_state_access_graph", {
+    functionName,
+    moduleAddress,
+    moduleName,
+    packagePath,
     rootPath,
   });
 }

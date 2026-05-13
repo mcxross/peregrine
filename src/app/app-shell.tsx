@@ -146,6 +146,9 @@ export function AppShell({
             typeGraph: hasTypeGraphPayload(latestPackageTree)
               ? latestPackageTree.typeGraph
               : detailedPackageTree.typeGraph,
+            stateAccessGraph: hasStateAccessGraphPayload(latestPackageTree)
+              ? latestPackageTree.stateAccessGraph
+              : detailedPackageTree.stateAccessGraph,
           });
         })
         .catch((error) => {
@@ -795,6 +798,12 @@ function hasTypeGraphPayload(packageTree: PackageTree) {
   return packageTree.typeGraph.nodes.length > 0
     || packageTree.typeGraph.edges.length > 0
     || packageTree.typeGraph.unresolvedTypes.length > 0;
+}
+
+function hasStateAccessGraphPayload(packageTree: PackageTree) {
+  return packageTree.stateAccessGraph.nodes.length > 0
+    || packageTree.stateAccessGraph.edges.length > 0
+    || packageTree.stateAccessGraph.unresolvedAccesses.length > 0;
 }
 
 function upsertLogRun(runs: BuildLogRun[], nextRun: BuildLogRun) {

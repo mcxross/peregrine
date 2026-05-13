@@ -355,6 +355,8 @@ export function MovePackagesOverviewScreen({
                 <ModuleSignatureScreen
                   selectedModule={selectedModule}
                   onClose={onClearSelectedModule}
+                  rootPath={packageTree.rootPath}
+                  stateAccessGraph={packageTree.stateAccessGraph}
                 />
                 ) : null
               )}
