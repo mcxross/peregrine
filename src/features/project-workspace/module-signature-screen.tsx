@@ -1,7 +1,21 @@
 import {
+  Background,
+  Controls,
+  Handle,
+  MarkerType,
+  Position,
+  ReactFlow,
+  type Edge,
+  type Node,
+  type NodeProps,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import {
+  ArrowLeft,
   Box,
   Check,
   ChevronDown,
+  ChevronRight,
   Copy,
   FileCode2,
   GitBranch,
@@ -55,6 +69,10 @@ export function ModuleSignatureScreen({
   >(null);
   const [stateAccessGraphRetryNonce, setStateAccessGraphRetryNonce] =
     React.useState(0);
+  const [collapsedSurfaceSections, setCollapsedSurfaceSections] =
+    React.useState<Set<string>>(() => new Set());
+  const [collapsedFunctionVisibilityGroups, setCollapsedFunctionVisibilityGroups] =
+    React.useState<Set<string>>(() => new Set());
   const loadedStateAccessGraphKeyRef = React.useRef<string | null>(null);
   const stateAccessGraphRequestRef = React.useRef(0);
   const selectedFunction =
@@ -184,128 +202,234 @@ export function ModuleSignatureScreen({
     setStateAccessGraphError(null);
     setStateAccessGraphRetryNonce((current) => current + 1);
   }, []);
+  const functionVisibilityGroups = React.useMemo(
+    () => groupFunctionsByVisibility(functions),
+    [functions],
+  );
+  const toggleSurfaceSection = React.useCallback((section: string) => {
+    setCollapsedSurfaceSections((current) => toggleSetValue(current, section));
+  }, []);
+  const toggleFunctionVisibilityGroup = React.useCallback((visibility: string) => {
+    setCollapsedFunctionVisibilityGroups((current) =>
+      toggleSetValue(current, visibility),
+    );
+  }, []);
 
   return (
     <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-[var(--app-window)]">
-      <header className="flex min-w-0 items-center justify-between gap-4 border-b border-[color:var(--app-border)] px-6 pb-3.5 pt-4">
-        <div className="min-w-0">
-          <h2 className="truncate text-xl font-semibold leading-6">
-            {moveModule.name}
-          </h2>
-          <p className="mt-1 truncate text-xs leading-5 text-muted-foreground">
-            {movePackage.name} / {moveModule.filePath}
-          </p>
+      <header className="flex min-h-12 min-w-0 items-center justify-between gap-4 border-b border-[color:var(--app-border)] px-5 py-2">
+        <div className="flex min-w-0 items-center gap-3">
+          {selectedFunction ? (
+            <button
+              aria-label="Back to module details"
+              className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground"
+              onClick={() => setOpenFunctionKey(null)}
+              type="button"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+            </button>
+          ) : null}
+          {selectedFunction ? (
+            <GitBranch
+              className="size-4 shrink-0 text-cyan-300"
+              aria-hidden="true"
+            />
+          ) : null}
+          {selectedFunction ? (
+            <div className="flex min-w-0 items-center gap-2">
+              <h2 className="truncate text-base font-semibold leading-5">
+                State access
+              </h2>
+              <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+                {moveModule.name}::{selectedFunction.name}
+              </span>
+              <span className="hidden min-w-0 truncate text-[11px] text-muted-foreground xl:inline">
+                {movePackage.name} / {moveModule.filePath}
+              </span>
+            </div>
+          ) : (
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-semibold leading-5">
+                {moveModule.name}
+              </h2>
+              <p className="mt-0.5 truncate text-[11px] leading-4 text-muted-foreground">
+                {movePackage.name} / {moveModule.filePath}
+              </p>
+            </div>
+          )}
         </div>
-        {onClose ? (
-          <button
-            aria-label="Close module surface"
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground"
-            onClick={onClose}
-            type="button"
-          >
-            <X className="size-4" aria-hidden="true" />
-          </button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {onClose ? (
+            <button
+              aria-label="Close module surface"
+              className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground"
+              onClick={onClose}
+              type="button"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
       </header>
 
-      <div className="min-h-0 overflow-auto px-6 py-5">
-        {hasSurface ? (
-          <div className="space-y-6">
-            <SurfaceSection
-              count={structs.length}
-              emptyText="No structs found for this module."
-              title="Structs"
-            >
-              <div className="space-y-3">
-                {structs.map((signature) => (
-                  <article
-                    key={`${signature.name}-${signature.signature}`}
-                    className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-4"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <Box
-                          className="size-4 shrink-0 text-muted-foreground"
-                          aria-hidden="true"
-                        />
-                        <h3 className="truncate text-sm font-semibold">
-                          {signature.name}
-                        </h3>
-                      </div>
-                      <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                        {signature.abilities.length ? (
-                          signature.abilities.map((ability) => (
-                            <Badge key={ability} tone="ability">
-                              {ability}
-                            </Badge>
-                          ))
-                        ) : (
-                          <Badge tone="private">no abilities</Badge>
-                        )}
-                      </div>
-                    </div>
-                    <SignatureCodeBlock source={signature.signature} />
-                  </article>
-                ))}
-              </div>
-            </SurfaceSection>
-
-            <SurfaceSection
-              count={functions.length}
-              emptyText="No function signatures found for this module."
-              title="Functions"
-            >
-              <div className="space-y-3">
-                {functions.map((signature) => {
-                  const key = functionKey(signature);
-                  const isOpen = openFunctionKey === key;
-
-                  return (
-                    <FunctionSignatureCard
+      {selectedFunction ? (
+        <StateAccessWorkspace
+          graph={activeStateAccessGraph}
+          isLoading={isLoadingStateAccessGraph}
+          error={stateAccessGraphError}
+          moveModule={moveModule}
+          movePackage={movePackage}
+          onRetry={retryStateAccessGraph}
+          rootPath={rootPath}
+          signature={selectedFunction}
+        />
+      ) : (
+        <div className="min-h-0 min-w-0 overflow-auto px-6 py-5">
+          {hasSurface ? (
+            <div className="space-y-6">
+              <SurfaceSection
+                count={structs.length}
+                emptyText="No structs found for this module."
+                isOpen={!collapsedSurfaceSections.has("structs")}
+                onToggle={() => toggleSurfaceSection("structs")}
+                title="Structs"
+              >
+                <div className="space-y-3">
+                  {structs.map((signature) => (
+                    <article
                       key={`${signature.name}-${signature.signature}`}
-                      isOpen={isOpen}
-                      onToggle={() => {
-                        setOpenFunctionKey((current) =>
-                          current === key ? null : key,
-                        );
-                      }}
-                      signature={signature}
+                      className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-4"
                     >
-                      {isOpen ? (
-                        <FunctionStateAccessGraphPanel
-                          graph={activeStateAccessGraph}
-                          isLoading={isLoadingStateAccessGraph}
-                          error={stateAccessGraphError}
-                          onRetry={retryStateAccessGraph}
-                          moveModule={moveModule}
-                          movePackage={movePackage}
-                          rootPath={rootPath}
-                          signature={signature}
-                        />
-                      ) : null}
-                    </FunctionSignatureCard>
-                  );
-                })}
-              </div>
-            </SurfaceSection>
-          </div>
-        ) : (
-          <div className="flex h-full min-h-48 items-center justify-center rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] text-sm text-muted-foreground">
-            No structs or function signatures found for this module.
-          </div>
-        )}
-      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Box
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                          <h3 className="truncate text-sm font-semibold">
+                            {signature.name}
+                          </h3>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                          {signature.abilities.length ? (
+                            signature.abilities.map((ability) => (
+                              <Badge key={ability} tone="ability">
+                                {ability}
+                              </Badge>
+                            ))
+                          ) : (
+                            <Badge tone="private">no abilities</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <SignatureCodeBlock source={signature.signature} />
+                    </article>
+                  ))}
+                </div>
+              </SurfaceSection>
+
+              <SurfaceSection
+                count={functions.length}
+                emptyText="No function signatures found for this module."
+                isOpen={!collapsedSurfaceSections.has("functions")}
+                onToggle={() => toggleSurfaceSection("functions")}
+                title="Functions"
+              >
+                <div className="space-y-4">
+                  {functionVisibilityGroups.map((group) => {
+                    const isGroupOpen = !collapsedFunctionVisibilityGroups.has(
+                      group.visibility,
+                    );
+
+                    return (
+                      <CollapsibleSurfaceGroup
+                        count={group.functions.length}
+                        isOpen={isGroupOpen}
+                        key={group.visibility}
+                        onToggle={() =>
+                          toggleFunctionVisibilityGroup(group.visibility)
+                        }
+                        title={visibilityGroupLabel(group.visibility)}
+                      >
+                        <div className="space-y-3">
+                          {group.functions.map((signature) => {
+                            const key = functionKey(signature);
+                            const isOpen = openFunctionKey === key;
+
+                            return (
+                              <FunctionSignatureCard
+                                key={`${signature.name}-${signature.signature}`}
+                                isOpen={isOpen}
+                                onToggle={() => {
+                                  setOpenFunctionKey((current) =>
+                                    current === key ? null : key,
+                                  );
+                                }}
+                                signature={signature}
+                              />
+                            );
+                          })}
+                        </div>
+                      </CollapsibleSurfaceGroup>
+                    );
+                  })}
+                </div>
+              </SurfaceSection>
+            </div>
+          ) : (
+            <div className="flex h-full min-h-48 items-center justify-center rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] text-sm text-muted-foreground">
+              No structs or function signatures found for this module.
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
 
+function StateAccessWorkspace({
+  error,
+  graph,
+  isLoading,
+  moveModule,
+  movePackage,
+  onRetry,
+  rootPath,
+  signature,
+}: {
+  error: string | null;
+  graph: MoveStateAccessGraph | null;
+  isLoading: boolean;
+  moveModule: MoveModule;
+  movePackage: MovePackage;
+  onRetry: () => void;
+  rootPath?: string;
+  signature: MoveFunctionSignature;
+}) {
+  return (
+    <div className="grid h-full min-h-0 min-w-0 bg-[var(--app-window)]">
+      <div className="h-full min-h-0 min-w-0 overflow-hidden">
+        <FunctionStateAccessGraphPanel
+          fullscreen
+          graph={graph}
+          isLoading={isLoading}
+          error={error}
+          onRetry={onRetry}
+          moveModule={moveModule}
+          movePackage={movePackage}
+          rootPath={rootPath}
+          signature={signature}
+        />
+      </div>
+    </div>
+  );
+}
+
 function FunctionSignatureCard({
-  children,
   isOpen,
   onToggle,
   signature,
 }: {
-  children?: React.ReactNode;
   isOpen: boolean;
   onToggle: () => void;
   signature: MoveFunctionSignature;
@@ -314,7 +438,12 @@ function FunctionSignatureCard({
     isOpen && signature.body ? signature.body : signature.signature;
 
   return (
-    <article className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-4">
+    <article
+      className={cn(
+        "rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-4 transition-colors",
+        isOpen && "border-primary/45 bg-primary/5",
+      )}
+    >
       <button
         className="flex w-full min-w-0 items-center justify-between gap-3 text-left"
         onClick={onToggle}
@@ -344,7 +473,6 @@ function FunctionSignatureCard({
         </div>
       </button>
       <SignatureCodeBlock maxHeight source={source} />
-      {children}
     </article>
   );
 }
@@ -384,8 +512,48 @@ type StateAccessDiagramModel = {
   height: number;
 };
 
+type StateAccessFlowRowData = {
+  accessKinds: string[];
+  direct: boolean;
+  id: string;
+  label: string;
+  meta: string;
+};
+
+type StateAccessFlowNodeData =
+  | {
+      kind: "function";
+      meta: string;
+      title: string;
+    }
+  | {
+      kind: "stateGroup";
+      meta: string;
+      rows: StateAccessFlowRowData[];
+      title: string;
+    };
+
+const STATE_ACCESS_GROUP_HEADER_HEIGHT = 64;
+const STATE_ACCESS_GROUP_ROW_HEIGHT = 66;
+const STATE_ACCESS_GROUP_GAP = 28;
+const STATE_ACCESS_GROUP_START_Y = 40;
+const STATE_ACCESS_GROUP_X = 520;
+
+const STATE_ACCESS_FUNCTION_HEIGHT = 104;
+
+type StateAccessFlowModelGroup = {
+  height: number;
+  rows: StateAccessFlowRowData[];
+  title: string;
+};
+
+const STATE_ACCESS_NODE_TYPES = {
+  stateAccess: StateAccessFlowNode,
+};
+
 function FunctionStateAccessGraphPanel({
   error,
+  fullscreen = false,
   graph,
   isLoading,
   onRetry,
@@ -395,6 +563,7 @@ function FunctionStateAccessGraphPanel({
   signature,
 }: {
   error: string | null;
+  fullscreen?: boolean;
   graph: MoveStateAccessGraph | null;
   isLoading: boolean;
   onRetry: () => void;
@@ -411,7 +580,12 @@ function FunctionStateAccessGraphPanel({
 
   if (isLoading && !graph) {
     return (
-      <div className="mt-4 flex items-center gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3 py-3 text-xs text-muted-foreground">
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3 py-3 text-xs text-muted-foreground",
+          fullscreen && "h-full justify-center",
+        )}
+      >
         <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
         Building state access graph from the Move AST...
       </div>
@@ -420,7 +594,12 @@ function FunctionStateAccessGraphPanel({
 
   if (error && !graph) {
     return (
-      <div className="mt-4 flex min-w-0 items-center justify-between gap-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-3 text-xs text-red-200">
+      <div
+        className={cn(
+          "flex min-w-0 items-center justify-between gap-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-3 text-xs text-red-200",
+          fullscreen && "h-full",
+        )}
+      >
         <span className="min-w-0 truncate">{error}</span>
         <button
           className="shrink-0 rounded border border-red-300/30 px-2 py-1 text-[11px] font-medium text-red-100 transition hover:bg-red-300/10"
@@ -435,7 +614,12 @@ function FunctionStateAccessGraphPanel({
 
   if (!graph) {
     return (
-      <div className="mt-4 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3 py-3 text-xs text-muted-foreground">
+      <div
+        className={cn(
+          "rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3 py-3 text-xs text-muted-foreground",
+          fullscreen && "grid h-full place-items-center",
+        )}
+      >
         {rootPath
           ? "State graph is not loaded yet."
           : "State graph is unavailable in this view."}
@@ -445,7 +629,12 @@ function FunctionStateAccessGraphPanel({
 
   if (!summary.stateNodes.length) {
     return (
-      <div className="mt-4 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3 py-3 text-xs text-muted-foreground">
+      <div
+        className={cn(
+          "rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3 py-3 text-xs text-muted-foreground",
+          fullscreen && "grid h-full place-items-center",
+        )}
+      >
         No package state access was found for this function in the current AST
         graph.
       </div>
@@ -453,54 +642,187 @@ function FunctionStateAccessGraphPanel({
   }
 
   return (
-    <div className="mt-4 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)]">
-      <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <GitBranch
-            className="size-3.5 shrink-0 text-cyan-300"
-            aria-hidden="true"
-          />
-          <span className="truncate text-xs font-semibold text-foreground">
-            State access
-          </span>
-        </div>
-        <span className="shrink-0 rounded bg-[var(--app-subtle)] px-2 py-0.5 text-[11px] text-muted-foreground">
-          {summary.stateNodes.length} touched
-        </span>
-      </div>
+    <div
+      className={cn(
+        "overflow-hidden border border-[color:var(--app-border)] bg-[var(--app-window)]",
+        fullscreen
+          ? "grid h-full min-h-0 rounded-none border-x-0"
+          : "rounded-md",
+      )}
+    >
       <StateAccessDiagram
+        fullscreen={fullscreen}
         moveModule={moveModule}
         signature={signature}
         summary={summary}
       />
-      <div className="grid gap-2 border-t border-[color:var(--app-border)] px-3 py-3">
-        {summary.stateNodes.slice(0, 6).map((node) => {
-          const accessKinds = accessKindsForNode(summary.stateEdges, node.id);
-          const direct = summary.stateEdges.some(
-            (edge) =>
-              edge.target === node.id && edge.source === summary.functionId,
-          );
+      {!fullscreen ? (
+        <div className="grid gap-2 border-t border-[color:var(--app-border)] bg-[var(--app-window)] px-4 py-3">
+          {summary.stateNodes.slice(0, 6).map((node) => {
+            const accessKinds = accessKindsForNode(summary.stateEdges, node.id);
+            const direct = summary.stateEdges.some(
+              (edge) =>
+                edge.target === node.id && edge.source === summary.functionId,
+            );
+
+            return (
+              <div
+                className="flex min-w-0 items-center justify-between gap-3 text-xs"
+                key={node.id}
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-medium text-foreground">
+                    {node.qualifiedName}
+                  </div>
+                  <div className="truncate text-muted-foreground">
+                    {node.kind === "field" ? "field" : "state type"}
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                  {direct ? (
+                    <StateAccessBadge label="direct" tone="direct" />
+                  ) : (
+                    <StateAccessBadge label="via call" tone="indirect" />
+                  )}
+                  {accessKinds.slice(0, 3).map((accessKind) => (
+                    <StateAccessBadge
+                      key={accessKind}
+                      label={accessKindLabel(accessKind)}
+                      tone={accessKindTone(accessKind)}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StateAccessDiagram({
+  fullscreen = false,
+  moveModule,
+  signature,
+  summary,
+}: {
+  fullscreen?: boolean;
+  moveModule: MoveModule;
+  signature: MoveFunctionSignature;
+  summary: FunctionStateAccessSummary;
+}) {
+  const flow = React.useMemo(
+    () => buildStateAccessFlowModel(summary, moveModule, signature),
+    [moveModule, signature, summary],
+  );
+
+  return (
+    <div
+      className={cn(
+        "state-access-flow relative bg-[var(--app-window)]",
+        fullscreen ? "h-full min-h-0" : "min-h-[32rem]",
+      )}
+    >
+      <div className="pointer-events-none absolute right-3 top-3 z-10 rounded bg-[var(--app-subtle)] px-2 py-0.5 text-[11px] text-muted-foreground">
+        {summary.stateNodes.length} touched
+      </div>
+      <ReactFlow
+        colorMode="dark"
+        edges={flow.edges}
+        edgesFocusable={false}
+        fitView
+        fitViewOptions={{ padding: fullscreen ? 0.06 : 0.12 }}
+        maxZoom={2.4}
+        minZoom={0.28}
+        nodeTypes={STATE_ACCESS_NODE_TYPES}
+        nodes={flow.nodes}
+        nodesDraggable={false}
+        nodesFocusable={false}
+        onlyRenderVisibleElements
+        panOnScroll
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background color="var(--border)" gap={18} size={1} />
+        <Controls
+          className="!right-3 !top-11 !bg-background/90 !shadow-none [&_button]:!border-border [&_button]:!bg-background [&_button]:!text-foreground"
+          position="top-right"
+          showInteractive={false}
+        />
+      </ReactFlow>
+    </div>
+  );
+}
+
+function StateAccessFlowNode({ data }: NodeProps<Node<StateAccessFlowNodeData>>) {
+  if (data.kind === "function") {
+    return (
+      <div className="relative h-[104px] w-72 overflow-hidden border border-cyan-400/70 bg-cyan-400/[0.04] text-left shadow-[0_0_0_1px_rgba(34,211,238,0.08)]">
+        <Handle
+          className="!size-2 !border-background"
+          id="out"
+          position={Position.Right}
+          style={{ backgroundColor: "rgb(34 211 238)" }}
+          type="source"
+        />
+        <div className="border-b border-cyan-400/20 px-4 py-3.5">
+          <div className="truncate text-base font-semibold text-foreground">
+            {truncateLabel(data.title, 26)}
+          </div>
+        </div>
+        <div className="px-4 py-3">
+          <div className="text-[11px] font-semibold text-muted-foreground">
+            selected Move function
+          </div>
+          <div className="mt-1 truncate text-[11px] text-slate-500">
+            {truncateLabel(data.meta, 38)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-[28rem] overflow-hidden border border-rose-400/75 bg-[var(--app-window)] text-left shadow-[0_0_0_1px_rgba(251,113,133,0.08)]">
+      <div className="h-16 border-b border-slate-700/80 px-4 py-3">
+        <div className="truncate text-sm font-semibold text-foreground">
+          {truncateLabel(data.title, 36)}
+        </div>
+        <div className="mt-1 truncate text-[11px] text-muted-foreground">
+          {truncateLabel(data.meta, 54)}
+        </div>
+      </div>
+      <div>
+        {data.rows.map((row) => {
+          const color = accessKindColor(primaryAccessKind(row.accessKinds));
 
           return (
             <div
-              className="flex min-w-0 items-center justify-between gap-3 text-xs"
-              key={node.id}
+              className="relative grid h-[66px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-rose-400/70 px-4 last:border-b-0"
+              key={row.id}
             >
+              <Handle
+                className="!left-0 !size-2.5 !-translate-x-1/2 !-translate-y-1/2 !border-background"
+                id={row.id}
+                position={Position.Left}
+                style={{ backgroundColor: color }}
+                type="target"
+              />
               <div className="min-w-0">
-                <div className="truncate font-medium text-foreground">
-                  {node.qualifiedName}
+                <div className="truncate text-sm font-semibold text-foreground">
+                  {truncateLabel(row.label, 32)}
                 </div>
-                <div className="truncate text-muted-foreground">
-                  {node.kind === "field" ? "field" : "state type"}
+                <div className="mt-1 truncate text-[11px] text-muted-foreground">
+                  {truncateLabel(row.meta, 48)}
                 </div>
               </div>
-              <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                {direct ? (
+              <div className="flex max-w-36 shrink-0 flex-wrap justify-end gap-1.5">
+                {row.direct ? (
                   <StateAccessBadge label="direct" tone="direct" />
                 ) : (
                   <StateAccessBadge label="via call" tone="indirect" />
                 )}
-                {accessKinds.slice(0, 3).map((accessKind) => (
+                {row.accessKinds.slice(0, 2).map((accessKind) => (
                   <StateAccessBadge
                     key={accessKind}
                     label={accessKindLabel(accessKind)}
@@ -516,276 +838,104 @@ function FunctionStateAccessGraphPanel({
   );
 }
 
-function StateAccessDiagram({
-  moveModule,
-  signature,
-  summary,
-}: {
-  moveModule: MoveModule;
-  signature: MoveFunctionSignature;
-  summary: FunctionStateAccessSummary;
-}) {
-  const model = React.useMemo(
-    () => buildStateAccessDiagramModel(summary),
-    [summary],
+function buildStateAccessFlowModel(
+  summary: FunctionStateAccessSummary,
+  moveModule: MoveModule,
+  signature: MoveFunctionSignature,
+): {
+  edges: Edge[];
+  nodes: Array<Node<StateAccessFlowNodeData>>;
+} {
+  const model = buildStateAccessDiagramModel(summary);
+  const groups = model.groups.map<StateAccessFlowModelGroup>((group) => {
+    const rows = group.rows.map<StateAccessFlowRowData>((row) => ({
+      accessKinds: row.accessKinds,
+      direct: row.direct,
+      id: row.id,
+      label: row.label,
+      meta: row.subtitle,
+    }));
+
+    return {
+      height:
+        STATE_ACCESS_GROUP_HEADER_HEIGHT +
+        rows.length * STATE_ACCESS_GROUP_ROW_HEIGHT,
+      rows,
+      title: group.title,
+    };
+  });
+  const totalGroupHeight =
+    groups.reduce((height, group) => height + group.height, 0) +
+    Math.max(0, groups.length - 1) * STATE_ACCESS_GROUP_GAP;
+  const functionY = Math.max(
+    STATE_ACCESS_GROUP_START_Y,
+    STATE_ACCESS_GROUP_START_Y +
+      totalGroupHeight / 2 -
+      STATE_ACCESS_FUNCTION_HEIGHT / 2,
   );
-  const functionBox = {
-    height: 118,
-    width: 292,
-    x: 34,
-    y: Math.max(42, model.height / 2 - 59),
-  };
-  const startX = functionBox.x + functionBox.width;
-  const startY = functionBox.y + functionBox.height / 2;
-  const stateX = 482;
-  const stateWidth = 396;
+  const nodes: Array<Node<StateAccessFlowNodeData>> = [
+    {
+      id: "selected-function",
+      position: { x: 48, y: functionY },
+      type: "stateAccess",
+      data: {
+        kind: "function",
+        meta: `${moveModule.name}::${signature.name}()`,
+        title: signature.name,
+      },
+    },
+  ];
+  const edges: Edge[] = [];
+  let groupY = STATE_ACCESS_GROUP_START_Y;
 
-  return (
-    <div className="overflow-x-auto bg-[var(--app-window)]">
-      <svg
-        aria-label={`AST state access diagram for ${signature.name}`}
-        className="block min-w-[820px]"
-        role="img"
-        viewBox={`0 0 920 ${model.height}`}
-      >
-        <defs>
-          <filter
-            id="state-access-diagram-shadow"
-            x="-18%"
-            y="-18%"
-            width="136%"
-            height="136%"
-          >
-            <feDropShadow dx="0" dy="3" stdDeviation="3" floodOpacity="0.22" />
-          </filter>
-          <linearGradient id="state-access-function-fill" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0%" stopColor="rgb(15 23 42)" />
-            <stop offset="100%" stopColor="rgb(8 13 24)" />
-          </linearGradient>
-        </defs>
+  model.groups.forEach((group, groupIndex) => {
+    const flowGroup = groups[groupIndex];
 
-        <rect
-          x="1"
-          y="1"
-          width="918"
-          height={model.height - 2}
-          rx="10"
-          fill="rgb(3 7 18 / 0.34)"
-          stroke="rgb(148 163 184 / 0.12)"
-        />
-        <path
-          d={`M ${functionBox.x + 18} ${functionBox.y - 28} L ${functionBox.x + 18} ${functionBox.y}`}
-          fill="none"
-          stroke="rgb(71 85 105 / 0.9)"
-          strokeWidth="1.2"
-        />
-        <rect
-          x={functionBox.x}
-          y={functionBox.y - 68}
-          width="292"
-          height="40"
-          rx="7"
-          fill="rgb(15 23 42 / 0.55)"
-          stroke="rgb(71 85 105 / 0.72)"
-        />
-        <text
-          x={functionBox.x + 16}
-          y={functionBox.y - 44}
-          fill="rgb(148 163 184)"
-          fontSize="12"
-          fontWeight="600"
-        >
-          {truncateLabel(moveModule.name, 28)}
-        </text>
+    if (!flowGroup) {
+      return;
+    }
 
-        {model.groups.map((group) => {
-          const groupCenterX = stateX + stateWidth / 2;
+    const groupNodeId = `state-group:${group.id}`;
 
-          return (
-            <g key={`source-${group.id}`}>
-              <path
-                d={`M ${groupCenterX} ${group.y - 20} L ${groupCenterX} ${group.y}`}
-                fill="none"
-                stroke="rgb(71 85 105 / 0.72)"
-                strokeWidth="1.2"
-              />
-              <rect
-                x={stateX}
-                y={group.y - 60}
-                width={stateWidth}
-                height="40"
-                rx="7"
-                fill="rgb(15 23 42 / 0.55)"
-                stroke="rgb(71 85 105 / 0.72)"
-              />
-              <text
-                x={stateX + 16}
-                y={group.y - 36}
-                fill="rgb(148 163 184)"
-                fontSize="12"
-                fontWeight="600"
-              >
-                {truncateLabel(group.subtitle, 42)}
-              </text>
-            </g>
-          );
-        })}
+    nodes.push({
+      id: groupNodeId,
+      position: { x: STATE_ACCESS_GROUP_X, y: groupY },
+      type: "stateAccess",
+      data: {
+        kind: "stateGroup",
+        meta: group.subtitle,
+        rows: flowGroup.rows,
+        title: flowGroup.title,
+      },
+    });
 
-        {model.groups.flatMap((group) =>
-          group.rows.map((row) => {
-            const targetX = stateX;
-            const targetY = row.y + 18;
-            const stroke = accessKindColor(primaryAccessKind(row.accessKinds));
-            const midX = startX + Math.max(70, (targetX - startX) * 0.44);
+    group.rows.forEach((row) => {
+      const color = accessKindColor(primaryAccessKind(row.accessKinds));
 
-            return (
-              <g key={`edge-${row.id}`}>
-                <path
-                  d={`M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${targetY}, ${targetX} ${targetY}`}
-                  fill="none"
-                  stroke={stroke}
-                  strokeDasharray={row.direct ? undefined : "5 6"}
-                  strokeLinecap="round"
-                  strokeOpacity={row.direct ? "0.92" : "0.56"}
-                  strokeWidth={row.direct ? "2" : "1.4"}
-                />
-                <path
-                  d={`M ${targetX - 8} ${targetY - 5} L ${targetX} ${targetY} L ${targetX - 8} ${targetY + 5}`}
-                  fill="none"
-                  stroke={stroke}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeOpacity={row.direct ? "0.92" : "0.6"}
-                  strokeWidth={row.direct ? "2" : "1.4"}
-                />
-              </g>
-            );
-          }),
-        )}
+      edges.push({
+        id: `access:${row.id}`,
+        animated: !row.direct,
+        markerEnd: {
+          color,
+          type: MarkerType.ArrowClosed,
+        },
+        source: "selected-function",
+        sourceHandle: "out",
+        target: groupNodeId,
+        targetHandle: row.id,
+        type: "smoothstep",
+        style: {
+          stroke: color,
+          strokeDasharray: row.direct ? undefined : "6 6",
+          strokeWidth: row.direct ? 2 : 1.35,
+        },
+      });
+    });
 
-        <g filter="url(#state-access-diagram-shadow)">
-          <rect
-            x={functionBox.x}
-            y={functionBox.y}
-            width={functionBox.width}
-            height={functionBox.height}
-            rx="8"
-            fill="url(#state-access-function-fill)"
-            stroke="rgb(34 211 238 / 0.68)"
-            strokeWidth="1.4"
-          />
-          <line
-            x1={functionBox.x}
-            x2={functionBox.x + functionBox.width}
-            y1={functionBox.y + 46}
-            y2={functionBox.y + 46}
-            stroke="rgb(34 211 238 / 0.22)"
-          />
-          <text
-            x={functionBox.x + 18}
-            y={functionBox.y + 28}
-            fill="rgb(226 232 240)"
-            fontSize="16"
-            fontWeight="700"
-          >
-            {truncateLabel(signature.name, 24)}
-          </text>
-          <text
-            x={functionBox.x + 18}
-            y={functionBox.y + 72}
-            fill="rgb(148 163 184)"
-            fontSize="12"
-            fontWeight="600"
-          >
-            selected Move function
-          </text>
-          <text
-            x={functionBox.x + 18}
-            y={functionBox.y + 94}
-            fill="rgb(100 116 139)"
-            fontSize="11"
-          >
-            {truncateLabel(`${moveModule.name}::${signature.name}()`, 36)}
-          </text>
-        </g>
+    groupY += flowGroup.height + STATE_ACCESS_GROUP_GAP;
+  });
 
-        {model.groups.map((group) => (
-          <g filter="url(#state-access-diagram-shadow)" key={group.id}>
-            <rect
-              x={stateX}
-              y={group.y}
-              width={stateWidth}
-              height={group.height}
-              rx="8"
-              fill="rgb(15 23 42 / 0.94)"
-              stroke="rgb(99 102 241 / 0.64)"
-              strokeWidth="1.35"
-            />
-            <line
-              x1={stateX}
-              x2={stateX + stateWidth}
-              y1={group.y + 46}
-              y2={group.y + 46}
-              stroke="rgb(99 102 241 / 0.3)"
-            />
-            <text
-              x={stateX + 20}
-              y={group.y + 28}
-              fill="rgb(226 232 240)"
-              fontSize="15"
-              fontWeight="700"
-            >
-              {truncateLabel(group.title, 34)}
-            </text>
-            {group.rows.map((row, index) => {
-              const rowY = group.y + 46 + index * 38;
-              const accessKinds = row.accessKinds.map(accessKindLabel).join(" / ");
-              const stroke = accessKindColor(primaryAccessKind(row.accessKinds));
-
-              return (
-                <g key={row.id}>
-                  <rect
-                    x={stateX + 1}
-                    y={rowY}
-                    width={stateWidth - 2}
-                    height="38"
-                    fill={row.direct ? "rgb(15 23 42 / 0.72)" : "rgb(15 23 42 / 0.45)"}
-                  />
-                  <line
-                    x1={stateX}
-                    x2={stateX + stateWidth}
-                    y1={rowY}
-                    y2={rowY}
-                    stroke="rgb(99 102 241 / 0.22)"
-                  />
-                  <circle cx={stateX + 18} cy={rowY + 19} r="4" fill={stroke} />
-                  <text
-                    x={stateX + 34}
-                    y={rowY + 23}
-                    fill="rgb(226 232 240)"
-                    fontSize="13"
-                    fontWeight="600"
-                  >
-                    {truncateLabel(row.label, 24)}
-                  </text>
-                  <text
-                    x={stateX + stateWidth - 18}
-                    y={rowY + 23}
-                    fill={row.direct ? "rgb(34 211 238)" : "rgb(148 163 184)"}
-                    fontSize="11"
-                    fontWeight="700"
-                    textAnchor="end"
-                  >
-                    {truncateLabel(accessKinds, 18)}
-                  </text>
-                </g>
-              );
-            })}
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
+  return { edges, nodes };
 }
 
 function buildStateAccessDiagramModel(
@@ -1149,6 +1299,61 @@ function functionKey(signature: { name: string; signature: string }) {
   return `${signature.name}-${signature.signature}`;
 }
 
+function toggleSetValue<T>(set: Set<T>, value: T) {
+  const next = new Set(set);
+
+  if (next.has(value)) {
+    next.delete(value);
+  } else {
+    next.add(value);
+  }
+
+  return next;
+}
+
+function groupFunctionsByVisibility(functions: MoveFunctionSignature[]) {
+  const groups = new Map<string, MoveFunctionSignature[]>();
+
+  for (const signature of functions) {
+    const visibility = signature.visibility || "private";
+    const group = groups.get(visibility) ?? [];
+
+    group.push(signature);
+    groups.set(visibility, group);
+  }
+
+  return Array.from(groups.entries())
+    .map(([visibility, groupFunctions]) => ({
+      functions: groupFunctions,
+      visibility,
+    }))
+    .sort((left, right) => {
+      return (
+        visibilitySortRank(left.visibility) -
+          visibilitySortRank(right.visibility) ||
+        left.visibility.localeCompare(right.visibility)
+      );
+    });
+}
+
+function visibilitySortRank(visibility: string) {
+  if (visibility === "public") {
+    return 0;
+  }
+  if (visibility.includes("package") || visibility.includes("friend")) {
+    return 1;
+  }
+  if (visibility === "private") {
+    return 3;
+  }
+
+  return 2;
+}
+
+function visibilityGroupLabel(visibility: string) {
+  return `${visibility || "private"} functions`;
+}
+
 function SignatureCodeBlock({
   maxHeight,
   source,
@@ -1310,28 +1515,92 @@ function SurfaceSection({
   children,
   count,
   emptyText,
+  isOpen,
+  onToggle,
   title,
 }: {
   children: React.ReactNode;
   count: number;
   emptyText: string;
+  isOpen: boolean;
+  onToggle: () => void;
   title: string;
 }) {
   return (
     <section>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      <button
+        className="mb-3 flex w-full items-center justify-between gap-3 text-left"
+        onClick={onToggle}
+        type="button"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <ChevronDown
+            className={cn(
+              "size-4 shrink-0 text-muted-foreground transition-transform",
+              !isOpen && "-rotate-90",
+            )}
+            aria-hidden="true"
+          />
+          <h3 className="truncate text-sm font-semibold text-foreground">
+            {title}
+          </h3>
+        </span>
         <span className="rounded bg-[var(--app-subtle)] px-2 py-0.5 text-xs text-muted-foreground">
           {count}
         </span>
-      </div>
-      {count ? (
+      </button>
+      {isOpen && count ? (
         children
-      ) : (
+      ) : isOpen ? (
         <div className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-4 py-5 text-sm text-muted-foreground">
           {emptyText}
         </div>
-      )}
+      ) : null}
+    </section>
+  );
+}
+
+function CollapsibleSurfaceGroup({
+  children,
+  count,
+  isOpen,
+  onToggle,
+  title,
+}: {
+  children: React.ReactNode;
+  count: number;
+  isOpen: boolean;
+  onToggle: () => void;
+  title: string;
+}) {
+  return (
+    <section className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-window)]">
+      <button
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        onClick={onToggle}
+        type="button"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <ChevronRight
+            className={cn(
+              "size-4 shrink-0 text-muted-foreground transition-transform",
+              isOpen && "rotate-90",
+            )}
+            aria-hidden="true"
+          />
+          <span className="truncate text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            {title}
+          </span>
+        </span>
+        <span className="rounded bg-[var(--app-subtle)] px-2 py-0.5 text-xs text-muted-foreground">
+          {count}
+        </span>
+      </button>
+      {isOpen ? (
+        <div className="border-t border-[color:var(--app-border)] p-3">
+          {children}
+        </div>
+      ) : null}
     </section>
   );
 }

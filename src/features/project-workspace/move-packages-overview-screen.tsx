@@ -266,6 +266,50 @@ export function MovePackagesOverviewScreen({
     onSelectModule(movePackage, matchingModule);
   }, [movePackage, onSelectModule, sourceJumpRequest]);
 
+  const toggleEditorMode = React.useCallback(() => {
+    if (!movePackage) {
+      return;
+    }
+
+    if (isEditorMode) {
+      setIsEditorMode(false);
+      return;
+    }
+
+    const moduleToEdit =
+      selectedModule?.movePackage.manifestPath === movePackage.manifestPath
+        ? selectedModule.moveModule
+        : movePackage.modules[0] ?? null;
+
+    if (!moduleToEdit) {
+      return;
+    }
+
+    const nextSelectedModule = {
+      moveModule: moduleToEdit,
+      movePackage,
+    };
+
+    setIsEditorMode(true);
+    setActiveEditorPath(moduleToEdit.filePath);
+    setEditorTabs((current) => {
+      const existing = current.find(
+        (tab) => tab.selectedModule.moveModule.filePath === moduleToEdit.filePath,
+      );
+
+      if (existing) {
+        return current.map((tab) =>
+          tab.selectedModule.moveModule.filePath === moduleToEdit.filePath
+            ? { ...tab, selectedModule: nextSelectedModule }
+            : tab,
+        );
+      }
+
+      return [...current, createModuleEditorTab(nextSelectedModule)];
+    });
+    onSelectModule(movePackage, moduleToEdit);
+  }, [isEditorMode, movePackage, onSelectModule, selectedModule]);
+
   const hasDetailPane = Boolean(selectedModule) || (isEditorMode && editorTabs.length > 0);
 
   return (
@@ -275,13 +319,12 @@ export function MovePackagesOverviewScreen({
           ref={containerRef}
           className={cn(
             "grid min-h-0",
-            !hasDetailPane && "grid-cols-1",
             isResizing && "select-none",
           )}
           style={
             hasDetailPane
               ? { gridTemplateColumns: `${treePaneWidth}px 6px minmax(0, 1fr)` }
-              : undefined
+              : { gridTemplateColumns: `${treePaneWidth}px minmax(0, 1fr)` }
           }
         >
           <ScrollArea className="min-h-0 select-none">
@@ -292,7 +335,7 @@ export function MovePackagesOverviewScreen({
                 isEditorMode={isEditorMode}
                 movePackage={movePackage}
                 onSelectModule={onSelectModule}
-                onToggleEditorMode={() => setIsEditorMode((current) => !current)}
+                onToggleEditorMode={toggleEditorMode}
                 selectedModulePath={selectedModule?.moveModule.filePath ?? null}
               />
             </div>
