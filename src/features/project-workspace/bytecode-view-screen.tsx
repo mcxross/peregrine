@@ -15,6 +15,9 @@ import {
   GripVertical,
   Loader2,
   Package,
+  Pause,
+  Play,
+  Repeat,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -915,11 +918,88 @@ function ControlFlowPanel({
   selectedBlock: MoveBytecodeBasicBlockView | null;
   selectedInstruction: MoveBytecodeInstructionView | null;
 }) {
+  const paths = React.useMemo(() => controlFlowPaths(blocks, edges), [blocks, edges]);
+  const animationFrames = React.useMemo(() => controlFlowAnimationFrames(paths), [paths]);
+  const [isPlaying, setIsPlaying] = React.useState(false);
+  const [loopPlayback, setLoopPlayback] = React.useState(false);
+  const [animationFrameIndex, setAnimationFrameIndex] = React.useState(0);
+  const canAnimate = animationFrames.length > 0;
+
+  React.useEffect(() => {
+    setIsPlaying(false);
+    setAnimationFrameIndex(0);
+  }, [animationFrames.length]);
+
+  React.useEffect(() => {
+    if (!isPlaying || !canAnimate) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setAnimationFrameIndex((current) => {
+        const next = current + 1;
+
+        if (next < animationFrames.length) {
+          return next;
+        }
+
+        if (loopPlayback) {
+          return 0;
+        }
+
+        setIsPlaying(false);
+        return current;
+      });
+    }, 520);
+
+    return () => window.clearInterval(interval);
+  }, [animationFrames.length, canAnimate, isPlaying, loopPlayback]);
+
   return (
     <section className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
-      <PanelHeader icon={GitBranch} title="Control Flow" subtitle={`${blocks.length} blocks, ${edges.length} edges`} />
+      <PanelHeader
+        actions={
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              aria-label={isPlaying ? "Pause control-flow playback" : "Play control-flow paths"}
+              className={cn(
+                "grid size-6 place-items-center rounded border border-[color:var(--app-border)] text-muted-foreground transition-colors hover:bg-[var(--app-subtle)] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40",
+                isPlaying && "border-sky-400/50 bg-sky-500/10 text-sky-200",
+              )}
+              disabled={!canAnimate}
+              onClick={() => {
+                if (!isPlaying && animationFrameIndex >= animationFrames.length - 1) {
+                  setAnimationFrameIndex(0);
+                }
+                setIsPlaying((current) => !current);
+              }}
+              title="Play all possible paths"
+              type="button"
+            >
+              {isPlaying ? <Pause className="size-3" aria-hidden="true" /> : <Play className="size-3" aria-hidden="true" />}
+            </button>
+            <button
+              aria-label="Loop control-flow playback"
+              aria-pressed={loopPlayback}
+              className={cn(
+                "grid size-6 place-items-center rounded border border-[color:var(--app-border)] text-muted-foreground transition-colors hover:bg-[var(--app-subtle)] hover:text-foreground",
+                loopPlayback && "border-sky-400/50 bg-sky-500/10 text-sky-200",
+              )}
+              onClick={() => setLoopPlayback((current) => !current)}
+              title="Loop playback"
+              type="button"
+            >
+              <Repeat className="size-3" aria-hidden="true" />
+            </button>
+          </div>
+        }
+        icon={GitBranch}
+        title="Control Flow"
+        subtitle={`${blocks.length} blocks, ${edges.length} edges`}
+      />
       <ScrollArea className="min-h-0 min-w-0">
         <ControlFlowGraph
+          activeAnimationFrame={(isPlaying || animationFrameIndex > 0) ? (animationFrames[animationFrameIndex] ?? null) : null}
           blocks={blocks}
           edges={edges}
           selectedBlock={selectedBlock}
@@ -932,12 +1012,14 @@ function ControlFlowPanel({
 }
 
 function ControlFlowGraph({
+  activeAnimationFrame,
   blocks,
   edges,
   onSelectBlock,
   selectedBlock,
   selectedInstruction,
 }: {
+  activeAnimationFrame: ControlFlowAnimationFrame | null;
   blocks: MoveBytecodeBasicBlockView[];
   edges: MoveBytecodeControlFlowEdgeView[];
   onSelectBlock: (block: MoveBytecodeBasicBlockView) => void;
@@ -945,6 +1027,10 @@ function ControlFlowGraph({
   selectedInstruction: MoveBytecodeInstructionView | null;
 }) {
   const layout = React.useMemo(() => layoutControlFlow(blocks, edges), [blocks, edges]);
+  const activeBlockIds = React.useMemo(
+    () => new Set(activeAnimationFrame?.blockIds ?? []),
+    [activeAnimationFrame],
+  );
 
   if (!blocks.length) {
     return (
@@ -993,16 +1079,17 @@ function ControlFlowGraph({
           </defs>
           {layout.edges.map((edge) => {
             const isActive = edge.source === selectedBlock?.id || edge.target === selectedBlock?.id;
+            const isAnimated = activeAnimationFrame?.edgeKey === controlFlowEdgeKey(edge);
 
             return (
               <g key={`${edge.source}:${edge.target}:${edge.kind}:${edge.sourceOffset}`}>
                 <path
                   d={edge.path}
                   fill="none"
-                  markerEnd={`url(#${isActive ? "cfg-arrow-selected" : "cfg-arrow"})`}
-                  stroke={isActive ? "rgb(96 165 250)" : edgeColor(edge.kind)}
+                  markerEnd={`url(#${isActive || isAnimated ? "cfg-arrow-selected" : "cfg-arrow"})`}
+                  stroke={isAnimated ? "rgb(56 189 248)" : isActive ? "rgb(96 165 250)" : edgeColor(edge.kind)}
                   strokeDasharray={edge.kind === "fallthrough" ? undefined : "5 4"}
-                  strokeWidth={isActive ? 2 : 1.4}
+                  strokeWidth={isActive || isAnimated ? 2.4 : 1.4}
                 />
                 <text
                   className="fill-muted-foreground font-mono text-[10px]"
@@ -1038,12 +1125,14 @@ function ControlFlowGraph({
             && selectedInstruction.offset >= item.block.startOffset
             && selectedInstruction.offset <= item.block.endOffset;
           const isSelected = item.block.id === selectedBlock?.id;
+          const isAnimated = activeBlockIds.has(item.block.id);
 
           return (
             <button
               className={cn(
                 "absolute rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-center text-xs shadow-sm transition-colors hover:border-primary/50 hover:bg-[var(--app-subtle)]",
                 (isSelected || containsInstruction) && "border-primary/70 bg-primary/15 text-foreground shadow-[0_0_0_1px_rgba(71,139,255,0.18)]",
+                isAnimated && "border-sky-400/80 bg-sky-500/10 text-foreground shadow-[0_0_0_1px_rgba(56,189,248,0.18)]",
               )}
               key={item.block.id}
               onClick={() => onSelectBlock(item.block)}
@@ -1155,23 +1244,26 @@ function ExplanationPanel({
 }
 
 function PanelHeader({
+  actions,
   icon: Icon,
   subtitle,
   title,
 }: {
+  actions?: React.ReactNode;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   subtitle?: string;
   title: string;
 }) {
   return (
     <header className="flex h-12 min-w-0 overflow-hidden items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-4">
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold">{title}</h2>
           {subtitle ? <p className="truncate text-[11px] text-muted-foreground">{subtitle}</p> : null}
         </div>
       </div>
+      {actions}
     </header>
   );
 }
@@ -1550,6 +1642,16 @@ type ControlFlowEdgeLayout = MoveBytecodeControlFlowEdgeView & {
   labelY: number;
 };
 
+type ControlFlowPath = {
+  blockIds: string[];
+  edgeKeys: string[];
+};
+
+type ControlFlowAnimationFrame = {
+  blockIds: string[];
+  edgeKey: string | null;
+};
+
 function layoutControlFlow(
   blocks: MoveBytecodeBasicBlockView[],
   edges: MoveBytecodeControlFlowEdgeView[],
@@ -1629,6 +1731,93 @@ function layoutControlFlow(
     height,
     width: minWidth,
   };
+}
+
+function controlFlowPaths(
+  blocks: MoveBytecodeBasicBlockView[],
+  edges: MoveBytecodeControlFlowEdgeView[],
+) {
+  const entryBlock = blocks[0];
+
+  if (!entryBlock) {
+    return [];
+  }
+
+  if (!edges.length) {
+    return [{ blockIds: [entryBlock.id], edgeKeys: [] }];
+  }
+
+  const outgoing = new Map<string, MoveBytecodeControlFlowEdgeView[]>();
+
+  for (const edge of edges) {
+    const current = outgoing.get(edge.source) ?? [];
+    current.push(edge);
+    outgoing.set(edge.source, current);
+  }
+
+  for (const group of outgoing.values()) {
+    group.sort((left, right) =>
+      left.sourceOffset - right.sourceOffset
+      || left.targetOffset - right.targetOffset
+      || left.kind.localeCompare(right.kind),
+    );
+  }
+
+  const paths: ControlFlowPath[] = [];
+  const maxDepth = Math.max(4, blocks.length * 2);
+
+  const walk = (blockId: string, blockIds: string[], edgeKeys: string[]) => {
+    const nextEdges = outgoing.get(blockId) ?? [];
+
+    if (!nextEdges.length || blockIds.length >= maxDepth) {
+      paths.push({ blockIds, edgeKeys });
+      return;
+    }
+
+    for (const edge of nextEdges) {
+      const nextBlockIds = [...blockIds, edge.target];
+      const nextEdgeKeys = [...edgeKeys, controlFlowEdgeKey(edge)];
+
+      if (blockIds.includes(edge.target)) {
+        paths.push({ blockIds: nextBlockIds, edgeKeys: nextEdgeKeys });
+        continue;
+      }
+
+      walk(edge.target, nextBlockIds, nextEdgeKeys);
+    }
+  };
+
+  walk(entryBlock.id, [entryBlock.id], []);
+
+  return paths;
+}
+
+function controlFlowAnimationFrames(paths: ControlFlowPath[]) {
+  const frames: ControlFlowAnimationFrame[] = [];
+
+  for (const path of paths) {
+    if (!path.blockIds.length) {
+      continue;
+    }
+
+    frames.push({
+      blockIds: [path.blockIds[0]],
+      edgeKey: null,
+    });
+
+    for (const [index, edgeKey] of path.edgeKeys.entries()) {
+      frames.push({
+        blockIds: path.blockIds.slice(0, index + 2),
+        edgeKey,
+      });
+    }
+  }
+
+  return frames;
+}
+
+function controlFlowEdgeKey(edge: Pick<MoveBytecodeControlFlowEdgeView, "kind" | "source" | "sourceOffset" | "target" | "targetOffset">) {
+  return `${edge.source}:${edge.target}:${edge.kind}:${edge.sourceOffset}:${edge.targetOffset}`;
 }
 
 function operandText(instruction: MoveBytecodeInstructionView) {
