@@ -934,6 +934,15 @@ function ControlFlowGraph({
               </g>
             );
           })}
+          {layout.blocks.length === 1 && edges.length === 0 ? (
+            <path
+              d={`M ${layout.centerX} 22 L ${layout.centerX} ${layout.blocks[0].top} M ${layout.centerX} ${layout.blocks[0].bottom} L ${layout.centerX} ${layout.height - 24}`}
+              fill="none"
+              markerEnd="url(#cfg-arrow)"
+              stroke="rgb(148 163 184 / 0.55)"
+              strokeWidth={1.4}
+            />
+          ) : null}
         </svg>
 
         <Circle
