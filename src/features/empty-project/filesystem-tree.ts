@@ -367,6 +367,9 @@ export type MoveBytecodeFunctionView = {
   name: string;
   visibility: string;
   isEntry: boolean;
+  parameters: string[];
+  returns: string[];
+  typeParameterCount: number;
   instructionCount: number;
   localCount: number;
   returnCount: number;
@@ -379,7 +382,17 @@ export type MoveBytecodeInstructionView = {
   offset: number;
   opcode: string;
   detail: string;
+  call: MoveBytecodeCallView | null;
   source: MoveBytecodeSourceSpan | null;
+};
+
+export type MoveBytecodeCallView = {
+  handleIndex: number;
+  moduleAddress: string;
+  moduleName: string;
+  functionName: string;
+  qualifiedName: string;
+  genericTypeArguments: string[];
 };
 
 export type MoveBytecodeControlFlowView = {

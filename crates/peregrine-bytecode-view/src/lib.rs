@@ -1,5 +1,6 @@
 use move_binary_format::file_format::{
-    Bytecode, CodeOffset, CompiledModule, FunctionDefinitionIndex,
+    Bytecode, CodeOffset, CompiledModule, FunctionDefinitionIndex, FunctionHandleIndex,
+    SignatureToken,
 };
 use move_bytecode_source_map::{
     mapping::SourceMapping, source_map::SourceMap, utils::source_map_from_file,
@@ -59,6 +60,9 @@ pub struct MoveBytecodeFunctionView {
     pub name: String,
     pub visibility: String,
     pub is_entry: bool,
+    pub parameters: Vec<String>,
+    pub returns: Vec<String>,
+    pub type_parameter_count: usize,
     pub instruction_count: usize,
     pub local_count: usize,
     pub return_count: usize,
@@ -73,7 +77,19 @@ pub struct MoveBytecodeInstructionView {
     pub offset: u16,
     pub opcode: String,
     pub detail: String,
+    pub call: Option<MoveBytecodeCallView>,
     pub source: Option<MoveBytecodeSourceSpan>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveBytecodeCallView {
+    pub handle_index: u16,
+    pub module_address: String,
+    pub module_name: String,
+    pub function_name: String,
+    pub qualified_name: String,
+    pub generic_type_arguments: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -311,6 +327,7 @@ fn module_functions(
                         .enumerate()
                         .map(|(offset, instruction)| {
                             instruction_view(
+                                module,
                                 instruction,
                                 source_map,
                                 FunctionDefinitionIndex(index as u16),
@@ -326,6 +343,18 @@ fn module_functions(
                 .map(|code| module.signature_at(code.locals).0.len())
                 .unwrap_or(0);
             let return_count = module.signature_at(handle.return_).0.len();
+            let parameters = module
+                .signature_at(handle.parameters)
+                .0
+                .iter()
+                .map(|token| signature_token_label(module, token))
+                .collect();
+            let returns = module
+                .signature_at(handle.return_)
+                .0
+                .iter()
+                .map(|token| signature_token_label(module, token))
+                .collect();
             let acquires = definition
                 .acquires_global_resources
                 .iter()
@@ -340,6 +369,9 @@ fn module_functions(
                 name,
                 visibility: format!("{:?}", definition.visibility),
                 is_entry: definition.is_entry,
+                parameters,
+                returns,
+                type_parameter_count: handle.type_parameters.len(),
                 instruction_count: instructions.len(),
                 local_count,
                 return_count,
@@ -468,6 +500,7 @@ fn edge_kind(
 }
 
 fn instruction_view(
+    module: &CompiledModule,
     instruction: &Bytecode,
     source_map: Option<&SourceMap>,
     function_index: FunctionDefinitionIndex,
@@ -477,6 +510,7 @@ fn instruction_view(
         offset,
         opcode: opcode_name(instruction),
         detail: format!("{instruction:?}"),
+        call: instruction_call(module, instruction),
         source: source_map.and_then(|source_map| {
             source_map
                 .get_code_location(function_index, offset)
@@ -489,10 +523,101 @@ fn instruction_view(
     }
 }
 
+fn instruction_call(
+    module: &CompiledModule,
+    instruction: &Bytecode,
+) -> Option<MoveBytecodeCallView> {
+    match instruction {
+        Bytecode::Call(handle_index) => Some(call_view(module, *handle_index, Vec::new())),
+        Bytecode::CallGeneric(instantiation_index) => {
+            let instantiation = module.function_instantiation_at(*instantiation_index);
+            let type_arguments = module
+                .signature_at(instantiation.type_parameters)
+                .0
+                .iter()
+                .map(|token| signature_token_label(module, token))
+                .collect();
+
+            Some(call_view(module, instantiation.handle, type_arguments))
+        }
+        _ => None,
+    }
+}
+
+fn call_view(
+    module: &CompiledModule,
+    handle_index: FunctionHandleIndex,
+    generic_type_arguments: Vec<String>,
+) -> MoveBytecodeCallView {
+    let handle = module.function_handle_at(handle_index);
+    let module_id = module.module_id_for_handle(module.module_handle_at(handle.module));
+    let module_address = module_id.address().short_str_lossless();
+    let module_name = module_id.name().to_string();
+    let function_name = module.identifier_at(handle.name).to_string();
+    let qualified_name = format!("{module_address}::{module_name}::{function_name}");
+
+    MoveBytecodeCallView {
+        handle_index: handle_index.0,
+        module_address,
+        module_name,
+        function_name,
+        qualified_name,
+        generic_type_arguments,
+    }
+}
+
 fn opcode_name(instruction: &Bytecode) -> String {
     let detail = format!("{instruction:?}");
     let end = detail.find(['(', ' ']).unwrap_or(detail.len());
     detail[..end].to_string()
+}
+
+fn signature_token_label(module: &CompiledModule, token: &SignatureToken) -> String {
+    match token {
+        SignatureToken::Bool => "bool".to_string(),
+        SignatureToken::U8 => "u8".to_string(),
+        SignatureToken::U16 => "u16".to_string(),
+        SignatureToken::U32 => "u32".to_string(),
+        SignatureToken::U64 => "u64".to_string(),
+        SignatureToken::U128 => "u128".to_string(),
+        SignatureToken::U256 => "u256".to_string(),
+        SignatureToken::Address => "address".to_string(),
+        SignatureToken::Signer => "signer".to_string(),
+        SignatureToken::Vector(inner) => {
+            format!("vector<{}>", signature_token_label(module, inner))
+        }
+        SignatureToken::Reference(inner) => format!("&{}", signature_token_label(module, inner)),
+        SignatureToken::MutableReference(inner) => {
+            format!("&mut {}", signature_token_label(module, inner))
+        }
+        SignatureToken::TypeParameter(index) => format!("T{index}"),
+        SignatureToken::Datatype(index) => datatype_label(module, *index),
+        SignatureToken::DatatypeInstantiation(instantiation) => {
+            let (index, type_arguments) = &**instantiation;
+            let arguments = type_arguments
+                .iter()
+                .map(|argument| signature_token_label(module, argument))
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            format!("{}<{arguments}>", datatype_label(module, *index))
+        }
+    }
+}
+
+fn datatype_label(
+    module: &CompiledModule,
+    index: move_binary_format::file_format::DatatypeHandleIndex,
+) -> String {
+    let handle = module.datatype_handle_at(index);
+    let module_id = module.module_id_for_handle(module.module_handle_at(handle.module));
+
+    format!(
+        "{}::{}::{}",
+        module_id.address().short_str_lossless(),
+        module_id.name(),
+        module.identifier_at(handle.name),
+    )
 }
 
 fn module_imports(module: &CompiledModule) -> Vec<String> {

@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import {
   Binary,
   Boxes,
@@ -43,6 +44,7 @@ import {
   loadMoveBytecodeView,
   type FilePreview,
   type MoveBytecodeBasicBlockView,
+  type MoveBytecodeCallView,
   type MoveBytecodeControlFlowEdgeView,
   type MoveBytecodeFunctionView,
   type MoveBytecodeInstructionView,
@@ -198,6 +200,18 @@ export function BytecodeViewScreen({
         selectedInstruction.offset >= block.startOffset && selectedInstruction.offset <= block.endOffset,
       ) ?? null
     : null;
+  const openCallTarget = React.useCallback((call: MoveBytecodeCallView) => {
+    const target = findBytecodeCallTarget(view, call);
+
+    if (!target) {
+      return;
+    }
+
+    setEditorTarget(null);
+    setSelectedModulePath(target.module.bytecodePath);
+    setSelectedFunctionName(target.fn.name);
+    setSelectedOffset(target.fn.instructions[0]?.offset ?? null);
+  }, [view]);
   const isEditorOpen = Boolean(editorTarget);
   const gridTemplateColumns = React.useMemo(
     () =>
@@ -365,9 +379,11 @@ export function BytecodeViewScreen({
             ) : (
               <>
                 <InstructionPanel
+                  onOpenCallTarget={openCallTarget}
                   selectedInstruction={selectedInstruction}
                   selectedModule={selectedModule}
                   selectedFunction={selectedFunction}
+                  view={view}
                   onSelectInstruction={(instruction) => setSelectedOffset(instruction.offset)}
                 />
                 <ColumnResizeHandle
@@ -394,6 +410,8 @@ export function BytecodeViewScreen({
                   instruction={selectedInstruction}
                   moveFunction={selectedFunction}
                   module={selectedModule}
+                  onOpenCallTarget={openCallTarget}
+                  view={view}
                 />
               </>
             )}
@@ -747,33 +765,41 @@ function BytecodeExplorer({
                                               module={module}
                                               onOpenInEditor={onOpenInEditor}
                                             >
-                                              <button
-                                                className={cn(
-                                                  "flex h-7 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded px-2 text-left text-xs text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground",
-                                                  isSelectedFunction && "bg-primary/15 text-foreground",
-                                                )}
-                                                onClick={() => onSelectFunction(module.bytecodePath, fn.name)}
-                                                type="button"
-                                              >
-                                                <FunctionSquare
+                                              <div className="group/callgraph relative min-w-0">
+                                                <button
                                                   className={cn(
-                                                    "size-3 shrink-0",
-                                                    functionGroupToneTextClass(functionGroup.tone),
+                                                    "flex h-7 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded px-2 text-left text-xs text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground",
+                                                    isSelectedFunction && "bg-primary/15 text-foreground",
                                                   )}
-                                                  aria-hidden="true"
-                                                />
-                                                <span className="min-w-0 flex-1 truncate">{fn.name}</span>
-                                                <span className="flex shrink-0 items-center gap-1">
-                                                  <span
+                                                  onClick={() => onSelectFunction(module.bytecodePath, fn.name)}
+                                                  type="button"
+                                                >
+                                                  <FunctionSquare
                                                     className={cn(
-                                                      "rounded px-1 text-[10px] font-semibold",
-                                                      functionGroupToneBadgeClass(functionGroup.tone),
+                                                      "size-3 shrink-0",
+                                                      functionGroupToneTextClass(functionGroup.tone),
                                                     )}
-                                                  >
-                                                    {functionBadgeLabel(fn, functionGroup.id)}
+                                                    aria-hidden="true"
+                                                  />
+                                                  <span className="min-w-0 flex-1 truncate">{fn.name}</span>
+                                                  <span className="flex shrink-0 items-center gap-1">
+                                                    <span
+                                                      className={cn(
+                                                        "rounded px-1 text-[10px] font-semibold",
+                                                        functionGroupToneBadgeClass(functionGroup.tone),
+                                                      )}
+                                                    >
+                                                      {functionBadgeLabel(fn, functionGroup.id)}
+                                                    </span>
                                                   </span>
-                                                </span>
-                                              </button>
+                                                </button>
+                                                <FunctionCallGraphHover
+                                                  fn={fn}
+                                                  module={module}
+                                                  view={view}
+                                                  onSelectFunction={onSelectFunction}
+                                                />
+                                              </div>
                                             </BytecodeExplorerContextMenu>
                                           );
                                         })}
@@ -955,16 +981,175 @@ function BytecodeSourceEditorPanel({
   );
 }
 
+function FunctionCallGraphHover({
+  fn,
+  module,
+  onSelectFunction,
+  view,
+}: {
+  fn: MoveBytecodeFunctionView;
+  module: MoveBytecodeModuleView;
+  onSelectFunction: (modulePath: string, functionName: string) => void;
+  view: MoveBytecodePackageView | null;
+}) {
+  const calls = React.useMemo(() => functionCallSummaries(view, fn), [fn, view]);
+  const anchorRef = React.useRef<HTMLSpanElement | null>(null);
+  const closeTimerRef = React.useRef<number | null>(null);
+  const openTimerRef = React.useRef<number | null>(null);
+  const [position, setPosition] = React.useState<{ left: number; top: number } | null>(null);
+
+  const clearOpenTimer = React.useCallback(() => {
+    if (openTimerRef.current !== null) {
+      window.clearTimeout(openTimerRef.current);
+      openTimerRef.current = null;
+    }
+  }, []);
+
+  const clearCloseTimer = React.useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleClose = React.useCallback(() => {
+    clearOpenTimer();
+    clearCloseTimer();
+    closeTimerRef.current = window.setTimeout(() => setPosition(null), 120);
+  }, [clearCloseTimer, clearOpenTimer]);
+
+  React.useEffect(() => {
+    const anchor = anchorRef.current;
+    const row = anchor?.parentElement;
+
+    if (!row) {
+      return;
+    }
+
+    const scheduleOpen = () => {
+      clearOpenTimer();
+      clearCloseTimer();
+      openTimerRef.current = window.setTimeout(() => {
+        const rect = row.getBoundingClientRect();
+        const cardWidth = 448;
+        const cardHeight = 360;
+        setPosition({
+          left: Math.max(8, Math.min(rect.right + 8, window.innerWidth - cardWidth - 8)),
+          top: Math.max(8, Math.min(rect.top, window.innerHeight - cardHeight - 8)),
+        });
+      }, 180);
+    };
+
+    row.addEventListener("mouseenter", scheduleOpen);
+    row.addEventListener("mouseleave", scheduleClose);
+
+    return () => {
+      row.removeEventListener("mouseenter", scheduleOpen);
+      row.removeEventListener("mouseleave", scheduleClose);
+      clearOpenTimer();
+      clearCloseTimer();
+    };
+  }, [clearCloseTimer, clearOpenTimer, scheduleClose]);
+
+  return (
+    <>
+      <span ref={anchorRef} className="hidden" />
+      {position
+        ? createPortal(
+          <div
+            className="fixed z-[9999] w-[28rem] rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-3 text-left shadow-2xl"
+            onMouseEnter={clearCloseTimer}
+            onMouseLeave={scheduleClose}
+            style={{ left: position.left, top: position.top }}
+          >
+            <div className="mb-2 min-w-0">
+              <div className="truncate text-xs font-semibold text-foreground">{fn.name}</div>
+              <div className="truncate text-[11px] text-muted-foreground">
+                {shortAddress(module.address)}::{module.name} call graph
+              </div>
+            </div>
+            {calls.length ? (
+              <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                {calls.map((call) => (
+                  <button
+                    className="grid w-full gap-2 rounded border border-[color:var(--app-border)] bg-black/10 p-2 text-left transition hover:border-primary/40 hover:bg-primary/10"
+                    key={`${call.call.qualifiedName}:${call.call.handleIndex}:${call.call.genericTypeArguments.join(",")}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+
+                      if (call.target) {
+                        onSelectFunction(call.target.module.bytecodePath, call.target.fn.name);
+                      }
+                    }}
+                    type="button"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <FunctionSquare className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
+                        {call.call.functionName}
+                      </span>
+                      <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                        {call.visibility}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                      <span>Module</span>
+                      <span className="truncate text-foreground">
+                        {shortAddress(call.call.moduleAddress)}::{call.call.moduleName}
+                      </span>
+                      <span>Types</span>
+                      <span className="truncate">{call.genericTypeArguments}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      <CallFact label="state" value={call.mutatesState} />
+                      <CallFact label="abort" value={call.canAbort} />
+                      <CallFact label="transfer" value={call.transfersAssets} />
+                      <CallFact label="event" value={call.emitsEvents} />
+                      <CallFact label="cap/signer" value={call.usesCapabilitiesOrSigner} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded border border-[color:var(--app-border)] bg-black/10 px-3 py-2 text-xs text-muted-foreground">
+                No bytecode calls in this function.
+              </div>
+            )}
+          </div>,
+          document.body,
+        )
+        : null}
+    </>
+  );
+}
+
+function CallFact({ label, value }: { label: string; value: boolean }) {
+  return (
+    <span
+      className={cn(
+        "rounded px-1.5 py-0.5 text-[10px] font-semibold",
+        value ? "bg-amber-500/15 text-amber-200" : "bg-white/5 text-muted-foreground",
+      )}
+    >
+      {label}: {value ? "yes" : "no"}
+    </span>
+  );
+}
+
 function InstructionPanel({
+  onOpenCallTarget,
   onSelectInstruction,
   selectedFunction,
   selectedInstruction,
   selectedModule,
+  view,
 }: {
+  onOpenCallTarget: (call: MoveBytecodeCallView) => void;
   onSelectInstruction: (instruction: MoveBytecodeInstructionView) => void;
   selectedFunction: MoveBytecodeFunctionView | null;
   selectedInstruction: MoveBytecodeInstructionView | null;
   selectedModule: MoveBytecodeModuleView | null;
+  view: MoveBytecodePackageView | null;
 }) {
   return (
     <section className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
@@ -993,6 +1178,7 @@ function InstructionPanel({
           <tbody>
             {selectedFunction?.instructions.map((instruction, index) => {
               const isSelected = selectedInstruction?.offset === instruction.offset;
+              const callTarget = instruction.call ? findBytecodeCallTarget(view, instruction.call) : null;
 
               return (
                 <tr
@@ -1008,8 +1194,22 @@ function InstructionPanel({
                   <td className="truncate px-2 py-1.5 font-semibold text-foreground" title={formatOpcode(instruction.opcode)}>
                     {formatOpcode(instruction.opcode)}
                   </td>
-                  <td className="truncate px-2 py-1.5" title={operandText(instruction)}>
-                    {operandText(instruction)}
+                  <td className="truncate px-2 py-1.5" title={instruction.call?.qualifiedName ?? operandText(instruction)}>
+                    {instruction.call ? (
+                      <button
+                        className="max-w-full truncate text-left text-sky-200 underline-offset-2 hover:underline disabled:text-muted-foreground disabled:no-underline"
+                        disabled={!callTarget}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenCallTarget(instruction.call!);
+                        }}
+                        type="button"
+                      >
+                        {callLabel(instruction.call)}
+                      </button>
+                    ) : (
+                      operandText(instruction)
+                    )}
                   </td>
                   <td className="px-3 py-1.5 text-right text-muted-foreground">
                     {formatSourceBytes(instruction)}
@@ -1433,12 +1633,20 @@ function ExplanationPanel({
   instruction,
   moveFunction,
   module,
+  onOpenCallTarget,
+  view,
 }: {
   block: MoveBytecodeBasicBlockView | null;
   instruction: MoveBytecodeInstructionView | null;
   moveFunction: MoveBytecodeFunctionView | null;
   module: MoveBytecodeModuleView | null;
+  onOpenCallTarget: (call: MoveBytecodeCallView) => void;
+  view: MoveBytecodePackageView | null;
 }) {
+  const callSummary = instruction?.call
+    ? callSummaryForInstruction(view, instruction.call)
+    : null;
+
   return (
     <section className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
       <PanelHeader
@@ -1461,10 +1669,36 @@ function ExplanationPanel({
             <div className="grid gap-2 text-xs text-muted-foreground">
               <ContextRow label="Offset" value={instruction ? formatOffset(instruction.offset) : "-"} />
               <ContextRow label="Opcode" value={instruction ? formatOpcode(instruction.opcode) : "-"} />
-              <ContextRow label="Operands" value={instruction ? operandText(instruction) || "-" : "-"} />
+              <ContextRow label="Operands" value={instruction?.call ? callLabel(instruction.call) : instruction ? operandText(instruction) || "-" : "-"} />
               <ContextRow label="Raw" value={instruction?.detail ?? "-"} />
             </div>
           </ExplanationSection>
+
+          {callSummary ? (
+            <ExplanationSection title="Call Target">
+              <div className="grid gap-3 text-xs text-muted-foreground">
+                <button
+                  className="flex min-w-0 items-center gap-2 rounded border border-primary/30 bg-primary/10 px-2 py-1.5 text-left text-sky-100 transition hover:bg-primary/15"
+                  disabled={!callSummary.target}
+                  onClick={() => instruction?.call && onOpenCallTarget(instruction.call)}
+                  type="button"
+                >
+                  <FunctionSquare className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 truncate">{callSummary.call.qualifiedName}</span>
+                </button>
+                <div className="grid gap-2">
+                  <ContextRow label="Module" value={`${shortAddress(callSummary.call.moduleAddress)}::${callSummary.call.moduleName}`} />
+                  <ContextRow label="Visibility" value={callSummary.visibility} />
+                  <ContextRow label="Type args" value={callSummary.genericTypeArguments} />
+                  <ContextRow label="Mutates state" value={callSummary.mutatesState ? "yes" : "no"} />
+                  <ContextRow label="Can abort" value={callSummary.canAbort ? "yes" : "no"} />
+                  <ContextRow label="Transfers assets" value={callSummary.transfersAssets ? "yes" : "no"} />
+                  <ContextRow label="Emits events" value={callSummary.emitsEvents ? "yes" : "no"} />
+                  <ContextRow label="Cap/signer" value={callSummary.usesCapabilitiesOrSigner ? "yes" : "no"} />
+                </div>
+              </div>
+            </ExplanationSection>
+          ) : null}
 
           <ExplanationSection title="Source Map">
             <div className="grid gap-2 text-xs text-muted-foreground">
@@ -2114,6 +2348,194 @@ function formatSourceBytes(instruction: MoveBytecodeInstructionView) {
   return instruction.source
     ? `${instruction.source.startByte}...${instruction.source.endByte}`
     : "-";
+}
+
+type BytecodeCallTarget = {
+  fn: MoveBytecodeFunctionView;
+  module: MoveBytecodeModuleView;
+};
+
+type BytecodeCallSummary = {
+  call: MoveBytecodeCallView;
+  canAbort: boolean;
+  emitsEvents: boolean;
+  genericTypeArguments: string;
+  mutatesState: boolean;
+  target: BytecodeCallTarget | null;
+  transfersAssets: boolean;
+  usesCapabilitiesOrSigner: boolean;
+  visibility: string;
+};
+
+function functionCallSummaries(
+  view: MoveBytecodePackageView | null,
+  fn: MoveBytecodeFunctionView,
+) {
+  const seen = new Set<string>();
+  const summaries: BytecodeCallSummary[] = [];
+
+  for (const instruction of fn.instructions) {
+    if (!instruction.call) {
+      continue;
+    }
+
+    const key = `${instruction.call.qualifiedName}<${instruction.call.genericTypeArguments.join(",")}>`;
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    summaries.push(callSummaryForInstruction(view, instruction.call));
+  }
+
+  return summaries;
+}
+
+function callSummaryForInstruction(
+  view: MoveBytecodePackageView | null,
+  call: MoveBytecodeCallView,
+): BytecodeCallSummary {
+  const target = findBytecodeCallTarget(view, call);
+  const targetFunction = target?.fn ?? null;
+
+  return {
+    call,
+    canAbort: targetFunction ? functionCanAbort(targetFunction) : callMayAbort(call),
+    emitsEvents: targetFunction ? functionEmitsEvents(targetFunction) : callMayEmitEvents(call),
+    genericTypeArguments: call.genericTypeArguments.length
+      ? call.genericTypeArguments.join(", ")
+      : "-",
+    mutatesState: targetFunction ? functionMutatesState(targetFunction) : callMayMutateState(call),
+    target,
+    transfersAssets: targetFunction ? functionTransfersAssets(targetFunction) : callMayTransferAssets(call),
+    usesCapabilitiesOrSigner: targetFunction
+      ? functionUsesCapabilitiesOrSigner(targetFunction)
+      : callMayUseCapabilitiesOrSigner(call),
+    visibility: targetFunction ? functionVisibilityLabel(targetFunction) : "external",
+  };
+}
+
+function findBytecodeCallTarget(
+  view: MoveBytecodePackageView | null,
+  call: MoveBytecodeCallView,
+): BytecodeCallTarget | null {
+  if (!view) {
+    return null;
+  }
+
+  const module = view.modules.find((candidate) =>
+    sameMoveAddress(candidate.address, call.moduleAddress)
+    && candidate.name === call.moduleName,
+  ) ?? null;
+  const fn = module?.functions.find((candidate) => candidate.name === call.functionName) ?? null;
+
+  return module && fn ? { fn, module } : null;
+}
+
+function sameMoveAddress(left: string, right: string) {
+  return normalizeMoveAddress(left) === normalizeMoveAddress(right);
+}
+
+function normalizeMoveAddress(address: string) {
+  return address.replace(/^0x/i, "").replace(/^0+/, "").toLowerCase() || "0";
+}
+
+function callLabel(call: MoveBytecodeCallView) {
+  const typeArguments = call.genericTypeArguments.length
+    ? `<${call.genericTypeArguments.join(", ")}>`
+    : "";
+
+  return `${shortAddress(call.moduleAddress)}::${call.moduleName}::${call.functionName}${typeArguments}`;
+}
+
+function functionVisibilityLabel(fn: MoveBytecodeFunctionView) {
+  if (fn.isEntry && fn.visibility === "Public") {
+    return "public entry";
+  }
+
+  if (fn.isEntry) {
+    return "entry";
+  }
+
+  return fn.visibility;
+}
+
+function functionMutatesState(fn: MoveBytecodeFunctionView) {
+  return fn.instructions.some((instruction) =>
+    ["WriteRef", "MoveTo", "MoveFrom", "MutBorrowGlobal", "MutBorrowField", "MutBorrowFieldGeneric", "MutBorrowVariantField", "MutBorrowVariantFieldGeneric"].includes(instruction.opcode)
+    || callMayMutateState(instruction.call),
+  );
+}
+
+function functionCanAbort(fn: MoveBytecodeFunctionView) {
+  return fn.instructions.some((instruction) =>
+    instruction.opcode === "Abort"
+    || instruction.opcode.startsWith("Branch")
+    || instruction.opcode.startsWith("Br")
+    || callMayAbort(instruction.call),
+  );
+}
+
+function functionTransfersAssets(fn: MoveBytecodeFunctionView) {
+  return fn.instructions.some((instruction) => callMayTransferAssets(instruction.call));
+}
+
+function functionEmitsEvents(fn: MoveBytecodeFunctionView) {
+  return fn.instructions.some((instruction) => callMayEmitEvents(instruction.call));
+}
+
+function functionUsesCapabilitiesOrSigner(fn: MoveBytecodeFunctionView) {
+  return [...fn.parameters, ...fn.returns, ...fn.acquires].some(typeLooksPrivileged)
+    || fn.instructions.some((instruction) => callMayUseCapabilitiesOrSigner(instruction.call));
+}
+
+function callMayMutateState(call: MoveBytecodeCallView | null) {
+  if (!call) {
+    return false;
+  }
+
+  return /(transfer|withdraw|deposit|mint|burn|create|destroy|set|push|remove|delete|claim|distribute|latch|borrow_mut|share|freeze|receive)/i
+    .test(`${call.moduleName}::${call.functionName}`);
+}
+
+function callMayAbort(call: MoveBytecodeCallView | null) {
+  if (!call) {
+    return false;
+  }
+
+  return !/^(is_|has_|get_|borrow_|contains|length|len|value|balance|supply|name|symbol|decimals)/i
+    .test(call.functionName);
+}
+
+function callMayTransferAssets(call: MoveBytecodeCallView | null) {
+  if (!call) {
+    return false;
+  }
+
+  return /(coin|balance|funds|asset|token|bucket|vault|transfer|withdraw|deposit)/i
+    .test(`${call.moduleName}::${call.functionName}`);
+}
+
+function callMayEmitEvents(call: MoveBytecodeCallView | null) {
+  if (!call) {
+    return false;
+  }
+
+  return /(event|emit)/i.test(`${call.moduleName}::${call.functionName}`);
+}
+
+function callMayUseCapabilitiesOrSigner(call: MoveBytecodeCallView | null) {
+  if (!call) {
+    return false;
+  }
+
+  return /(cap|capability|treasury|admin|owner|signer|auth|witness|publisher)/i
+    .test(`${call.moduleName}::${call.functionName}::${call.genericTypeArguments.join("::")}`);
+}
+
+function typeLooksPrivileged(value: string) {
+  return /(signer|cap|capability|treasury|admin|owner|witness|publisher)/i.test(value);
 }
 
 function shortAddress(address: string | null | undefined) {
