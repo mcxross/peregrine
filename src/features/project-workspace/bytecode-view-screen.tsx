@@ -18,9 +18,16 @@ import {
   Pause,
   Play,
   Repeat,
+  X,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -30,8 +37,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import type { CodeEditorJumpRequest } from "@/features/project-workspace/code-editor";
 import {
+  loadFilePreview,
   loadMoveBytecodeView,
+  type FilePreview,
   type MoveBytecodeBasicBlockView,
   type MoveBytecodeControlFlowEdgeView,
   type MoveBytecodeFunctionView,
@@ -43,9 +53,21 @@ import {
 } from "@/features/empty-project/filesystem-tree";
 import { cn } from "@/lib/utils";
 
+const CodeEditor = React.lazy(() =>
+  import("@/features/project-workspace/code-editor").then((module) => ({
+    default: module.CodeEditor,
+  })),
+);
+
 type BytecodeViewScreenProps = {
   activeMovePackage: MovePackage | null;
   packageTree: PackageTree;
+};
+
+type BytecodeEditorTarget = {
+  functionName: string | null;
+  moduleName: string;
+  sourcePath: string;
 };
 
 const BYTECODE_COLUMN_WIDTHS = [236, 470, 260, 292];
@@ -90,6 +112,7 @@ export function BytecodeViewScreen({
   const [selectedOffset, setSelectedOffset] = React.useState<number | null>(null);
   const [columnWidths, setColumnWidths] = React.useState(BYTECODE_COLUMN_WIDTHS);
   const [resizingHandleIndex, setResizingHandleIndex] = React.useState<number | null>(null);
+  const [editorTarget, setEditorTarget] = React.useState<BytecodeEditorTarget | null>(null);
 
   React.useEffect(() => {
     if (!activeMovePackage) {
@@ -150,6 +173,7 @@ export function BytecodeViewScreen({
     setSelectedModulePath(null);
     setSelectedFunctionName(null);
     setSelectedOffset(null);
+    setEditorTarget(null);
   }, [activeMovePackage?.manifestPath, packageTree.rootPath]);
 
   const selectedModule = view?.modules.find((module) => module.bytecodePath === selectedModulePath)
@@ -174,21 +198,28 @@ export function BytecodeViewScreen({
         selectedInstruction.offset >= block.startOffset && selectedInstruction.offset <= block.endOffset,
       ) ?? null
     : null;
+  const isEditorOpen = Boolean(editorTarget);
   const gridTemplateColumns = React.useMemo(
-    () => [
-      `${columnWidths[0]}px`,
-      `${BYTECODE_RESIZE_HANDLE_WIDTH}px`,
-      `${columnWidths[1]}px`,
-      `${BYTECODE_RESIZE_HANDLE_WIDTH}px`,
-      `${columnWidths[2]}px`,
-      `${BYTECODE_RESIZE_HANDLE_WIDTH}px`,
-      `${columnWidths[3]}px`,
-    ].join(" "),
-    [columnWidths],
+    () =>
+      isEditorOpen
+        ? `${columnWidths[0]}px ${BYTECODE_RESIZE_HANDLE_WIDTH}px minmax(0,1fr)`
+        : [
+            `${columnWidths[0]}px`,
+            `${BYTECODE_RESIZE_HANDLE_WIDTH}px`,
+            `${columnWidths[1]}px`,
+            `${BYTECODE_RESIZE_HANDLE_WIDTH}px`,
+            `${columnWidths[2]}px`,
+            `${BYTECODE_RESIZE_HANDLE_WIDTH}px`,
+            `${columnWidths[3]}px`,
+          ].join(" "),
+    [columnWidths, isEditorOpen],
   );
   const gridMinWidth = React.useMemo(
-    () => columnWidths.reduce((sum, width) => sum + width, 0) + BYTECODE_RESIZE_HANDLE_WIDTH * 3,
-    [columnWidths],
+    () =>
+      isEditorOpen
+        ? columnWidths[0] + BYTECODE_RESIZE_HANDLE_WIDTH + 420
+        : columnWidths.reduce((sum, width) => sum + width, 0) + BYTECODE_RESIZE_HANDLE_WIDTH * 3,
+    [columnWidths, isEditorOpen],
   );
   const handleColumnResizeStart = React.useCallback((
     handleIndex: number,
@@ -289,6 +320,17 @@ export function BytecodeViewScreen({
           >
             <BytecodeExplorer
               isLoading={isLoading}
+              onOpenInEditor={(module, fn) => {
+                if (!module.sourcePath) {
+                  return;
+                }
+
+                setEditorTarget({
+                  functionName: fn?.name ?? null,
+                  moduleName: module.name,
+                  sourcePath: module.sourcePath,
+                });
+              }}
               selectedFunctionName={selectedFunction?.name ?? null}
               selectedModulePath={selectedModule?.bytecodePath ?? null}
               view={view}
@@ -314,37 +356,47 @@ export function BytecodeViewScreen({
               onPointerDown={handleColumnResizeStart}
             />
 
-            <InstructionPanel
-              selectedInstruction={selectedInstruction}
-              selectedModule={selectedModule}
-              selectedFunction={selectedFunction}
-              onSelectInstruction={(instruction) => setSelectedOffset(instruction.offset)}
-            />
-            <ColumnResizeHandle
-              active={resizingHandleIndex === 1}
-              index={1}
-              onPointerDown={handleColumnResizeStart}
-            />
+            {editorTarget ? (
+              <BytecodeSourceEditorPanel
+                packageTree={packageTree}
+                target={editorTarget}
+                onClose={() => setEditorTarget(null)}
+              />
+            ) : (
+              <>
+                <InstructionPanel
+                  selectedInstruction={selectedInstruction}
+                  selectedModule={selectedModule}
+                  selectedFunction={selectedFunction}
+                  onSelectInstruction={(instruction) => setSelectedOffset(instruction.offset)}
+                />
+                <ColumnResizeHandle
+                  active={resizingHandleIndex === 1}
+                  index={1}
+                  onPointerDown={handleColumnResizeStart}
+                />
 
-            <ControlFlowPanel
-              blocks={blocks}
-              edges={edges}
-              selectedBlock={selectedBlock}
-              selectedInstruction={selectedInstruction}
-              onSelectBlock={(block) => setSelectedOffset(block.startOffset)}
-            />
-            <ColumnResizeHandle
-              active={resizingHandleIndex === 2}
-              index={2}
-              onPointerDown={handleColumnResizeStart}
-            />
+                <ControlFlowPanel
+                  blocks={blocks}
+                  edges={edges}
+                  selectedBlock={selectedBlock}
+                  selectedInstruction={selectedInstruction}
+                  onSelectBlock={(block) => setSelectedOffset(block.startOffset)}
+                />
+                <ColumnResizeHandle
+                  active={resizingHandleIndex === 2}
+                  index={2}
+                  onPointerDown={handleColumnResizeStart}
+                />
 
-            <ExplanationPanel
-              block={selectedBlock}
-              instruction={selectedInstruction}
-              moveFunction={selectedFunction}
-              module={selectedModule}
-            />
+                <ExplanationPanel
+                  block={selectedBlock}
+                  instruction={selectedInstruction}
+                  moveFunction={selectedFunction}
+                  module={selectedModule}
+                />
+              </>
+            )}
           </div>
         </div>
       )}
@@ -385,6 +437,7 @@ function BytecodeHeader({
 
 function BytecodeExplorer({
   isLoading,
+  onOpenInEditor,
   onSelectFunction,
   onSelectModule,
   selectedFunctionName,
@@ -392,6 +445,7 @@ function BytecodeExplorer({
   view,
 }: {
   isLoading: boolean;
+  onOpenInEditor: (module: MoveBytecodeModuleView, fn: MoveBytecodeFunctionView | null) => void;
   onSelectFunction: (modulePath: string, functionName: string) => void;
   onSelectModule: (modulePath: string) => void;
   selectedFunctionName: string | null;
@@ -607,37 +661,42 @@ function BytecodeExplorer({
 
                       return (
                         <div className="mb-1 min-w-0 overflow-hidden" key={module.bytecodePath}>
-                          <button
-                            className={cn(
-                              "flex h-8 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded px-2 text-left text-xs hover:bg-[var(--app-subtle)]",
-                              isSelectedModule && "bg-[var(--app-subtle)] text-foreground",
-                            )}
-                            aria-expanded={isExpandedModule}
-                            onClick={() => {
-                              if (isSelectedModule) {
-                                toggleModule(module.bytecodePath);
-                                return;
-                              }
-
-                              setExpandedModules((current) => {
-                                const next = new Set(current);
-                                next.add(module.bytecodePath);
-                                return next;
-                              });
-                              onSelectModule(module.bytecodePath);
-                            }}
-                            type="button"
+                          <BytecodeExplorerContextMenu
+                            module={module}
+                            onOpenInEditor={onOpenInEditor}
                           >
-                            <ChevronRight
-                              className={cn("size-3 shrink-0 text-muted-foreground transition-transform duration-150 ease-out", isExpandedModule && "rotate-90")}
-                              aria-hidden="true"
-                            />
-                            <FileCode2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                            <span className="min-w-0 flex-1 truncate font-semibold">{module.name}</span>
-                            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                              {module.functionCount}
-                            </span>
-                          </button>
+                            <button
+                              className={cn(
+                                "flex h-8 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded px-2 text-left text-xs hover:bg-[var(--app-subtle)]",
+                                isSelectedModule && "bg-[var(--app-subtle)] text-foreground",
+                              )}
+                              aria-expanded={isExpandedModule}
+                              onClick={() => {
+                                if (isSelectedModule) {
+                                  toggleModule(module.bytecodePath);
+                                  return;
+                                }
+
+                                setExpandedModules((current) => {
+                                  const next = new Set(current);
+                                  next.add(module.bytecodePath);
+                                  return next;
+                                });
+                                onSelectModule(module.bytecodePath);
+                              }}
+                              type="button"
+                            >
+                              <ChevronRight
+                                className={cn("size-3 shrink-0 text-muted-foreground transition-transform duration-150 ease-out", isExpandedModule && "rotate-90")}
+                                aria-hidden="true"
+                              />
+                              <FileCode2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                              <span className="min-w-0 flex-1 truncate font-semibold">{module.name}</span>
+                              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                                {module.functionCount}
+                              </span>
+                            </button>
+                          </BytecodeExplorerContextMenu>
 
                           <CollapsibleTreeBody isOpen={isExpandedModule}>
                             <div className="ml-6 min-w-0 overflow-hidden border-l border-[color:var(--app-border)] py-1 pl-2">
@@ -682,34 +741,40 @@ function BytecodeExplorer({
                                           const isSelectedFunction = isSelectedModule && fn.name === selectedFunctionName;
 
                                           return (
-                                            <button
-                                              className={cn(
-                                                "flex h-7 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded px-2 text-left text-xs text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground",
-                                                isSelectedFunction && "bg-primary/15 text-foreground",
-                                              )}
+                                            <BytecodeExplorerContextMenu
+                                              fn={fn}
                                               key={`${module.bytecodePath}:${fn.name}`}
-                                              onClick={() => onSelectFunction(module.bytecodePath, fn.name)}
-                                              type="button"
+                                              module={module}
+                                              onOpenInEditor={onOpenInEditor}
                                             >
-                                              <FunctionSquare
+                                              <button
                                                 className={cn(
-                                                  "size-3 shrink-0",
-                                                  functionGroupToneTextClass(functionGroup.tone),
+                                                  "flex h-7 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded px-2 text-left text-xs text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground",
+                                                  isSelectedFunction && "bg-primary/15 text-foreground",
                                                 )}
-                                                aria-hidden="true"
-                                              />
-                                              <span className="min-w-0 flex-1 truncate">{fn.name}</span>
-                                              <span className="flex shrink-0 items-center gap-1">
-                                                <span
+                                                onClick={() => onSelectFunction(module.bytecodePath, fn.name)}
+                                                type="button"
+                                              >
+                                                <FunctionSquare
                                                   className={cn(
-                                                    "rounded px-1 text-[10px] font-semibold",
-                                                    functionGroupToneBadgeClass(functionGroup.tone),
+                                                    "size-3 shrink-0",
+                                                    functionGroupToneTextClass(functionGroup.tone),
                                                   )}
-                                                >
-                                                  {functionBadgeLabel(fn, functionGroup.id)}
+                                                  aria-hidden="true"
+                                                />
+                                                <span className="min-w-0 flex-1 truncate">{fn.name}</span>
+                                                <span className="flex shrink-0 items-center gap-1">
+                                                  <span
+                                                    className={cn(
+                                                      "rounded px-1 text-[10px] font-semibold",
+                                                      functionGroupToneBadgeClass(functionGroup.tone),
+                                                    )}
+                                                  >
+                                                    {functionBadgeLabel(fn, functionGroup.id)}
+                                                  </span>
                                                 </span>
-                                              </span>
-                                            </button>
+                                              </button>
+                                            </BytecodeExplorerContextMenu>
                                           );
                                         })}
                                       </div>
@@ -735,6 +800,158 @@ function BytecodeExplorer({
         </div>
       </ScrollArea>
     </aside>
+  );
+}
+
+function BytecodeExplorerContextMenu({
+  children,
+  fn = null,
+  module,
+  onOpenInEditor,
+}: {
+  children: React.ReactElement;
+  fn?: MoveBytecodeFunctionView | null;
+  module: MoveBytecodeModuleView;
+  onOpenInEditor: (module: MoveBytecodeModuleView, fn: MoveBytecodeFunctionView | null) => void;
+}) {
+  const canOpenInEditor = Boolean(module.sourcePath);
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-44 border-[color:var(--app-border)] bg-[var(--app-panel)] text-foreground">
+        <ContextMenuItem
+          className="text-xs"
+          disabled={!canOpenInEditor}
+          onSelect={() => {
+            if (!module.sourcePath) {
+              return;
+            }
+
+            onOpenInEditor(module, fn);
+          }}
+        >
+          <FileCode2 className="size-3.5" aria-hidden="true" />
+          Open in editor
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+function BytecodeSourceEditorPanel({
+  onClose,
+  packageTree,
+  target,
+}: {
+  onClose: () => void;
+  packageTree: PackageTree;
+  target: BytecodeEditorTarget;
+}) {
+  const [preview, setPreview] = React.useState<FilePreview | null>(null);
+  const [source, setSource] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [jumpRequest, setJumpRequest] = React.useState<CodeEditorJumpRequest | null>(null);
+
+  React.useEffect(() => {
+    let isCancelled = false;
+    setPreview(null);
+    setSource("");
+    setError(null);
+    setIsLoading(true);
+    setJumpRequest(null);
+
+    loadFilePreview(packageTree, target.sourcePath)
+      .then((nextPreview) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setPreview(nextPreview);
+
+        if (nextPreview.kind !== "text") {
+          setError("This source file cannot be opened in the editor.");
+          return;
+        }
+
+        setSource(nextPreview.source);
+        setJumpRequest({
+          line: target.functionName ? findMoveFunctionLine(nextPreview.source, target.functionName) : 1,
+          token: Date.now(),
+        });
+      })
+      .catch((reason: unknown) => {
+        if (!isCancelled) {
+          setError(reason instanceof Error ? reason.message : "Could not open this source file.");
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [packageTree, target.functionName, target.sourcePath]);
+
+  return (
+    <section className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
+      <header className="flex min-h-11 min-w-0 items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <FileCode2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold">
+              {target.functionName ? `${target.moduleName}::${target.functionName}` : target.moduleName}
+            </div>
+            <div className="truncate text-[11px] text-muted-foreground">{target.sourcePath}</div>
+          </div>
+        </div>
+        <button
+          aria-label="Close source editor"
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground"
+          onClick={onClose}
+          type="button"
+        >
+          <X className="size-4" aria-hidden="true" />
+        </button>
+      </header>
+
+      {error ? (
+        <div className="grid min-h-0 place-items-center px-6">
+          <div className="max-w-lg rounded-md border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-100">
+            {error}
+          </div>
+        </div>
+      ) : isLoading ? (
+        <div className="flex min-h-0 items-center justify-center gap-2 px-6 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          Loading source...
+        </div>
+      ) : preview?.kind === "text" ? (
+        <React.Suspense
+          fallback={
+            <div className="flex min-h-0 items-center justify-center px-6 text-sm text-muted-foreground">
+              Loading editor...
+            </div>
+          }
+        >
+          <CodeEditor
+            jumpRequest={jumpRequest}
+            key={target.sourcePath}
+            language={preview.language || "move"}
+            value={source}
+            onChange={setSource}
+          />
+        </React.Suspense>
+      ) : (
+        <div className="grid min-h-0 place-items-center px-6 text-sm text-muted-foreground">
+          No source preview available.
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1909,6 +2126,23 @@ function shortAddress(address: string | null | undefined) {
   }
 
   return `${address.slice(0, 8)}...${address.slice(-6)}`;
+}
+
+function findMoveFunctionLine(source: string, functionName: string) {
+  const functionPattern = new RegExp(`\\bfun\\s+${escapeRegExp(functionName)}\\b`);
+  const lines = source.split(/\r?\n/);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    if (functionPattern.test(lines[index])) {
+      return index + 1;
+    }
+  }
+
+  return 1;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function edgeColor(kind: string) {
