@@ -47,6 +47,22 @@ type ModuleSignatureScreenProps = {
   stateAccessGraph?: MoveStateAccessGraph;
 };
 
+type FunctionCategoryId =
+  | "entry"
+  | "private"
+  | "public"
+  | "public-entry"
+  | "public-friend"
+  | "public-package"
+  | "view";
+
+type FunctionCategory = {
+  functions: MoveFunctionSignature[];
+  id: FunctionCategoryId;
+  label: string;
+  tone: "entry" | "friend" | "package" | "private" | "public" | "publicEntry" | "view";
+};
+
 export function ModuleSignatureScreen({
   onClose,
   rootPath,
@@ -71,7 +87,7 @@ export function ModuleSignatureScreen({
     React.useState(0);
   const [collapsedSurfaceSections, setCollapsedSurfaceSections] =
     React.useState<Set<string>>(() => new Set());
-  const [collapsedFunctionVisibilityGroups, setCollapsedFunctionVisibilityGroups] =
+  const [collapsedFunctionGroups, setCollapsedFunctionGroups] =
     React.useState<Set<string>>(() => new Set());
   const loadedStateAccessGraphKeyRef = React.useRef<string | null>(null);
   const stateAccessGraphRequestRef = React.useRef(0);
@@ -202,16 +218,16 @@ export function ModuleSignatureScreen({
     setStateAccessGraphError(null);
     setStateAccessGraphRetryNonce((current) => current + 1);
   }, []);
-  const functionVisibilityGroups = React.useMemo(
-    () => groupFunctionsByVisibility(functions),
+  const functionGroups = React.useMemo(
+    () => groupFunctionsByCategory(functions),
     [functions],
   );
   const toggleSurfaceSection = React.useCallback((section: string) => {
     setCollapsedSurfaceSections((current) => toggleSetValue(current, section));
   }, []);
-  const toggleFunctionVisibilityGroup = React.useCallback((visibility: string) => {
-    setCollapsedFunctionVisibilityGroups((current) =>
-      toggleSetValue(current, visibility),
+  const toggleFunctionGroup = React.useCallback((groupId: string) => {
+    setCollapsedFunctionGroups((current) =>
+      toggleSetValue(current, groupId),
     );
   }, []);
 
@@ -336,20 +352,21 @@ export function ModuleSignatureScreen({
                 title="Functions"
               >
                 <div className="space-y-4">
-                  {functionVisibilityGroups.map((group) => {
-                    const isGroupOpen = !collapsedFunctionVisibilityGroups.has(
-                      group.visibility,
+                  {functionGroups.map((group) => {
+                    const isGroupOpen = !collapsedFunctionGroups.has(
+                      group.id,
                     );
 
                     return (
                       <CollapsibleSurfaceGroup
                         count={group.functions.length}
                         isOpen={isGroupOpen}
-                        key={group.visibility}
+                        key={group.id}
                         onToggle={() =>
-                          toggleFunctionVisibilityGroup(group.visibility)
+                          toggleFunctionGroup(group.id)
                         }
-                        title={visibilityGroupLabel(group.visibility)}
+                        title={group.label}
+                        tone={group.tone}
                       >
                         <div className="space-y-3">
                           {group.functions.map((signature) => {
@@ -457,10 +474,9 @@ function FunctionSignatureCard({
           <h3 className="truncate text-sm font-semibold">{signature.name}</h3>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Badge tone={visibilityTone(signature.visibility)}>
-            {signature.visibility}
+          <Badge tone={functionBadgeTone(signature)}>
+            {functionBadgeLabel(signature)}
           </Badge>
-          {signature.isEntry ? <Badge tone="entry">entry</Badge> : null}
           {signature.body ? (
             <ChevronDown
               className={cn(
@@ -1311,47 +1327,179 @@ function toggleSetValue<T>(set: Set<T>, value: T) {
   return next;
 }
 
-function groupFunctionsByVisibility(functions: MoveFunctionSignature[]) {
-  const groups = new Map<string, MoveFunctionSignature[]>();
+function groupFunctionsByCategory(functions: MoveFunctionSignature[]) {
+  const groups = new Map<FunctionCategoryId, FunctionCategory>();
 
   for (const signature of functions) {
-    const visibility = signature.visibility || "private";
-    const group = groups.get(visibility) ?? [];
+    const category = functionCategory(signature);
+    const group = groups.get(category.id);
 
-    group.push(signature);
-    groups.set(visibility, group);
-  }
+    if (group) {
+      group.functions.push(signature);
+      continue;
+    }
 
-  return Array.from(groups.entries())
-    .map(([visibility, groupFunctions]) => ({
-      functions: groupFunctions,
-      visibility,
-    }))
-    .sort((left, right) => {
-      return (
-        visibilitySortRank(left.visibility) -
-          visibilitySortRank(right.visibility) ||
-        left.visibility.localeCompare(right.visibility)
-      );
+    groups.set(category.id, {
+      ...category,
+      functions: [signature],
     });
+  }
+
+  return FUNCTION_CATEGORY_ORDER
+    .map((id) => groups.get(id))
+    .filter((group): group is FunctionCategory => Boolean(group))
+    .map((group) => ({
+      ...group,
+      functions: [...group.functions].sort((left, right) =>
+        left.name.localeCompare(right.name),
+      ),
+    }));
 }
 
-function visibilitySortRank(visibility: string) {
+const FUNCTION_CATEGORY_ORDER: FunctionCategoryId[] = [
+  "public-entry",
+  "entry",
+  "public-package",
+  "public-friend",
+  "public",
+  "view",
+  "private",
+];
+
+function functionCategory(signature: MoveFunctionSignature): Omit<FunctionCategory, "functions"> {
+  const visibility = normalizedVisibility(signature.visibility);
+
+  if (signature.isEntry && visibility === "public") {
+    return { id: "public-entry", label: "Public entry", tone: "publicEntry" };
+  }
+
+  if (signature.isEntry) {
+    return { id: "entry", label: "Entry only", tone: "entry" };
+  }
+
+  if (isViewFunction(signature)) {
+    return { id: "view", label: "View", tone: "view" };
+  }
+
+  if (visibility === "public(package)") {
+    return { id: "public-package", label: "Public(package)", tone: "package" };
+  }
+
+  if (visibility === "public(friend)") {
+    return { id: "public-friend", label: "Public(friend)", tone: "friend" };
+  }
+
   if (visibility === "public") {
-    return 0;
-  }
-  if (visibility.includes("package") || visibility.includes("friend")) {
-    return 1;
-  }
-  if (visibility === "private") {
-    return 3;
+    return { id: "public", label: "Public", tone: "public" };
   }
 
-  return 2;
+  return { id: "private", label: "Private", tone: "private" };
 }
 
-function visibilityGroupLabel(visibility: string) {
-  return `${visibility || "private"} functions`;
+function isViewFunction(signature: MoveFunctionSignature) {
+  const visibility = normalizedVisibility(signature.visibility);
+  const isVisible =
+    visibility === "public" ||
+    visibility === "public(package)" ||
+    visibility === "public(friend)";
+
+  if (!isVisible || signature.isEntry || !signature.signature.includes("):")) {
+    return false;
+  }
+
+  const source = `${signature.signature}\n${signature.body ?? ""}`;
+
+  return ![
+    "&mut",
+    "borrow_global_mut",
+    "move_to",
+    "move_from",
+    "table::add",
+    "table::remove",
+    "push_back",
+    "pop_back",
+    "swap_remove",
+  ].some((token) => source.includes(token));
+}
+
+function normalizedVisibility(visibility: string) {
+  return visibility.trim().toLowerCase() || "private";
+}
+
+function functionCategoryTextClass(tone: FunctionCategory["tone"]) {
+  switch (tone) {
+    case "publicEntry":
+      return "text-emerald-300";
+    case "entry":
+      return "text-lime-300";
+    case "view":
+      return "text-fuchsia-300";
+    case "package":
+      return "text-orange-300";
+    case "friend":
+      return "text-yellow-300";
+    case "public":
+      return "text-cyan-300";
+    case "private":
+      return "text-muted-foreground";
+  }
+}
+
+function functionCategoryDotClass(tone: FunctionCategory["tone"]) {
+  switch (tone) {
+    case "publicEntry":
+      return "bg-emerald-300";
+    case "entry":
+      return "bg-lime-300";
+    case "view":
+      return "bg-fuchsia-300";
+    case "package":
+      return "bg-orange-300";
+    case "friend":
+      return "bg-yellow-300";
+    case "public":
+      return "bg-cyan-300";
+    case "private":
+      return "bg-slate-400";
+  }
+}
+
+function functionBadgeTone(signature: MoveFunctionSignature): BadgeTone {
+  if (signature.isEntry && normalizedVisibility(signature.visibility) === "public") {
+    return "publicEntry";
+  }
+
+  if (signature.isEntry) {
+    return "entry";
+  }
+
+  if (isViewFunction(signature)) {
+    return "view";
+  }
+
+  const visibility = normalizedVisibility(signature.visibility);
+
+  if (visibility === "public(package)") {
+    return "package";
+  }
+
+  if (visibility === "public(friend)") {
+    return "friend";
+  }
+
+  return visibility === "private" ? "private" : "public";
+}
+
+function functionBadgeLabel(signature: MoveFunctionSignature) {
+  if (signature.isEntry && normalizedVisibility(signature.visibility) === "public") {
+    return "public entry";
+  }
+
+  if (signature.isEntry) {
+    return "entry only";
+  }
+
+  return normalizedVisibility(signature.visibility);
 }
 
 function SignatureCodeBlock({
@@ -1565,12 +1713,14 @@ function CollapsibleSurfaceGroup({
   count,
   isOpen,
   onToggle,
+  tone,
   title,
 }: {
   children: React.ReactNode;
   count: number;
   isOpen: boolean;
   onToggle: () => void;
+  tone?: FunctionCategory["tone"];
   title: string;
 }) {
   return (
@@ -1588,7 +1738,16 @@ function CollapsibleSurfaceGroup({
             )}
             aria-hidden="true"
           />
-          <span className="truncate text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          {tone ? (
+            <span
+              className={cn("size-1.5 shrink-0 rounded-full", functionCategoryDotClass(tone))}
+              aria-hidden="true"
+            />
+          ) : null}
+          <span className={cn(
+            "truncate text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground",
+            tone && functionCategoryTextClass(tone),
+          )}>
             {title}
           </span>
         </span>
@@ -1605,28 +1764,38 @@ function CollapsibleSurfaceGroup({
   );
 }
 
+type BadgeTone =
+  | "ability"
+  | "entry"
+  | "friend"
+  | "package"
+  | "private"
+  | "public"
+  | "publicEntry"
+  | "view";
+
 function Badge({
   children,
   tone,
 }: {
   children: string;
-  tone: "ability" | "entry" | "private" | "public";
+  tone: BadgeTone;
 }) {
   return (
     <span
       className={cn(
         "rounded px-2 py-0.5 text-xs font-medium",
         tone === "ability" && "bg-sky-500/10 text-sky-300",
-        tone === "public" && "bg-emerald-500/10 text-emerald-300",
+        tone === "publicEntry" && "bg-emerald-500/15 text-emerald-300",
+        tone === "entry" && "bg-lime-500/15 text-lime-300",
+        tone === "view" && "bg-fuchsia-500/15 text-fuchsia-300",
+        tone === "package" && "bg-orange-500/15 text-orange-300",
+        tone === "friend" && "bg-yellow-500/15 text-yellow-300",
+        tone === "public" && "bg-cyan-500/15 text-cyan-300",
         tone === "private" && "bg-muted text-muted-foreground",
-        tone === "entry" && "bg-primary/15 text-primary",
       )}
     >
       {children}
     </span>
   );
-}
-
-function visibilityTone(visibility: string) {
-  return visibility === "private" ? "private" : "public";
 }

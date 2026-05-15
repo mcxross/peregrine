@@ -1091,14 +1091,6 @@ function ControlFlowGraph({
                   strokeDasharray={edge.kind === "fallthrough" ? undefined : "5 4"}
                   strokeWidth={isActive || isAnimated ? 2.4 : 1.4}
                 />
-                <text
-                  className="fill-muted-foreground font-mono text-[10px]"
-                  x={edge.labelX}
-                  y={edge.labelY}
-                  textAnchor="middle"
-                >
-                  {edge.kind}
-                </text>
               </g>
             );
           })}
@@ -1118,6 +1110,19 @@ function ControlFlowGraph({
           style={{ left: layout.centerX - 6, top: 10 }}
           aria-hidden="true"
         />
+
+        {layout.edges.map((edge) => (
+          <div
+            className="pointer-events-none absolute flex h-[18px] min-w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded bg-black/70 px-2 font-mono text-[10px] leading-[18px] text-muted-foreground"
+            key={`${edge.source}:${edge.target}:${edge.kind}:${edge.sourceOffset}:label`}
+            style={{
+              left: edge.labelX,
+              top: edge.labelY,
+            }}
+          >
+            {edge.kind}
+          </div>
+        ))}
 
         {layout.blocks.map((item) => {
           const containsInstruction =
@@ -1449,10 +1454,10 @@ function hasBranchControlFlow(fn: MoveBytecodeFunctionView) {
 const FUNCTION_CATEGORY_ORDER: BytecodeFunctionCategoryId[] = [
   "public-entry",
   "entry",
-  "view",
   "public-package",
   "public-friend",
   "public",
+  "view",
   "private",
 ];
 
@@ -1574,13 +1579,13 @@ function functionGroupToneTextClass(tone: BytecodeFunctionCategory["tone"]) {
     case "entry":
       return "text-lime-300";
     case "view":
-      return "text-sky-300";
+      return "text-fuchsia-300";
     case "package":
       return "text-orange-300";
     case "friend":
       return "text-yellow-300";
     case "public":
-      return "text-blue-300";
+      return "text-cyan-300";
     case "private":
       return "text-muted-foreground";
   }
@@ -1593,13 +1598,13 @@ function functionGroupToneDotClass(tone: BytecodeFunctionCategory["tone"]) {
     case "entry":
       return "bg-lime-300";
     case "view":
-      return "bg-sky-300";
+      return "bg-fuchsia-300";
     case "package":
       return "bg-orange-300";
     case "friend":
       return "bg-yellow-300";
     case "public":
-      return "bg-blue-300";
+      return "bg-cyan-300";
     case "private":
       return "bg-slate-400";
   }
@@ -1612,13 +1617,13 @@ function functionGroupToneBadgeClass(tone: BytecodeFunctionCategory["tone"]) {
     case "entry":
       return "bg-lime-500/15 text-lime-300";
     case "view":
-      return "bg-sky-500/15 text-sky-300";
+      return "bg-fuchsia-500/15 text-fuchsia-300";
     case "package":
       return "bg-orange-500/15 text-orange-300";
     case "friend":
       return "bg-yellow-500/15 text-yellow-300";
     case "public":
-      return "bg-blue-500/15 text-blue-300";
+      return "bg-cyan-500/15 text-cyan-300";
     case "private":
       return "bg-muted text-muted-foreground";
   }
