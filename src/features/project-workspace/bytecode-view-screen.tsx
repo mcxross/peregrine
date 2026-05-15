@@ -48,8 +48,8 @@ type BytecodeViewScreenProps = {
   packageTree: PackageTree;
 };
 
-const BYTECODE_COLUMN_WIDTHS = [272, 560, 300, 360];
-const BYTECODE_COLUMN_MIN_WIDTHS = [224, 420, 240, 300];
+const BYTECODE_COLUMN_WIDTHS = [236, 470, 260, 292];
+const BYTECODE_COLUMN_MIN_WIDTHS = [184, 340, 210, 236];
 const BYTECODE_RESIZE_HANDLE_WIDTH = 8;
 const BYTECODE_TREE_ANIMATION_MS = 160;
 
@@ -763,14 +763,14 @@ function InstructionPanel({
 
       <ScrollArea className="min-h-0 min-w-0">
         <div className="max-w-full min-w-0 overflow-x-auto overflow-y-hidden">
-          <table className="w-full min-w-[42rem] table-fixed border-collapse font-mono text-xs">
+          <table className="w-full min-w-[34rem] table-fixed border-collapse font-mono text-xs">
           <thead className="sticky top-0 z-10 bg-[var(--app-window)] text-[11px] text-muted-foreground shadow-[0_1px_0_var(--app-border)]">
             <tr className="text-left">
-              <th className="w-14 px-3 py-2 font-semibold">#</th>
-              <th className="w-16 px-2 py-2 font-semibold">Offset</th>
-              <th className="w-56 px-2 py-2 font-semibold">Opcode</th>
+              <th className="w-12 px-3 py-2 font-semibold">#</th>
+              <th className="w-14 px-2 py-2 font-semibold">Offset</th>
+              <th className="w-48 px-2 py-2 font-semibold">Opcode</th>
               <th className="px-2 py-2 font-semibold">Operands</th>
-              <th className="w-36 px-3 py-2 text-right font-semibold">Source bytes</th>
+              <th className="w-28 px-3 py-2 text-right font-semibold">Source</th>
             </tr>
           </thead>
           <tbody>
@@ -1027,10 +1027,47 @@ function ControlFlowGraph({
   selectedInstruction: MoveBytecodeInstructionView | null;
 }) {
   const layout = React.useMemo(() => layoutControlFlow(blocks, edges), [blocks, edges]);
+  const [pan, setPan] = React.useState({ x: 0, y: 0 });
   const activeBlockIds = React.useMemo(
     () => new Set(activeAnimationFrame?.blockIds ?? []),
     [activeAnimationFrame],
   );
+
+  React.useEffect(() => {
+    setPan({ x: 0, y: 0 });
+  }, [layout.width, layout.height]);
+
+  const handlePanStart = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || event.target !== event.currentTarget) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startPan = pan;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "grabbing";
+    document.body.style.userSelect = "none";
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      setPan({
+        x: startPan.x + moveEvent.clientX - startX,
+        y: startPan.y + moveEvent.clientY - startY,
+      });
+    };
+
+    const handleEnd = () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", handleMove);
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleEnd, { once: true });
+  }, [pan]);
 
   if (!blocks.length) {
     return (
@@ -1041,12 +1078,16 @@ function ControlFlowGraph({
   }
 
   return (
-    <div className="min-w-0 overflow-auto p-4">
+    <div
+      className="min-w-0 cursor-grab overflow-hidden p-4 active:cursor-grabbing"
+      onPointerDown={handlePanStart}
+    >
       <div
-        className="relative"
+        className="pointer-events-none relative"
         style={{
           height: layout.height,
           minWidth: layout.width,
+          transform: `translate(${pan.x}px, ${pan.y}px)`,
         }}
       >
         <svg
@@ -1135,7 +1176,7 @@ function ControlFlowGraph({
           return (
             <button
               className={cn(
-                "absolute rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-center text-xs shadow-sm transition-colors hover:border-primary/50 hover:bg-[var(--app-subtle)]",
+                "pointer-events-auto absolute rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-center text-xs shadow-sm transition-colors hover:border-primary/50 hover:bg-[var(--app-subtle)]",
                 (isSelected || containsInstruction) && "border-primary/70 bg-primary/15 text-foreground shadow-[0_0_0_1px_rgba(71,139,255,0.18)]",
                 isAnimated && "border-sky-400/80 bg-sky-500/10 text-foreground shadow-[0_0_0_1px_rgba(56,189,248,0.18)]",
               )}
@@ -1190,7 +1231,7 @@ function ExplanationPanel({
       />
       <ScrollArea className="min-h-0">
         <div className="divide-y divide-[color:var(--app-border)]">
-          <section className="p-5">
+          <section className="p-4">
             <h3 className="font-mono text-sm font-semibold text-foreground">
               {instruction ? `${formatOpcode(instruction.opcode)} ${operandText(instruction)}` : "Select an instruction"}
             </h3>
@@ -1260,7 +1301,7 @@ function PanelHeader({
   title: string;
 }) {
   return (
-    <header className="flex h-12 min-w-0 overflow-hidden items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-4">
+    <header className="flex h-11 min-w-0 overflow-hidden items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <div className="min-w-0">
@@ -1305,7 +1346,7 @@ function ExplanationSection({
   title: string;
 }) {
   return (
-    <section className="p-5">
+    <section className="p-4">
       <h4 className="mb-3 text-sm font-semibold text-foreground">{title}</h4>
       {children}
     </section>
@@ -1524,7 +1565,7 @@ function normalizedVisibility(visibility: string) {
 }
 
 function isBytecodeGetter(fn: MoveBytecodeFunctionView) {
-  if (fn.isEntry || !fn.instructions.length) {
+  if (fn.isEntry || !fn.instructions.length || fn.returnCount === 0) {
     return false;
   }
 
@@ -1543,6 +1584,7 @@ function isBytecodeGetter(fn: MoveBytecodeFunctionView) {
 
     return (
       opcode.includes("MUT_BORROW") ||
+      opcode.includes("CALL") ||
       opcode.includes("WRITE_REF") ||
       opcode.includes("MOVE_TO") ||
       opcode.includes("MOVE_FROM") ||
@@ -1661,13 +1703,13 @@ function layoutControlFlow(
   blocks: MoveBytecodeBasicBlockView[],
   edges: MoveBytecodeControlFlowEdgeView[],
 ) {
-  const nodeWidth = 168;
-  const nodeHeight = 74;
-  const verticalGap = 76;
+  const nodeWidth = 148;
+  const nodeHeight = 68;
+  const verticalGap = 68;
   const topPadding = 48;
   const bottomPadding = 52;
-  const centerX = 220;
-  const minWidth = 440;
+  const centerX = 180;
+  const minWidth = 360;
   const blockIndex = new Map(blocks.map((block, index) => [block.id, index]));
   const blockLayouts: ControlFlowBlockLayout[] = blocks.map((block, index) => {
     const y = topPadding + index * (nodeHeight + verticalGap);
@@ -1702,12 +1744,12 @@ function layoutControlFlow(
         return {
           ...edge,
           path: `M ${source.centerX} ${source.bottom} L ${target.centerX} ${target.top}`,
-          labelX: source.centerX + 46,
+          labelX: source.centerX + 36,
           labelY: (source.bottom + target.top) / 2 - 4,
         };
       }
 
-      const lane = 52 + (index % 3) * 34;
+      const lane = 36 + (index % 3) * 24;
       const goesForward = targetIndex > sourceIndex;
       const usesRightLane = goesForward || index % 2 === 0;
       const laneX = usesRightLane

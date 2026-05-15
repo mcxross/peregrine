@@ -369,6 +369,7 @@ export type MoveBytecodeFunctionView = {
   isEntry: boolean;
   instructionCount: number;
   localCount: number;
+  returnCount: number;
   acquires: string[];
   instructions: MoveBytecodeInstructionView[];
   controlFlow: MoveBytecodeControlFlowView;

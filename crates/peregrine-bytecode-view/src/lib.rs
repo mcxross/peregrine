@@ -61,6 +61,7 @@ pub struct MoveBytecodeFunctionView {
     pub is_entry: bool,
     pub instruction_count: usize,
     pub local_count: usize,
+    pub return_count: usize,
     pub acquires: Vec<String>,
     pub instructions: Vec<MoveBytecodeInstructionView>,
     pub control_flow: MoveBytecodeControlFlowView,
@@ -324,6 +325,7 @@ fn module_functions(
                 .as_ref()
                 .map(|code| module.signature_at(code.locals).0.len())
                 .unwrap_or(0);
+            let return_count = module.signature_at(handle.return_).0.len();
             let acquires = definition
                 .acquires_global_resources
                 .iter()
@@ -340,6 +342,7 @@ fn module_functions(
                 is_entry: definition.is_entry,
                 instruction_count: instructions.len(),
                 local_count,
+                return_count,
                 acquires,
                 instructions,
                 control_flow: code
