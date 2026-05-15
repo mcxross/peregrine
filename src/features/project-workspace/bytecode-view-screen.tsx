@@ -471,10 +471,11 @@ function BytecodeExplorer({
   view: MoveBytecodePackageView | null;
 }) {
   const [branchOnly, setBranchOnly] = React.useState(false);
+  const [callsOnly, setCallsOnly] = React.useState(false);
   const [packageOnly, setPackageOnly] = React.useState(false);
   const moduleGroups = React.useMemo(
-    () => groupBytecodeModules(view, { branchOnly, packageOnly }),
-    [branchOnly, packageOnly, view],
+    () => groupBytecodeModules(view, { branchOnly, callsOnly, packageOnly }),
+    [branchOnly, callsOnly, packageOnly, view],
   );
   const branchFunctionCount = React.useMemo(
     () => view?.modules.reduce(
@@ -483,11 +484,18 @@ function BytecodeExplorer({
     ) ?? 0,
     [view],
   );
+  const callFunctionCount = React.useMemo(
+    () => view?.modules.reduce(
+      (total, module) => total + module.functions.filter(hasBytecodeCall).length,
+      0,
+    ) ?? 0,
+    [view],
+  );
   const localModuleCount = React.useMemo(
     () => view?.modules.filter((module) => !module.isDependency).length ?? 0,
     [view],
   );
-  const activeFilterCount = Number(branchOnly) + Number(packageOnly);
+  const activeFilterCount = Number(branchOnly) + Number(callsOnly) + Number(packageOnly);
   const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(() => new Set());
   const [expandedModules, setExpandedModules] = React.useState<Set<string>>(() => new Set());
   const [collapsedFunctionGroups, setCollapsedFunctionGroups] = React.useState<Set<string>>(() => new Set());
@@ -622,6 +630,15 @@ function BytecodeExplorer({
                 <GitFork className="size-3.5 text-sky-300" aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate">Branch functions</span>
                 <span className="font-mono text-[10px] text-muted-foreground">{branchFunctionCount}</span>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={callsOnly}
+                className="py-2 text-xs"
+                onCheckedChange={(checked) => setCallsOnly(checked === true)}
+              >
+                <FunctionSquare className="size-3.5 text-violet-300" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate">Call functions</span>
+                <span className="font-mono text-[10px] text-muted-foreground">{callFunctionCount}</span>
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
                 checked={packageOnly}
@@ -818,7 +835,7 @@ function BytecodeExplorer({
               </div>
             );
           })}
-          {!isLoading && view && (branchOnly || packageOnly) && !moduleGroups.length ? (
+          {!isLoading && view && activeFilterCount > 0 && !moduleGroups.length ? (
             <div className="px-3 py-6 text-xs leading-5 text-muted-foreground">
               No bytecode functions match the active filters.
             </div>
@@ -1841,6 +1858,7 @@ function groupBytecodeModules(
   view: MoveBytecodePackageView | null,
   filters: {
     branchOnly?: boolean;
+    callsOnly?: boolean;
     packageOnly?: boolean;
   } = {},
 ): BytecodeModuleGroup[] {
@@ -1848,7 +1866,7 @@ function groupBytecodeModules(
     return [];
   }
 
-  const { branchOnly = false, packageOnly = false } = filters;
+  const { branchOnly = false, callsOnly = false, packageOnly = false } = filters;
   const groups = new Map<string, BytecodeModuleGroup>();
 
   for (const module of view.modules) {
@@ -1856,15 +1874,24 @@ function groupBytecodeModules(
       continue;
     }
 
-    const functions = branchOnly
-      ? module.functions.filter(hasBranchControlFlow)
-      : module.functions;
+    const functions = module.functions.filter((fn) => {
+      if (branchOnly && !hasBranchControlFlow(fn)) {
+        return false;
+      }
 
-    if (branchOnly && functions.length === 0) {
+      if (callsOnly && !hasBytecodeCall(fn)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if ((branchOnly || callsOnly) && functions.length === 0) {
       continue;
     }
 
-    const visibleModule: MoveBytecodeModuleView = branchOnly
+    const hasFunctionFilter = branchOnly || callsOnly;
+    const visibleModule: MoveBytecodeModuleView = hasFunctionFilter
       ? {
           ...module,
           functionCount: functions.length,
@@ -1941,6 +1968,14 @@ function groupBytecodeFunctions(functions: MoveBytecodeFunctionView[]) {
 
 function hasBranchControlFlow(fn: MoveBytecodeFunctionView) {
   return fn.controlFlow.edges.some((edge) => edge.kind !== "fallthrough");
+}
+
+function hasBytecodeCall(fn: MoveBytecodeFunctionView) {
+  return fn.instructions.some((instruction) =>
+    instruction.opcode === "Call" ||
+    instruction.opcode === "CallGeneric" ||
+    instruction.call !== null,
+  );
 }
 
 const FUNCTION_CATEGORY_ORDER: BytecodeFunctionCategoryId[] = [
