@@ -3,18 +3,29 @@ import {
   Binary,
   Boxes,
   Braces,
+  ChevronDown,
   ChevronRight,
   Circle,
   Cpu,
   FileCode2,
+  Filter,
   FunctionSquare,
   GitBranch,
+  GitFork,
   GripVertical,
   Loader2,
   Package,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   loadMoveBytecodeView,
@@ -384,7 +395,24 @@ function BytecodeExplorer({
   selectedModulePath: string | null;
   view: MoveBytecodePackageView | null;
 }) {
-  const moduleGroups = React.useMemo(() => groupBytecodeModules(view), [view]);
+  const [branchOnly, setBranchOnly] = React.useState(false);
+  const [packageOnly, setPackageOnly] = React.useState(false);
+  const moduleGroups = React.useMemo(
+    () => groupBytecodeModules(view, { branchOnly, packageOnly }),
+    [branchOnly, packageOnly, view],
+  );
+  const branchFunctionCount = React.useMemo(
+    () => view?.modules.reduce(
+      (total, module) => total + module.functions.filter(hasBranchControlFlow).length,
+      0,
+    ) ?? 0,
+    [view],
+  );
+  const localModuleCount = React.useMemo(
+    () => view?.modules.filter((module) => !module.isDependency).length ?? 0,
+    [view],
+  );
+  const activeFilterCount = Number(branchOnly) + Number(packageOnly);
   const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(() => new Set());
   const [expandedModules, setExpandedModules] = React.useState<Set<string>>(() => new Set());
   const [collapsedFunctionGroups, setCollapsedFunctionGroups] = React.useState<Set<string>>(() => new Set());
@@ -485,6 +513,52 @@ function BytecodeExplorer({
             <MiniMetric icon={Braces} label="Functions" value={view.functionCount} />
             <MiniMetric icon={Boxes} label="Structs" value={view.structCount} />
           </div>
+        ) : null}
+        {view ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  "mt-3 flex h-8 w-full min-w-0 items-center gap-2 rounded border border-[color:var(--app-border)] bg-black/10 px-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-[var(--app-subtle)] hover:text-foreground",
+                  activeFilterCount > 0 && "border-sky-400/40 bg-sky-500/10 text-sky-200",
+                )}
+                type="button"
+              >
+                <Filter className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate">Filters</span>
+                {activeFilterCount > 0 ? (
+                  <span className="shrink-0 rounded bg-sky-500/20 px-1.5 py-0.5 font-mono text-[10px] text-sky-200">
+                    {activeFilterCount}
+                  </span>
+                ) : null}
+                <ChevronDown className="size-3 shrink-0" aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64 border-[color:var(--app-border)] bg-[var(--app-panel)] text-foreground">
+              <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Bytecode filters
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-[var(--app-border)]" />
+              <DropdownMenuCheckboxItem
+                checked={branchOnly}
+                className="py-2 text-xs"
+                onCheckedChange={(checked) => setBranchOnly(checked === true)}
+              >
+                <GitFork className="size-3.5 text-sky-300" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate">Branch functions</span>
+                <span className="font-mono text-[10px] text-muted-foreground">{branchFunctionCount}</span>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={packageOnly}
+                className="py-2 text-xs"
+                onCheckedChange={(checked) => setPackageOnly(checked === true)}
+              >
+                <Package className="size-3.5 text-primary" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate">Active package only</span>
+                <span className="font-mono text-[10px] text-muted-foreground">{localModuleCount}</span>
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : null}
       </div>
 
@@ -650,6 +724,11 @@ function BytecodeExplorer({
               </div>
             );
           })}
+          {!isLoading && view && (branchOnly || packageOnly) && !moduleGroups.length ? (
+            <div className="px-3 py-6 text-xs leading-5 text-muted-foreground">
+              No bytecode functions match the active filters.
+            </div>
+          ) : null}
         </div>
       </ScrollArea>
     </aside>
@@ -1167,21 +1246,48 @@ function Chevron({ className }: { className?: string }) {
   return <ChevronRight className={cn("size-3 shrink-0", className)} aria-hidden="true" />;
 }
 
-function groupBytecodeModules(view: MoveBytecodePackageView | null): BytecodeModuleGroup[] {
+function groupBytecodeModules(
+  view: MoveBytecodePackageView | null,
+  filters: {
+    branchOnly?: boolean;
+    packageOnly?: boolean;
+  } = {},
+): BytecodeModuleGroup[] {
   if (!view) {
     return [];
   }
 
+  const { branchOnly = false, packageOnly = false } = filters;
   const groups = new Map<string, BytecodeModuleGroup>();
 
   for (const module of view.modules) {
+    if (packageOnly && module.isDependency) {
+      continue;
+    }
+
+    const functions = branchOnly
+      ? module.functions.filter(hasBranchControlFlow)
+      : module.functions;
+
+    if (branchOnly && functions.length === 0) {
+      continue;
+    }
+
+    const visibleModule: MoveBytecodeModuleView = branchOnly
+      ? {
+          ...module,
+          functionCount: functions.length,
+          functions,
+          instructionCount: functions.reduce((total, fn) => total + fn.instructionCount, 0),
+        }
+      : module;
     const id = module.isDependency
       ? `dependency:${module.packageName}`
       : `package:${view.packageName}`;
     const existing = groups.get(id);
 
     if (existing) {
-      existing.modules.push(module);
+      existing.modules.push(visibleModule);
       existing.moduleCount += 1;
       continue;
     }
@@ -1193,7 +1299,7 @@ function groupBytecodeModules(view: MoveBytecodePackageView | null): BytecodeMod
         ? `Dependency: ${module.packageName}`
         : `Package: ${view.packageName}`,
       moduleCount: 1,
-      modules: [module],
+      modules: [visibleModule],
     });
   }
 
@@ -1240,6 +1346,10 @@ function groupBytecodeFunctions(functions: MoveBytecodeFunctionView[]) {
         left.name.localeCompare(right.name),
       ),
     }));
+}
+
+function hasBranchControlFlow(fn: MoveBytecodeFunctionView) {
+  return fn.controlFlow.edges.some((edge) => edge.kind !== "fallthrough");
 }
 
 const FUNCTION_CATEGORY_ORDER: BytecodeFunctionCategoryId[] = [
