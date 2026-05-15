@@ -47,6 +47,23 @@ type BytecodeModuleGroup = {
   modules: MoveBytecodeModuleView[];
 };
 
+type BytecodeFunctionCategoryId =
+  | "entry"
+  | "private"
+  | "public"
+  | "public-entry"
+  | "public-friend"
+  | "public-package"
+  | "view";
+
+type BytecodeFunctionCategory = {
+  count: number;
+  functions: MoveBytecodeFunctionView[];
+  id: BytecodeFunctionCategoryId;
+  label: string;
+  tone: "entry" | "friend" | "package" | "private" | "public" | "publicEntry" | "view";
+};
+
 export function BytecodeViewScreen({
   activeMovePackage,
   packageTree,
@@ -370,11 +387,13 @@ function BytecodeExplorer({
   const moduleGroups = React.useMemo(() => groupBytecodeModules(view), [view]);
   const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(() => new Set());
   const [expandedModules, setExpandedModules] = React.useState<Set<string>>(() => new Set());
+  const [collapsedFunctionGroups, setCollapsedFunctionGroups] = React.useState<Set<string>>(() => new Set());
 
   React.useEffect(() => {
     if (!view) {
       setExpandedGroups(new Set());
       setExpandedModules(new Set());
+      setCollapsedFunctionGroups(new Set());
       return;
     }
 
@@ -432,6 +451,20 @@ function BytecodeExplorer({
         next.delete(modulePath);
       } else {
         next.add(modulePath);
+      }
+
+      return next;
+    });
+  }, []);
+
+  const toggleFunctionGroup = React.useCallback((groupKey: string) => {
+    setCollapsedFunctionGroups((current) => {
+      const next = new Set(current);
+
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
       }
 
       return next;
@@ -531,27 +564,80 @@ function BytecodeExplorer({
 
                           <CollapsibleTreeBody isOpen={isExpandedModule}>
                             <div className="ml-6 min-w-0 overflow-hidden border-l border-[color:var(--app-border)] py-1 pl-2">
-                              {module.functions.map((fn) => {
-                                const isSelectedFunction = isSelectedModule && fn.name === selectedFunctionName;
+                              {groupBytecodeFunctions(module.functions).map((functionGroup) => {
+                                const groupKey = `${module.bytecodePath}:${functionGroup.id}`;
+                                const isFunctionGroupOpen = !collapsedFunctionGroups.has(groupKey);
 
                                 return (
-                                  <button
-                                    className={cn(
-                                      "flex h-7 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded px-2 text-left text-xs text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground",
-                                      isSelectedFunction && "bg-primary/15 text-foreground",
-                                    )}
-                                    key={`${module.bytecodePath}:${fn.name}`}
-                                    onClick={() => onSelectFunction(module.bytecodePath, fn.name)}
-                                    type="button"
-                                  >
-                                    <FunctionSquare className="size-3 shrink-0" aria-hidden="true" />
-                                    <span className="min-w-0 flex-1 truncate">{fn.name}</span>
-                                    {fn.isEntry ? (
-                                      <span className="shrink-0 rounded bg-emerald-500/15 px-1 text-[10px] font-semibold text-emerald-400">
-                                        entry
+                                  <div className="mb-1 min-w-0 overflow-hidden" key={groupKey}>
+                                    <button
+                                      className={cn(
+                                        "flex h-7 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded px-2 text-left text-[11px] font-semibold uppercase tracking-wide hover:bg-[var(--app-subtle)]",
+                                        functionGroupToneTextClass(functionGroup.tone),
+                                      )}
+                                      aria-expanded={isFunctionGroupOpen}
+                                      onClick={() => toggleFunctionGroup(groupKey)}
+                                      type="button"
+                                    >
+                                      <ChevronRight
+                                        className={cn(
+                                          "size-3 shrink-0 transition-transform duration-150 ease-out",
+                                          isFunctionGroupOpen && "rotate-90",
+                                        )}
+                                        aria-hidden="true"
+                                      />
+                                      <span
+                                        className={cn(
+                                          "size-1.5 shrink-0 rounded-full",
+                                          functionGroupToneDotClass(functionGroup.tone),
+                                        )}
+                                      />
+                                      <span className="min-w-0 flex-1 truncate">
+                                        {functionGroup.label}
                                       </span>
-                                    ) : null}
-                                  </button>
+                                      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                                        {functionGroup.count}
+                                      </span>
+                                    </button>
+                                    <CollapsibleTreeBody isOpen={isFunctionGroupOpen}>
+                                      <div className="ml-5 min-w-0 overflow-hidden border-l border-[color:var(--app-border)] py-1 pl-2">
+                                        {functionGroup.functions.map((fn) => {
+                                          const isSelectedFunction = isSelectedModule && fn.name === selectedFunctionName;
+
+                                          return (
+                                            <button
+                                              className={cn(
+                                                "flex h-7 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded px-2 text-left text-xs text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground",
+                                                isSelectedFunction && "bg-primary/15 text-foreground",
+                                              )}
+                                              key={`${module.bytecodePath}:${fn.name}`}
+                                              onClick={() => onSelectFunction(module.bytecodePath, fn.name)}
+                                              type="button"
+                                            >
+                                              <FunctionSquare
+                                                className={cn(
+                                                  "size-3 shrink-0",
+                                                  functionGroupToneTextClass(functionGroup.tone),
+                                                )}
+                                                aria-hidden="true"
+                                              />
+                                              <span className="min-w-0 flex-1 truncate">{fn.name}</span>
+                                              <span className="flex shrink-0 items-center gap-1">
+                                                <span
+                                                  className={cn(
+                                                    "rounded px-1 text-[10px] font-semibold",
+                                                    functionGroupToneBadgeClass(functionGroup.tone),
+                                                  )}
+                                                >
+                                                  {functionBadgeLabel(fn, functionGroup.id)}
+                                                </span>
+                                              </span>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </CollapsibleTreeBody>
+                                  </div>
                                 );
                               })}
                             </div>
@@ -1114,6 +1200,215 @@ function groupBytecodeModules(view: MoveBytecodePackageView | null): BytecodeMod
 
       return left.label.localeCompare(right.label);
     });
+}
+
+function groupBytecodeFunctions(functions: MoveBytecodeFunctionView[]) {
+  const groups = new Map<BytecodeFunctionCategoryId, BytecodeFunctionCategory>();
+
+  for (const fn of functions) {
+    const category = bytecodeFunctionCategory(fn);
+    const group = groups.get(category.id);
+
+    if (group) {
+      group.functions.push(fn);
+      group.count += 1;
+      continue;
+    }
+
+    groups.set(category.id, {
+      ...category,
+      count: 1,
+      functions: [fn],
+    });
+  }
+
+  return FUNCTION_CATEGORY_ORDER
+    .map((id) => groups.get(id))
+    .filter((group): group is BytecodeFunctionCategory => Boolean(group))
+    .map((group) => ({
+      ...group,
+      functions: [...group.functions].sort((left, right) =>
+        left.name.localeCompare(right.name),
+      ),
+    }));
+}
+
+const FUNCTION_CATEGORY_ORDER: BytecodeFunctionCategoryId[] = [
+  "public-entry",
+  "entry",
+  "view",
+  "public-package",
+  "public-friend",
+  "public",
+  "private",
+];
+
+function bytecodeFunctionCategory(fn: MoveBytecodeFunctionView): Omit<BytecodeFunctionCategory, "count" | "functions"> {
+  const visibility = normalizedVisibility(fn.visibility);
+
+  if (fn.isEntry && visibility === "public") {
+    return {
+      id: "public-entry",
+      label: "Public entry",
+      tone: "publicEntry",
+    };
+  }
+
+  if (fn.isEntry) {
+    return {
+      id: "entry",
+      label: "Entry only",
+      tone: "entry",
+    };
+  }
+
+  if (isBytecodeGetter(fn)) {
+    return {
+      id: "view",
+      label: "View",
+      tone: "view",
+    };
+  }
+
+  if (visibility === "public(package)") {
+    return {
+      id: "public-package",
+      label: "Public(package)",
+      tone: "package",
+    };
+  }
+
+  if (visibility === "public(friend)") {
+    return {
+      id: "public-friend",
+      label: "Public(friend)",
+      tone: "friend",
+    };
+  }
+
+  if (visibility === "public") {
+    return {
+      id: "public",
+      label: "Public",
+      tone: "public",
+    };
+  }
+
+  return {
+    id: "private",
+    label: "Private",
+    tone: "private",
+  };
+}
+
+function normalizedVisibility(visibility: string) {
+  return visibility.trim().toLowerCase() || "private";
+}
+
+function isBytecodeGetter(fn: MoveBytecodeFunctionView) {
+  if (fn.isEntry || !fn.instructions.length) {
+    return false;
+  }
+
+  const visibility = normalizedVisibility(fn.visibility);
+  const isExternallyUseful =
+    visibility === "public" ||
+    visibility === "public(package)" ||
+    visibility === "public(friend)";
+
+  if (!isExternallyUseful) {
+    return false;
+  }
+
+  return !fn.instructions.some((instruction) => {
+    const opcode = instruction.opcode.toUpperCase();
+
+    return (
+      opcode.includes("MUT_BORROW") ||
+      opcode.includes("WRITE_REF") ||
+      opcode.includes("MOVE_TO") ||
+      opcode.includes("MOVE_FROM") ||
+      opcode.includes("PACK") ||
+      opcode.includes("UNPACK") ||
+      opcode.includes("VEC_PUSH") ||
+      opcode.includes("VEC_POP") ||
+      opcode.includes("VEC_SWAP")
+    );
+  });
+}
+
+function functionBadgeLabel(
+  fn: MoveBytecodeFunctionView,
+  category: BytecodeFunctionCategoryId,
+) {
+  if (category === "public-entry") {
+    return "public entry";
+  }
+  if (category === "entry") {
+    return "entry only";
+  }
+  if (category === "view") {
+    return normalizedVisibility(fn.visibility);
+  }
+
+  return normalizedVisibility(fn.visibility);
+}
+
+function functionGroupToneTextClass(tone: BytecodeFunctionCategory["tone"]) {
+  switch (tone) {
+    case "publicEntry":
+      return "text-emerald-300";
+    case "entry":
+      return "text-lime-300";
+    case "view":
+      return "text-sky-300";
+    case "package":
+      return "text-orange-300";
+    case "friend":
+      return "text-yellow-300";
+    case "public":
+      return "text-blue-300";
+    case "private":
+      return "text-muted-foreground";
+  }
+}
+
+function functionGroupToneDotClass(tone: BytecodeFunctionCategory["tone"]) {
+  switch (tone) {
+    case "publicEntry":
+      return "bg-emerald-300";
+    case "entry":
+      return "bg-lime-300";
+    case "view":
+      return "bg-sky-300";
+    case "package":
+      return "bg-orange-300";
+    case "friend":
+      return "bg-yellow-300";
+    case "public":
+      return "bg-blue-300";
+    case "private":
+      return "bg-slate-400";
+  }
+}
+
+function functionGroupToneBadgeClass(tone: BytecodeFunctionCategory["tone"]) {
+  switch (tone) {
+    case "publicEntry":
+      return "bg-emerald-500/15 text-emerald-300";
+    case "entry":
+      return "bg-lime-500/15 text-lime-300";
+    case "view":
+      return "bg-sky-500/15 text-sky-300";
+    case "package":
+      return "bg-orange-500/15 text-orange-300";
+    case "friend":
+      return "bg-yellow-500/15 text-yellow-300";
+    case "public":
+      return "bg-blue-500/15 text-blue-300";
+    case "private":
+      return "bg-muted text-muted-foreground";
+  }
 }
 
 type ControlFlowBlockLayout = {
