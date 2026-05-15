@@ -753,7 +753,7 @@ function InstructionPanel({
         title="Instructions"
         subtitle={
           selectedModule && selectedFunction
-            ? `${selectedModule.address}::${selectedModule.name}::${selectedFunction.name}`
+            ? `${shortAddress(selectedModule.address)}::${selectedModule.name}::${selectedFunction.name}`
             : "Compiled bytecode"
         }
       />
@@ -765,7 +765,7 @@ function InstructionPanel({
             <tr className="text-left">
               <th className="w-14 px-3 py-2 font-semibold">#</th>
               <th className="w-16 px-2 py-2 font-semibold">Offset</th>
-              <th className="w-40 px-2 py-2 font-semibold">Opcode</th>
+              <th className="w-56 px-2 py-2 font-semibold">Opcode</th>
               <th className="px-2 py-2 font-semibold">Operands</th>
               <th className="w-36 px-3 py-2 text-right font-semibold">Source bytes</th>
             </tr>
@@ -785,7 +785,9 @@ function InstructionPanel({
                 >
                   <td className="px-3 py-1.5 text-[11px] text-muted-foreground">{index.toString().padStart(4, "0")}</td>
                   <td className="px-2 py-1.5">{formatOffset(instruction.offset)}</td>
-                  <td className="px-2 py-1.5 font-semibold text-foreground">{formatOpcode(instruction.opcode)}</td>
+                  <td className="truncate px-2 py-1.5 font-semibold text-foreground" title={formatOpcode(instruction.opcode)}>
+                    {formatOpcode(instruction.opcode)}
+                  </td>
                   <td className="truncate px-2 py-1.5" title={operandText(instruction)}>
                     {operandText(instruction)}
                   </td>
@@ -1140,7 +1142,7 @@ function ExplanationPanel({
 
           <ExplanationSection title="Module">
             <div className="grid gap-2 text-xs text-muted-foreground">
-              <ContextRow label="Module" value={module ? `${module.address}::${module.name}` : "-"} />
+              <ContextRow label="Module" value={module ? `${shortAddress(module.address)}::${module.name}` : "-"} />
               <ContextRow label="Version" value={module ? String(module.version) : "-"} />
               <ContextRow label="Size" value={module ? formatBytes(module.byteSize) : "-"} />
               <ContextRow label="Bytecode" value={module?.bytecodePath ?? "-"} />
@@ -1659,6 +1661,18 @@ function formatSourceBytes(instruction: MoveBytecodeInstructionView) {
   return instruction.source
     ? `${instruction.source.startByte}...${instruction.source.endByte}`
     : "-";
+}
+
+function shortAddress(address: string | null | undefined) {
+  if (!address) {
+    return "_";
+  }
+
+  if (address.length <= 18) {
+    return address;
+  }
+
+  return `${address.slice(0, 8)}...${address.slice(-6)}`;
 }
 
 function edgeColor(kind: string) {
