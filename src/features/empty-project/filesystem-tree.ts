@@ -550,6 +550,7 @@ export type SuiAdapterStatus = {
 export type SuiAdapterSource = "bundled" | "system";
 
 export type SuiAdapterSettings = {
+  cliPath?: string | null;
   source: SuiAdapterSource;
 };
 
@@ -626,6 +627,16 @@ export async function loadMoveStateAccessGraph(
     moduleName,
     packagePath,
     rootPath,
+  });
+}
+
+export async function createMoveProject(
+  parentPath: string,
+  projectName: string,
+): Promise<PackageTree> {
+  return invoke<PackageTree>("create_move_project", {
+    parentPath,
+    projectName,
   });
 }
 

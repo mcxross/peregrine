@@ -1,4 +1,5 @@
 import React from "react";
+import { FolderOpen } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   checkSuiAdapter,
   getSuiAdapterSettings,
@@ -39,11 +41,14 @@ const suiSourceOptions: { value: SuiAdapterSource; label: string }[] = [
 export function SettingsScreen({ onBack }: SettingsScreenProps) {
   const { themes, themeId, mode, resolvedMode, setMode, setThemeId } = useTheme();
   const [suiSettings, setSuiSettings] = React.useState<SuiAdapterSettings>({
+    cliPath: null,
     source: "bundled",
   });
+  const [suiCliPathInput, setSuiCliPathInput] = React.useState("");
   const [suiStatus, setSuiStatus] = React.useState<SuiAdapterStatus | null>(null);
   const [suiSettingsError, setSuiSettingsError] = React.useState<string | null>(null);
   const [isSavingSuiSettings, setIsSavingSuiSettings] = React.useState(false);
+  const effectiveSuiSource = suiSettings.cliPath?.trim() ? "system" : suiSettings.source;
 
   React.useEffect(() => {
     let isMounted = true;
@@ -55,6 +60,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
         }
 
         setSuiSettings(settings);
+        setSuiCliPathInput(settings.cliPath ?? "");
         setSuiStatus(status);
         setSuiSettingsError(null);
       })
@@ -71,11 +77,15 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
 
   const updateSuiSource = React.useCallback(
     async (source: SuiAdapterSource) => {
-      if (source === suiSettings.source || isSavingSuiSettings) {
+      if (source === effectiveSuiSource || isSavingSuiSettings) {
         return;
       }
 
-      const nextSettings = { source };
+      const nextSettings: SuiAdapterSettings = {
+        ...suiSettings,
+        cliPath: source === "bundled" ? null : suiSettings.cliPath ?? null,
+        source,
+      };
       setSuiSettings(nextSettings);
       setIsSavingSuiSettings(true);
       setSuiSettingsError(null);
@@ -85,6 +95,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
         const status = await checkSuiAdapter();
 
         setSuiSettings(savedSettings);
+        setSuiCliPathInput(savedSettings.cliPath ?? "");
         setSuiStatus(status);
       } catch (error) {
         setSuiSettingsError(getSettingsErrorMessage(error));
@@ -92,8 +103,50 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
         setIsSavingSuiSettings(false);
       }
     },
-    [isSavingSuiSettings, suiSettings.source],
+    [effectiveSuiSource, isSavingSuiSettings, suiSettings],
   );
+  const saveSuiCliPath = React.useCallback(
+    async (path: string) => {
+      if (isSavingSuiSettings) {
+        return;
+      }
+
+      const cliPath = path.trim() || null;
+      const nextSettings: SuiAdapterSettings = {
+        ...suiSettings,
+        cliPath,
+        source: cliPath ? "system" : suiSettings.source,
+      };
+
+      setSuiSettings(nextSettings);
+      setIsSavingSuiSettings(true);
+      setSuiSettingsError(null);
+
+      try {
+        const savedSettings = await saveSuiAdapterSettings(nextSettings);
+        const status = await checkSuiAdapter();
+
+        setSuiSettings(savedSettings);
+        setSuiCliPathInput(savedSettings.cliPath ?? "");
+        setSuiStatus(status);
+      } catch (error) {
+        setSuiSettingsError(getSettingsErrorMessage(error));
+      } finally {
+        setIsSavingSuiSettings(false);
+      }
+    },
+    [isSavingSuiSettings, suiSettings],
+  );
+  const chooseSuiCliPath = React.useCallback(async () => {
+    const selectedPath = await openSuiCliPath();
+
+    if (!selectedPath) {
+      return;
+    }
+
+    setSuiCliPathInput(selectedPath);
+    await saveSuiCliPath(selectedPath);
+  }, [saveSuiCliPath]);
 
   return (
     <main className="h-full min-h-0 overflow-auto bg-background text-foreground">
@@ -136,7 +189,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
             <Card>
               <CardHeader>
                 <CardTitle>Sui CLI</CardTitle>
-                <CardDescription>{suiSourceLabel(suiSettings.source)}</CardDescription>
+                <CardDescription>{suiSourceLabel(effectiveSuiSource)}</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3">
                 <div className="grid grid-cols-2 gap-1 rounded-lg border bg-muted p-1 md:grid-cols-1">
@@ -151,7 +204,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
                         onClick={() => void updateSuiSource(option.value)}
                         size="sm"
                         title={unavailableSystem ? suiStatus?.system.error ?? "Sui CLI not found on PATH." : undefined}
-                        variant={suiSettings.source === option.value ? "default" : "ghost"}
+                        variant={effectiveSuiSource === option.value ? "default" : "ghost"}
                       >
                         {option.label}
                       </Button>
@@ -161,17 +214,55 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
 
                 <div className="grid gap-2 text-xs text-muted-foreground">
                   <SuiSourceStatusRow
-                    active={suiSettings.source === "bundled"}
+                    active={effectiveSuiSource === "bundled"}
                     label="Bundled crate"
+                    path={suiStatus?.bundled.path ?? null}
                     version={suiStatus?.bundled.version ?? null}
                     available={suiStatus?.bundled.available ?? false}
                   />
                   <SuiSourceStatusRow
-                    active={suiSettings.source === "system"}
+                    active={effectiveSuiSource === "system"}
                     label="User installed"
+                    path={suiStatus?.system.path ?? null}
                     version={suiStatus?.system.version ?? null}
                     available={suiStatus?.system.available ?? false}
                   />
+                  <div className="grid gap-2 rounded border bg-card p-2">
+                    <label className="text-xs font-medium text-foreground" htmlFor="sui-cli-path">
+                      Sui CLI path
+                    </label>
+                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                      <Input
+                        autoComplete="off"
+                        id="sui-cli-path"
+                        onChange={(event) => setSuiCliPathInput(event.target.value)}
+                        placeholder="Use bundled crate or PATH"
+                        type="text"
+                        value={suiCliPathInput}
+                      />
+                      <Button
+                        disabled={isSavingSuiSettings}
+                        onClick={() => void chooseSuiCliPath()}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <FolderOpen aria-hidden="true" />
+                        Browse
+                      </Button>
+                      <Button
+                        disabled={isSavingSuiSettings || suiCliPathInput === (suiSettings.cliPath ?? "")}
+                        onClick={() => void saveSuiCliPath(suiCliPathInput)}
+                        size="sm"
+                        type="button"
+                      >
+                        Save
+                      </Button>
+                    </div>
+                    <p>
+                      Set a CLI path to make project creation and package commands use that binary instead of the embedded toolchain.
+                    </p>
+                  </div>
                   {suiSettingsError ? (
                     <p className="rounded border border-destructive/30 bg-destructive/10 px-2 py-1 text-destructive">
                       {suiSettingsError}
@@ -239,11 +330,13 @@ function SuiSourceStatusRow({
   active,
   available,
   label,
+  path,
   version,
 }: {
   active: boolean;
   available: boolean;
   label: string;
+  path: string | null;
   version: string | null;
 }) {
   const stateLabel = active
@@ -257,26 +350,43 @@ function SuiSourceStatusRow({
       : "Idle";
 
   return (
-    <div className="flex min-w-0 items-center justify-between gap-2 rounded border bg-card px-2 py-1.5">
-      <span className="min-w-0 truncate">{label}</span>
-      <div className="flex min-w-0 items-center gap-2">
-        <Badge
-          className={cn(
-            "rounded px-1.5 py-0 text-[10px]",
-            available
-              ? "bg-emerald-500/15 text-emerald-400"
-              : "bg-amber-500/15 text-amber-400",
-          )}
-          variant="secondary"
-        >
-          {available ? "Ready" : "Missing"}
-        </Badge>
-        <span className="max-w-[8rem] truncate text-right">
-          {stateLabel}
-        </span>
+    <div className="grid min-w-0 gap-1 rounded border bg-card px-2 py-1.5">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <span className="min-w-0 truncate">{label}</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <Badge
+            className={cn(
+              "rounded px-1.5 py-0 text-[10px]",
+              available
+                ? "bg-emerald-500/15 text-emerald-400"
+                : "bg-amber-500/15 text-amber-400",
+            )}
+            variant="secondary"
+          >
+            {available ? "Ready" : "Missing"}
+          </Badge>
+          <span className="max-w-[8rem] truncate text-right">
+            {stateLabel}
+          </span>
+        </div>
       </div>
+      {path ? (
+        <p className="truncate font-mono text-[11px] text-muted-foreground">{path}</p>
+      ) : null}
     </div>
   );
+}
+
+async function openSuiCliPath(): Promise<string | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+
+  const selectedPath = await open({
+    directory: false,
+    multiple: false,
+    title: "Select Sui CLI",
+  });
+
+  return typeof selectedPath === "string" ? selectedPath : null;
 }
 
 function suiSourceLabel(source: SuiAdapterSource) {

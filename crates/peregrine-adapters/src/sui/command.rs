@@ -28,6 +28,78 @@ pub struct SuiPackageCommand {
     pub kind: SuiCommandKind,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SuiMoveNewCommand {
+    pub execution: SuiExecutionTarget,
+    pub project_name: String,
+    pub args: Vec<String>,
+    pub display: String,
+}
+
+impl SuiMoveNewCommand {
+    pub(crate) fn new(
+        project_name: &str,
+        execution: SuiExecutionTarget,
+    ) -> Result<Self, SuiAdapterError> {
+        let project_name = validated_move_project_name(project_name)?;
+        let args = vec!["move".to_string(), "new".to_string(), project_name.clone()];
+
+        Ok(Self {
+            execution,
+            display: format!("sui move new {project_name}"),
+            project_name,
+            args,
+        })
+    }
+
+    pub fn source(&self) -> SuiAdapterSource {
+        self.execution.source()
+    }
+
+    pub fn bundled_args(&self) -> Vec<OsString> {
+        let mut args = vec![OsString::from("sui")];
+        args.extend(self.args.iter().map(OsString::from));
+        args
+    }
+}
+
+fn validated_move_project_name(project_name: &str) -> Result<String, SuiAdapterError> {
+    let project_name = project_name.trim();
+
+    if project_name.is_empty() {
+        return Err(SuiAdapterError::InvalidProjectName(
+            "Project name cannot be empty.".to_string(),
+        ));
+    }
+
+    if project_name.len() > 128 {
+        return Err(SuiAdapterError::InvalidProjectName(
+            "Project name is too long.".to_string(),
+        ));
+    }
+
+    let mut characters = project_name.chars();
+    let Some(first) = characters.next() else {
+        return Err(SuiAdapterError::InvalidProjectName(
+            "Project name cannot be empty.".to_string(),
+        ));
+    };
+
+    if !(first == '_' || first.is_ascii_alphabetic()) {
+        return Err(SuiAdapterError::InvalidProjectName(
+            "Project name must start with a letter or underscore.".to_string(),
+        ));
+    }
+
+    if !characters.all(|character| character == '_' || character.is_ascii_alphanumeric()) {
+        return Err(SuiAdapterError::InvalidProjectName(
+            "Project name can only contain letters, numbers, and underscores.".to_string(),
+        ));
+    }
+
+    Ok(project_name.to_string())
+}
+
 impl SuiPackageCommand {
     pub(crate) fn new(kind: SuiCommandKind, execution: SuiExecutionTarget) -> Self {
         let (args, display, temp_pubfile_path) = command_parts(kind);

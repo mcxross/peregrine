@@ -6,11 +6,24 @@ use std::{
     process::Command,
 };
 
-pub(crate) fn status(environment: &SuiAdapterEnvironment) -> SuiAdapterSourceStatus {
-    binary_status(SuiAdapterSource::System, executable(environment))
+pub(crate) fn status(
+    environment: &SuiAdapterEnvironment,
+    configured_cli_path: Option<&str>,
+) -> SuiAdapterSourceStatus {
+    binary_status(
+        SuiAdapterSource::System,
+        executable(environment, configured_cli_path),
+    )
 }
 
-pub(crate) fn executable(environment: &SuiAdapterEnvironment) -> Option<PathBuf> {
+pub(crate) fn executable(
+    environment: &SuiAdapterEnvironment,
+    configured_cli_path: Option<&str>,
+) -> Option<PathBuf> {
+    if let Some(path) = configured_cli_path {
+        return Some(PathBuf::from(path));
+    }
+
     find_on_path(sui_binary_name(), environment.path.as_ref()).or_else(|| {
         environment
             .search_common_user_locations

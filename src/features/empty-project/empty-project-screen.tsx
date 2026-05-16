@@ -1,10 +1,12 @@
 import React from "react";
-import { Package } from "lucide-react";
+import { FolderOpen, Package, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  createMoveProject,
   loadPackageTree,
   type MovePackage,
   type PackageTree,
@@ -37,6 +39,7 @@ export function EmptyProjectScreen({
   const [storedRecentProjects, setStoredRecentProjects] = React.useState<RecentProject[]>(() => loadRecentProjects());
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isCreateProjectOpen, setIsCreateProjectOpen] = React.useState(false);
   const [pendingPackageTree, setPendingPackageTree] = React.useState<PackageTree | null>(null);
   const visibleRecentProjects = recentProjects ?? storedRecentProjects;
   const selectProject = React.useCallback(
@@ -73,6 +76,28 @@ export function EmptyProjectScreen({
       setIsLoading(false);
     }
   });
+  const handleCreateProject = React.useCallback(
+    async (input: CreateMoveProjectInput) => {
+      setLoadError(null);
+      setPendingPackageTree(null);
+      setIsLoading(true);
+
+      try {
+        const packageTree = await createMoveProject(input.parentPath, input.projectName);
+        const activePackage = packageTree.movePackages.find(
+          (movePackage) => movePackage.name === input.projectName,
+        ) ?? packageTree.movePackages[0] ?? null;
+
+        setIsCreateProjectOpen(false);
+        selectProject(withActivePackage(packageTree, activePackage));
+      } catch (error) {
+        setLoadError(getOpenPackageErrorMessage(error));
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [selectProject],
+  );
   const handleOpenRecentProject = onOpenRecentProject ?? (async (project: RecentProject) => {
     setLoadError(null);
     setPendingPackageTree(null);
@@ -116,9 +141,20 @@ export function EmptyProjectScreen({
   }
 
   return (
-    <div className="grid h-full min-h-0 place-items-center overflow-hidden bg-background px-6 py-5">
+    <div className="grid h-full min-h-0 place-items-center overflow-auto bg-background px-6 py-5">
       <div className="flex max-h-full w-full max-w-[660px] flex-col items-stretch gap-4">
-        <ProjectDropzone onOpenProject={handleOpenProject} isLoading={isLoading} />
+        <ProjectDropzone
+          onCreateProject={() => setIsCreateProjectOpen((isOpen) => !isOpen)}
+          onOpenProject={handleOpenProject}
+          isLoading={isLoading}
+        />
+        {isCreateProjectOpen ? (
+          <CreateMoveProjectForm
+            isLoading={isLoading}
+            onCancel={() => setIsCreateProjectOpen(false)}
+            onCreateProject={handleCreateProject}
+          />
+        ) : null}
         {loadError ? (
           <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {loadError}
@@ -133,6 +169,118 @@ export function EmptyProjectScreen({
         </ScrollArea>
       </div>
     </div>
+  );
+}
+
+type CreateMoveProjectInput = {
+  parentPath: string;
+  projectName: string;
+};
+
+function CreateMoveProjectForm({
+  isLoading,
+  onCancel,
+  onCreateProject,
+}: {
+  isLoading: boolean;
+  onCancel: () => void;
+  onCreateProject: (input: CreateMoveProjectInput) => void;
+}) {
+  const [parentPath, setParentPath] = React.useState("");
+  const [projectName, setProjectName] = React.useState("");
+  const trimmedProjectName = projectName.trim();
+  const projectNameError = trimmedProjectName && !isValidMoveProjectName(trimmedProjectName)
+    ? "Use a Move package name: letters, numbers, and underscores; start with a letter or underscore."
+    : null;
+  const canCreate = Boolean(parentPath && trimmedProjectName && !projectNameError && !isLoading);
+
+  return (
+    <Card className="rounded-md p-4 shadow-none">
+      <form
+        className="grid gap-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+
+          if (!canCreate) {
+            return;
+          }
+
+          onCreateProject({ parentPath, projectName: trimmedProjectName });
+        }}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold tracking-tight">Create a Move package</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Choose a parent folder and package name. Peregrine opens the new package after creation.
+            </p>
+          </div>
+          <Button type="button" variant="ghost" onClick={onCancel} disabled={isLoading}>
+            Cancel
+          </Button>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="grid gap-2">
+            <label className="text-sm font-medium" htmlFor="new-move-project-name">
+              Package name
+            </label>
+            <Input
+              autoComplete="off"
+              id="new-move-project-name"
+              onChange={(event) => setProjectName(event.target.value)}
+              placeholder="my_package"
+              type="text"
+              value={projectName}
+              aria-invalid={Boolean(projectNameError)}
+            />
+            {projectNameError ? (
+              <p className="text-xs text-destructive">{projectNameError}</p>
+            ) : null}
+          </div>
+
+          <div className="grid gap-2">
+            <span className="text-sm font-medium">Parent directory</span>
+            <Button
+              className="justify-start"
+              type="button"
+              variant="outline"
+              onClick={() => {
+                void chooseProjectParentDirectory().then((selectedPath) => {
+                  if (selectedPath) {
+                    setParentPath(selectedPath);
+                  }
+                });
+              }}
+              disabled={isLoading}
+            >
+              <FolderOpen aria-hidden="true" />
+              Choose Folder
+            </Button>
+          </div>
+        </div>
+
+        {parentPath ? (
+          <p className="truncate rounded-md border bg-[var(--app-surface)] px-3 py-2 font-mono text-xs text-muted-foreground">
+            {parentPath}/{trimmedProjectName || "<package_name>"}
+          </p>
+        ) : (
+          <p className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+            Choose the directory where the new package folder should be created.
+          </p>
+        )}
+
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+            Close
+          </Button>
+          <Button type="submit" disabled={!canCreate}>
+            <Plus aria-hidden="true" />
+            {isLoading ? "Creating..." : "Create Package"}
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 
@@ -234,6 +382,23 @@ async function openMovePackage(): Promise<string | null> {
   });
 
   return typeof selectedPath === "string" ? selectedPath : null;
+}
+
+async function chooseProjectParentDirectory(): Promise<string | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+
+  const selectedPath = await open({
+    directory: true,
+    multiple: false,
+    recursive: false,
+    title: "Choose Project Directory",
+  });
+
+  return typeof selectedPath === "string" ? selectedPath : null;
+}
+
+function isValidMoveProjectName(projectName: string) {
+  return /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(projectName);
 }
 
 function getOpenPackageErrorMessage(error: unknown) {

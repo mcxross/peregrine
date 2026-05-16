@@ -1,7 +1,7 @@
 use super::{
     bundled, system, SuiAdapterEnvironment, SuiAdapterError, SuiAdapterSettings, SuiAdapterSource,
     SuiAdapterSourceStatus, SuiAdapterStatus, SuiCommandKind, SuiExecutionTarget,
-    SuiPackageCommand,
+    SuiMoveNewCommand, SuiPackageCommand,
 };
 
 pub struct SuiAdapter {
@@ -24,7 +24,11 @@ impl SuiAdapter {
     pub fn status(&self) -> SuiAdapterStatus {
         let bundled = bundled::status();
         let system = self.system_status();
-        let preferred_source = self.settings.source;
+        let preferred_source = if self.settings.configured_cli_path().is_some() {
+            SuiAdapterSource::System
+        } else {
+            self.settings.source
+        };
         let active = match preferred_source {
             SuiAdapterSource::Bundled if bundled.available => Some(&bundled),
             SuiAdapterSource::System if system.available => Some(&system),
@@ -44,10 +48,16 @@ impl SuiAdapter {
     }
 
     pub fn resolve(&self) -> Result<SuiExecutionTarget, SuiAdapterError> {
+        if let Some(path) = self.settings.configured_cli_path() {
+            return Ok(SuiExecutionTarget::System {
+                executable: path.into(),
+            });
+        }
+
         match self.settings.source {
             SuiAdapterSource::Bundled => Ok(SuiExecutionTarget::Bundled),
             SuiAdapterSource::System => {
-                let executable = system::executable(&self.environment)
+                let executable = system::executable(&self.environment, None)
                     .ok_or(SuiAdapterError::MissingSystemBinary)?;
 
                 Ok(SuiExecutionTarget::System { executable })
@@ -69,8 +79,25 @@ impl SuiAdapter {
         Ok(SuiPackageCommand::new(command_kind, self.resolve()?))
     }
 
+    pub fn move_new_command(
+        &self,
+        project_name: &str,
+    ) -> Result<SuiMoveNewCommand, SuiAdapterError> {
+        SuiMoveNewCommand::new(project_name, self.resolve_move_new())
+    }
+
     fn system_status(&self) -> SuiAdapterSourceStatus {
-        system::status(&self.environment)
+        system::status(&self.environment, self.settings.configured_cli_path())
+    }
+
+    fn resolve_move_new(&self) -> SuiExecutionTarget {
+        if let Some(path) = self.settings.configured_cli_path() {
+            SuiExecutionTarget::System {
+                executable: path.into(),
+            }
+        } else {
+            SuiExecutionTarget::Bundled
+        }
     }
 
     fn install_hint(&self) -> String {

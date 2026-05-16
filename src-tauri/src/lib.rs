@@ -4,7 +4,7 @@ use base64::{engine::general_purpose, Engine};
 use file_preview::{build_file_preview, FilePreview};
 use peregrine_adapters::sui::{
     SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus, SuiExecutionTarget,
-    SuiPackageCommand,
+    SuiMoveNewCommand, SuiPackageCommand,
 };
 use peregrine_static_analysis::sui::bytecode_view::{
     load_package_bytecode, MoveBytecodePackageView,
@@ -255,6 +255,34 @@ async fn load_move_state_access_graph(
     })
     .await
     .map_err(|error| format!("Could not join Move state graph task: {error}"))?
+}
+
+#[tauri::command]
+async fn create_move_project(
+    app: tauri::AppHandle,
+    parent_path: String,
+    project_name: String,
+    stream_id: Option<String>,
+) -> Result<PackageTree, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let sui = sui_adapter(&app)?;
+        let command = sui
+            .move_new_command(&project_name)
+            .map_err(|error| error.to_string())?;
+        let project_root = run_create_move_project_command(
+            &parent_path,
+            &project_name,
+            command,
+            command_output_stream(app, stream_id),
+        )?;
+
+        build_package_tree(
+            project_root.to_string_lossy().into_owned(),
+            PackageTreeMode::Shallow,
+        )
+    })
+    .await
+    .map_err(|error| format!("Could not join Move project creation task: {error}"))?
 }
 
 #[tauri::command]
@@ -1064,6 +1092,121 @@ fn run_package_command(
     Ok(output)
 }
 
+fn run_create_move_project_command(
+    parent_path: &str,
+    project_name: &str,
+    command: SuiMoveNewCommand,
+    stream: Option<CommandOutputStream>,
+) -> Result<PathBuf, String> {
+    let project_name = validated_move_project_name(project_name)?;
+    let parent = PathBuf::from(parent_path)
+        .canonicalize()
+        .map_err(|error| format!("Could not read parent directory {parent_path}: {error}"))?;
+
+    if !parent.is_dir() {
+        return Err("Project parent path is not a directory.".to_string());
+    }
+
+    let project_root = parent.join(&project_name);
+
+    if project_root.exists() {
+        return Err(format!(
+            "A file or folder named `{project_name}` already exists in {}.",
+            parent.display()
+        ));
+    }
+
+    let output = match &command.execution {
+        SuiExecutionTarget::Bundled => run_bundled_move_new_command(&command, &parent, stream)
+            .map_err(|error| {
+                format!(
+                    "Could not execute bundled `{}` in {}: {error}",
+                    command.display,
+                    parent.display()
+                )
+            })?,
+        SuiExecutionTarget::System { executable } => {
+            let mut process = Command::new(executable);
+            run_configured_command(
+                configure_plain_command_output(process.args(&command.args).current_dir(&parent)),
+                stream,
+            )
+            .map_err(|error| {
+                format!(
+                    "Could not execute `{}` in {}: {error}",
+                    command.display,
+                    parent.display()
+                )
+            })?
+        }
+    };
+
+    if output.status != Some(0) {
+        let message = command_failure_message(&output);
+
+        return Err(if message.is_empty() {
+            format!(
+                "`{}` failed in {} with status {:?}.",
+                command.display,
+                parent.display(),
+                output.status
+            )
+        } else {
+            format!(
+                "`{}` failed in {} with status {:?}: {message}",
+                command.display,
+                parent.display(),
+                output.status
+            )
+        });
+    }
+
+    let project_root = project_root.canonicalize().map_err(|error| {
+        format!(
+            "`{}` completed but Peregrine could not read {}: {error}",
+            command.display,
+            project_root.display()
+        )
+    })?;
+
+    if !project_root.join("Move.toml").is_file() {
+        return Err(format!(
+            "`{}` completed but {} does not contain Move.toml.",
+            command.display,
+            project_root.display()
+        ));
+    }
+
+    Ok(project_root)
+}
+
+fn validated_move_project_name(project_name: &str) -> Result<String, String> {
+    let project_name = project_name.trim();
+
+    if project_name.is_empty() {
+        return Err("Project name cannot be empty.".to_string());
+    }
+
+    if project_name.len() > 128 {
+        return Err("Project name is too long.".to_string());
+    }
+
+    let mut characters = project_name.chars();
+    let Some(first) = characters.next() else {
+        return Err("Project name cannot be empty.".to_string());
+    };
+
+    if !(first == '_' || first.is_ascii_alphabetic()) {
+        return Err("Project name must start with a letter or underscore.".to_string());
+    }
+
+    if !characters.all(|character| character == '_' || character.is_ascii_alphanumeric()) {
+        return Err("Project name can only contain letters, numbers, and underscores.".to_string());
+    }
+
+    Ok(project_name.to_string())
+}
+
 fn run_bundled_package_command(
     command: &SuiPackageCommand,
     package_root: &Path,
@@ -1087,6 +1230,43 @@ fn run_bundled_package_command(
     output.stdout = format!("{header}{}", output.stdout);
 
     Ok(output)
+}
+
+fn run_bundled_move_new_command(
+    command: &SuiMoveNewCommand,
+    parent: &Path,
+    stream: Option<CommandOutputStream>,
+) -> Result<CommandOutput, String> {
+    let header = format!(
+        "Running bundled Sui crate from the linked app dependency: {}\n",
+        command.display
+    );
+
+    emit_command_output_chunk(stream.as_ref(), "stdout", &header);
+
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let mut process = Command::new(executable);
+    process
+        .arg(BUNDLED_SUI_HELPER_ARG)
+        .args(command.bundled_args())
+        .current_dir(parent);
+
+    let mut output = run_configured_command(&mut process, stream)?;
+    output.stdout = format!("{header}{}", output.stdout);
+
+    Ok(output)
+}
+
+fn command_failure_message(output: &CommandOutput) -> String {
+    output
+        .stderr
+        .lines()
+        .chain(output.stdout.lines())
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn emit_command_output_chunk(
@@ -1615,6 +1795,7 @@ pub fn run() {
             load_package_tree_details,
             load_move_graphs,
             load_move_state_access_graph,
+            create_move_project,
             load_file_preview,
             save_text_file,
             save_graph_png,
@@ -1636,4 +1817,29 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validated_move_project_name;
+
+    #[test]
+    fn move_project_name_accepts_move_identifiers() {
+        assert_eq!(
+            validated_move_project_name(" savings_vault_2 ").expect("valid project name"),
+            "savings_vault_2"
+        );
+    }
+
+    #[test]
+    fn move_project_name_rejects_paths() {
+        assert_eq!(
+            validated_move_project_name("../savings").expect_err("path-like name should fail"),
+            "Project name must start with a letter or underscore."
+        );
+        assert_eq!(
+            validated_move_project_name("savings-vault").expect_err("hyphenated name should fail"),
+            "Project name can only contain letters, numbers, and underscores."
+        );
+    }
 }

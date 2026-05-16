@@ -5,6 +5,7 @@ use std::fmt;
 pub enum SuiAdapterError {
     MissingSystemBinary,
     UnsupportedCommand(String),
+    InvalidProjectName(String),
     CommandParse(String),
     Runtime(String),
     InvalidExecutionSource {
@@ -23,6 +24,7 @@ impl fmt::Display for SuiAdapterError {
             Self::UnsupportedCommand(command_kind) => {
                 write!(formatter, "Unsupported Sui command: {command_kind}")
             }
+            Self::InvalidProjectName(message) => write!(formatter, "{message}"),
             Self::CommandParse(error) => {
                 write!(formatter, "Could not parse bundled Sui command: {error}")
             }

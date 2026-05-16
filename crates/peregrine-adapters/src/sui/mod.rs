@@ -15,7 +15,8 @@ mod system;
 
 pub use adapter::SuiAdapter;
 pub use command::{
-    SuiCommandKind, SuiCommandOutput, SuiExecutionTarget, SuiNetwork, SuiPackageCommand,
+    SuiCommandKind, SuiCommandOutput, SuiExecutionTarget, SuiMoveNewCommand, SuiNetwork,
+    SuiPackageCommand,
 };
 pub use environment::SuiAdapterEnvironment;
 pub use error::SuiAdapterError;

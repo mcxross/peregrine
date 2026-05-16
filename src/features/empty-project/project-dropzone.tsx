@@ -1,14 +1,19 @@
-import { Download, FolderOpen } from "lucide-react";
+import { Download, FolderOpen, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 type ProjectDropzoneProps = {
   isLoading?: boolean;
+  onCreateProject?: () => void;
   onOpenProject?: () => void;
 };
 
-export function ProjectDropzone({ isLoading = false, onOpenProject }: ProjectDropzoneProps) {
+export function ProjectDropzone({
+  isLoading = false,
+  onCreateProject,
+  onOpenProject,
+}: ProjectDropzoneProps) {
   return (
     <Card className="mx-auto min-h-[280px] w-full max-w-[640px] rounded-md p-4 shadow-none sm:aspect-[16/9]">
       <div className="flex h-full flex-col items-center justify-center rounded-md border border-dashed border-muted-foreground/30 bg-[var(--app-surface)] px-8 py-7 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
@@ -24,10 +29,16 @@ export function ProjectDropzone({ isLoading = false, onOpenProject }: ProjectDro
           sources/, tests/, and dependencies are scanned locally.
         </p>
 
-        <Button className="mt-5" onClick={onOpenProject} disabled={isLoading}>
-          <FolderOpen aria-hidden="true" />
-          {isLoading ? "Opening..." : "Open Move Package"}
-        </Button>
+        <div className="mt-5 flex flex-col items-center justify-center gap-2 sm:flex-row">
+          <Button onClick={onOpenProject} disabled={isLoading}>
+            <FolderOpen aria-hidden="true" />
+            {isLoading ? "Opening..." : "Open Move Package"}
+          </Button>
+          <Button variant="outline" onClick={onCreateProject} disabled={isLoading}>
+            <Plus aria-hidden="true" />
+            New Move Package
+          </Button>
+        </div>
 
         <div className="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground">
           <Download className="size-4" aria-hidden="true" />

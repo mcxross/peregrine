@@ -103,6 +103,7 @@ fn system_source_reports_missing_when_path_is_empty() {
     let adapter = SuiAdapter::new(
         SuiAdapterSettings {
             source: SuiAdapterSource::System,
+            cli_path: None,
         },
         SuiAdapterEnvironment::new()
             .with_path(None)
@@ -111,6 +112,90 @@ fn system_source_reports_missing_when_path_is_empty() {
 
     assert_eq!(adapter.resolve(), Err(SuiAdapterError::MissingSystemBinary));
     assert!(!adapter.status().installed);
+}
+
+#[test]
+fn configured_cli_path_is_used_before_bundled_source() {
+    let adapter = SuiAdapter::new(
+        SuiAdapterSettings {
+            source: SuiAdapterSource::Bundled,
+            cli_path: Some("/opt/sui/bin/sui".to_string()),
+        },
+        SuiAdapterEnvironment::new()
+            .with_path(None)
+            .with_common_user_locations(false),
+    );
+
+    assert_eq!(
+        adapter.resolve(),
+        Ok(SuiExecutionTarget::System {
+            executable: "/opt/sui/bin/sui".into(),
+        })
+    );
+    assert_eq!(adapter.status().preferred_source, SuiAdapterSource::System);
+}
+
+#[test]
+fn move_new_command_uses_cli_project_name() {
+    let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
+    let command = adapter.move_new_command("vault").expect("command");
+
+    assert_eq!(command.execution, SuiExecutionTarget::Bundled);
+    assert_eq!(command.args, ["move", "new", "vault"]);
+    assert_eq!(command.display, "sui move new vault");
+    assert_eq!(
+        command
+            .bundled_args()
+            .into_iter()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>(),
+        ["sui", "move", "new", "vault"]
+    );
+}
+
+#[test]
+fn move_new_command_uses_bundled_when_system_source_has_no_cli_path() {
+    let adapter = SuiAdapter::new(
+        SuiAdapterSettings {
+            source: SuiAdapterSource::System,
+            cli_path: None,
+        },
+        SuiAdapterEnvironment::new(),
+    );
+    let command = adapter.move_new_command("vault").expect("command");
+
+    assert_eq!(command.execution, SuiExecutionTarget::Bundled);
+}
+
+#[test]
+fn move_new_command_uses_configured_cli_path() {
+    let adapter = SuiAdapter::new(
+        SuiAdapterSettings {
+            source: SuiAdapterSource::Bundled,
+            cli_path: Some("/opt/sui/bin/sui".to_string()),
+        },
+        SuiAdapterEnvironment::new(),
+    );
+    let command = adapter.move_new_command("vault").expect("command");
+
+    assert_eq!(
+        command.execution,
+        SuiExecutionTarget::System {
+            executable: "/opt/sui/bin/sui".into(),
+        }
+    );
+}
+
+#[test]
+fn move_new_command_rejects_path_like_project_name() {
+    let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
+
+    assert_eq!(
+        adapter.move_new_command("../vault"),
+        Err(SuiAdapterError::InvalidProjectName(
+            "Project name must start with a letter or underscore.".to_string(),
+        ))
+    );
 }
 
 #[test]
