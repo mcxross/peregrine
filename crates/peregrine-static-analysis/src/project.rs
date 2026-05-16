@@ -1,5 +1,4 @@
-use peregrine_attack_surface::package_surface;
-use peregrine_move_model::{
+use peregrine_types::sui::move_model::{
     discover_move_project_graphs, discover_move_project_graphs_for_package,
     discover_move_project_model, discover_move_project_model_fast,
     discover_move_project_model_shallow, discover_move_state_access_graph_for_function,
@@ -8,19 +7,21 @@ use peregrine_move_model::{
 use serde::Serialize;
 use std::path::Path;
 
-pub use peregrine_attack_surface::{
+use crate::sui::attack_surface::package_surface;
+
+pub use crate::sui::attack_surface::{
     AdminControlFinding, CapabilityFinding, ExternalCallFinding, MovePackageSurface,
     ObjectOwnershipFinding, PublicPackageRelationship,
 };
-pub use peregrine_move_model::{
+pub use crate::sui::object_lifecycle::{
+    ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleRisk, ObjectLifecycleStage,
+};
+pub use peregrine_types::sui::move_model::{
     MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode, MoveFunctionSignature, MoveModule,
     MoveProjectGraphs, MoveSourceSpan, MoveStateAccessGraph, MoveStateAccessGraphEdge,
     MoveStateAccessGraphNode, MoveStructField, MoveStructSignature, MoveTypeGraph,
     MoveTypeGraphEdge, MoveTypeGraphNode, MoveUnresolvedCall, MoveUnresolvedStateAccess,
     MoveUnresolvedType, PackageDependencyEdge, PackageDependencyGraph, PackageDependencyNode,
-};
-pub use peregrine_object_lifecycle::{
-    ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleRisk, ObjectLifecycleStage,
 };
 
 #[derive(Serialize)]
@@ -82,7 +83,7 @@ pub fn discover_state_access_graph_for_function(
     )
 }
 
-fn build_move_project(model: peregrine_move_model::MoveProjectModel) -> MoveProject {
+fn build_move_project(model: peregrine_types::sui::move_model::MoveProjectModel) -> MoveProject {
     let packages = model
         .packages
         .into_iter()
@@ -113,8 +114,8 @@ fn build_move_package(model: MovePackageModel) -> MovePackage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use peregrine_attack_surface::package_surface;
-    use peregrine_move_model::parse_module_declarations;
+    use crate::sui::attack_surface::package_surface;
+    use peregrine_types::sui::move_model::parse_module_declarations;
     use std::fs;
     use tempfile::tempdir;
 

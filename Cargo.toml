@@ -1,15 +1,10 @@
 [workspace]
 members = [
   "src-tauri",
-  "crates/peregrine-analysis-core",
-  "crates/peregrine-attack-surface",
-  "crates/peregrine-bytecode-view",
-  "crates/peregrine-complexity-rules",
-  "crates/peregrine-move-model",
-  "crates/peregrine-movy-fuzz-adapter",
-  "crates/peregrine-object-lifecycle",
+  "crates/peregrine-adapters",
+  "crates/peregrine-dynamic-analysis",
   "crates/peregrine-static-analysis",
-  "crates/peregrine-sui-adapter",
+  "crates/peregrine-types",
 ]
 resolver = "2"
 
@@ -28,15 +23,10 @@ move-compiler = { path = "../oss/sui/external-crates/move/crates/move-compiler" 
 move-disassembler = { path = "../oss/sui/external-crates/move/crates/move-disassembler" }
 move-ir-types = { path = "../oss/sui/external-crates/move/crates/move-ir-types" }
 movy = { path = "../oss/movy/crates/movy", default-features = false, features = ["sui-fuzz"] }
-peregrine-analysis-core = { path = "crates/peregrine-analysis-core" }
-peregrine-attack-surface = { path = "crates/peregrine-attack-surface" }
-peregrine-bytecode-view = { path = "crates/peregrine-bytecode-view" }
-peregrine-complexity-rules = { path = "crates/peregrine-complexity-rules" }
-peregrine-move-model = { path = "crates/peregrine-move-model" }
-peregrine-movy-fuzz-adapter = { path = "crates/peregrine-movy-fuzz-adapter" }
-peregrine-object-lifecycle = { path = "crates/peregrine-object-lifecycle" }
+peregrine-adapters = { path = "crates/peregrine-adapters" }
+peregrine-dynamic-analysis = { path = "crates/peregrine-dynamic-analysis" }
 peregrine-static-analysis = { path = "crates/peregrine-static-analysis" }
-peregrine-sui-adapter = { path = "crates/peregrine-sui-adapter" }
+peregrine-types = { path = "crates/peregrine-types" }
 pulldown-cmark = "0.12"
 reqwest = { version = "0.13.2", default-features = false }
 serde = { version = "1", features = ["derive"] }

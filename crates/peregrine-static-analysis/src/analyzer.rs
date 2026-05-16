@@ -1,11 +1,13 @@
 use std::path::Path;
 
-use peregrine_analysis_core::{
+use crate::{
+    parser::parse_package,
+    plugins::WasmPluginHost,
+    sui::{ComplexityRuleSetProvider, SuiRuleSetProvider},
+};
+use peregrine_types::analysis::{
     AnalysisConfig, AnalysisDiagnostic, AnalysisReport, RuleSetProvider,
 };
-use peregrine_complexity_rules::ComplexityRuleSetProvider;
-
-use crate::{parser::parse_package, plugins::WasmPluginHost, sui::SuiRuleSetProvider};
 
 pub struct Analyzer {
     providers: Vec<Box<dyn RuleSetProvider>>,

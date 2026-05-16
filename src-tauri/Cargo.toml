@@ -23,7 +23,6 @@ pulldown-cmark = { workspace = true }
 syntect = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
+peregrine-adapters = { workspace = true }
+peregrine-dynamic-analysis = { workspace = true }
 peregrine-static-analysis = { workspace = true }
-peregrine-sui-adapter = { workspace = true }
-peregrine-movy-fuzz-adapter = { workspace = true }
-peregrine-bytecode-view = { workspace = true }

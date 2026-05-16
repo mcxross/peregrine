@@ -1082,7 +1082,7 @@ function FunctionCallGraphHover({
             <div className="mb-2 min-w-0">
               <div className="truncate text-xs font-semibold text-foreground">{fn.name}</div>
               <div className="truncate text-[11px] text-muted-foreground">
-                {shortAddress(module.address)}::{module.name} call graph
+                {shortAddress(module.address)}::{module.name} bytecode interactions
               </div>
             </div>
             {calls.length ? (
@@ -1090,7 +1090,7 @@ function FunctionCallGraphHover({
                 {calls.map((call) => (
                   <button
                     className="grid w-full gap-2 rounded border border-[color:var(--app-border)] bg-black/10 p-2 text-left transition hover:border-primary/40 hover:bg-primary/10"
-                    key={`${call.call.qualifiedName}:${call.call.handleIndex}:${call.call.genericTypeArguments.join(",")}`}
+                    key={call.key}
                     onClick={(event) => {
                       event.stopPropagation();
 
@@ -1103,7 +1103,10 @@ function FunctionCallGraphHover({
                     <div className="flex min-w-0 items-center gap-2">
                       <FunctionSquare className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
                       <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">
-                        {call.call.functionName}
+                        {call.functionName}
+                      </span>
+                      <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                        {call.kind}
                       </span>
                       <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
                         {call.visibility}
@@ -1112,7 +1115,7 @@ function FunctionCallGraphHover({
                     <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
                       <span>Module</span>
                       <span className="truncate text-foreground">
-                        {shortAddress(call.call.moduleAddress)}::{call.call.moduleName}
+                        {call.moduleLabel}
                       </span>
                       <span>Types</span>
                       <span className="truncate">{call.genericTypeArguments}</span>
@@ -1129,7 +1132,7 @@ function FunctionCallGraphHover({
               </div>
             ) : (
               <div className="rounded border border-[color:var(--app-border)] bg-black/10 px-3 py-2 text-xs text-muted-foreground">
-                No bytecode calls in this function.
+                No resolved calls or notable bytecode effects in this function.
               </div>
             )}
           </div>,
@@ -1701,10 +1704,12 @@ function ExplanationPanel({
                   type="button"
                 >
                   <FunctionSquare className="size-3.5 shrink-0" aria-hidden="true" />
-                  <span className="min-w-0 flex-1 truncate">{callSummary.call.qualifiedName}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {callSummary.moduleLabel}::{callSummary.functionName}
+                  </span>
                 </button>
                 <div className="grid gap-2">
-                  <ContextRow label="Module" value={`${shortAddress(callSummary.call.moduleAddress)}::${callSummary.call.moduleName}`} />
+                  <ContextRow label="Module" value={callSummary.moduleLabel} />
                   <ContextRow label="Visibility" value={callSummary.visibility} />
                   <ContextRow label="Type args" value={callSummary.genericTypeArguments} />
                   <ContextRow label="Mutates state" value={callSummary.mutatesState ? "yes" : "no"} />
@@ -2391,10 +2396,13 @@ type BytecodeCallTarget = {
 };
 
 type BytecodeCallSummary = {
-  call: MoveBytecodeCallView;
   canAbort: boolean;
   emitsEvents: boolean;
+  functionName: string;
   genericTypeArguments: string;
+  key: string;
+  kind: "call" | "op";
+  moduleLabel: string;
   mutatesState: boolean;
   target: BytecodeCallTarget | null;
   transfersAssets: boolean;
@@ -2410,18 +2418,20 @@ function functionCallSummaries(
   const summaries: BytecodeCallSummary[] = [];
 
   for (const instruction of fn.instructions) {
-    if (!instruction.call) {
+    const summary = instruction.call
+      ? callSummaryForInstruction(view, instruction.call)
+      : bytecodeOperationSummary(instruction);
+
+    if (!summary) {
       continue;
     }
 
-    const key = `${instruction.call.qualifiedName}<${instruction.call.genericTypeArguments.join(",")}>`;
-
-    if (seen.has(key)) {
+    if (seen.has(summary.key)) {
       continue;
     }
 
-    seen.add(key);
-    summaries.push(callSummaryForInstruction(view, instruction.call));
+    seen.add(summary.key);
+    summaries.push(summary);
   }
 
   return summaries;
@@ -2435,12 +2445,15 @@ function callSummaryForInstruction(
   const targetFunction = target?.fn ?? null;
 
   return {
-    call,
     canAbort: targetFunction ? functionCanAbort(targetFunction) : callMayAbort(call),
     emitsEvents: targetFunction ? functionEmitsEvents(targetFunction) : callMayEmitEvents(call),
+    functionName: call.functionName,
     genericTypeArguments: call.genericTypeArguments.length
       ? call.genericTypeArguments.join(", ")
       : "-",
+    key: `call:${call.qualifiedName}<${call.genericTypeArguments.join(",")}>`,
+    kind: "call",
+    moduleLabel: `${shortAddress(call.moduleAddress)}::${call.moduleName}`,
     mutatesState: targetFunction ? functionMutatesState(targetFunction) : callMayMutateState(call),
     target,
     transfersAssets: targetFunction ? functionTransfersAssets(targetFunction) : callMayTransferAssets(call),
@@ -2449,6 +2462,75 @@ function callSummaryForInstruction(
       : callMayUseCapabilitiesOrSigner(call),
     visibility: targetFunction ? functionVisibilityLabel(targetFunction) : "external",
   };
+}
+
+function bytecodeOperationSummary(instruction: MoveBytecodeInstructionView): BytecodeCallSummary | null {
+  const operation = trackedBytecodeOperation(instruction.opcode);
+
+  if (!operation) {
+    return null;
+  }
+
+  return {
+    canAbort: bytecodeOperationCanAbort(instruction.opcode),
+    emitsEvents: false,
+    functionName: operation,
+    genericTypeArguments: signatureOperandLabel(instruction.detail),
+    key: `op:${instruction.opcode}:${signatureOperandLabel(instruction.detail)}`,
+    kind: "op",
+    moduleLabel: "Move VM",
+    mutatesState: bytecodeOperationMutates(instruction.opcode),
+    target: null,
+    transfersAssets: false,
+    usesCapabilitiesOrSigner: false,
+    visibility: "bytecode",
+  };
+}
+
+function trackedBytecodeOperation(opcode: string) {
+  if (isNotableBytecodeOperation(opcode)) {
+    return bytecodeOperationName(opcode);
+  }
+
+  return null;
+}
+
+function isNotableBytecodeOperation(opcode: string) {
+  return opcode.startsWith("Vec") ||
+    opcode.includes("Borrow") ||
+    opcode.includes("Ref") ||
+    opcode.includes("Pack") ||
+    opcode.includes("Unpack") ||
+    opcode.includes("Branch") ||
+    opcode.startsWith("Br") ||
+    opcode === "Abort" ||
+    opcode === "Ret";
+}
+
+function bytecodeOperationName(opcode: string) {
+  return formatOpcode(opcode).toLowerCase();
+}
+
+function bytecodeOperationCanAbort(opcode: string) {
+  return opcode.includes("Borrow") ||
+    opcode.includes("Unpack") ||
+    opcode === "Abort" ||
+    opcode === "VecPopBack" ||
+    opcode === "VecSwap";
+}
+
+function bytecodeOperationMutates(opcode: string) {
+  return opcode === "VecPushBack" ||
+    opcode === "VecPopBack" ||
+    opcode === "VecSwap" ||
+    opcode === "WriteRef" ||
+    opcode.includes("MutBorrow") ||
+    opcode === "StLoc";
+}
+
+function signatureOperandLabel(detail: string) {
+  const match = detail.match(/SignatureIndex\((\d+)\)/);
+  return match ? `signature #${match[1]}` : "-";
 }
 
 function findBytecodeCallTarget(

@@ -1,9 +1,0 @@
-[package]
-name = "peregrine-object-lifecycle"
-version.workspace = true
-edition.workspace = true
-description = "Object lifecycle scanner for Sui Move packages used by Peregrine"
-
-[dependencies]
-peregrine-move-model = { workspace = true }
-serde = { workspace = true }

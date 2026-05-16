@@ -1,0 +1,15 @@
+[package]
+name = "peregrine-dynamic-analysis"
+version.workspace = true
+edition.workspace = true
+description = "Dynamic analysis tools for Peregrine grouped by blockchain"
+
+[dependencies]
+movy = { workspace = true }
+serde = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

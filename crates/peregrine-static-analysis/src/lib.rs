@@ -5,13 +5,13 @@ mod project;
 pub mod sui;
 
 pub mod config {
-    pub use peregrine_analysis_core::{
+    pub use peregrine_types::analysis::{
         AnalysisConfig, AnalysisSection, PluginConfig, RuleConfig, RuleSetConfig,
     };
 }
 
 pub mod model {
-    pub use peregrine_analysis_core::{
+    pub use peregrine_types::analysis::{
         AnalysisContext, AnalysisDiagnostic, AnalysisReport, Finding, Metric, ParsedFunction,
         ParsedModule, RuleMetric, Severity, SourceFile, Span,
     };
@@ -19,19 +19,19 @@ pub mod model {
 
 pub mod rules {
     pub mod complexity {
-        pub use peregrine_complexity_rules::*;
+        pub use crate::sui::complexity::*;
     }
 
     pub mod sui {
-        pub use crate::sui::*;
+        pub use crate::sui::rules::*;
     }
 }
 
 pub use analyzer::Analyzer;
-pub use peregrine_analysis_core::{
+pub use peregrine_types::analysis::{
     AnalysisConfig, AnalysisSection, PluginConfig, RuleConfig, RuleSetConfig,
 };
-pub use peregrine_analysis_core::{
+pub use peregrine_types::analysis::{
     AnalysisContext, AnalysisDiagnostic, AnalysisReport, Finding, Metric, ParsedFunction,
     ParsedModule, Rule, RuleMetric, RuleOutcome, RuleSet, RuleSetProvider, Severity, SourceFile,
     Span,

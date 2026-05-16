@@ -1,42 +1,22 @@
-mod bool_judgement;
-mod common;
-mod infinite_loop;
-mod precision_loss;
-mod type_conversion;
-mod unchecked_return;
-mod unused_const;
-mod unused_private_fun;
-mod unused_struct;
+pub mod attack_surface;
+pub mod bytecode_view;
+pub mod complexity;
+pub mod object_lifecycle;
+pub mod rules;
 
-use peregrine_analysis_core::{Rule, RuleSet, RuleSetProvider};
-
-pub use common::RULESET_ID;
-
-pub struct SuiRuleSetProvider;
-
-impl RuleSetProvider for SuiRuleSetProvider {
-    fn rule_sets(&self) -> Vec<Box<dyn RuleSet>> {
-        vec![Box::new(SuiRuleSet)]
-    }
-}
-
-pub struct SuiRuleSet;
-
-impl RuleSet for SuiRuleSet {
-    fn id(&self) -> &'static str {
-        RULESET_ID
-    }
-
-    fn rules(&self) -> Vec<Box<dyn Rule>> {
-        vec![
-            Box::new(bool_judgement::BoolJudgementRule),
-            Box::new(infinite_loop::InfiniteLoopRule),
-            Box::new(precision_loss::PrecisionLossRule),
-            Box::new(type_conversion::TypeConversionRule),
-            Box::new(unchecked_return::UncheckedReturnRule),
-            Box::new(unused_const::UnusedConstRule),
-            Box::new(unused_private_fun::UnusedPrivateFunctionRule),
-            Box::new(unused_struct::UnusedStructRule),
-        ]
-    }
-}
+pub use attack_surface::{
+    package_surface, AdminControlFinding, CapabilityFinding, ExternalCallFinding,
+    MovePackageSurface, ObjectOwnershipFinding, PublicPackageRelationship,
+};
+pub use bytecode_view::{
+    load_package_bytecode, MoveBytecodeBasicBlockView, MoveBytecodeCallView,
+    MoveBytecodeControlFlowEdgeView, MoveBytecodeControlFlowView, MoveBytecodeFunctionView,
+    MoveBytecodeInstructionView, MoveBytecodeModuleView, MoveBytecodePackageView,
+    MoveBytecodeSourceSpan,
+};
+pub use complexity::ComplexityRuleSetProvider;
+pub use object_lifecycle::{
+    object_lifecycle_maps, ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleRisk,
+    ObjectLifecycleStage,
+};
+pub use rules::{SuiRuleSet, SuiRuleSetProvider, RULESET_ID};

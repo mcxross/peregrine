@@ -1,9 +1,0 @@
-[package]
-name = "peregrine-analysis-core"
-version.workspace = true
-edition.workspace = true
-description = "Shared analyzer contracts, config, reports, and findings for Peregrine analysis crates"
-
-[dependencies]
-serde = { workspace = true }
-toml = { workspace = true }

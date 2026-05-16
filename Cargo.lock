@@ -11572,10 +11572,9 @@ name = "peregrine"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
- "peregrine-bytecode-view",
- "peregrine-movy-fuzz-adapter",
+ "peregrine-adapters",
+ "peregrine-dynamic-analysis",
  "peregrine-static-analysis",
- "peregrine-sui-adapter",
  "pulldown-cmark 0.12.2",
  "reqwest 0.13.2",
  "serde",
@@ -11589,95 +11588,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "peregrine-analysis-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "toml 0.8.23",
-]
-
-[[package]]
-name = "peregrine-attack-surface"
-version = "0.1.0"
-dependencies = [
- "peregrine-move-model",
- "peregrine-object-lifecycle",
- "serde",
-]
-
-[[package]]
-name = "peregrine-bytecode-view"
-version = "0.1.0"
-dependencies = [
- "move-binary-format",
- "move-bytecode-source-map",
- "move-disassembler",
- "move-ir-types",
- "serde",
- "walkdir",
-]
-
-[[package]]
-name = "peregrine-complexity-rules"
-version = "0.1.0"
-dependencies = [
- "peregrine-analysis-core",
- "toml 0.8.23",
-]
-
-[[package]]
-name = "peregrine-move-model"
-version = "0.1.0"
-dependencies = [
- "move-command-line-common",
- "move-compiler",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "peregrine-movy-fuzz-adapter"
-version = "0.1.0"
-dependencies = [
- "movy",
- "serde",
- "tempfile",
- "tokio",
- "walkdir",
-]
-
-[[package]]
-name = "peregrine-object-lifecycle"
-version = "0.1.0"
-dependencies = [
- "peregrine-move-model",
- "serde",
-]
-
-[[package]]
-name = "peregrine-static-analysis"
-version = "0.1.0"
-dependencies = [
- "globset",
- "move-command-line-common",
- "move-compiler",
- "peregrine-analysis-core",
- "peregrine-attack-surface",
- "peregrine-complexity-rules",
- "peregrine-move-model",
- "peregrine-object-lifecycle",
- "serde",
- "serde_json",
- "tempfile",
- "toml 0.8.23",
- "walkdir",
- "wasmtime",
- "wat",
-]
-
-[[package]]
-name = "peregrine-sui-adapter"
+name = "peregrine-adapters"
 version = "0.1.0"
 dependencies = [
  "alloy",
@@ -11720,6 +11631,50 @@ dependencies = [
  "serde_json",
  "sui",
  "tokio",
+]
+
+[[package]]
+name = "peregrine-dynamic-analysis"
+version = "0.1.0"
+dependencies = [
+ "movy",
+ "serde",
+ "tempfile",
+ "tokio",
+ "walkdir",
+]
+
+[[package]]
+name = "peregrine-static-analysis"
+version = "0.1.0"
+dependencies = [
+ "globset",
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-command-line-common",
+ "move-compiler",
+ "move-disassembler",
+ "move-ir-types",
+ "peregrine-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml 0.8.23",
+ "walkdir",
+ "wasmtime",
+ "wat",
+]
+
+[[package]]
+name = "peregrine-types"
+version = "0.1.0"
+dependencies = [
+ "move-command-line-common",
+ "move-compiler",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml 0.8.23",
 ]
 
 [[package]]

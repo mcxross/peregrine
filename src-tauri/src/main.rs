@@ -20,7 +20,7 @@ fn main() {
 }
 
 fn run_bundled_sui_helper(args: impl IntoIterator<Item = std::ffi::OsString>) {
-    match peregrine_sui_adapter::run_bundled_sui_blocking(args) {
+    match peregrine_adapters::sui::run_bundled_sui_blocking(args) {
         Ok(output) => {
             print!("{}", output.stdout);
             eprint!("{}", output.stderr);
@@ -44,10 +44,10 @@ fn run_movy_fuzz_helper(mut args: impl Iterator<Item = std::ffi::OsString>) {
     };
 
     let package_path = package_path.to_string_lossy().into_owned();
-    match peregrine_movy_fuzz_adapter::run_movy_fuzz_blocking(
+    match peregrine_dynamic_analysis::sui::movy_fuzz::run_movy_fuzz_blocking(
         std::path::PathBuf::from(root_path),
         &package_path,
-        peregrine_movy_fuzz_adapter::MovyFuzzOptions::default(),
+        peregrine_dynamic_analysis::sui::movy_fuzz::MovyFuzzOptions::default(),
     ) {
         Ok(run) => {
             println!("{}", run.stdout);

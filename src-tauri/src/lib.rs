@@ -2,16 +2,18 @@ mod file_preview;
 
 use base64::{engine::general_purpose, Engine};
 use file_preview::{build_file_preview, FilePreview};
-use peregrine_bytecode_view::{load_package_bytecode, MoveBytecodePackageView};
+use peregrine_adapters::sui::{
+    SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus, SuiExecutionTarget,
+    SuiPackageCommand,
+};
+use peregrine_static_analysis::sui::bytecode_view::{
+    load_package_bytecode, MoveBytecodePackageView,
+};
 use peregrine_static_analysis::{
     discover_move_project_fast, discover_move_project_shallow, discover_project_graphs,
     discover_project_graphs_for_package, discover_state_access_graph_for_function, AnalysisConfig,
     AnalysisReport, Analyzer, MoveCallGraph, MovePackage, MoveProjectGraphs, MoveStateAccessGraph,
     MoveTypeGraph, PackageDependencyGraph,
-};
-use peregrine_sui_adapter::{
-    SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus, SuiExecutionTarget,
-    SuiPackageCommand,
 };
 use serde::{Deserialize, Serialize};
 use std::{

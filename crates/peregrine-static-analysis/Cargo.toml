@@ -6,13 +6,13 @@ description = "Static analysis engine for Move packages used by Peregrine"
 
 [dependencies]
 globset = { workspace = true }
+move-binary-format = { workspace = true }
+move-bytecode-source-map = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler = { workspace = true }
-peregrine-analysis-core = { workspace = true }
-peregrine-attack-surface = { workspace = true }
-peregrine-complexity-rules = { workspace = true }
-peregrine-move-model = { workspace = true }
-peregrine-object-lifecycle = { workspace = true }
+move-disassembler = { workspace = true }
+move-ir-types = { workspace = true }
+peregrine-types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
