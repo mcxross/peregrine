@@ -286,6 +286,30 @@ async fn create_move_project(
 }
 
 #[tauri::command]
+async fn move_project_path_exists(
+    parent_path: String,
+    project_name: String,
+) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let project_name = match validated_move_project_name(&project_name) {
+            Ok(project_name) => project_name,
+            Err(_) => return Ok(false),
+        };
+        let parent = PathBuf::from(&parent_path)
+            .canonicalize()
+            .map_err(|error| format!("Could not read parent directory {parent_path}: {error}"))?;
+
+        if !parent.is_dir() {
+            return Err("Project parent path is not a directory.".to_string());
+        }
+
+        Ok(parent.join(project_name).exists())
+    })
+    .await
+    .map_err(|error| format!("Could not join Move project path check task: {error}"))?
+}
+
+#[tauri::command]
 async fn load_file_preview(
     root_path: String,
     relative_path: String,
@@ -1796,6 +1820,7 @@ pub fn run() {
             load_move_graphs,
             load_move_state_access_graph,
             create_move_project,
+            move_project_path_exists,
             load_file_preview,
             save_text_file,
             save_graph_png,

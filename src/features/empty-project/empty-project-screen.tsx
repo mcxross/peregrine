@@ -3,11 +3,20 @@ import { FolderOpen, Package, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   createMoveProject,
   loadPackageTree,
+  moveProjectPathExists,
   type MovePackage,
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
@@ -44,7 +53,9 @@ export function EmptyProjectScreen({
   const visibleRecentProjects = recentProjects ?? storedRecentProjects;
   const selectProject = React.useCallback(
     (packageTree: PackageTree) => {
-      setStoredRecentProjects((projects) => rememberRecentProject(projects, packageTree));
+      const nextRecentProjects = rememberRecentProject(loadRecentProjects(), packageTree);
+
+      setStoredRecentProjects(nextRecentProjects);
       onProjectSelected?.(packageTree);
     },
     [onProjectSelected],
@@ -144,17 +155,24 @@ export function EmptyProjectScreen({
     <div className="grid h-full min-h-0 place-items-center overflow-auto bg-background px-6 py-5">
       <div className="flex max-h-full w-full max-w-[660px] flex-col items-stretch gap-4">
         <ProjectDropzone
-          onCreateProject={() => setIsCreateProjectOpen((isOpen) => !isOpen)}
+          onCreateProject={() => setIsCreateProjectOpen(true)}
           onOpenProject={handleOpenProject}
           isLoading={isLoading}
         />
-        {isCreateProjectOpen ? (
-          <CreateMoveProjectForm
+        <Dialog
+          open={isCreateProjectOpen}
+          onOpenChange={(isOpen) => {
+            if (!isLoading) {
+              setIsCreateProjectOpen(isOpen);
+            }
+          }}
+        >
+          <CreateMoveProjectDialog
             isLoading={isLoading}
             onCancel={() => setIsCreateProjectOpen(false)}
             onCreateProject={handleCreateProject}
           />
-        ) : null}
+        </Dialog>
         {loadError ? (
           <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {loadError}
@@ -177,7 +195,7 @@ type CreateMoveProjectInput = {
   projectName: string;
 };
 
-function CreateMoveProjectForm({
+function CreateMoveProjectDialog({
   isLoading,
   onCancel,
   onCreateProject,
@@ -188,14 +206,71 @@ function CreateMoveProjectForm({
 }) {
   const [parentPath, setParentPath] = React.useState("");
   const [projectName, setProjectName] = React.useState("");
+  const [projectPathExists, setProjectPathExists] = React.useState(false);
+  const [projectPathCheckError, setProjectPathCheckError] = React.useState<string | null>(null);
+  const [isCheckingProjectPath, setIsCheckingProjectPath] = React.useState(false);
   const trimmedProjectName = projectName.trim();
   const projectNameError = trimmedProjectName && !isValidMoveProjectName(trimmedProjectName)
     ? "Use a Move package name: letters, numbers, and underscores; start with a letter or underscore."
     : null;
-  const canCreate = Boolean(parentPath && trimmedProjectName && !projectNameError && !isLoading);
+  const canCreate = Boolean(
+    parentPath
+      && trimmedProjectName
+      && !projectNameError
+      && !projectPathExists
+      && !projectPathCheckError
+      && !isCheckingProjectPath
+      && !isLoading,
+  );
+
+  React.useEffect(() => {
+    let isCurrent = true;
+
+    if (!parentPath || !trimmedProjectName || projectNameError) {
+      setProjectPathExists(false);
+      setProjectPathCheckError(null);
+      setIsCheckingProjectPath(false);
+      return () => {
+        isCurrent = false;
+      };
+    }
+
+    setIsCheckingProjectPath(true);
+    setProjectPathCheckError(null);
+
+    void moveProjectPathExists(parentPath, trimmedProjectName)
+      .then((exists) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setProjectPathExists(exists);
+      })
+      .catch((error) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setProjectPathExists(false);
+        setProjectPathCheckError(getOpenPackageErrorMessage(error));
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsCheckingProjectPath(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [parentPath, projectNameError, trimmedProjectName]);
 
   return (
-    <Card className="rounded-md p-4 shadow-none">
+    <DialogContent
+      onInteractOutside={(event) => {
+        event.preventDefault();
+      }}
+    >
       <form
         className="grid gap-4"
         onSubmit={(event) => {
@@ -208,22 +283,17 @@ function CreateMoveProjectForm({
           onCreateProject({ parentPath, projectName: trimmedProjectName });
         }}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold tracking-tight">Create a Move package</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Choose a parent folder and package name. Peregrine opens the new package after creation.
-            </p>
-          </div>
-          <Button type="button" variant="ghost" onClick={onCancel} disabled={isLoading}>
-            Cancel
-          </Button>
-        </div>
+        <DialogHeader>
+          <DialogTitle>Create a New Package</DialogTitle>
+          <DialogDescription>
+            Choose a parent folder and package name.
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="grid gap-2">
             <label className="text-sm font-medium" htmlFor="new-move-project-name">
-              Package name
+              Package Name
             </label>
             <Input
               autoComplete="off"
@@ -239,8 +309,7 @@ function CreateMoveProjectForm({
             ) : null}
           </div>
 
-          <div className="grid gap-2">
-            <span className="text-sm font-medium">Parent directory</span>
+          <div className="flex items-end">
             <Button
               className="justify-start"
               type="button"
@@ -261,26 +330,34 @@ function CreateMoveProjectForm({
         </div>
 
         {parentPath ? (
-          <p className="truncate rounded-md border bg-[var(--app-surface)] px-3 py-2 font-mono text-xs text-muted-foreground">
-            {parentPath}/{trimmedProjectName || "<package_name>"}
-          </p>
-        ) : (
-          <p className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
-            Choose the directory where the new package folder should be created.
-          </p>
-        )}
+          <div className="grid gap-2">
+            <p className="truncate rounded-md border bg-[var(--app-surface)] px-3 py-2 font-mono text-xs text-muted-foreground">
+              {parentPath}/{trimmedProjectName || "<package_name>"}
+            </p>
+            {projectPathExists ? (
+              <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
+                A file or folder named `{trimmedProjectName}` already exists in that directory.
+              </p>
+            ) : null}
+            {projectPathCheckError ? (
+              <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {projectPathCheckError}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <DialogFooter>
           <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-            Close
+            Cancel
           </Button>
           <Button type="submit" disabled={!canCreate}>
             <Plus aria-hidden="true" />
             {isLoading ? "Creating..." : "Create Package"}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
-    </Card>
+    </DialogContent>
   );
 }
 

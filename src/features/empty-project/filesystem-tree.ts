@@ -640,6 +640,16 @@ export async function createMoveProject(
   });
 }
 
+export async function moveProjectPathExists(
+  parentPath: string,
+  projectName: string,
+): Promise<boolean> {
+  return invoke<boolean>("move_project_path_exists", {
+    parentPath,
+    projectName,
+  });
+}
+
 export async function loadMoveBytecodeView(
   packageTree: PackageTree,
   movePackage: MovePackage,
