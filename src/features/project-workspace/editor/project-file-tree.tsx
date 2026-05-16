@@ -48,6 +48,7 @@ function ProjectFileTreeBody({
   onSelectPath,
 }: ProjectFileTreeProps) {
   const onSelectPathRef = React.useRef(onSelectPath);
+  const activatedPathRef = React.useRef<string | null>(null);
   const isSyncingSelectionRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -63,7 +64,16 @@ function ProjectFileTreeBody({
         return;
       }
 
-      onSelectPathRef.current(paths[0] ?? null);
+      const selectedPath = paths[0] ?? null;
+
+      const activatedPath = activatedPathRef.current;
+      activatedPathRef.current = null;
+
+      if (activatedPath === selectedPath) {
+        return;
+      }
+
+      onSelectPathRef.current(selectedPath);
     },
     paths: packageTree.paths,
     stickyFolders: true,
@@ -85,9 +95,35 @@ function ProjectFileTreeBody({
     <FileTree
       model={model}
       className="min-h-0"
+      onClickCapture={(event) => {
+        const path = treePathFromEvent(event.nativeEvent);
+
+        if (path) {
+          activatedPathRef.current = path;
+          onSelectPathRef.current(path);
+        }
+      }}
       style={treeStyles}
     />
   );
+}
+
+function treePathFromEvent(event: Event) {
+  for (const target of event.composedPath()) {
+    if (!(target instanceof HTMLElement)) {
+      continue;
+    }
+
+    const path =
+      target.dataset.itemPath ??
+      target.closest<HTMLElement>("[data-item-path]")?.dataset.itemPath;
+
+    if (path) {
+      return path;
+    }
+  }
+
+  return null;
 }
 
 function syncSelectedPath(model: FileTreeModel, selectedPath: string | null) {

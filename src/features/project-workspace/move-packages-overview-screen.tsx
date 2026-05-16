@@ -24,12 +24,13 @@ import { analyzeMovePackage, loadFilePreview } from "@/features/empty-project/fi
 import type {
   CodeEditorJumpRequest,
   ComplexityHighlight,
-} from "@/features/project-workspace/code-editor";
+} from "@/features/project-workspace/editor/code-editor";
 import type { SourceJumpRequest } from "@/features/project-workspace/project-workspace";
 import {
   ModuleSignatureScreen,
   type SelectedMoveModule,
 } from "@/features/project-workspace/module-signature-screen";
+import { sameSourcePath } from "@/features/project-workspace/source-paths";
 import { cn } from "@/lib/utils";
 
 const TREE_PANE_DEFAULT_WIDTH = 460;
@@ -39,7 +40,7 @@ const DETAIL_PANE_MIN_WIDTH = 420;
 const COMPLEXITY_RULESET_ID = "complexity";
 const FUNCTION_COMPLEXITY_RULE_ID = "FunctionComplexity";
 const CodeEditor = React.lazy(() =>
-  import("@/features/project-workspace/code-editor").then((module) => ({
+  import("@/features/project-workspace/editor/code-editor").then((module) => ({
     default: module.CodeEditor,
   })),
 );
@@ -1284,23 +1285,6 @@ function packageRelativeFilePath(filePath: string, movePackage: MovePackage) {
   return packagePathWithSlash && normalizedPath.startsWith(packagePathWithSlash)
     ? normalizedPath.slice(packagePathWithSlash.length)
     : normalizedPath;
-}
-
-function sameSourcePath(moduleFilePath: string, requestedFilePath: string, packagePath: string) {
-  const normalizedModulePath = normalizeFilePath(moduleFilePath);
-  const normalizedRequestedPath = normalizeFilePath(requestedFilePath);
-  const normalizedPackagePath = normalizeFilePath(packagePath);
-  const requestedRelativeToPackage =
-    normalizedPackagePath && normalizedRequestedPath.startsWith(`${normalizedPackagePath}/`)
-      ? normalizedRequestedPath.slice(normalizedPackagePath.length + 1)
-      : normalizedRequestedPath;
-
-  return (
-    normalizedModulePath === normalizedRequestedPath
-    || normalizedModulePath === requestedRelativeToPackage
-    || normalizedModulePath.endsWith(`/${requestedRelativeToPackage}`)
-    || requestedRelativeToPackage.endsWith(`/${normalizedModulePath}`)
-  );
 }
 
 function packagePathPrefix(movePackage: MovePackage) {

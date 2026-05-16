@@ -25,11 +25,8 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { WorkspaceMode, WorkspaceTab } from "@/app/titlebar";
+import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 import {
-  isDirectoryPath,
-  loadFilePreview,
-  type FilePreview,
   type MoveModule,
   type MovePackage,
   type PackageTree,
@@ -44,12 +41,12 @@ import {
 import { BytecodeViewScreen } from "@/features/project-workspace/bytecode-view-screen";
 import { DependencyGraphScreen } from "@/features/project-workspace/dependency-graph-screen";
 import { ExecutionBuilderScreen } from "@/features/project-workspace/execution-builder-screen";
-import { EditorTabs } from "@/features/project-workspace/editor-tabs";
+import { ProjectSourceEditorWorkspace } from "@/features/project-workspace/editor/project-source-editor-workspace";
 import { MovePackagesOverviewScreen } from "@/features/project-workspace/move-packages-overview-screen";
 import { assessmentSidebarItems } from "@/features/project-workspace/package-load-assessment-cards";
 import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
-import { ProjectFileTree } from "@/features/project-workspace/project-file-tree";
 import type { SelectedMoveModule } from "@/features/project-workspace/module-signature-screen";
+import { findSourceModule } from "@/features/project-workspace/source-paths";
 import type { TypeGraphSourceLocation } from "@/features/project-workspace/type-graph-view";
 import {
   SurfaceDetailScreen,
@@ -75,16 +72,6 @@ type ProjectWorkspaceProps = {
   onProjectSelected: (packageTree: PackageTree) => void;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
   packageTree: PackageTree;
-};
-
-export type OpenFileTab = {
-  path: string;
-  preview: FilePreview | null;
-  editedSource: string | null;
-  error: string | null;
-  isDirty: boolean;
-  isSaving: boolean;
-  status: "idle" | "loading" | "loaded" | "error";
 };
 
 export type SourceJumpRequest = TypeGraphSourceLocation & {
@@ -323,7 +310,7 @@ export function ProjectWorkspace({
         style={{ gridTemplateRows: `minmax(0, 1fr) ${workspaceStatusBarHeight}px` }}
       >
         <WorkspaceErrorBoundary
-          resetKey={`${activeWorkspaceTab}:${activePackageManifestPath ?? ""}:${sourceJumpRequest?.token ?? "no-source-jump"}`}
+          resetKey={`${mode}:${packageTree.rootPath}:${activeWorkspaceTab}:${activePackageManifestPath ?? ""}:${sourceJumpRequest?.token ?? "no-source-jump"}`}
         >
           <WorkspaceMainPanel
             activeWorkspaceTab={activeWorkspaceTab}
@@ -482,132 +469,6 @@ function WorkspaceMainPanel({
       rootPath={packageTree.rootPath}
       typeGraph={packageTree.typeGraph}
     />
-  );
-}
-
-function ProjectSourceEditorWorkspace({
-  activeMovePackage,
-  onSelectModule,
-  packageTree,
-}: {
-  activeMovePackage: MovePackage | null;
-  onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
-  packageTree: PackageTree;
-}) {
-  const [selectedPath, setSelectedPath] = React.useState<string | null>(null);
-  const [activePath, setActivePath] = React.useState<string | null>(null);
-  const [tabs, setTabs] = React.useState<OpenFileTab[]>([]);
-
-  const openFile = React.useCallback((path: string) => {
-    if (isDirectoryPath(path)) {
-      return;
-    }
-
-    setSelectedPath(path);
-    setActivePath(path);
-    setTabs((current) => {
-      if (current.some((tab) => tab.path === path)) {
-        return current;
-      }
-
-      return [...current, createOpenFileTab(path)];
-    });
-
-    void loadFilePreview(packageTree, path)
-      .then((preview) => {
-        setTabs((current) =>
-          current.map((tab) =>
-            tab.path === path
-              ? {
-                  ...tab,
-                  error: null,
-                  preview,
-                  status: "loaded",
-                }
-              : tab,
-          ),
-        );
-      })
-      .catch((error: unknown) => {
-        setTabs((current) =>
-          current.map((tab) =>
-            tab.path === path
-              ? {
-                  ...tab,
-                  error: error instanceof Error ? error.message : "Could not load this file.",
-                  status: "error",
-                }
-              : tab,
-          ),
-        );
-      });
-
-    const selectedMoveModule = findModuleByPath(packageTree.movePackages, path, activeMovePackage);
-    if (selectedMoveModule) {
-      onSelectModule(selectedMoveModule.movePackage, selectedMoveModule.moveModule);
-    }
-  }, [activeMovePackage, onSelectModule, packageTree]);
-
-  const closeTab = React.useCallback((path: string) => {
-    setTabs((current) => {
-      const nextTabs = current.filter((tab) => tab.path !== path);
-
-      if (activePath === path) {
-        const closedIndex = current.findIndex((tab) => tab.path === path);
-        const nextActivePath = nextTabs[Math.max(0, closedIndex - 1)]?.path ?? nextTabs[0]?.path ?? null;
-        setActivePath(nextActivePath);
-        setSelectedPath(nextActivePath);
-      }
-
-      return nextTabs;
-    });
-  }, [activePath]);
-
-  const updateTabSource = React.useCallback((path: string, source: string) => {
-    setTabs((current) =>
-      current.map((tab) =>
-        tab.path === path
-          ? {
-              ...tab,
-              editedSource: source,
-              isDirty: tab.preview?.kind === "text" ? source !== tab.preview.source : true,
-            }
-          : tab,
-      ),
-    );
-  }, []);
-
-  return (
-    <section className="grid h-full min-h-0 bg-[var(--app-window)]" style={{ gridTemplateColumns: "280px minmax(0,1fr)" }}>
-      <ProjectFileTree
-        packageTree={packageTree}
-        selectedPath={selectedPath}
-        onSelectPath={(path) => {
-          if (!path) {
-            return;
-          }
-
-          if (isDirectoryPath(path)) {
-            setSelectedPath(path);
-            return;
-          }
-
-          if (path !== activePath) {
-            openFile(path);
-          }
-        }}
-      />
-      <EditorTabs
-        activePath={activePath}
-        tabs={tabs}
-        onActivateTab={(path) => {
-          setActivePath(path);
-          setSelectedPath(path);
-        }}
-        onCloseTab={closeTab}
-        onUpdateTabSource={updateTabSource}
-      />
-    </section>
   );
 }
 
@@ -1109,78 +970,6 @@ function compactPath(path: string) {
   }
 
   return path;
-}
-
-function findSourceModule(
-  movePackages: MovePackage[],
-  location: TypeGraphSourceLocation,
-) {
-  for (const movePackage of movePackages) {
-    const moveModule = movePackage.modules.find((module) =>
-      sameSourcePath(module.filePath, location.filePath, movePackage.path),
-    );
-
-    if (moveModule) {
-      return { moveModule, movePackage };
-    }
-  }
-
-  return null;
-}
-
-function findModuleByPath(
-  movePackages: MovePackage[],
-  path: string,
-  preferredPackage: MovePackage | null,
-) {
-  const packages = preferredPackage
-    ? [preferredPackage, ...movePackages.filter((movePackage) => movePackage.manifestPath !== preferredPackage.manifestPath)]
-    : movePackages;
-
-  for (const movePackage of packages) {
-    const moveModule = movePackage.modules.find((module) =>
-      sameSourcePath(module.filePath, path, movePackage.path),
-    );
-
-    if (moveModule) {
-      return { moveModule, movePackage };
-    }
-  }
-
-  return null;
-}
-
-function sameSourcePath(moduleFilePath: string, requestedFilePath: string, packagePath: string) {
-  const normalizedModulePath = normalizeFilePath(moduleFilePath);
-  const normalizedRequestedPath = normalizeFilePath(requestedFilePath);
-  const normalizedPackagePath = normalizeFilePath(packagePath);
-  const requestedRelativeToPackage =
-    normalizedPackagePath && normalizedRequestedPath.startsWith(`${normalizedPackagePath}/`)
-      ? normalizedRequestedPath.slice(normalizedPackagePath.length + 1)
-      : normalizedRequestedPath;
-
-  return (
-    normalizedModulePath === normalizedRequestedPath
-    || normalizedModulePath === requestedRelativeToPackage
-    || normalizedModulePath.endsWith(`/${requestedRelativeToPackage}`)
-    || requestedRelativeToPackage.endsWith(`/${normalizedModulePath}`)
-  );
-}
-
-function createOpenFileTab(path: string): OpenFileTab {
-  return {
-    editedSource: null,
-    error: null,
-    isDirty: false,
-    isSaving: false,
-    path,
-    preview: null,
-    status: "loading",
-  };
-}
-
-function normalizeFilePath(filePath: string | null | undefined) {
-  return (filePath ?? "").replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, "");
 }
 
 function packagePathLabel(movePackage: MovePackage, packageTree: PackageTree) {

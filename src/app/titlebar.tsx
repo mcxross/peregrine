@@ -34,6 +34,7 @@ import {
   trafficLightInset,
   workspaceSidebarWidth,
 } from "@/layout/window-chrome";
+import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 
 type TitlebarProps = {
   activeWorkspaceTab?: WorkspaceTab;
@@ -162,22 +163,6 @@ export function Titlebar({
     </header>
   );
 }
-
-const workspaceTabs = [
-  "Overview",
-  "Explore",
-  "Execution",
-  "Bytecode",
-  "Attack Surface",
-  "Tests",
-  "Fuzzing",
-  "Formal",
-  "Audit",
-  "CI",
-] as const;
-
-export type WorkspaceTab = (typeof workspaceTabs)[number];
-export type WorkspaceMode = "security" | "editor";
 
 const networkOptions = [
   { id: "testnet", label: "Testnet" },

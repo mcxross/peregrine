@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Titlebar } from "@/app/titlebar";
-import type { WorkspaceMode, WorkspaceTab } from "@/app/titlebar";
+import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 import { Sidebar } from "@/app/sidebar";
 import { Workspace } from "@/app/workspace";
 import { Button } from "@/components/ui/button";

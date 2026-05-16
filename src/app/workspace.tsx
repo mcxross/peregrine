@@ -1,4 +1,5 @@
 import { EmptyProjectScreen } from "@/features/empty-project/empty-project-screen";
+import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 import type { PackageTree } from "@/features/empty-project/filesystem-tree";
 import type {
   BuildLogRun,
@@ -7,7 +8,6 @@ import type {
 } from "@/features/project-workspace/build-log-sheet";
 import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
 import { ProjectWorkspace } from "@/features/project-workspace/project-workspace";
-import type { WorkspaceMode, WorkspaceTab } from "@/app/titlebar";
 
 type WorkspaceProps = {
   activeWorkspaceTab: WorkspaceTab;

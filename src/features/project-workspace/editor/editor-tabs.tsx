@@ -1,11 +1,11 @@
 import { FileText, X } from "lucide-react";
 import React from "react";
 
-import type { OpenFileTab } from "@/features/project-workspace/project-workspace";
+import type { OpenFileTab } from "@/features/project-workspace/editor/types";
 import { cn } from "@/lib/utils";
 
 const PreviewRenderer = React.lazy(() =>
-  import("@/features/project-workspace/preview-renderer"),
+  import("@/features/project-workspace/editor/preview-renderer"),
 );
 
 type EditorTabsProps = {

@@ -38,7 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { CodeEditorJumpRequest } from "@/features/project-workspace/code-editor";
+import type { CodeEditorJumpRequest } from "@/features/project-workspace/editor/code-editor";
 import {
   loadFilePreview,
   loadMoveBytecodeView,
@@ -56,7 +56,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const CodeEditor = React.lazy(() =>
-  import("@/features/project-workspace/code-editor").then((module) => ({
+  import("@/features/project-workspace/editor/code-editor").then((module) => ({
     default: module.CodeEditor,
   })),
 );

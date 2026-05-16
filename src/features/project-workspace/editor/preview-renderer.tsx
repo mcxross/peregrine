@@ -1,5 +1,5 @@
-import type { OpenFileTab } from "@/features/project-workspace/project-workspace";
-import { CodeEditor } from "@/features/project-workspace/code-editor";
+import { CodeEditor } from "@/features/project-workspace/editor/code-editor";
+import type { OpenFileTab } from "@/features/project-workspace/editor/types";
 
 type PreviewRendererProps = {
   tab: OpenFileTab;
