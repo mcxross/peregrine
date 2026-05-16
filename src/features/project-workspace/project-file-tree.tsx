@@ -1,8 +1,10 @@
-import { FileTree, useFileTree, useFileTreeSelection } from "@pierre/trees/react";
+import { FileTree, useFileTree } from "@pierre/trees/react";
 import React, { type CSSProperties } from "react";
 
 import type { PackageTree } from "@/features/empty-project/filesystem-tree";
 import { cn } from "@/lib/utils";
+
+type FileTreeModel = ReturnType<typeof useFileTree>["model"];
 
 type ProjectFileTreeProps = {
   packageTree: PackageTree;
@@ -45,19 +47,39 @@ function ProjectFileTreeBody({
   selectedPath,
   onSelectPath,
 }: ProjectFileTreeProps) {
+  const onSelectPathRef = React.useRef(onSelectPath);
+  const isSyncingSelectionRef = React.useRef(false);
+
+  React.useEffect(() => {
+    onSelectPathRef.current = onSelectPath;
+  }, [onSelectPath]);
+
   const { model } = useFileTree({
     flattenEmptyDirectories: true,
     initialExpansion: "closed",
     initialSelectedPaths: selectedPath ? [selectedPath] : undefined,
+    onSelectionChange: (paths) => {
+      if (isSyncingSelectionRef.current) {
+        return;
+      }
+
+      onSelectPathRef.current(paths[0] ?? null);
+    },
     paths: packageTree.paths,
     stickyFolders: true,
   });
-  const selectedPaths = useFileTreeSelection(model);
-  const activePath = selectedPaths[0] ?? null;
 
   React.useEffect(() => {
-    onSelectPath(activePath);
-  }, [activePath, onSelectPath]);
+    isSyncingSelectionRef.current = true;
+
+    try {
+      syncSelectedPath(model, selectedPath);
+    } finally {
+      queueMicrotask(() => {
+        isSyncingSelectionRef.current = false;
+      });
+    }
+  }, [model, selectedPath]);
 
   return (
     <FileTree
@@ -66,6 +88,59 @@ function ProjectFileTreeBody({
       style={treeStyles}
     />
   );
+}
+
+function syncSelectedPath(model: FileTreeModel, selectedPath: string | null) {
+  const currentSelectedPaths = model.getSelectedPaths();
+  const currentSelectedPath = currentSelectedPaths[0] ?? null;
+
+  if (!selectedPath && currentSelectedPaths.length === 0) {
+    return;
+  }
+
+  if (currentSelectedPaths.length === 1 && currentSelectedPath === selectedPath) {
+    return;
+  }
+
+  for (const path of currentSelectedPaths) {
+    model.getItem(path)?.deselect();
+  }
+
+  if (!selectedPath) {
+    return;
+  }
+
+  expandAncestorDirectories(model, selectedPath);
+
+  const item = model.getItem(selectedPath);
+  item?.select();
+  item?.focus();
+}
+
+function expandAncestorDirectories(model: FileTreeModel, path: string) {
+  const ancestors = ancestorDirectoryPaths(path);
+
+  for (const ancestor of ancestors) {
+    const item = model.getItem(ancestor);
+
+    if (item && "expand" in item) {
+      item.expand();
+    }
+  }
+}
+
+function ancestorDirectoryPaths(path: string) {
+  const normalizedPath = path.replace(/\/$/, "");
+  const parts = normalizedPath.split("/").filter(Boolean);
+  const ancestors: string[] = [];
+  let current = "";
+
+  for (const part of parts.slice(0, -1)) {
+    current = `${current}${part}/`;
+    ancestors.push(current);
+  }
+
+  return ancestors;
 }
 
 const treeStyles = {

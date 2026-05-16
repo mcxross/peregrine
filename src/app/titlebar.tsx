@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Bug,
   ChevronDown,
+  Code2,
   FileCheck2,
   FlaskConical,
   Gauge,
@@ -10,9 +11,9 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Play,
-  RefreshCw,
   ShieldAlert,
   Share,
+  ShieldCheck,
   SquareFunction,
 } from "lucide-react";
 
@@ -41,12 +42,12 @@ type TitlebarProps = {
   isLeftPanelOpen?: boolean;
   layout: LayoutSettings;
   hasWorkspace?: boolean;
+  mode?: WorkspaceMode;
   onBuildPackage?: () => void;
   onFuzzPackage?: () => void;
-  onRescanProject?: () => void;
   onTestPackage?: () => void;
+  onToggleMode?: () => void;
   onToggleLeftPanel?: () => void;
-  rescanActionState?: WorkspaceActionState;
   testActionState?: WorkspaceActionState;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
 };
@@ -57,12 +58,12 @@ export function Titlebar({
   isLeftPanelOpen = true,
   layout,
   hasWorkspace = true,
+  mode = "security",
   onBuildPackage,
   onFuzzPackage,
-  onRescanProject,
   onTestPackage,
+  onToggleMode,
   onToggleLeftPanel,
-  rescanActionState,
   testActionState,
 }: TitlebarProps) {
   const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
@@ -148,11 +149,9 @@ export function Titlebar({
       {hasWorkspace ? (
         <div className="flex h-full items-center justify-end gap-4 pr-5" onPointerDown={(event) => event.stopPropagation()}>
           <TitlebarAction
-            disabled={rescanActionState?.disabled || rescanActionState?.running}
-            icon={RefreshCw}
-            isRunning={rescanActionState?.running}
-            label="Rescan"
-            onClick={onRescanProject}
+            icon={mode === "security" ? Code2 : ShieldCheck}
+            label={mode === "security" ? "Editor" : "Security"}
+            onClick={onToggleMode}
           />
           <TitlebarAction icon={Share} label="Export" />
           <NetworkSelector />
@@ -178,6 +177,7 @@ const workspaceTabs = [
 ] as const;
 
 export type WorkspaceTab = (typeof workspaceTabs)[number];
+export type WorkspaceMode = "security" | "editor";
 
 const networkOptions = [
   { id: "testnet", label: "Testnet" },

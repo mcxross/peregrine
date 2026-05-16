@@ -1,18 +1,13 @@
-import { Save } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
 import type { OpenFileTab } from "@/features/project-workspace/project-workspace";
 import { CodeEditor } from "@/features/project-workspace/code-editor";
 
 type PreviewRendererProps = {
   tab: OpenFileTab;
-  onSave: () => void;
   onUpdateSource: (source: string) => void;
 };
 
 export function PreviewRenderer({
   tab,
-  onSave,
   onUpdateSource,
 }: PreviewRendererProps) {
   if (tab.status === "loading" || tab.status === "idle") {
@@ -34,23 +29,7 @@ export function PreviewRenderer({
   switch (tab.preview.kind) {
     case "text":
       return (
-        <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)]">
-          <header className="flex h-9 items-center justify-between border-b px-4 text-xs text-muted-foreground">
-            <span>{tab.preview.language}</span>
-            <div className="flex items-center gap-2">
-              {tab.isDirty ? <span>Edited</span> : null}
-              <Button
-                disabled={!tab.isDirty || tab.isSaving}
-                onClick={onSave}
-                size="xs"
-                type="button"
-                variant="ghost"
-              >
-                <Save aria-hidden="true" />
-                {tab.isSaving ? "Saving" : "Save"}
-              </Button>
-            </div>
-          </header>
+        <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
           {tab.error ? (
             <div className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-xs text-destructive">
               {tab.error}

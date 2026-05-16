@@ -25,12 +25,14 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { WorkspaceTab } from "@/app/titlebar";
-import type {
-  FilePreview,
-  MoveModule,
-  MovePackage,
-  PackageTree,
+import type { WorkspaceMode, WorkspaceTab } from "@/app/titlebar";
+import {
+  isDirectoryPath,
+  loadFilePreview,
+  type FilePreview,
+  type MoveModule,
+  type MovePackage,
+  type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
 import { AiFloatingWindow } from "@/features/project-workspace/ai/ai-floating-window";
 import {
@@ -42,9 +44,11 @@ import {
 import { BytecodeViewScreen } from "@/features/project-workspace/bytecode-view-screen";
 import { DependencyGraphScreen } from "@/features/project-workspace/dependency-graph-screen";
 import { ExecutionBuilderScreen } from "@/features/project-workspace/execution-builder-screen";
+import { EditorTabs } from "@/features/project-workspace/editor-tabs";
 import { MovePackagesOverviewScreen } from "@/features/project-workspace/move-packages-overview-screen";
 import { assessmentSidebarItems } from "@/features/project-workspace/package-load-assessment-cards";
 import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
+import { ProjectFileTree } from "@/features/project-workspace/project-file-tree";
 import type { SelectedMoveModule } from "@/features/project-workspace/module-signature-screen";
 import type { TypeGraphSourceLocation } from "@/features/project-workspace/type-graph-view";
 import {
@@ -65,6 +69,7 @@ type ProjectWorkspaceProps = {
   isLeftPanelOpen: boolean;
   lastScannedAt: number | null;
   loadAssessment: PackageLoadAssessment | null;
+  mode: WorkspaceMode;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
@@ -153,6 +158,7 @@ export function ProjectWorkspace({
   isLeftPanelOpen,
   lastScannedAt,
   loadAssessment,
+  mode,
   onActivePackageManifestPathChange,
   onCommandLog,
   onProjectSelected,
@@ -171,8 +177,11 @@ export function ProjectWorkspace({
           (movePackage) => movePackage.manifestPath === activePackageManifestPath,
         ) ?? null;
   const packageName = activeMovePackage?.name || packageTree.rootName || packageTree.movePackages[0]?.name || "savings_personal";
+  const isEditorMode = mode === "editor";
   const hasInspectorColumn = activeWorkspaceTab !== "Bytecode";
-  const workspaceColumns = isLeftPanelOpen
+  const workspaceColumns = isEditorMode
+    ? "minmax(0, 1fr)"
+    : isLeftPanelOpen
     ? hasInspectorColumn
       ? `${workspaceSidebarWidth}px minmax(0, 1fr) ${isRightPanelOpen ? "clamp(360px, 24vw, 400px)" : "44px"}`
       : `${workspaceSidebarWidth}px minmax(0, 1fr)`
@@ -285,7 +294,7 @@ export function ProjectWorkspace({
         gridTemplateColumns: workspaceColumns,
       }}
     >
-      {isLeftPanelOpen ? (
+      {!isEditorMode && isLeftPanelOpen ? (
         <SecuritySidebar
           activeMovePackage={activeMovePackage}
           activeSurfaceDetail={activeSurfaceDetail}
@@ -321,6 +330,7 @@ export function ProjectWorkspace({
             activeSurfaceDetail={activeSurfaceDetail}
             activeMovePackage={activeMovePackage}
             isDependencyGraphLoading={isDependencyGraphLoading}
+            mode={mode}
             packageTree={packageTree}
             packageName={packageName}
             selectedModule={selectedModule}
@@ -347,7 +357,7 @@ export function ProjectWorkspace({
         </footer>
       </main>
 
-      {hasInspectorColumn ? (
+      {!isEditorMode && hasInspectorColumn ? (
         isRightPanelOpen ? (
           <InspectorPanel
             onCollapse={() => setIsRightPanelOpen(false)}
@@ -363,7 +373,7 @@ export function ProjectWorkspace({
         )
       ) : null}
 
-      {activeMovePackage ? (
+      {!isEditorMode && activeMovePackage ? (
         <AiFloatingWindow
           activeMovePackage={activeMovePackage}
           isOpen={isAiOpen}
@@ -380,6 +390,7 @@ function WorkspaceMainPanel({
   activeSurfaceDetail,
   activeMovePackage,
   isDependencyGraphLoading,
+  mode,
   onClearSelectedModule,
   onOpenSourceLocation,
   onSelectModule,
@@ -394,6 +405,7 @@ function WorkspaceMainPanel({
   activeSurfaceDetail: SurfaceDetailKind | null;
   activeMovePackage: MovePackage | null;
   isDependencyGraphLoading: boolean;
+  mode: WorkspaceMode;
   onClearSelectedModule: () => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onOpenSourceLocation: (location: TypeGraphSourceLocation) => void;
@@ -404,6 +416,16 @@ function WorkspaceMainPanel({
   selectedModule: SelectedMoveModule | null;
   sourceJumpRequest: SourceJumpRequest | null;
 }) {
+  if (mode === "editor") {
+    return (
+      <ProjectSourceEditorWorkspace
+        activeMovePackage={activeMovePackage}
+        onSelectModule={onSelectModule}
+        packageTree={packageTree}
+      />
+    );
+  }
+
   if (activeSurfaceDetail) {
     return <SurfaceDetailScreen detail={activeSurfaceDetail} movePackage={activeMovePackage} />;
   }
@@ -460,6 +482,132 @@ function WorkspaceMainPanel({
       rootPath={packageTree.rootPath}
       typeGraph={packageTree.typeGraph}
     />
+  );
+}
+
+function ProjectSourceEditorWorkspace({
+  activeMovePackage,
+  onSelectModule,
+  packageTree,
+}: {
+  activeMovePackage: MovePackage | null;
+  onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
+  packageTree: PackageTree;
+}) {
+  const [selectedPath, setSelectedPath] = React.useState<string | null>(null);
+  const [activePath, setActivePath] = React.useState<string | null>(null);
+  const [tabs, setTabs] = React.useState<OpenFileTab[]>([]);
+
+  const openFile = React.useCallback((path: string) => {
+    if (isDirectoryPath(path)) {
+      return;
+    }
+
+    setSelectedPath(path);
+    setActivePath(path);
+    setTabs((current) => {
+      if (current.some((tab) => tab.path === path)) {
+        return current;
+      }
+
+      return [...current, createOpenFileTab(path)];
+    });
+
+    void loadFilePreview(packageTree, path)
+      .then((preview) => {
+        setTabs((current) =>
+          current.map((tab) =>
+            tab.path === path
+              ? {
+                  ...tab,
+                  error: null,
+                  preview,
+                  status: "loaded",
+                }
+              : tab,
+          ),
+        );
+      })
+      .catch((error: unknown) => {
+        setTabs((current) =>
+          current.map((tab) =>
+            tab.path === path
+              ? {
+                  ...tab,
+                  error: error instanceof Error ? error.message : "Could not load this file.",
+                  status: "error",
+                }
+              : tab,
+          ),
+        );
+      });
+
+    const selectedMoveModule = findModuleByPath(packageTree.movePackages, path, activeMovePackage);
+    if (selectedMoveModule) {
+      onSelectModule(selectedMoveModule.movePackage, selectedMoveModule.moveModule);
+    }
+  }, [activeMovePackage, onSelectModule, packageTree]);
+
+  const closeTab = React.useCallback((path: string) => {
+    setTabs((current) => {
+      const nextTabs = current.filter((tab) => tab.path !== path);
+
+      if (activePath === path) {
+        const closedIndex = current.findIndex((tab) => tab.path === path);
+        const nextActivePath = nextTabs[Math.max(0, closedIndex - 1)]?.path ?? nextTabs[0]?.path ?? null;
+        setActivePath(nextActivePath);
+        setSelectedPath(nextActivePath);
+      }
+
+      return nextTabs;
+    });
+  }, [activePath]);
+
+  const updateTabSource = React.useCallback((path: string, source: string) => {
+    setTabs((current) =>
+      current.map((tab) =>
+        tab.path === path
+          ? {
+              ...tab,
+              editedSource: source,
+              isDirty: tab.preview?.kind === "text" ? source !== tab.preview.source : true,
+            }
+          : tab,
+      ),
+    );
+  }, []);
+
+  return (
+    <section className="grid h-full min-h-0 bg-[var(--app-window)]" style={{ gridTemplateColumns: "280px minmax(0,1fr)" }}>
+      <ProjectFileTree
+        packageTree={packageTree}
+        selectedPath={selectedPath}
+        onSelectPath={(path) => {
+          if (!path) {
+            return;
+          }
+
+          if (isDirectoryPath(path)) {
+            setSelectedPath(path);
+            return;
+          }
+
+          if (path !== activePath) {
+            openFile(path);
+          }
+        }}
+      />
+      <EditorTabs
+        activePath={activePath}
+        tabs={tabs}
+        onActivateTab={(path) => {
+          setActivePath(path);
+          setSelectedPath(path);
+        }}
+        onCloseTab={closeTab}
+        onUpdateTabSource={updateTabSource}
+      />
+    </section>
   );
 }
 
@@ -980,6 +1128,28 @@ function findSourceModule(
   return null;
 }
 
+function findModuleByPath(
+  movePackages: MovePackage[],
+  path: string,
+  preferredPackage: MovePackage | null,
+) {
+  const packages = preferredPackage
+    ? [preferredPackage, ...movePackages.filter((movePackage) => movePackage.manifestPath !== preferredPackage.manifestPath)]
+    : movePackages;
+
+  for (const movePackage of packages) {
+    const moveModule = movePackage.modules.find((module) =>
+      sameSourcePath(module.filePath, path, movePackage.path),
+    );
+
+    if (moveModule) {
+      return { moveModule, movePackage };
+    }
+  }
+
+  return null;
+}
+
 function sameSourcePath(moduleFilePath: string, requestedFilePath: string, packagePath: string) {
   const normalizedModulePath = normalizeFilePath(moduleFilePath);
   const normalizedRequestedPath = normalizeFilePath(requestedFilePath);
@@ -995,6 +1165,18 @@ function sameSourcePath(moduleFilePath: string, requestedFilePath: string, packa
     || normalizedModulePath.endsWith(`/${requestedRelativeToPackage}`)
     || requestedRelativeToPackage.endsWith(`/${normalizedModulePath}`)
   );
+}
+
+function createOpenFileTab(path: string): OpenFileTab {
+  return {
+    editedSource: null,
+    error: null,
+    isDirty: false,
+    isSaving: false,
+    path,
+    preview: null,
+    status: "loading",
+  };
 }
 
 function normalizeFilePath(filePath: string | null | undefined) {

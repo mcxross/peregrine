@@ -7,7 +7,7 @@ import type {
 } from "@/features/project-workspace/build-log-sheet";
 import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
 import { ProjectWorkspace } from "@/features/project-workspace/project-workspace";
-import type { WorkspaceTab } from "@/app/titlebar";
+import type { WorkspaceMode, WorkspaceTab } from "@/app/titlebar";
 
 type WorkspaceProps = {
   activeWorkspaceTab: WorkspaceTab;
@@ -17,6 +17,7 @@ type WorkspaceProps = {
   isDependencyGraphLoading?: boolean;
   lastScannedAt: number | null;
   loadAssessment: PackageLoadAssessment | null;
+  mode: WorkspaceMode;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   packageTree: PackageTree | null;
@@ -32,6 +33,7 @@ export function Workspace({
   isLeftPanelOpen,
   lastScannedAt,
   loadAssessment,
+  mode,
   onActivePackageManifestPathChange,
   onCommandLog,
   onWorkspaceTabChange,
@@ -48,6 +50,7 @@ export function Workspace({
         isLeftPanelOpen={isLeftPanelOpen}
         lastScannedAt={lastScannedAt}
         loadAssessment={loadAssessment}
+        mode={mode}
         onActivePackageManifestPathChange={onActivePackageManifestPathChange}
         onCommandLog={onCommandLog}
         onProjectSelected={onProjectSelected}

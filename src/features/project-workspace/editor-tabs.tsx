@@ -2,63 +2,33 @@ import { FileText, X } from "lucide-react";
 import React from "react";
 
 import type { OpenFileTab } from "@/features/project-workspace/project-workspace";
-import { DependencyGraphScreen } from "@/features/project-workspace/dependency-graph-screen";
-import {
-  ModuleSignatureScreen,
-  type SelectedMoveModule,
-} from "@/features/project-workspace/module-signature-screen";
 import { cn } from "@/lib/utils";
-import type {
-  MoveCallGraph,
-  MoveTypeGraph,
-  PackageDependencyGraph,
-} from "@/features/empty-project/filesystem-tree";
 
 const PreviewRenderer = React.lazy(() =>
   import("@/features/project-workspace/preview-renderer"),
 );
 
-const EMPTY_TYPE_GRAPH: MoveTypeGraph = {
-  edges: [],
-  nodes: [],
-  unresolvedTypes: [],
-};
-
-const EMPTY_CALL_GRAPH: MoveCallGraph = {
-  edges: [],
-  nodes: [],
-  unresolvedCalls: [],
-};
-
 type EditorTabsProps = {
-  packageName: string;
-  dependencyGraph: PackageDependencyGraph;
-  selectedModule: SelectedMoveModule | null;
   tabs: OpenFileTab[];
   activePath: string | null;
   onActivateTab: (path: string) => void;
   onCloseTab: (path: string) => void;
-  onSaveTab: (path: string) => void;
   onUpdateTabSource: (path: string, source: string) => void;
 };
 
 export function EditorTabs({
-  packageName,
-  dependencyGraph,
-  selectedModule,
   tabs,
   activePath,
   onActivateTab,
   onCloseTab,
-  onSaveTab,
   onUpdateTabSource,
 }: EditorTabsProps) {
   const activeTab = tabs.find((tab) => tab.path === activePath) ?? null;
 
   return (
-    <section className="grid min-h-0 grid-rows-[auto_1fr] bg-background">
-      <div className="flex min-w-0 items-center border-b bg-muted/20">
-        {tabs.length ? (
+    <section className={cn("grid min-h-0 bg-background", tabs.length ? "grid-rows-[auto_1fr]" : "grid-rows-[1fr]")}>
+      {tabs.length ? (
+        <div className="flex min-w-0 items-center border-b bg-muted/20">
           <div className="flex min-w-0 flex-1 overflow-x-auto">
             {tabs.map((tab) => (
               <button
@@ -88,12 +58,8 @@ export function EditorTabs({
               </button>
             ))}
           </div>
-        ) : (
-          <div className="flex h-10 min-w-0 items-center px-5 text-sm text-muted-foreground">
-            {packageName}
-          </div>
-        )}
-      </div>
+        </div>
+      ) : null}
 
       {activeTab ? (
         <React.Suspense
@@ -105,22 +71,21 @@ export function EditorTabs({
         >
           <PreviewRenderer
             tab={activeTab}
-            onSave={() => onSaveTab(activeTab.path)}
             onUpdateSource={(source) => onUpdateTabSource(activeTab.path, source)}
           />
         </React.Suspense>
       ) : (
-        selectedModule ? (
-          <ModuleSignatureScreen selectedModule={selectedModule} />
-        ) : (
-          <DependencyGraphScreen
-            activeMovePackage={null}
-            callGraph={EMPTY_CALL_GRAPH}
-            graph={dependencyGraph}
-            packageName={packageName}
-            typeGraph={EMPTY_TYPE_GRAPH}
-          />
-        )
+        <div className="grid min-h-0 place-items-center bg-[var(--app-window)] px-6 text-center">
+          <div className="max-w-sm">
+            <div className="mx-auto grid size-10 place-items-center rounded-md border border-[color:var(--app-border)] bg-[var(--app-subtle)] text-muted-foreground">
+              <FileText className="size-5" aria-hidden="true" />
+            </div>
+            <div className="mt-4 text-sm font-semibold text-foreground">Select a file to edit</div>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Choose a file from the project tree to open it in the editor.
+            </p>
+          </div>
+        </div>
       )}
     </section>
   );

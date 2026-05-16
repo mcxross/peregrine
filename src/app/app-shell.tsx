@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Titlebar } from "@/app/titlebar";
-import type { WorkspaceTab } from "@/app/titlebar";
+import type { WorkspaceMode, WorkspaceTab } from "@/app/titlebar";
 import { Sidebar } from "@/app/sidebar";
 import { Workspace } from "@/app/workspace";
 import { Button } from "@/components/ui/button";
@@ -56,11 +56,11 @@ export function AppShell({
   onProjectSelected,
 }: AppShellProps) {
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTab>("Overview");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("security");
   const [activePackageManifestPath, setActivePackageManifestPath] = useState<string | null>(null);
   const [buildRuns, setBuildRuns] = useState<BuildLogRun[]>([]);
   const [isBuildSheetOpen, setIsBuildSheetOpen] = useState(false);
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
-  const [isRescanning, setIsRescanning] = useState(false);
   const [lastScannedAt, setLastScannedAt] = useState<number | null>(null);
   const [launchBuild, setLaunchBuild] = useState<LaunchBuildState | null>(null);
   const loadAssessment: PackageLoadAssessment | null = null;
@@ -363,37 +363,6 @@ export function AppShell({
     return () => window.clearTimeout(timer);
   }, [launchBuild]);
 
-  const rescanProject = useCallback(async () => {
-    if (!packageTree || isRescanning) {
-      return;
-    }
-
-    const previousActiveManifestPath =
-      activePackageManifestPath ?? packageTree.activePackageManifestPath ?? null;
-
-    setIsRescanning(true);
-
-    try {
-      const rescannedPackageTree = await loadPackageTree(packageTree.rootPath);
-      const activePackageManifestPath =
-        previousActiveManifestPath &&
-        rescannedPackageTree.movePackages.some(
-          (movePackage) => movePackage.manifestPath === previousActiveManifestPath,
-        )
-          ? previousActiveManifestPath
-          : rescannedPackageTree.movePackages[0]?.manifestPath ?? null;
-
-      handleProjectSelected({
-        ...rescannedPackageTree,
-        activePackageManifestPath,
-      });
-    } catch (error) {
-      console.error("Could not rescan package.", error);
-    } finally {
-      setIsRescanning(false);
-    }
-  }, [activePackageManifestPath, handleProjectSelected, isRescanning, packageTree]);
-
   const runBuild = useCallback(async () => {
     if (!packageTree || !activeMovePackage || isCommandRunning) {
       return;
@@ -622,17 +591,14 @@ export function AppShell({
           disabled: !activeMovePackage,
           running: isCommandRunning,
         }}
-        rescanActionState={{
-          disabled: !packageTree,
-          running: isRescanning,
-        }}
         isLeftPanelOpen={isLeftPanelOpen}
         layout={layout}
         hasWorkspace={!isSettings && Boolean(packageTree)}
+        mode={workspaceMode}
         onBuildPackage={runBuild}
         onFuzzPackage={runFuzz}
-        onRescanProject={rescanProject}
         onTestPackage={runTests}
+        onToggleMode={() => setWorkspaceMode((mode) => mode === "security" ? "editor" : "security")}
         onToggleLeftPanel={() => setIsLeftPanelOpen((isOpen) => !isOpen)}
         testActionState={{
           disabled: !activeMovePackage,
@@ -659,6 +625,7 @@ export function AppShell({
               isLeftPanelOpen={isLeftPanelOpen}
               lastScannedAt={lastScannedAt}
               loadAssessment={loadAssessment}
+              mode={workspaceMode}
               onActivePackageManifestPathChange={setActivePackageManifestPath}
               onWorkspaceTabChange={setActiveWorkspaceTab}
               packageTree={packageTree}
