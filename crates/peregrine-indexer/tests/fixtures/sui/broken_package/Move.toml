@@ -1,0 +1,6 @@
+[package]
+name = "broken_package"
+edition = "2024"
+
+[addresses]
+broken_package = "0x0"

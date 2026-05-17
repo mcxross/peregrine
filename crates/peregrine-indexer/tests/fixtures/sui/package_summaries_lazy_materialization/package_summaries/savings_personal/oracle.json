@@ -1,0 +1,14 @@
+{
+  "id": { "address": "savings_personal", "name": "oracle" },
+  "immediate_dependencies": [{ "address": "pyth", "name": "price_info" }],
+  "structs": {},
+  "functions": {
+    "read_price": {
+      "visibility": "Public",
+      "entry": false,
+      "parameters": [{ "name": "price", "type_": "pyth::price_info::PriceInfo" }],
+      "return_": ["u64"]
+    }
+  }
+}
+

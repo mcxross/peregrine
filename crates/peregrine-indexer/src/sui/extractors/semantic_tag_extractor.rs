@@ -41,10 +41,18 @@ pub fn function_tags(function: &FunctionInfo) -> Vec<&'static str> {
 
 pub fn type_tags(type_def: &TypeDef) -> Vec<&'static str> {
     let mut tags = Vec::new();
-    if type_def.abilities.iter().any(|ability| ability == "key") {
+    if type_def
+        .abilities
+        .iter()
+        .any(|ability| ability.eq_ignore_ascii_case("key"))
+    {
         tags.push("ability_key_detected");
     }
-    if type_def.abilities.iter().any(|ability| ability == "store") {
+    if type_def
+        .abilities
+        .iter()
+        .any(|ability| ability.eq_ignore_ascii_case("store"))
+    {
         tags.push("store_type_detected");
     }
     if type_def

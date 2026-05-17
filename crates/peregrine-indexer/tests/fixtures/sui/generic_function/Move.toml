@@ -1,0 +1,6 @@
+[package]
+name = "generic_function"
+edition = "2024"
+
+[addresses]
+generic_function = "0x0"

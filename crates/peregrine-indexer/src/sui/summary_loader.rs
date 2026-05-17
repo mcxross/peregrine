@@ -434,6 +434,46 @@ fn materialize_root_summary(
         source_span: span.clone(),
         metadata_json: None,
     });
+    program.edges.push(Edge {
+        id: stable_id(
+            "edge",
+            [
+                &package_id,
+                &program.package.id,
+                &artifact.id,
+                "HAS_SUMMARY_ARTIFACT",
+            ],
+        ),
+        package_id: package_id.clone(),
+        from_id: program.package.id.clone(),
+        to_id: artifact.id.clone(),
+        edge_type: EdgeType::HasSummaryArtifact,
+        operation_id: None,
+        source_span: span.clone(),
+        metadata_json: None,
+    });
+
+    for dep in &summary.immediate_dependencies {
+        program.edges.push(Edge {
+            id: stable_id(
+                "edge",
+                [
+                    &package_id,
+                    &module_id,
+                    &dep.address,
+                    &dep.name,
+                    "DEPENDS_ON_MODULE",
+                ],
+            ),
+            package_id: package_id.clone(),
+            from_id: module_id.clone(),
+            to_id: format!("{}::{}", dep.address, dep.name),
+            edge_type: EdgeType::DependsOnModule,
+            operation_id: None,
+            source_span: span.clone(),
+            metadata_json: None,
+        });
+    }
 
     for friend in &summary.friends {
         program.edges.push(Edge {
@@ -481,6 +521,18 @@ fn materialize_root_summary(
             source_span: span.clone(),
             metadata_json: None,
         });
+        for field in &type_def.fields {
+            program.edges.push(Edge {
+                id: stable_id("edge", [&package_id, &type_def.id, &field.id, "HAS_FIELD"]),
+                package_id: package_id.clone(),
+                from_id: type_def.id.clone(),
+                to_id: field.id.clone(),
+                edge_type: EdgeType::HasField,
+                operation_id: None,
+                source_span: field.source_span.clone(),
+                metadata_json: Some(json!({ "type": field.type_name })),
+            });
+        }
         program.types.push(type_def);
     }
 
@@ -495,6 +547,31 @@ fn materialize_root_summary(
             span.clone(),
         );
         emit_type_tags(program, &type_def);
+        program.edges.push(Edge {
+            id: stable_id(
+                "edge",
+                [&package_id, &module_id, &type_def.id, "DEFINES_TYPE"],
+            ),
+            package_id: package_id.clone(),
+            from_id: module_id.clone(),
+            to_id: type_def.id.clone(),
+            edge_type: EdgeType::DefinesType,
+            operation_id: None,
+            source_span: span.clone(),
+            metadata_json: None,
+        });
+        for field in &type_def.fields {
+            program.edges.push(Edge {
+                id: stable_id("edge", [&package_id, &type_def.id, &field.id, "HAS_FIELD"]),
+                package_id: package_id.clone(),
+                from_id: type_def.id.clone(),
+                to_id: field.id.clone(),
+                edge_type: EdgeType::HasField,
+                operation_id: None,
+                source_span: field.source_span.clone(),
+                metadata_json: Some(json!({ "type": field.type_name })),
+            });
+        }
         program.types.push(type_def);
     }
 
@@ -521,8 +598,80 @@ fn materialize_root_summary(
             source_span: span.clone(),
             metadata_json: None,
         });
+        for parameter in &function.parameters {
+            program.edges.push(Edge {
+                id: stable_id(
+                    "edge",
+                    [&package_id, &function.id, &parameter.id, "HAS_PARAMETER"],
+                ),
+                package_id: package_id.clone(),
+                from_id: function.id.clone(),
+                to_id: parameter.id.clone(),
+                edge_type: EdgeType::HasParameter,
+                operation_id: None,
+                source_span: function.source_span.clone(),
+                metadata_json: Some(json!({
+                    "name": parameter.name,
+                    "type": parameter.type_name,
+                    "index": parameter.index,
+                })),
+            });
+            let type_target = resolve_type_target(program, &parameter.type_name);
+            program.edges.push(Edge {
+                id: stable_id(
+                    "edge",
+                    [
+                        &package_id,
+                        &function.id,
+                        &type_target,
+                        &parameter.index.to_string(),
+                        "ACCEPTS_TYPE",
+                    ],
+                ),
+                package_id: package_id.clone(),
+                from_id: function.id.clone(),
+                to_id: type_target,
+                edge_type: EdgeType::AcceptsType,
+                operation_id: None,
+                source_span: function.source_span.clone(),
+                metadata_json: Some(json!({ "type": parameter.type_name })),
+            });
+        }
+        for (index, return_type) in function.returns.iter().enumerate() {
+            let type_target = resolve_type_target(program, return_type);
+            program.edges.push(Edge {
+                id: stable_id(
+                    "edge",
+                    [
+                        &package_id,
+                        &function.id,
+                        &type_target,
+                        &index.to_string(),
+                        "RETURNS_TYPE",
+                    ],
+                ),
+                package_id: package_id.clone(),
+                from_id: function.id.clone(),
+                to_id: type_target,
+                edge_type: EdgeType::ReturnsType,
+                operation_id: None,
+                source_span: function.source_span.clone(),
+                metadata_json: Some(json!({ "type": return_type })),
+            });
+        }
         program.functions.push(function);
     }
+}
+
+fn resolve_type_target(program: &ProgramIndex, type_name: &str) -> String {
+    program
+        .types
+        .iter()
+        .find(|type_def| {
+            type_name.contains(&type_def.full_name) || type_name.ends_with(&type_def.name)
+        })
+        .map(|type_def| type_def.id.clone())
+        .unwrap_or_else(|| type_name.to_string())
 }
 
 fn type_from_summary(
@@ -673,7 +822,11 @@ fn emit_function_tags(program: &mut ProgramIndex, function: &FunctionInfo) {
 }
 
 fn emit_type_tags(program: &mut ProgramIndex, type_def: &TypeDef) {
-    if type_def.abilities.iter().any(|ability| ability == "key") {
+    if type_def
+        .abilities
+        .iter()
+        .any(|ability| ability.eq_ignore_ascii_case("key"))
+    {
         push_tag(
             program,
             &type_def.id,
@@ -681,7 +834,11 @@ fn emit_type_tags(program: &mut ProgramIndex, type_def: &TypeDef) {
             type_def.source_span.clone(),
         );
     }
-    if type_def.abilities.iter().any(|ability| ability == "store") {
+    if type_def
+        .abilities
+        .iter()
+        .any(|ability| ability.eq_ignore_ascii_case("store"))
+    {
         push_tag(
             program,
             &type_def.id,
@@ -951,6 +1108,7 @@ fn abilities(value: &Value) -> Vec<String> {
         .into_iter()
         .flatten()
         .map(type_value_to_string)
+        .map(|ability| ability.to_ascii_lowercase())
         .collect::<Vec<_>>();
     result.sort();
     result.dedup();
@@ -1004,26 +1162,43 @@ fn type_value_to_string(value: &Value) -> String {
     match value {
         Value::String(value) => value.clone(),
         Value::Object(map) => {
-            if let Some(value) = map
-                .get("Datatype")
-                .or_else(|| map.get("Struct"))
-                .or_else(|| map.get("Reference"))
-            {
+            if let Some(value) = map.get("Reference") {
+                return reference_type_to_string(value);
+            }
+            if let Some(value) = map.get("NamedTypeParameter").and_then(Value::as_str) {
+                return value.to_string();
+            }
+            if let Some(value) = map.get("argument") {
+                return type_value_to_string(value);
+            }
+            if let Some(value) = map.get("Datatype").or_else(|| map.get("Struct")) {
                 return type_value_to_string(value);
             }
             if let Some(value) = map.get("MutableReference") {
                 return format!("&mut {}", type_value_to_string(value));
             }
-            if let Some(value) = map.get("Vector") {
+            if let Some(value) = map.get("Vector").or_else(|| map.get("vector")) {
                 return format!("vector<{}>", type_value_to_string(value));
             }
             if let Some(name) = map.get("name").and_then(Value::as_str) {
-                return name.to_string();
-            }
-            if let Some(module) = map.get("module").and_then(Value::as_str) {
-                if let Some(name) = map.get("name").and_then(Value::as_str) {
-                    return format!("{module}::{name}");
+                if let Some(constraints) = constraints_to_string(map.get("constraints")) {
+                    let name = if map.get("phantom").and_then(Value::as_bool).unwrap_or(false) {
+                        format!("phantom {name}")
+                    } else {
+                        name.to_string()
+                    };
+                    return format!("{name}: {constraints}");
                 }
+                if let Some(module) = datatype_module_to_string(map.get("module")) {
+                    let mut rendered = format!("{module}::{name}");
+                    if let Some(arguments) = type_arguments_to_string(map.get("type_arguments")) {
+                        rendered.push('<');
+                        rendered.push_str(&arguments);
+                        rendered.push('>');
+                    }
+                    return rendered;
+                }
+                return name.to_string();
             }
             serde_json::to_string(value).unwrap_or_default()
         }
@@ -1035,6 +1210,55 @@ fn type_value_to_string(value: &Value) -> String {
         Value::Bool(value) => value.to_string(),
         Value::Number(value) => value.to_string(),
         Value::Null => "unknown".to_string(),
+    }
+}
+
+fn constraints_to_string(value: Option<&Value>) -> Option<String> {
+    let constraints = value?
+        .as_array()?
+        .iter()
+        .map(type_value_to_string)
+        .map(|constraint| constraint.to_ascii_lowercase())
+        .collect::<Vec<_>>();
+    (!constraints.is_empty()).then(|| constraints.join(" + "))
+}
+
+fn type_arguments_to_string(value: Option<&Value>) -> Option<String> {
+    let arguments = value?
+        .as_array()?
+        .iter()
+        .map(type_value_to_string)
+        .collect::<Vec<_>>();
+    (!arguments.is_empty()).then(|| arguments.join(", "))
+}
+
+fn reference_type_to_string(value: &Value) -> String {
+    match value {
+        Value::Array(items) if items.len() == 2 => {
+            let mutable = items.first().and_then(Value::as_bool).unwrap_or(false);
+            let inner = items
+                .get(1)
+                .map(type_value_to_string)
+                .unwrap_or_else(|| "unknown".to_string());
+            if mutable {
+                format!("&mut {inner}")
+            } else {
+                format!("&{inner}")
+            }
+        }
+        _ => format!("&{}", type_value_to_string(value)),
+    }
+}
+
+fn datatype_module_to_string(value: Option<&Value>) -> Option<String> {
+    match value {
+        Some(Value::String(module)) => Some(module.clone()),
+        Some(Value::Object(module)) => {
+            let address = module.get("address").and_then(Value::as_str)?;
+            let name = module.get("name").and_then(Value::as_str)?;
+            Some(format!("{address}::{name}"))
+        }
+        _ => None,
     }
 }
 

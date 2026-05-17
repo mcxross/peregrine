@@ -1,0 +1,129 @@
+{
+  "id": {
+    "address": "duplicate_type_dedup",
+    "name": "main"
+  },
+  "doc": null,
+  "immediate_dependencies": [],
+  "attributes": [],
+  "functions": {
+    "first": {
+      "source_index": 0,
+      "index": 0,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [],
+      "parameters": [
+        {
+          "name": "value",
+          "type_": {
+            "Datatype": {
+              "module": {
+                "address": "duplicate_type_dedup",
+                "name": "main"
+              },
+              "name": "Shared",
+              "type_arguments": []
+            }
+          }
+        }
+      ],
+      "return_": [
+        "u64"
+      ]
+    },
+    "second": {
+      "source_index": 1,
+      "index": 1,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [],
+      "parameters": [
+        {
+          "name": "value",
+          "type_": {
+            "Datatype": {
+              "module": {
+                "address": "duplicate_type_dedup",
+                "name": "main"
+              },
+              "name": "Shared",
+              "type_arguments": []
+            }
+          }
+        }
+      ],
+      "return_": [
+        "u64"
+      ]
+    },
+    "combine": {
+      "source_index": 2,
+      "index": 2,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [],
+      "parameters": [
+        {
+          "name": "left",
+          "type_": {
+            "Datatype": {
+              "module": {
+                "address": "duplicate_type_dedup",
+                "name": "main"
+              },
+              "name": "Shared",
+              "type_arguments": []
+            }
+          }
+        },
+        {
+          "name": "right",
+          "type_": {
+            "Datatype": {
+              "module": {
+                "address": "duplicate_type_dedup",
+                "name": "main"
+              },
+              "name": "Shared",
+              "type_arguments": []
+            }
+          }
+        }
+      ],
+      "return_": [
+        "u64"
+      ]
+    }
+  },
+  "structs": {
+    "Shared": {
+      "index": 0,
+      "doc": null,
+      "attributes": [],
+      "abilities": [
+        "Copy",
+        "Drop",
+        "Store"
+      ],
+      "type_parameters": [],
+      "fields": {
+        "positional_fields": false,
+        "fields": {
+          "value": {
+            "index": 0,
+            "doc": null,
+            "type_": "u64"
+          }
+        }
+      }
+    }
+  },
+  "enums": {}
+}

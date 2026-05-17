@@ -1,0 +1,6 @@
+[package]
+name = "transfer_call_direct"
+edition = "2024"
+
+[addresses]
+transfer_call_direct = "0x0"

@@ -5,7 +5,8 @@ use rusqlite::{params, Connection, OptionalExtension};
 use crate::{
     core::{
         estimate_tokens, ContextBudget, Diagnostic, FunctionInfo, FunctionParameter,
-        FunctionVisibility, ModuleInfo, Operation, OperationKind, SemanticTag, TypeDef, TypeKind,
+        FunctionVisibility, ModuleInfo, Operation, OperationKind, SemanticTag, SourceSpan, TypeDef,
+        TypeKind,
     },
     sui::model::{
         ContextPack, FunctionContext, FunctionOutline, FunctionSymbolCard, GraphView,
@@ -701,8 +702,22 @@ fn count(connection: &Connection, table: &str, package_id: &str) -> rusqlite::Re
 }
 
 fn apply_function_budget(context: &mut FunctionContext) {
-    let mut text = serde_json::to_string(context).unwrap_or_default();
-    context.estimated_tokens = estimate_tokens(&text);
+    refresh_estimate(context);
+    if context.estimated_tokens > context.budget_tokens {
+        let mut stripped = 0;
+        for operation in &mut context.operations {
+            if operation.metadata_json.take().is_some() {
+                stripped += 1;
+            }
+        }
+        if stripped > 0 {
+            context.trimmed = true;
+            context
+                .trim_reasons
+                .push("operation_metadata_trimmed".to_string());
+            refresh_estimate(context);
+        }
+    }
     if context.estimated_tokens > context.budget_tokens && !context.source_excerpts.is_empty() {
         context.trimmed = true;
         context
@@ -720,22 +735,36 @@ fn apply_function_budget(context: &mut FunctionContext) {
                 .start_line
                 .saturating_add(lines.len().saturating_sub(1) as u32);
         }
-        text = serde_json::to_string(context).unwrap_or_default();
-        context.estimated_tokens = estimate_tokens(&text);
+        refresh_estimate(context);
     }
     while context.estimated_tokens > context.budget_tokens && !context.operations.is_empty() {
-        context.trimmed = true;
-        context.trim_reasons.push("operations_trimmed".to_string());
-        context.operations.pop();
-        text = serde_json::to_string(context).unwrap_or_default();
-        context.estimated_tokens = estimate_tokens(&text);
+        if let Some(index) = context
+            .operations
+            .iter()
+            .rposition(|operation| !is_high_signal_operation(&operation.kind))
+        {
+            context.trimmed = true;
+            context
+                .trim_reasons
+                .push("low_signal_operations_collapsed".to_string());
+            context.operations.remove(index);
+        } else {
+            break;
+        }
+        refresh_estimate(context);
     }
     if context.estimated_tokens > context.budget_tokens && !context.callers.is_empty() {
         context.trimmed = true;
         context.trim_reasons.push("callers_trimmed".to_string());
         context.callers.clear();
-        text = serde_json::to_string(context).unwrap_or_default();
-        context.estimated_tokens = estimate_tokens(&text);
+        refresh_estimate(context);
+    }
+    if context.estimated_tokens > context.budget_tokens && !context.callees.is_empty() {
+        context.trimmed = true;
+        context.trim_reasons.push("callees_trimmed".to_string());
+        context.callees.clear();
+        context.outline.direct_calls.clear();
+        refresh_estimate(context);
     }
     if context.estimated_tokens > context.budget_tokens && !context.reachable_callees.is_empty() {
         context.trimmed = true;
@@ -743,8 +772,7 @@ fn apply_function_budget(context: &mut FunctionContext) {
             .trim_reasons
             .push("reachable_callees_trimmed".to_string());
         context.reachable_callees.clear();
-        text = serde_json::to_string(context).unwrap_or_default();
-        context.estimated_tokens = estimate_tokens(&text);
+        refresh_estimate(context);
     }
     if context.estimated_tokens > context.budget_tokens && !context.related_types.is_empty() {
         context.trimmed = true;
@@ -752,16 +780,116 @@ fn apply_function_budget(context: &mut FunctionContext) {
             .trim_reasons
             .push("related_types_trimmed".to_string());
         context.related_types.clear();
-        text = serde_json::to_string(context).unwrap_or_default();
-        context.estimated_tokens = estimate_tokens(&text);
+        refresh_estimate(context);
     }
     if context.estimated_tokens > context.budget_tokens && !context.diagnostics.is_empty() {
         context.trimmed = true;
         context.trim_reasons.push("diagnostics_trimmed".to_string());
         context.diagnostics.clear();
-        text = serde_json::to_string(context).unwrap_or_default();
-        context.estimated_tokens = estimate_tokens(&text);
+        refresh_estimate(context);
     }
+    if context.estimated_tokens > context.budget_tokens && !context.source_excerpts.is_empty() {
+        context.trimmed = true;
+        context
+            .trim_reasons
+            .push("source_excerpts_removed".to_string());
+        context.source_excerpts.clear();
+        refresh_estimate(context);
+    }
+    if context.estimated_tokens > context.budget_tokens && !context.operation_histogram.is_empty() {
+        context.trimmed = true;
+        context
+            .trim_reasons
+            .push("operation_histogram_trimmed".to_string());
+        context.operation_histogram.clear();
+        refresh_estimate(context);
+    }
+    if context.estimated_tokens > context.budget_tokens
+        && (!context.field_reads.is_empty() || !context.field_writes.is_empty())
+    {
+        context.trimmed = true;
+        context
+            .trim_reasons
+            .push("field_access_lists_trimmed".to_string());
+        context.field_reads.clear();
+        context.field_writes.clear();
+        refresh_estimate(context);
+    }
+    if context.estimated_tokens > context.budget_tokens {
+        let mut stripped = 0;
+        for operation in &mut context.operations {
+            if operation.source_span.precision != crate::core::SourcePrecision::Unknown {
+                operation.source_span = SourceSpan::unknown();
+                stripped += 1;
+            }
+        }
+        if stripped > 0 {
+            context.trimmed = true;
+            context
+                .trim_reasons
+                .push("operation_spans_trimmed".to_string());
+            refresh_estimate(context);
+        }
+    }
+    while context.estimated_tokens > context.budget_tokens && !context.operations.is_empty() {
+        context.trimmed = true;
+        if let Some(index) = context
+            .operations
+            .iter()
+            .rposition(|operation| is_support_operation(&operation.kind))
+        {
+            context
+                .trim_reasons
+                .push("support_operations_trimmed".to_string());
+            context.operations.remove(index);
+        } else {
+            context.trim_reasons.push("operations_trimmed".to_string());
+            context.operations.pop();
+        }
+        refresh_estimate(context);
+    }
+}
+
+fn refresh_estimate(context: &mut FunctionContext) {
+    context.trim_reasons.sort();
+    context.trim_reasons.dedup();
+    let text = serde_json::to_string(context).unwrap_or_default();
+    context.estimated_tokens = estimate_tokens(&text);
+}
+
+fn is_high_signal_operation(kind: &OperationKind) -> bool {
+    matches!(
+        kind,
+        OperationKind::Call
+            | OperationKind::Assert
+            | OperationKind::Abort
+            | OperationKind::ReadField
+            | OperationKind::WriteField
+            | OperationKind::BorrowFieldMut
+            | OperationKind::BorrowGlobalMut
+            | OperationKind::MoveFrom
+            | OperationKind::MoveTo
+            | OperationKind::Pack
+            | OperationKind::Unpack
+            | OperationKind::Branch
+            | OperationKind::BranchIf
+    )
+}
+
+fn is_support_operation(kind: &OperationKind) -> bool {
+    !matches!(
+        kind,
+        OperationKind::Call
+            | OperationKind::Assert
+            | OperationKind::ReadField
+            | OperationKind::WriteField
+            | OperationKind::BorrowFieldMut
+            | OperationKind::BorrowGlobalMut
+            | OperationKind::MoveFrom
+            | OperationKind::MoveTo
+            | OperationKind::Pack
+            | OperationKind::Unpack
+    )
 }
 
 fn pack_from_sections(

@@ -1,0 +1,136 @@
+{
+  "id": {
+    "address": "generic_function",
+    "name": "main"
+  },
+  "doc": null,
+  "immediate_dependencies": [],
+  "attributes": [],
+  "functions": {
+    "wrap": {
+      "source_index": 0,
+      "index": 0,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [
+        {
+          "name": "T",
+          "constraints": [
+            "Store"
+          ]
+        }
+      ],
+      "parameters": [
+        {
+          "name": "value",
+          "type_": {
+            "NamedTypeParameter": "T"
+          }
+        }
+      ],
+      "return_": [
+        {
+          "Datatype": {
+            "module": {
+              "address": "generic_function",
+              "name": "main"
+            },
+            "name": "Holder",
+            "type_arguments": [
+              {
+                "phantom": false,
+                "argument": {
+                  "NamedTypeParameter": "T"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "unwrap_copy": {
+      "source_index": 1,
+      "index": 1,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [
+        {
+          "name": "T",
+          "constraints": [
+            "Copy",
+            "Drop",
+            "Store"
+          ]
+        }
+      ],
+      "parameters": [
+        {
+          "name": "holder",
+          "type_": {
+            "Reference": [
+              false,
+              {
+                "Datatype": {
+                  "module": {
+                    "address": "generic_function",
+                    "name": "main"
+                  },
+                  "name": "Holder",
+                  "type_arguments": [
+                    {
+                      "phantom": false,
+                      "argument": {
+                        "NamedTypeParameter": "T"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "return_": [
+        {
+          "NamedTypeParameter": "T"
+        }
+      ]
+    }
+  },
+  "structs": {
+    "Holder": {
+      "index": 0,
+      "doc": null,
+      "attributes": [],
+      "abilities": [
+        "Store"
+      ],
+      "type_parameters": [
+        {
+          "phantom": false,
+          "name": "T",
+          "constraints": [
+            "Store"
+          ]
+        }
+      ],
+      "fields": {
+        "positional_fields": false,
+        "fields": {
+          "value": {
+            "index": 0,
+            "doc": null,
+            "type_": {
+              "NamedTypeParameter": "T"
+            }
+          }
+        }
+      }
+    }
+  },
+  "enums": {}
+}

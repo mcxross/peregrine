@@ -1,0 +1,96 @@
+{
+  "id": {
+    "address": "pack_unpack",
+    "name": "main"
+  },
+  "doc": null,
+  "immediate_dependencies": [],
+  "attributes": [],
+  "functions": {
+    "make": {
+      "source_index": 0,
+      "index": 0,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [],
+      "parameters": [
+        {
+          "name": "left",
+          "type_": "u64"
+        },
+        {
+          "name": "right",
+          "type_": "u64"
+        }
+      ],
+      "return_": [
+        {
+          "Datatype": {
+            "module": {
+              "address": "pack_unpack",
+              "name": "main"
+            },
+            "name": "Pair",
+            "type_arguments": []
+          }
+        }
+      ]
+    },
+    "destroy": {
+      "source_index": 1,
+      "index": 1,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [],
+      "parameters": [
+        {
+          "name": "pair",
+          "type_": {
+            "Datatype": {
+              "module": {
+                "address": "pack_unpack",
+                "name": "main"
+              },
+              "name": "Pair",
+              "type_arguments": []
+            }
+          }
+        }
+      ],
+      "return_": [
+        "u64"
+      ]
+    }
+  },
+  "structs": {
+    "Pair": {
+      "index": 0,
+      "doc": null,
+      "attributes": [],
+      "abilities": [
+        "Drop"
+      ],
+      "type_parameters": [],
+      "fields": {
+        "positional_fields": false,
+        "fields": {
+          "left": {
+            "index": 0,
+            "doc": null,
+            "type_": "u64"
+          },
+          "right": {
+            "index": 1,
+            "doc": null,
+            "type_": "u64"
+          }
+        }
+      }
+    }
+  },
+  "enums": {}
+}

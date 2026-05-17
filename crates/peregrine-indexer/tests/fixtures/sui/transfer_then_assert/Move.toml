@@ -1,0 +1,6 @@
+[package]
+name = "transfer_then_assert"
+edition = "2024"
+
+[addresses]
+transfer_then_assert = "0x0"

@@ -1,0 +1,39 @@
+{
+  "id": { "address": "savings_personal", "name": "vault" },
+  "immediate_dependencies": [
+    { "address": "sui", "name": "coin" },
+    { "address": "sui", "name": "transfer" },
+    { "address": "pyth", "name": "price_info" },
+    { "address": "deepbook_margin", "name": "margin_pool" }
+  ],
+  "structs": {
+    "Vault": {
+      "abilities": ["key", "store"],
+      "fields": {
+        "fields": {
+          "id": { "type_": "sui::object::UID" },
+          "owner": { "type_": "address" },
+          "balance": { "type_": "u64" }
+        }
+      }
+    }
+  },
+  "functions": {
+    "deposit": {
+      "visibility": "Public",
+      "entry": true,
+      "parameters": [
+        { "name": "vault", "type_": "&mut savings_personal::vault::Vault" },
+        { "name": "ctx", "type_": "&mut sui::tx_context::TxContext" }
+      ],
+      "return_": []
+    },
+    "internal_rebalance": {
+      "visibility": "Internal",
+      "entry": false,
+      "parameters": [],
+      "return_": []
+    }
+  }
+}
+

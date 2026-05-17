@@ -1,5 +1,12 @@
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
+use move_binary_format::file_format::{CodeOffset, FunctionDefinitionIndex};
+use move_bytecode_source_map::{source_map::SourceMap, utils::source_map_from_file};
+use move_ir_types::location::Loc;
 use walkdir::WalkDir;
 
 use crate::{
@@ -13,6 +20,156 @@ use crate::{
 pub struct SuiSourceMap {
     function_spans: BTreeMap<FunctionId, SourceSpan>,
     operation_spans: BTreeMap<OperationId, SourceSpan>,
+}
+
+#[derive(Debug)]
+pub struct SourceMapIndex {
+    modules: BTreeMap<String, SourceMap>,
+    files_by_hash: BTreeMap<String, SourceFileSpanIndex>,
+    files_by_id: BTreeMap<String, SourceFileSpanIndex>,
+}
+
+#[derive(Clone, Debug)]
+struct SourceFileSpanIndex {
+    file_id: String,
+    source: String,
+    line_starts: Vec<usize>,
+    len: usize,
+}
+
+impl SourceMapIndex {
+    pub fn load(program: &ProgramIndex, build_root: &Path) -> Self {
+        let mut files_by_id = BTreeMap::new();
+        let files_by_hash = program
+            .files
+            .iter()
+            .filter(|file| file.kind == "move_source")
+            .filter_map(|file| {
+                let hash = file.content_hash.clone()?;
+                let source = fs::read_to_string(&file.path).ok()?;
+                let index = SourceFileSpanIndex {
+                    file_id: file.id.clone(),
+                    line_starts: line_starts(&source),
+                    len: source.len(),
+                    source,
+                };
+                files_by_id.insert(file.id.clone(), index.clone());
+                Some((hash, index))
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        let mut modules = BTreeMap::new();
+        for path in discover_source_map_files(build_root) {
+            let Ok(source_map) = source_map_from_file(&path) else {
+                continue;
+            };
+            let module_name = source_map.module_name.1.to_string();
+            modules.insert(module_name, source_map);
+        }
+
+        Self {
+            modules,
+            files_by_hash,
+            files_by_id,
+        }
+    }
+
+    pub fn function_span(&self, module_name: &str, function_index: usize) -> Option<SourceSpan> {
+        let source_map = self.modules.get(module_name)?;
+        let function_map = source_map
+            .get_function_source_map(FunctionDefinitionIndex(function_index as u16))
+            .ok()?;
+        self.span_for_loc(function_map.location, SourcePrecision::Function)
+    }
+
+    pub fn operation_span(
+        &self,
+        module_name: &str,
+        function_index: usize,
+        offset: usize,
+    ) -> Option<SourceSpan> {
+        let source_map = self.modules.get(module_name)?;
+        let loc = source_map
+            .get_code_location(
+                FunctionDefinitionIndex(function_index as u16),
+                offset as CodeOffset,
+            )
+            .ok()?;
+        self.span_for_loc(loc, SourcePrecision::ExactExpression)
+    }
+
+    pub fn local_name_and_span(
+        &self,
+        module_name: &str,
+        function_index: usize,
+        local_index: u64,
+    ) -> Option<(String, SourceSpan)> {
+        let source_map = self.modules.get(module_name)?;
+        let (name, loc) = source_map
+            .get_parameter_or_local_name(
+                FunctionDefinitionIndex(function_index as u16),
+                local_index,
+            )
+            .ok()?;
+        let span = self
+            .span_for_loc(loc, SourcePrecision::Statement)
+            .unwrap_or_else(SourceSpan::unknown);
+        Some((name, span))
+    }
+
+    pub fn span_for_loc(&self, loc: Loc, precision: SourcePrecision) -> Option<SourceSpan> {
+        if !loc.is_valid() {
+            return None;
+        }
+        let file_hash = loc.file_hash().to_string();
+        let file = self.files_by_hash.get(&file_hash)?;
+        let (start_line, start_col) = file.line_col(loc.start() as usize);
+        let (end_line, end_col) = file.line_col(loc.end() as usize);
+        Some(SourceSpan {
+            file_id: Some(file.file_id.clone()),
+            summary_artifact_id: None,
+            start_line: Some(start_line),
+            start_col: Some(start_col),
+            end_line: Some(end_line),
+            end_col: Some(end_col),
+            precision,
+        })
+    }
+
+    pub fn source_text_for_span(&self, span: &SourceSpan) -> Option<String> {
+        let file = self.files_by_id.get(span.file_id.as_deref()?)?;
+        let start = file.offset_for_line_col(span.start_line?, span.start_col?);
+        let end = file.offset_for_line_col(span.end_line?, span.end_col?);
+        let (start, end) = if start <= end {
+            (start, end)
+        } else {
+            (end, start)
+        };
+        file.source.get(start..end).map(ToOwned::to_owned)
+    }
+}
+
+impl SourceFileSpanIndex {
+    fn line_col(&self, offset: usize) -> (u32, u32) {
+        let offset = offset.min(self.len);
+        let line_index = self
+            .line_starts
+            .partition_point(|line_start| *line_start <= offset)
+            .saturating_sub(1);
+        let line_start = self.line_starts.get(line_index).copied().unwrap_or(0);
+        (
+            line_index as u32 + 1,
+            offset.saturating_sub(line_start) as u32 + 1,
+        )
+    }
+
+    fn offset_for_line_col(&self, line: u32, col: u32) -> usize {
+        let line_index = line.saturating_sub(1) as usize;
+        let line_start = self.line_starts.get(line_index).copied().unwrap_or(0);
+        line_start
+            .saturating_add(col.saturating_sub(1) as usize)
+            .min(self.len)
+    }
 }
 
 impl SuiSourceMap {
@@ -101,6 +258,39 @@ pub fn enrich_source_spans_from_sources(program: &mut ProgramIndex, package_root
             }
         }
     }
+}
+
+fn discover_source_map_files(build_root: &Path) -> Vec<PathBuf> {
+    let mut files = WalkDir::new(build_root)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_file())
+        .map(|entry| entry.into_path())
+        .filter(|path| {
+            let extension = path.extension().and_then(|extension| extension.to_str());
+            matches!(extension, Some("mvsm" | "mvd" | "json"))
+        })
+        .filter(|path| {
+            path.components().any(|component| {
+                matches!(
+                    component.as_os_str().to_str(),
+                    Some("source_maps" | "debug_info")
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    files.sort();
+    files
+}
+
+fn line_starts(source: &str) -> Vec<usize> {
+    let mut starts = vec![0];
+    for (index, byte) in source.bytes().enumerate() {
+        if byte == b'\n' {
+            starts.push(index + 1);
+        }
+    }
+    starts
 }
 
 fn discover_source_files(package_root: &Path) -> Vec<std::path::PathBuf> {

@@ -1,0 +1,19 @@
+{
+  "id": { "address": "savings_personal", "name": "config" },
+  "immediate_dependencies": [{ "address": "sui", "name": "transfer" }],
+  "structs": {
+    "Config": {
+      "abilities": ["copy", "drop", "store"],
+      "fields": { "fields": { "rate": { "type_": "u64" } } }
+    }
+  },
+  "functions": {
+    "set_rate": {
+      "visibility": "Public",
+      "entry": true,
+      "parameters": [{ "name": "ctx", "type_": "&mut sui::tx_context::TxContext" }],
+      "return_": []
+    }
+  }
+}
+

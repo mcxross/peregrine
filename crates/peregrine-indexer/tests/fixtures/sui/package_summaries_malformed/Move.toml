@@ -1,0 +1,6 @@
+[package]
+name = "package_summaries_malformed"
+edition = "2024"
+
+[addresses]
+package_summaries_malformed = "0x0"

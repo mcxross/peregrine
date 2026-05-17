@@ -1,0 +1,31 @@
+{
+  "id": {
+    "address": "friend_function",
+    "name": "b"
+  },
+  "doc": null,
+  "immediate_dependencies": [
+    {
+      "address": "friend_function",
+      "name": "a"
+    }
+  ],
+  "attributes": [],
+  "functions": {
+    "call_friend": {
+      "source_index": 0,
+      "index": 0,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [],
+      "parameters": [],
+      "return_": [
+        "u64"
+      ]
+    }
+  },
+  "structs": {},
+  "enums": {}
+}

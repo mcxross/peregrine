@@ -1,0 +1,246 @@
+{
+  "id": {
+    "address": "bytecode_fixture",
+    "name": "vault"
+  },
+  "doc": null,
+  "immediate_dependencies": [
+    {
+      "address": "sui",
+      "name": "object"
+    },
+    {
+      "address": "sui",
+      "name": "transfer"
+    },
+    {
+      "address": "sui",
+      "name": "tx_context"
+    }
+  ],
+  "attributes": [],
+  "functions": {
+    "create": {
+      "source_index": 0,
+      "index": 0,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [],
+      "parameters": [
+        {
+          "name": "ctx",
+          "type_": {
+            "Reference": [
+              true,
+              {
+                "Datatype": {
+                  "module": {
+                    "address": "sui",
+                    "name": "tx_context"
+                  },
+                  "name": "TxContext",
+                  "type_arguments": []
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "return_": [
+        {
+          "Datatype": {
+            "module": {
+              "address": "bytecode_fixture",
+              "name": "vault"
+            },
+            "name": "Vault",
+            "type_arguments": []
+          }
+        }
+      ]
+    },
+    "deposit": {
+      "source_index": 1,
+      "index": 1,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [],
+      "parameters": [
+        {
+          "name": "vault",
+          "type_": {
+            "Reference": [
+              true,
+              {
+                "Datatype": {
+                  "module": {
+                    "address": "bytecode_fixture",
+                    "name": "vault"
+                  },
+                  "name": "Vault",
+                  "type_arguments": []
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "amount",
+          "type_": "u64"
+        },
+        {
+          "name": "ctx",
+          "type_": {
+            "Reference": [
+              true,
+              {
+                "Datatype": {
+                  "module": {
+                    "address": "sui",
+                    "name": "tx_context"
+                  },
+                  "name": "TxContext",
+                  "type_arguments": []
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "return_": []
+    },
+    "send": {
+      "source_index": 2,
+      "index": 2,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [],
+      "parameters": [
+        {
+          "name": "vault",
+          "type_": {
+            "Datatype": {
+              "module": {
+                "address": "bytecode_fixture",
+                "name": "vault"
+              },
+              "name": "Vault",
+              "type_arguments": []
+            }
+          }
+        },
+        {
+          "name": "recipient",
+          "type_": "address"
+        }
+      ],
+      "return_": []
+    },
+    "wrapper": {
+      "source_index": 3,
+      "index": 3,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [],
+      "parameters": [
+        {
+          "name": "vault",
+          "type_": {
+            "Datatype": {
+              "module": {
+                "address": "bytecode_fixture",
+                "name": "vault"
+              },
+              "name": "Vault",
+              "type_arguments": []
+            }
+          }
+        },
+        {
+          "name": "recipient",
+          "type_": "address"
+        }
+      ],
+      "return_": []
+    },
+    "transfer_then_assert": {
+      "source_index": 4,
+      "index": 4,
+      "doc": null,
+      "attributes": [],
+      "visibility": "Public",
+      "entry": false,
+      "type_parameters": [],
+      "parameters": [
+        {
+          "name": "vault",
+          "type_": {
+            "Datatype": {
+              "module": {
+                "address": "bytecode_fixture",
+                "name": "vault"
+              },
+              "name": "Vault",
+              "type_arguments": []
+            }
+          }
+        },
+        {
+          "name": "recipient",
+          "type_": "address"
+        }
+      ],
+      "return_": []
+    }
+  },
+  "structs": {
+    "Vault": {
+      "index": 0,
+      "doc": null,
+      "attributes": [],
+      "abilities": [
+        "Key",
+        "Store"
+      ],
+      "type_parameters": [],
+      "fields": {
+        "positional_fields": false,
+        "fields": {
+          "id": {
+            "index": 0,
+            "doc": null,
+            "type_": {
+              "Datatype": {
+                "module": {
+                  "address": "sui",
+                  "name": "object"
+                },
+                "name": "UID",
+                "type_arguments": []
+              }
+            }
+          },
+          "owner": {
+            "index": 1,
+            "doc": null,
+            "type_": "address"
+          },
+          "balance": {
+            "index": 2,
+            "doc": null,
+            "type_": "u64"
+          }
+        }
+      }
+    }
+  },
+  "enums": {}
+}

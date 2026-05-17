@@ -1,0 +1,6 @@
+[package]
+name = "friend_function"
+edition = "legacy"
+
+[addresses]
+friend_function = "0x0"

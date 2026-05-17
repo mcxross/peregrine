@@ -1,0 +1,6 @@
+[package]
+name = "progressive_context_levels"
+edition = "2024"
+
+[addresses]
+progressive_context_levels = "0x0"

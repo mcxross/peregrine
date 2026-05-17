@@ -1,0 +1,6 @@
+[package]
+name = "large_function_budget"
+edition = "2024"
+
+[addresses]
+large_function_budget = "0x0"

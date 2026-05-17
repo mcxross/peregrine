@@ -1,0 +1,6 @@
+[package]
+name = "call_graph_budget"
+edition = "2024"
+
+[addresses]
+call_graph_budget = "0x0"

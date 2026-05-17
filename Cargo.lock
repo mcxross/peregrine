@@ -11680,6 +11680,7 @@ dependencies = [
  "move-bytecode-source-map",
  "move-command-line-common",
  "move-compiler",
+ "move-ir-types",
  "rusqlite",
  "serde",
  "serde_json",

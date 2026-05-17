@@ -1,0 +1,9 @@
+{
+  "id": { "address": "package_summaries_malformed", "name": "good" },
+  "immediate_dependencies": [],
+  "structs": {},
+  "enums": {},
+  "functions": {
+    "ping": { "visibility": "Public", "entry": false, "parameters": [], "return_": [] }
+  }
+}

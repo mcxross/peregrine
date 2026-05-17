@@ -1,0 +1,6 @@
+[package]
+name = "pack_unpack"
+edition = "2024"
+
+[addresses]
+pack_unpack = "0x0"

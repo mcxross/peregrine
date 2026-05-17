@@ -1,0 +1,6 @@
+[package]
+name = "assert_then_call"
+edition = "2024"
+
+[addresses]
+assert_then_call = "0x0"

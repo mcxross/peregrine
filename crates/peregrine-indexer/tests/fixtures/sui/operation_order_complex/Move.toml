@@ -1,0 +1,6 @@
+[package]
+name = "operation_order_complex"
+edition = "2024"
+
+[addresses]
+operation_order_complex = "0x0"

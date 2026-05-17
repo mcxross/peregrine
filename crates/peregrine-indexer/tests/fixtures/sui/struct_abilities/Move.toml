@@ -1,0 +1,6 @@
+[package]
+name = "struct_abilities"
+edition = "2024"
+
+[addresses]
+struct_abilities = "0x0"

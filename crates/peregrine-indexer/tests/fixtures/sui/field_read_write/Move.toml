@@ -1,0 +1,6 @@
+[package]
+name = "field_read_write"
+edition = "2024"
+
+[addresses]
+field_read_write = "0x0"

@@ -11,7 +11,7 @@ use crate::{
         logical_id, stable_id, BasicBlock, Edge, EdgeType, LocalInfo, Operation, OperationKind,
         SemanticTag, SourceSpan,
     },
-    sui::model::ProgramIndex,
+    sui::{model::ProgramIndex, source_map::SourceMapIndex},
 };
 
 pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) {
@@ -21,12 +21,14 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
     }
 
     let mut function_ids = BTreeMap::new();
+    let mut module_ids = BTreeMap::new();
     for function in &program.functions {
         if let Some(module) = program
             .modules
             .iter()
             .find(|module| module.id == function.module_id)
         {
+            module_ids.insert(module.name.clone(), module.id.clone());
             function_ids.insert(
                 (module.name.clone(), function.name.clone()),
                 function.id.clone(),
@@ -57,6 +59,7 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
             }
         }
     }
+    let source_maps = SourceMapIndex::load(program, build_root);
     let function_spans = program
         .functions
         .iter()
@@ -85,7 +88,40 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
             continue;
         };
         let module_name = module.self_id().name().to_string();
-        for definition in module.function_defs() {
+        if let Some(source_module_id) = module_ids.get(&module_name).cloned() {
+            let source_span = program
+                .modules
+                .iter()
+                .find(|indexed_module| indexed_module.id == source_module_id)
+                .map(|indexed_module| indexed_module.source_span.clone())
+                .unwrap_or_else(SourceSpan::unknown);
+            for friend in module.immediate_friends() {
+                let friend_name = friend.name().to_string();
+                let target = module_ids.get(&friend_name).cloned().unwrap_or_else(|| {
+                    format!(
+                        "{}::{}",
+                        friend.address().short_str_lossless(),
+                        friend.name()
+                    )
+                });
+                program.edges.push(Edge {
+                    id: stable_id(
+                        "edge",
+                        [&program.package.id, &source_module_id, &target, "FRIENDS"],
+                    ),
+                    package_id: program.package.id.clone(),
+                    from_id: source_module_id.clone(),
+                    to_id: target,
+                    edge_type: EdgeType::Friends,
+                    operation_id: None,
+                    source_span: source_span.clone(),
+                    metadata_json: Some(serde_json::json!({
+                        "source": "compiled_module.friend_decls"
+                    })),
+                });
+            }
+        }
+        for (function_index, definition) in module.function_defs().iter().enumerate() {
             let handle = module.function_handle_at(definition.function);
             let function_name = module.identifier_at(handle.name).to_string();
             let Some(function_id) = function_ids
@@ -94,22 +130,34 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
             else {
                 continue;
             };
-            let source_span = function_spans
-                .get(&function_id)
-                .cloned()
+            let source_span = source_maps
+                .function_span(&module_name, function_index)
+                .or_else(|| function_spans.get(&function_id).cloned())
                 .unwrap_or_else(SourceSpan::unknown);
+            if let Some(function) = program
+                .functions
+                .iter_mut()
+                .find(|function| function.id == function_id)
+            {
+                function.source_span = source_span.clone();
+            }
             let Some(code) = &definition.code else {
                 continue;
             };
+            let parameter_count = module.signature_at(handle.parameters).0.len();
             for (local_index, token) in module.signature_at(code.locals).0.iter().enumerate() {
+                let source_local_index = (parameter_count + local_index) as u64;
+                let (name, local_span) = source_maps
+                    .local_name_and_span(&module_name, function_index, source_local_index)
+                    .unwrap_or_else(|| (format!("local_{local_index}"), source_span.clone()));
                 program.locals.push(LocalInfo {
                     id: logical_id("local", [&function_id, &local_index.to_string()]),
                     package_id: program.package.id.clone(),
                     function_id: function_id.clone(),
-                    name: format!("local_{local_index}"),
+                    name,
                     type_name: Some(signature_token_label(&module, token)),
                     index_in_function: Some(local_index),
-                    source_span: source_span.clone(),
+                    source_span: local_span,
                 });
             }
             let basic_blocks = build_basic_blocks(
@@ -134,7 +182,12 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
             let mut pending_field_reference: Option<(String, String, bool, String)> = None;
             for (index, bytecode) in code.code.iter().enumerate() {
                 let (mut kind, mut display, target) = operation_parts(&module, bytecode);
-                if is_assert_pattern(&code.code, index, &code.jump_tables) {
+                let operation_span = source_maps
+                    .operation_span(&module_name, function_index, index)
+                    .unwrap_or_else(|| source_span.clone());
+                if is_assert_pattern(&code.code, index, &code.jump_tables)
+                    && source_confirms_assert(&source_maps, &operation_span, &source_span)
+                {
                     kind = OperationKind::Assert;
                     display = format!("assert-pattern {bytecode:?}");
                 }
@@ -147,10 +200,11 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                     kind: kind.clone(),
                     display,
                     target: target.clone(),
-                    source_span: source_span.clone(),
+                    source_span: operation_span.clone(),
                     metadata_json: Some(serde_json::json!({
                         "bytecode": format!("{bytecode:?}"),
                         "offset": index,
+                        "source_map_precision": format!("{:?}", operation_span.precision),
                     })),
                 });
                 if kind == OperationKind::Call {
@@ -173,10 +227,10 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                             to_id: edge_target,
                             edge_type: EdgeType::Calls,
                             operation_id: Some(operation_id.clone()),
-                            source_span: source_span.clone(),
+                            source_span: operation_span.clone(),
                             metadata_json: Some(serde_json::json!({ "target": target })),
                         });
-                        emit_call_tag(program, &operation_id, target, source_span.clone());
+                        emit_call_tag(program, &operation_id, target, operation_span.clone());
                     }
                 }
                 if matches!(kind, OperationKind::Pack | OperationKind::Unpack) {
@@ -209,7 +263,7 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                             to_id: edge_target,
                             edge_type,
                             operation_id: Some(operation_id.clone()),
-                            source_span: source_span.clone(),
+                            source_span: operation_span.clone(),
                             metadata_json: Some(serde_json::json!({ "target": target })),
                         });
                     }
@@ -242,7 +296,7 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                             EdgeType::BorrowsField
                         },
                         operation_id: Some(operation_id.clone()),
-                        source_span: source_span.clone(),
+                        source_span: operation_span.clone(),
                         metadata_json: Some(serde_json::json!({
                             "field": field_target,
                             "bytecode": format!("{bytecode:?}")
@@ -272,7 +326,7 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                                 to_id: edge_target,
                                 edge_type: EdgeType::ReadsField,
                                 operation_id: Some(operation_id.clone()),
-                                source_span: source_span.clone(),
+                                source_span: operation_span.clone(),
                                 metadata_json: Some(serde_json::json!({
                                     "borrow_operation_id": borrow_operation_id,
                                     "field": field_target,
@@ -300,7 +354,7 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                                 to_id: edge_target,
                                 edge_type: EdgeType::WritesField,
                                 operation_id: Some(operation_id.clone()),
-                                source_span: source_span.clone(),
+                                source_span: operation_span.clone(),
                                 metadata_json: Some(serde_json::json!({
                                     "borrow_operation_id": borrow_operation_id,
                                     "field": field_target,
@@ -322,7 +376,7 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                     }
                     _ => {}
                 }
-                emit_operation_tag(program, &operation_id, &kind, source_span.clone());
+                emit_operation_tag(program, &operation_id, &kind, operation_span);
             }
         }
     }
@@ -578,14 +632,44 @@ fn is_assert_pattern(
         return false;
     };
     let target = *target as usize;
-    if target <= index + 1 || target > code.len() {
+    if target <= index || target > code.len() {
         return false;
     }
-    code[index + 1..target]
-        .iter()
-        .any(|bytecode| matches!(bytecode, Bytecode::Abort))
-        && Bytecode::get_successors(index as CodeOffset, code, jump_tables)
-            .contains(&(target as CodeOffset))
+    let branches_to_target = Bytecode::get_successors(index as CodeOffset, code, jump_tables)
+        .contains(&(target as CodeOffset));
+    branches_to_target
+        && (code[index + 1..target]
+            .iter()
+            .any(|bytecode| matches!(bytecode, Bytecode::Abort))
+            || abort_in_linear_block(code, target)
+            || abort_in_linear_block(code, index.saturating_add(1)))
+}
+
+fn abort_in_linear_block(code: &[Bytecode], start: usize) -> bool {
+    for bytecode in code.iter().skip(start) {
+        match bytecode {
+            Bytecode::Abort => return true,
+            Bytecode::Ret
+            | Bytecode::Branch(_)
+            | Bytecode::BrTrue(_)
+            | Bytecode::BrFalse(_)
+            | Bytecode::VariantSwitch(_) => return false,
+            _ => {}
+        }
+    }
+    false
+}
+
+fn source_confirms_assert(
+    source_maps: &SourceMapIndex,
+    operation_span: &SourceSpan,
+    function_span: &SourceSpan,
+) -> bool {
+    source_maps
+        .source_text_for_span(operation_span)
+        .or_else(|| source_maps.source_text_for_span(function_span))
+        .map(|source| source.contains("assert!"))
+        .unwrap_or(true)
 }
 
 fn call_target(module: &CompiledModule, handle_index: FunctionHandleIndex) -> Option<String> {

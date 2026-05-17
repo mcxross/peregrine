@@ -1,0 +1,6 @@
+[package]
+name = "clock_usage"
+edition = "2024"
+
+[addresses]
+clock_usage = "0x0"

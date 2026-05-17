@@ -1,0 +1,14 @@
+{
+  "id": { "address": "sui", "name": "coin" },
+  "immediate_dependencies": [],
+  "structs": {
+    "Coin": {
+      "abilities": ["key", "store"],
+      "fields": { "fields": { "id": { "type_": "sui::object::UID" }, "value": { "type_": "u64" } } }
+    }
+  },
+  "functions": {
+    "value": { "visibility": "Public", "entry": false, "parameters": [{ "type_": "&sui::coin::Coin" }], "return_": ["u64"] }
+  }
+}
+

@@ -1,0 +1,6 @@
+[package]
+name = "dynamic_field_usage"
+edition = "2024"
+
+[addresses]
+dynamic_field_usage = "0x0"

@@ -1,0 +1,6 @@
+[package]
+name = "duplicate_type_dedup"
+edition = "2024"
+
+[addresses]
+duplicate_type_dedup = "0x0"

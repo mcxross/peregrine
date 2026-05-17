@@ -1,0 +1,6 @@
+[package]
+name = "source_excerpt_budget"
+edition = "2024"
+
+[addresses]
+source_excerpt_budget = "0x0"

@@ -1,0 +1,14 @@
+{
+  "id": { "address": "pyth", "name": "price_info" },
+  "immediate_dependencies": [],
+  "structs": {
+    "PriceInfo": {
+      "abilities": ["store"],
+      "fields": { "fields": { "price": { "type_": "u64" } } }
+    }
+  },
+  "functions": {
+    "get_price": { "visibility": "Public", "entry": false, "parameters": [{ "type_": "&pyth::price_info::PriceInfo" }], "return_": ["u64"] }
+  }
+}
+

@@ -1,0 +1,6 @@
+[package]
+name = "entry_function"
+edition = "2024"
+
+[addresses]
+entry_function = "0x0"

@@ -1,0 +1,6 @@
+[package]
+name = "model_context_pack"
+edition = "2024"
+
+[addresses]
+model_context_pack = "0x0"

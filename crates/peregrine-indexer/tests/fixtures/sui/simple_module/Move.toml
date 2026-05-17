@@ -1,0 +1,6 @@
+[package]
+name = "simple_module"
+edition = "2024"
+
+[addresses]
+simple_module = "0x0"

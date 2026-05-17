@@ -1,0 +1,6 @@
+[package]
+name = "bytecode_fixture"
+edition = "2024"
+
+[addresses]
+bytecode_fixture = "0x0"
