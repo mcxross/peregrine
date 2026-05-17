@@ -106,6 +106,7 @@ pub struct IndexReport {
     pub db_path: String,
     pub status: String,
     pub index_health: Option<serde_json::Value>,
+    pub index_layers: Vec<IndexLayerSummary>,
     pub summary_artifact_count: usize,
     pub module_count: usize,
     pub function_count: usize,
@@ -123,11 +124,25 @@ pub struct PackageOverview {
     pub status: String,
     pub indexed_at: i64,
     pub index_health: Option<serde_json::Value>,
+    pub index_layers: Vec<IndexLayerSummary>,
     pub modules: usize,
     pub functions: usize,
     pub types: usize,
     pub summary_artifacts: usize,
     pub pointer_only_summaries: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexLayerSummary {
+    pub name: String,
+    pub purpose: String,
+    pub status: String,
+    pub fact_count: usize,
+    pub backing_tables: Vec<String>,
+    pub freshness_inputs: Vec<String>,
+    pub primary_queries: Vec<String>,
+    pub security_context_value: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

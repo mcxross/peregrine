@@ -2,6 +2,7 @@ pub mod adapter;
 pub mod compiler;
 pub mod extractors;
 pub mod index_health;
+pub mod index_layers;
 pub mod lowering;
 pub mod model;
 pub mod package_loader;

@@ -10,6 +10,7 @@ use crate::{
     storage::sqlite::{SqliteIndexReader, SqliteIndexWriter},
     sui::{
         index_health::harden_program_index,
+        index_layers::summarize_program_layers,
         model::{
             ContextPack, FunctionContext, GraphView, IndexReport, MaterializedSummaryContext,
             ModuleContext, ModuleSummaryCard, PackageOverview, SymbolResult, TypeContext,
@@ -87,6 +88,7 @@ impl SuiMoveIndexer {
             db_path: db_path.to_string_lossy().into_owned(),
             status: format!("{:?}", program.package.status),
             index_health: Some(index_health),
+            index_layers: summarize_program_layers(&program),
             summary_artifact_count: program.summary_artifacts.len(),
             module_count: program.modules.len(),
             function_count: program.functions.len(),

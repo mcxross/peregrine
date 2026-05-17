@@ -4,14 +4,18 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::{
     core::{
-        estimate_tokens, ContextBudget, Diagnostic, FunctionInfo, FunctionParameter,
-        FunctionVisibility, ModuleInfo, Operation, OperationKind, SemanticTag, SourceSpan, TypeDef,
-        TypeKind,
+        estimate_tokens, hash_str, stable_id, ContextBudget, Diagnostic, FunctionInfo,
+        FunctionParameter, FunctionVisibility, ModuleInfo, Operation, OperationKind, SemanticTag,
+        SourceSpan, TypeDef, TypeKind,
     },
-    sui::model::{
-        ContextPack, FunctionContext, FunctionEvidenceSummary, FunctionOutline, FunctionSymbolCard,
-        GraphView, ModuleContext, ModuleSummaryCard, OperationHistogramEntry, PackageOverview,
-        RelatedTypeCard, SourceExcerpt, SymbolResult, TypeContext,
+    sui::{
+        index_layers::{summarize_index_layers, IndexLayerCounts},
+        model::{
+            ContextPack, FunctionContext, FunctionEvidenceSummary, FunctionOutline,
+            FunctionSymbolCard, GraphView, ModuleContext, ModuleSummaryCard,
+            OperationHistogramEntry, PackageOverview, RelatedTypeCard, SourceExcerpt, SymbolResult,
+            TypeContext,
+        },
     },
 };
 
@@ -90,6 +94,7 @@ impl SqliteIndexReader {
                 .as_ref()
                 .and_then(|metadata| metadata.get("index_health"))
                 .cloned(),
+            index_layers: self.index_layers_for_package(package_id)?,
             modules,
             functions,
             types,
@@ -382,38 +387,40 @@ impl SqliteIndexReader {
         target_id: &str,
         budget: &ContextBudget,
     ) -> rusqlite::Result<ContextPack> {
+        if let Some(cached) = self.cached_context_pack(target_id, budget)? {
+            return Ok(cached);
+        }
         if target_id.starts_with("function:") {
             let function = self.get_function_context(target_id, budget)?;
+            let package_id = self.package_id_for_target("functions", target_id)?;
             let text = serde_json::to_string(&function).unwrap_or_default();
-            return Ok(pack_from_sections(
+            let pack = pack_from_sections(
                 target_id,
                 budget,
                 vec![text],
                 function.trimmed,
                 function.trim_reasons,
-            ));
+            );
+            if let Some(package_id) = package_id {
+                self.store_context_pack(&package_id, target_id, budget, &pack)?;
+            }
+            return Ok(pack);
         }
         if target_id.starts_with("module:") {
             let module = self.get_module_context(target_id)?;
+            let package_id = module.module.package_id.clone();
             let text = serde_json::to_string(&module).unwrap_or_default();
-            return Ok(pack_from_sections(
-                target_id,
-                budget,
-                vec![text],
-                false,
-                Vec::new(),
-            ));
+            let pack = pack_from_sections(target_id, budget, vec![text], false, Vec::new());
+            self.store_context_pack(&package_id, target_id, budget, &pack)?;
+            return Ok(pack);
         }
         if target_id.starts_with("type:") {
             let type_context = self.get_type_context(target_id)?;
+            let package_id = type_context.type_def.package_id.clone();
             let text = serde_json::to_string(&type_context).unwrap_or_default();
-            return Ok(pack_from_sections(
-                target_id,
-                budget,
-                vec![text],
-                false,
-                Vec::new(),
-            ));
+            let pack = pack_from_sections(target_id, budget, vec![text], false, Vec::new());
+            self.store_context_pack(&package_id, target_id, budget, &pack)?;
+            return Ok(pack);
         }
 
         Ok(pack_from_sections(
@@ -474,6 +481,121 @@ impl SqliteIndexReader {
         )?;
         let rows = stmt.query_map([package_id], diagnostic_from_row)?.collect();
         rows
+    }
+
+    fn index_layers_for_package(
+        &self,
+        package_id: &str,
+    ) -> rusqlite::Result<Vec<crate::sui::model::IndexLayerSummary>> {
+        let root_card_count = self.count_summary_status(package_id, "RootCard")?;
+        let direct_dependency_card_count =
+            self.count_summary_status(package_id, "DirectDependencyCard")?;
+        let expanded_module_count = self.count_summary_status(package_id, "ExpandedModule")?;
+        let expanded_symbol_count = self.count_summary_status(package_id, "ExpandedSymbol")?;
+        Ok(summarize_index_layers(IndexLayerCounts {
+            file_count: count(&self.connection, "files", package_id)?,
+            summary_artifact_count: count(&self.connection, "summary_artifacts", package_id)?,
+            root_card_count,
+            direct_dependency_card_count,
+            expanded_summary_count: expanded_module_count + expanded_symbol_count,
+            module_count: count(&self.connection, "modules", package_id)?,
+            function_count: count(&self.connection, "functions", package_id)?,
+            type_count: count(&self.connection, "types", package_id)?,
+            field_count: count(&self.connection, "fields", package_id)?,
+            operation_count: count(&self.connection, "operations", package_id)?,
+            edge_count: count(&self.connection, "edges", package_id)?,
+            diagnostic_count: count(&self.connection, "diagnostics", package_id)?,
+            context_pack_count: count(&self.connection, "chunks", package_id)?,
+        }))
+    }
+
+    fn count_summary_status(&self, package_id: &str, status: &str) -> rusqlite::Result<usize> {
+        self.connection
+            .query_row(
+                "SELECT COUNT(*) FROM summary_artifacts WHERE package_id = ?1 AND materialized_status = ?2",
+                params![package_id, status],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|count| count as usize)
+    }
+
+    fn cached_context_pack(
+        &self,
+        target_id: &str,
+        budget: &ContextBudget,
+    ) -> rusqlite::Result<Option<ContextPack>> {
+        if !context_pack_is_cacheable(budget) {
+            return Ok(None);
+        }
+        let chunk_id = context_pack_chunk_id(target_id, budget);
+        let text: Option<String> = self
+            .connection
+            .query_row(
+                "SELECT text FROM chunks WHERE id = ?1",
+                [&chunk_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        text.map(|text| {
+            serde_json::from_str(&text).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    0,
+                    rusqlite::types::Type::Text,
+                    error.into(),
+                )
+            })
+        })
+        .transpose()
+    }
+
+    fn store_context_pack(
+        &self,
+        package_id: &str,
+        target_id: &str,
+        budget: &ContextBudget,
+        pack: &ContextPack,
+    ) -> rusqlite::Result<()> {
+        if !context_pack_is_cacheable(budget) {
+            return Ok(());
+        }
+        let budget_json = serde_json::to_string(budget).unwrap_or_default();
+        let budget_hash = hash_str(&budget_json);
+        let chunk_id = context_pack_chunk_id(target_id, budget);
+        let text = serde_json::to_string(pack).unwrap_or_default();
+        let metadata = serde_json::json!({
+            "cacheKind": "context_pack",
+            "budgetHash": budget_hash,
+            "targetId": target_id,
+            "level": format!("{:?}", budget.level),
+            "includeSource": budget.include_source,
+            "includeFullSource": budget.include_full_source,
+        });
+        self.connection.execute(
+            "INSERT INTO chunks (id, package_id, target_id, level, estimated_tokens, text, metadata_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(id) DO UPDATE SET estimated_tokens = excluded.estimated_tokens, text = excluded.text, metadata_json = excluded.metadata_json",
+            params![
+                chunk_id,
+                package_id,
+                target_id,
+                format!("{:?}", budget.level),
+                pack.estimated_tokens as i64,
+                text,
+                serde_json::to_string(&metadata).unwrap_or_default(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn package_id_for_target(
+        &self,
+        table: &str,
+        target_id: &str,
+    ) -> rusqlite::Result<Option<String>> {
+        let sql = format!("SELECT package_id FROM {table} WHERE id = ?1");
+        self.connection
+            .query_row(&sql, [target_id], |row| row.get(0))
+            .optional()
     }
 
     fn load_module(&self, module_id: &str) -> rusqlite::Result<ModuleInfo> {
@@ -990,6 +1112,19 @@ fn pack_from_sections(
         trimmed,
         trim_reasons,
     }
+}
+
+fn context_pack_is_cacheable(budget: &ContextBudget) -> bool {
+    !budget.include_full_source
+        && !budget.include_operation_raw_json
+        && !budget.include_raw_summary_json
+}
+
+fn context_pack_chunk_id(target_id: &str, budget: &ContextBudget) -> String {
+    let budget_json = serde_json::to_string(budget).unwrap_or_default();
+    let level = format!("{:?}", budget.level);
+    let budget_hash = hash_str(&budget_json);
+    stable_id("chunk", [target_id, level.as_str(), budget_hash.as_str()])
 }
 
 fn module_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ModuleInfo> {

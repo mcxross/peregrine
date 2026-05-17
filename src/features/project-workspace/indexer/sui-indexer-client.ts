@@ -54,6 +54,7 @@ export type IndexReport = {
   dbPath: string;
   status: string;
   indexHealth: unknown | null;
+  indexLayers: IndexLayerSummary[];
   summaryArtifactCount: number;
   moduleCount: number;
   functionCount: number;
@@ -69,11 +70,23 @@ export type PackageOverview = {
   status: string;
   indexedAt: number;
   indexHealth: unknown | null;
+  indexLayers: IndexLayerSummary[];
   modules: number;
   functions: number;
   types: number;
   summaryArtifacts: number;
   pointerOnlySummaries: number;
+};
+
+export type IndexLayerSummary = {
+  name: string;
+  purpose: string;
+  status: string;
+  factCount: number;
+  backingTables: string[];
+  freshnessInputs: string[];
+  primaryQueries: string[];
+  securityContextValue: string;
 };
 
 export type SymbolResult = {

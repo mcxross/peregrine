@@ -380,6 +380,25 @@ fn index_health_reports_freshness_coverage_and_integrity() {
 
     assert_eq!(health["readiness"], "compiler_backed");
     assert_eq!(health["freshness"], "first_index");
+    assert_eq!(report.index_layers.len(), 9);
+    assert!(report
+        .index_layers
+        .iter()
+        .any(|layer| layer.name == "artifact_pointer" && layer.status == "ready"));
+    assert!(report
+        .index_layers
+        .iter()
+        .any(|layer| layer.name == "operation" && layer.status == "ready"));
+    assert_eq!(
+        report
+            .index_layers
+            .iter()
+            .find(|layer| layer.name == "context_pack_cache")
+            .expect("context pack layer")
+            .status,
+        "empty_cache"
+    );
+    assert_eq!(health["layers"].as_array().expect("health layers").len(), 9);
     assert!(health["fingerprints"]["sourceHash"].is_string());
     assert!(health["coverage"]["operationCount"].as_u64().unwrap() > 0);
     assert!(
@@ -1195,6 +1214,28 @@ fn model_context_pack_fixture_contains_compact_function_evidence() {
     assert!(serialized.contains("Assert"));
     assert!(serialized.contains("Call"));
     assert!(!serialized.contains("debug_raw_summary_json"));
+
+    let chunk_rows: i64 = Connection::open(&fixture.db_path)
+        .expect("db")
+        .query_row(
+            "SELECT COUNT(*) FROM chunks WHERE target_id = ?1",
+            [&deposit.id],
+            |row| row.get(0),
+        )
+        .expect("context pack cache rows");
+    assert_eq!(chunk_rows, 1);
+
+    let overview = fixture
+        .indexer
+        .get_package_overview(&fixture.db_path, &fixture.report.package_id)
+        .expect("overview");
+    let cache_layer = overview
+        .index_layers
+        .iter()
+        .find(|layer| layer.name == "context_pack_cache")
+        .expect("cache layer");
+    assert_eq!(cache_layer.status, "ready");
+    assert_eq!(cache_layer.fact_count, 1);
 }
 
 #[test]

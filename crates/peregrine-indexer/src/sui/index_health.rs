@@ -8,7 +8,7 @@ use crate::{
         OperationKind, SourcePrecision, SourceSpan,
     },
     incremental::{InvalidationPlan, PackageFingerprints},
-    sui::model::ProgramIndex,
+    sui::{index_layers::summarize_program_layers, model::ProgramIndex},
 };
 
 pub fn harden_program_index(
@@ -20,6 +20,7 @@ pub fn harden_program_index(
 ) -> Value {
     let coverage = Coverage::from_program(program);
     let integrity = Integrity::from_program(program);
+    let layers = summarize_program_layers(program);
     let readiness = readiness(&coverage, full_mode_requested);
     let freshness = freshness(previous_fingerprints_present, invalidation);
 
@@ -31,6 +32,7 @@ pub fn harden_program_index(
         "fullModeRequested": full_mode_requested,
         "fingerprints": fingerprints,
         "invalidation": invalidation,
+        "layers": layers,
         "coverage": coverage.to_json(),
         "integrity": integrity.to_json(),
     });
