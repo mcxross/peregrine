@@ -53,6 +53,7 @@ export type IndexReport = {
   packageName: string;
   dbPath: string;
   status: string;
+  indexHealth: unknown | null;
   summaryArtifactCount: number;
   moduleCount: number;
   functionCount: number;
@@ -67,6 +68,7 @@ export type PackageOverview = {
   rootPath: string;
   status: string;
   indexedAt: number;
+  indexHealth: unknown | null;
   modules: number;
   functions: number;
   types: number;

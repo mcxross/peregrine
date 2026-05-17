@@ -369,6 +369,100 @@ fn bytecode_parity_every_call_operation_has_call_edge() {
 }
 
 #[test]
+fn index_health_reports_freshness_coverage_and_integrity() {
+    let root = copy_fixture("bytecode_full_mode");
+    let indexer = SuiMoveIndexer::new(IndexerConfig::default());
+    let report = indexer
+        .index_package(root.path(), "bytecode-run".to_string())
+        .expect("index package");
+    let db_path = root.path().join(".peregrine/index.sqlite");
+    let health = report.index_health.as_ref().expect("report health");
+
+    assert_eq!(health["readiness"], "compiler_backed");
+    assert_eq!(health["freshness"], "first_index");
+    assert!(health["fingerprints"]["sourceHash"].is_string());
+    assert!(health["coverage"]["operationCount"].as_u64().unwrap() > 0);
+    assert!(
+        health["coverage"]["operationExactSpanCount"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+    assert_eq!(
+        health["coverage"]["callOperationCount"],
+        health["coverage"]["callEdgeWithOperationCount"]
+    );
+    assert_eq!(
+        health["integrity"]["danglingOperationEdgeCount"]
+            .as_u64()
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        health["integrity"]["danglingSemanticTagTargetCount"]
+            .as_u64()
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        health["integrity"]["prohibitedTagCount"].as_u64().unwrap(),
+        0
+    );
+
+    let overview = indexer
+        .get_package_overview(&db_path, &report.package_id)
+        .expect("overview");
+    assert_eq!(
+        overview.index_health.as_ref().expect("overview health")["readiness"],
+        "compiler_backed"
+    );
+
+    let rerun = indexer
+        .reindex_package(&db_path, &report.package_id, "bytecode-rerun".to_string())
+        .expect("reindex package");
+    assert_eq!(
+        rerun.index_health.as_ref().expect("rerun health")["freshness"],
+        "fresh"
+    );
+}
+
+#[test]
+fn function_context_reports_compiler_evidence_summary() {
+    let root = copy_fixture("bytecode_full_mode");
+    let indexer = SuiMoveIndexer::new(IndexerConfig::default());
+    let report = indexer
+        .index_package(root.path(), "bytecode-run".to_string())
+        .expect("index package");
+    let db_path = root.path().join(".peregrine/index.sqlite");
+    let deposit = find_function(&db_path, &report.package_id, "deposit");
+    let context = indexer
+        .get_function_context(
+            &db_path,
+            &deposit.id,
+            &ContextBudget {
+                level: ContextLevel::Level2,
+                max_operations: 128,
+                max_tokens_estimate: 3_000,
+                ..ContextBudget::default()
+            },
+        )
+        .expect("function context");
+
+    assert!(context.evidence.body_indexed);
+    assert!(context.evidence.operation_count > 0);
+    assert!(context.evidence.exact_operation_spans > 0);
+    assert!(context.evidence.source_mapped_operations > 0);
+    assert!(context.evidence.call_operation_count > 0);
+    assert_eq!(
+        context.evidence.call_operation_count,
+        context.evidence.call_edge_count
+    );
+    assert!(context.evidence.field_read_count > 0);
+    assert!(context.evidence.field_write_count > 0);
+    assert_eq!(context.evidence.source_precision, "Function");
+}
+
+#[test]
 fn compact_context_trimming_preserves_high_signal_operations() {
     let root = copy_fixture("bytecode_full_mode");
     let indexer = SuiMoveIndexer::new(IndexerConfig::default());

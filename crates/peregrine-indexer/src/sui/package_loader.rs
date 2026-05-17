@@ -1,6 +1,8 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    process::Command,
+    sync::OnceLock,
 };
 
 use serde_json::json;
@@ -108,6 +110,24 @@ pub fn compile_package(package: LoadedPackage) -> crate::core::IndexerResult<Com
 
 pub fn content_hash_or_empty(path: &Path) -> String {
     hash_file(path).unwrap_or_default()
+}
+
+pub fn local_sui_cli_version() -> Option<String> {
+    static SUI_CLI_VERSION: OnceLock<Option<String>> = OnceLock::new();
+    SUI_CLI_VERSION
+        .get_or_init(|| {
+            let output = Command::new("sui").arg("--version").output().ok()?;
+            if !output.status.success() {
+                return None;
+            }
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !stdout.is_empty() {
+                return Some(stdout);
+            }
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            (!stderr.is_empty()).then_some(stderr)
+        })
+        .clone()
 }
 
 fn parse_package_name(source: &str) -> Option<String> {

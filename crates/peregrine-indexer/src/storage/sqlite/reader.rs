@@ -9,8 +9,8 @@ use crate::{
         TypeKind,
     },
     sui::model::{
-        ContextPack, FunctionContext, FunctionOutline, FunctionSymbolCard, GraphView,
-        ModuleContext, ModuleSummaryCard, OperationHistogramEntry, PackageOverview,
+        ContextPack, FunctionContext, FunctionEvidenceSummary, FunctionOutline, FunctionSymbolCard,
+        GraphView, ModuleContext, ModuleSummaryCard, OperationHistogramEntry, PackageOverview,
         RelatedTypeCard, SourceExcerpt, SymbolResult, TypeContext,
     },
 };
@@ -49,9 +49,15 @@ impl SqliteIndexReader {
     }
 
     pub fn get_package_overview(&self, package_id: &str) -> rusqlite::Result<PackageOverview> {
-        let (id, name, root_path, status, indexed_at): (String, String, String, String, i64) =
-            self.connection.query_row(
-                "SELECT id, name, root_path, status, indexed_at FROM packages WHERE id = ?1",
+        let (id, name, root_path, status, indexed_at, metadata_json): (
+            String,
+            String,
+            String,
+            String,
+            i64,
+            Option<serde_json::Value>,
+        ) = self.connection.query_row(
+                "SELECT id, name, root_path, status, indexed_at, metadata_json FROM packages WHERE id = ?1",
                 [package_id],
                 |row| {
                     Ok((
@@ -60,6 +66,7 @@ impl SqliteIndexReader {
                         row.get(2)?,
                         row.get(3)?,
                         row.get(4)?,
+                        optional_json_from_col(row, 5)?,
                     ))
                 },
             )?;
@@ -79,6 +86,10 @@ impl SqliteIndexReader {
             root_path,
             status,
             indexed_at,
+            index_health: metadata_json
+                .as_ref()
+                .and_then(|metadata| metadata.get("index_health"))
+                .cloned(),
             modules,
             functions,
             types,
@@ -144,22 +155,30 @@ impl SqliteIndexReader {
         } else {
             Vec::new()
         };
+        let operation_count = self.operation_count(function_id)?;
         let operation_histogram = self.operation_histogram(function_id)?;
         let source_excerpts = if budget.include_source || budget.include_full_source {
             self.source_excerpts_for_function(&function, budget)?
         } else {
             Vec::new()
         };
+        let evidence = self.function_evidence_summary(
+            &function,
+            operation_count,
+            field_reads.len(),
+            field_writes.len(),
+        )?;
         let outline = FunctionOutline {
             params: function.parameters.clone(),
             returns: function.returns.clone(),
             direct_calls: callees.clone(),
-            operation_count: self.operation_count(function_id)?,
+            operation_count,
             tags: tags.iter().map(|tag| tag.tag.clone()).collect(),
         };
         let mut context = FunctionContext {
             card: FunctionSymbolCard::from_function(&function, tags),
             outline,
+            evidence,
             callers,
             callees,
             reachable_callees,
@@ -541,6 +560,59 @@ impl SqliteIndexReader {
             .query_row(
                 "SELECT COUNT(*) FROM operations WHERE function_id = ?1",
                 [function_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|count| count as usize)
+    }
+
+    fn function_evidence_summary(
+        &self,
+        function: &FunctionInfo,
+        operation_count: usize,
+        field_read_count: usize,
+        field_write_count: usize,
+    ) -> rusqlite::Result<FunctionEvidenceSummary> {
+        let exact_operation_spans =
+            self.operation_source_precision_count(&function.id, "ExactExpression")?;
+        let source_mapped_operations = self.connection.query_row(
+            "SELECT COUNT(*) FROM operations WHERE function_id = ?1 AND source_span_json NOT LIKE '%\"precision\":\"Unknown\"%'",
+            [&function.id],
+            |row| row.get::<_, i64>(0),
+        )? as usize;
+        let call_operation_count = self.connection.query_row(
+            "SELECT COUNT(*) FROM operations WHERE function_id = ?1 AND kind = 'Call'",
+            [&function.id],
+            |row| row.get::<_, i64>(0),
+        )? as usize;
+        let call_edge_count = self.connection.query_row(
+            "SELECT COUNT(*) FROM edges WHERE from_id = ?1 AND edge_type = 'Calls' AND operation_id IS NOT NULL",
+            [&function.id],
+            |row| row.get::<_, i64>(0),
+        )? as usize;
+
+        Ok(FunctionEvidenceSummary {
+            body_indexed: operation_count > 0,
+            operation_count,
+            exact_operation_spans,
+            source_mapped_operations,
+            call_operation_count,
+            call_edge_count,
+            field_read_count,
+            field_write_count,
+            source_precision: format!("{:?}", function.source_span.precision),
+        })
+    }
+
+    fn operation_source_precision_count(
+        &self,
+        function_id: &str,
+        precision: &str,
+    ) -> rusqlite::Result<usize> {
+        let pattern = format!("%\"precision\":\"{precision}\"%");
+        self.connection
+            .query_row(
+                "SELECT COUNT(*) FROM operations WHERE function_id = ?1 AND source_span_json LIKE ?2",
+                params![function_id, pattern],
                 |row| row.get::<_, i64>(0),
             )
             .map(|count| count as usize)

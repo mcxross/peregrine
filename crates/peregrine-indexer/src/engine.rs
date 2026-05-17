@@ -5,14 +5,16 @@ use std::{
 
 use crate::{
     config::IndexerConfig,
-    core::{ContextBudget, IndexerResult, MoveIndexerAdapter, Operation},
+    core::{hash_str, ContextBudget, IndexerResult, MoveIndexerAdapter, Operation},
+    incremental::{compare_fingerprints, fingerprint_package, IncrementalCache},
     storage::sqlite::{SqliteIndexReader, SqliteIndexWriter},
     sui::{
+        index_health::harden_program_index,
         model::{
             ContextPack, FunctionContext, GraphView, IndexReport, MaterializedSummaryContext,
             ModuleContext, ModuleSummaryCard, PackageOverview, SymbolResult, TypeContext,
         },
-        SuiIndexerAdapter,
+        package_loader, SuiIndexerAdapter,
     },
 };
 
@@ -37,18 +39,46 @@ impl SuiMoveIndexer {
         if let Some(parent) = db_path.parent() {
             fs::create_dir_all(parent)?;
         }
+        let mut fingerprints = fingerprint_package(&loaded.root, env!("CARGO_PKG_VERSION"))?;
+        fingerprints.extraction_config_hash = Some(hash_str(
+            &serde_json::json!({
+                "debugStoreRawSummaryJson": self.config.debug_store_raw_summary_json,
+                "enrichFullMode": self.config.enrich_full_mode,
+            })
+            .to_string(),
+        ));
 
         let artifacts = self.adapter.discover_summaries(&loaded)?;
         let summary = self.adapter.extract_summary_pointers(artifacts)?;
         let compiled = self.adapter.compile_package(loaded)?;
-        let program = if self.config.enrich_full_mode {
+        let mut program = if self.config.enrich_full_mode {
             self.adapter.enrich_full_index(compiled, summary)?
         } else {
             summary.program_index
         };
+        if program.package.compiler_version.is_none() {
+            program.package.compiler_version = package_loader::local_sui_cli_version();
+        }
+        fingerprints.compiler_version = program.package.compiler_version.clone();
+
+        let incremental_cache = IncrementalCache::open(&db_path)?;
+        let previous_fingerprints = incremental_cache.load(&program.package.id)?;
+        let invalidation = compare_fingerprints(previous_fingerprints.as_ref(), &fingerprints);
+        let index_health = harden_program_index(
+            &mut program,
+            &fingerprints,
+            previous_fingerprints.is_some(),
+            &invalidation,
+            self.config.enrich_full_mode,
+        );
 
         let mut writer = SqliteIndexWriter::open(&db_path)?;
         writer.write_program_index(&program)?;
+        incremental_cache.store(
+            &program.package.id,
+            &fingerprints,
+            program.package.indexed_at,
+        )?;
 
         Ok(IndexReport {
             run_id,
@@ -56,6 +86,7 @@ impl SuiMoveIndexer {
             package_name: program.package.name.clone(),
             db_path: db_path.to_string_lossy().into_owned(),
             status: format!("{:?}", program.package.status),
+            index_health: Some(index_health),
             summary_artifact_count: program.summary_artifacts.len(),
             module_count: program.modules.len(),
             function_count: program.functions.len(),

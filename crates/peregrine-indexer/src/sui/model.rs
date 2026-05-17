@@ -105,6 +105,7 @@ pub struct IndexReport {
     pub package_name: String,
     pub db_path: String,
     pub status: String,
+    pub index_health: Option<serde_json::Value>,
     pub summary_artifact_count: usize,
     pub module_count: usize,
     pub function_count: usize,
@@ -121,6 +122,7 @@ pub struct PackageOverview {
     pub root_path: String,
     pub status: String,
     pub indexed_at: i64,
+    pub index_health: Option<serde_json::Value>,
     pub modules: usize,
     pub functions: usize,
     pub types: usize,
@@ -147,6 +149,7 @@ pub struct TypeContext {
 pub struct FunctionContext {
     pub card: FunctionSymbolCard,
     pub outline: FunctionOutline,
+    pub evidence: FunctionEvidenceSummary,
     pub callers: Vec<String>,
     pub callees: Vec<String>,
     pub reachable_callees: Vec<String>,
@@ -214,6 +217,20 @@ pub struct FunctionOutline {
     pub direct_calls: Vec<String>,
     pub operation_count: usize,
     pub tags: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FunctionEvidenceSummary {
+    pub body_indexed: bool,
+    pub operation_count: usize,
+    pub exact_operation_spans: usize,
+    pub source_mapped_operations: usize,
+    pub call_operation_count: usize,
+    pub call_edge_count: usize,
+    pub field_read_count: usize,
+    pub field_write_count: usize,
+    pub source_precision: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
