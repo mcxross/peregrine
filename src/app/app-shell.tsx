@@ -22,7 +22,11 @@ import type {
   BuildLogSheetController,
   BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
-import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
+import {
+  createPackageLoadAssessment,
+  type PackageLoadAssessment,
+  type PackageLoadAssessmentState,
+} from "@/features/project-workspace/package-load-assessment";
 import { defaultLayoutSettings } from "@/layout/layout-store";
 import { titlebarHeight } from "@/layout/window-chrome";
 import { SettingsScreen } from "@/screens/settings-screen";
@@ -63,7 +67,6 @@ export function AppShell({
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
   const [lastScannedAt, setLastScannedAt] = useState<number | null>(null);
   const [launchBuild, setLaunchBuild] = useState<LaunchBuildState | null>(null);
-  const loadAssessment: PackageLoadAssessment | null = null;
   const currentCommandLogIdRef = useRef<number | null>(null);
   const detailHydratedRootRef = useRef<string | null>(null);
   const launchBuildKeysRef = useRef<Set<string>>(new Set());
@@ -75,6 +78,10 @@ export function AppShell({
   const activeMovePackage = useMemo(
     () => resolveActiveMovePackage(packageTree, activePackageManifestPath),
     [activePackageManifestPath, packageTree],
+  );
+  const loadAssessment = useMemo(
+    () => createVisibleLoadAssessment(packageTree, activeMovePackage, buildRuns),
+    [activeMovePackage, buildRuns, packageTree],
   );
   const isBuildRunning = buildRuns.some((run) => run.state === "running");
   const isCommandRunning = isBuildRunning;
@@ -752,6 +759,84 @@ function defaultProjectMetadata(): ProjectMetadata {
   return {
     builds: {},
     version: 1,
+  };
+}
+
+function createVisibleLoadAssessment(
+  packageTree: PackageTree | null,
+  activeMovePackage: MovePackage | null,
+  buildRuns: BuildLogRun[],
+): PackageLoadAssessment | null {
+  if (!packageTree || !activeMovePackage) {
+    return null;
+  }
+
+  const packagePath = activeMovePackage.path || ".";
+  const latestBuildRun = [...buildRuns]
+    .reverse()
+    .find(
+      (run) =>
+        run.command === "sui move build"
+        && run.packageName === activeMovePackage.name
+        && run.packagePath === packagePath,
+    ) ?? null;
+  const assessment = createPackageLoadAssessment({
+    movePackage: activeMovePackage,
+    packageTree,
+    startedAt: latestBuildRun?.startedAt ?? new Date(),
+  });
+
+  if (!latestBuildRun) {
+    return assessment;
+  }
+
+  const { detail, state, value } = buildAssessmentDisplay(latestBuildRun);
+
+  return {
+    ...assessment,
+    finishedAt: latestBuildRun.finishedAt,
+    startedAt: latestBuildRun.startedAt,
+    steps: assessment.steps.map((step) =>
+      step.id === "build"
+        ? {
+            ...step,
+            detail,
+            finishedAt: latestBuildRun.finishedAt,
+            output: latestBuildRun.output,
+            startedAt: latestBuildRun.startedAt,
+            state,
+            value,
+          }
+        : step,
+    ),
+  };
+}
+
+function buildAssessmentDisplay(run: BuildLogRun): {
+  detail: string;
+  state: PackageLoadAssessmentState;
+  value: string;
+} {
+  if (run.state === "running") {
+    return {
+      detail: run.runningText ?? "Build running",
+      state: "running",
+      value: "Run",
+    };
+  }
+
+  if (run.state === "success") {
+    return {
+      detail: "Build passed",
+      state: "success",
+      value: "Pass",
+    };
+  }
+
+  return {
+    detail: run.error ?? "Build failed",
+    state: "error",
+    value: "Fail",
   };
 }
 

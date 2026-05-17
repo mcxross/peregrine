@@ -19,6 +19,7 @@ import type {
   PackageLoadAssessmentState,
   PackageLoadAssessmentStep,
 } from "@/features/project-workspace/package-load-assessment";
+import { packageLoadAssessmentCommands } from "@/features/project-workspace/package-load-assessment";
 import { cn } from "@/lib/utils";
 
 type PackageLoadAssessmentCardsProps = {
@@ -103,12 +104,14 @@ export function PackageLoadAssessmentCards({
 }
 
 export function assessmentSidebarItems(assessment: PackageLoadAssessment | null) {
-  return (assessment?.steps ?? []).map((step) => ({
-    badge: sidebarBadge(step),
-    icon: assessmentIconById[step.id],
-    label: step.label,
-    tone: sidebarTone(step.state),
-  }));
+  return (assessment?.steps ?? defaultSidebarAssessmentSteps())
+    .filter((step) => step.id !== "risk")
+    .map((step) => ({
+      badge: sidebarBadge(step),
+      icon: assessmentIconById[step.id],
+      label: step.label,
+      tone: sidebarTone(step.state),
+    }));
 }
 
 function StepStateIcon({ state }: { state: PackageLoadAssessmentState }) {
@@ -183,4 +186,24 @@ function sidebarTone(state: PackageLoadAssessmentState) {
     case "muted":
       return "muted";
   }
+}
+
+function defaultSidebarAssessmentSteps(): PackageLoadAssessmentStep[] {
+  return packageLoadAssessmentCommands.map((command) => {
+    return {
+      caption: command.enabled
+        ? command.command ?? ""
+        : command.mutedCaption ?? "Not enabled",
+      command: command.command,
+      detail: null,
+      enabled: command.enabled,
+      finishedAt: null,
+      id: command.id,
+      label: command.label,
+      output: null,
+      startedAt: null,
+      state: command.enabled ? "idle" : "muted",
+      value: command.enabled ? "Queued" : "Locked",
+    };
+  });
 }
