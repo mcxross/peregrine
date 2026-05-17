@@ -17,10 +17,19 @@ export type PackageTree = {
 export type ProjectMetadata = {
   version: number;
   builds: Record<string, ProjectBuildMetadata>;
+  packageConfigs: Record<string, ProjectPackageConfig>;
 };
 
 export type ProjectBuildMetadata = {
   lastSuccessfulBuildAt?: number | null;
+};
+
+export type ProjectPackageConfig = {
+  commands?: ProjectCommandConfig;
+};
+
+export type ProjectCommandConfig = {
+  moveTestScriptPath?: string | null;
 };
 
 export type MoveProjectGraphs = {

@@ -4,14 +4,13 @@ import {
   Bug,
   ChevronDown,
   Code2,
-  FileCheck2,
   FlaskConical,
   Gauge,
   Hammer,
+  MoreVertical,
   PanelLeftClose,
   PanelLeftOpen,
   Play,
-  ShieldAlert,
   Share,
   ShieldCheck,
   SquareFunction,
@@ -46,6 +45,7 @@ type TitlebarProps = {
   mode?: WorkspaceMode;
   onBuildPackage?: () => void;
   onFuzzPackage?: () => void;
+  onOpenProjectConfig?: () => void;
   onTestPackage?: () => void;
   onToggleMode?: () => void;
   onToggleLeftPanel?: () => void;
@@ -62,6 +62,7 @@ export function Titlebar({
   mode = "security",
   onBuildPackage,
   onFuzzPackage,
+  onOpenProjectConfig,
   onTestPackage,
   onToggleMode,
   onToggleLeftPanel,
@@ -141,6 +142,16 @@ export function Titlebar({
                 }
               />
             ))}
+            <Button
+              aria-label="Project configuration"
+              className="group h-8 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2 text-muted-foreground hover:bg-[var(--app-elevated)] hover:text-foreground"
+              onClick={onOpenProjectConfig}
+              title="Project configuration"
+              type="button"
+              variant="ghost"
+            >
+              <MoreVertical className="size-4" aria-hidden="true" />
+            </Button>
           </div>
         </div>
       ) : (
@@ -180,8 +191,6 @@ const workspaceActions = [
   { id: "coverage", icon: Gauge, label: "Check coverage", tone: "default" },
   { id: "fuzzing", icon: Bug, label: "Run fuzzing", tone: "danger" },
   { id: "formal", icon: SquareFunction, label: "Run formal checks", tone: "success" },
-  { id: "audit", icon: ShieldAlert, label: "Open audit", tone: "warning" },
-  { id: "ci", icon: FileCheck2, label: "Run CI", tone: "default" },
 ] as const;
 
 type WorkspaceAction = (typeof workspaceActions)[number];
@@ -217,7 +226,6 @@ function WorkspaceActionButton({
           "size-3.5 shrink-0 text-zinc-300",
           action.tone === "success" && "text-emerald-400",
           action.tone === "danger" && "text-red-400",
-          action.tone === "warning" && "text-amber-400",
         )}
         aria-hidden="true"
       />

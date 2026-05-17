@@ -532,6 +532,8 @@ struct ProjectMetadata {
     version: u32,
     #[serde(default)]
     builds: HashMap<String, ProjectBuildMetadata>,
+    #[serde(default)]
+    package_configs: HashMap<String, ProjectPackageConfig>,
 }
 
 impl Default for ProjectMetadata {
@@ -539,6 +541,7 @@ impl Default for ProjectMetadata {
         Self {
             version: default_project_metadata_version(),
             builds: HashMap::new(),
+            package_configs: HashMap::new(),
         }
     }
 }
@@ -547,6 +550,19 @@ impl Default for ProjectMetadata {
 #[serde(rename_all = "camelCase")]
 struct ProjectBuildMetadata {
     last_successful_build_at: Option<u64>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+struct ProjectPackageConfig {
+    #[serde(default)]
+    commands: ProjectCommandConfig,
+}
+
+#[derive(Deserialize, Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+struct ProjectCommandConfig {
+    move_test_script_path: Option<String>,
 }
 
 fn default_project_metadata_version() -> u32 {

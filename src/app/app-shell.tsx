@@ -10,6 +10,7 @@ import {
   loadPackageTreeDetails,
   loadProjectMetadata,
   runMovyFuzz,
+  runSecurityScript,
   runSecurityCommand,
   saveProjectMetadata,
   type MovePackage,
@@ -26,6 +27,7 @@ import {
   type PackageLoadAssessment,
   type PackageLoadAssessmentState,
 } from "@/features/project-workspace/package-load-assessment";
+import { ProjectConfigDialog } from "@/features/project-workspace/project-config-dialog";
 import {
   type LaunchIndexState,
   useLaunchIndexer,
@@ -68,6 +70,7 @@ export function AppShell({
   const [buildRuns, setBuildRuns] = useState<BuildLogRun[]>([]);
   const [isBuildSheetOpen, setIsBuildSheetOpen] = useState(false);
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
+  const [isProjectConfigOpen, setIsProjectConfigOpen] = useState(false);
   const [lastScannedAt, setLastScannedAt] = useState<number | null>(null);
   const [launchBuild, setLaunchBuild] = useState<LaunchBuildState | null>(null);
   const {
@@ -508,21 +511,46 @@ export function AppShell({
       workingDirectory,
     };
 
+    const metadata = await loadProjectMetadata(packageTree.rootPath).catch((error) => {
+      console.warn("Could not load project metadata; running default Move tests.", error);
+      return defaultProjectMetadata();
+    });
+    const moveTestScriptPath = projectMoveTestScriptPath(metadata, activeMovePackage);
+
+    if (moveTestScriptPath) {
+      nextRun.command = `bash ${moveTestScriptPath}`;
+      nextRun.metadata = [
+        { label: "Mode", value: "Project script" },
+        { label: "Default", value: "sui move test" },
+      ];
+    }
+
     currentCommandLogIdRef.current = nextRun.id;
     setBuildRuns([nextRun]);
     setIsBuildSheetOpen(true);
 
     try {
-      const output = await runSecurityCommand(packageTree, activeMovePackage.path, "move-test", {
-        streamId: nextRun.id,
-        onOutput: (output) => {
-          setBuildRuns((current) =>
-            updateLogRun(current, nextRun.id, (run) =>
-              run.state === "running" ? { ...run, output } : run,
-            ),
-          );
-        },
-      });
+      const output = moveTestScriptPath
+        ? await runSecurityScript(packageTree, activeMovePackage.path, moveTestScriptPath, {
+            streamId: nextRun.id,
+            onOutput: (output) => {
+              setBuildRuns((current) =>
+                updateLogRun(current, nextRun.id, (run) =>
+                  run.state === "running" ? { ...run, output } : run,
+                ),
+              );
+            },
+          })
+        : await runSecurityCommand(packageTree, activeMovePackage.path, "move-test", {
+            streamId: nextRun.id,
+            onOutput: (output) => {
+              setBuildRuns((current) =>
+                updateLogRun(current, nextRun.id, (run) =>
+                  run.state === "running" ? { ...run, output } : run,
+                ),
+              );
+            },
+          });
       const state = output.status === 0 ? "success" : "error";
 
       setBuildRuns((current) =>
@@ -537,7 +565,12 @@ export function AppShell({
       setBuildRuns((current) =>
         updateLogRun(current, nextRun.id, (run) => ({
           ...run,
-          error: getCommandErrorMessage(error, "Could not run `sui move test`."),
+          error: getCommandErrorMessage(
+            error,
+            moveTestScriptPath
+              ? `Could not run project test script ${moveTestScriptPath}.`
+              : "Could not run `sui move test`.",
+          ),
           finishedAt: new Date(),
           state: "error",
         })),
@@ -634,6 +667,7 @@ export function AppShell({
         mode={workspaceMode}
         onBuildPackage={runBuild}
         onFuzzPackage={runFuzz}
+        onOpenProjectConfig={() => setIsProjectConfigOpen(true)}
         onTestPackage={runTests}
         onToggleMode={() => setWorkspaceMode((mode) => mode === "security" ? "editor" : "security")}
         onToggleLeftPanel={() => setIsLeftPanelOpen((isOpen) => !isOpen)}
@@ -671,6 +705,15 @@ export function AppShell({
           )}
         </div>
       </section>
+
+      {!isSettings && packageTree ? (
+        <ProjectConfigDialog
+          activeMovePackage={activeMovePackage}
+          open={isProjectConfigOpen}
+          onOpenChange={setIsProjectConfigOpen}
+          packageTree={packageTree}
+        />
+      ) : null}
 
       <LaunchStatusToasts
         buildState={launchBuild}
@@ -822,8 +865,16 @@ async function rememberSuccessfulLaunchBuild(
 function defaultProjectMetadata(): ProjectMetadata {
   return {
     builds: {},
+    packageConfigs: {},
     version: 1,
   };
+}
+
+function projectMoveTestScriptPath(metadata: ProjectMetadata, movePackage: MovePackage) {
+  return (
+    metadata.packageConfigs?.[projectPackageMetadataKey(movePackage)]?.commands?.moveTestScriptPath?.trim()
+    || null
+  );
 }
 
 function createVisibleLoadAssessment(
