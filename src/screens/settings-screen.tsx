@@ -1,15 +1,22 @@
 import React from "react";
-import { FolderOpen } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  FolderOpen,
+  Palette,
+  TerminalSquare,
+  type LucideIcon,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   checkSuiAdapter,
@@ -27,6 +34,28 @@ type SettingsScreenProps = {
   onBack: () => void;
 };
 
+type SettingsGroupId = "appearance" | "toolchain";
+
+const settingsGroups: {
+  id: SettingsGroupId;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+}[] = [
+  {
+    id: "appearance",
+    label: "Appearance",
+    description: "Mode and theme",
+    icon: Palette,
+  },
+  {
+    id: "toolchain",
+    label: "Sui CLI",
+    description: "Move toolchain",
+    icon: TerminalSquare,
+  },
+];
+
 const modeOptions: { value: ThemeMode; label: string }[] = [
   { value: "system", label: "System" },
   { value: "light", label: "Light" },
@@ -40,6 +69,7 @@ const suiSourceOptions: { value: SuiAdapterSource; label: string }[] = [
 
 export function SettingsScreen({ onBack }: SettingsScreenProps) {
   const { themes, themeId, mode, resolvedMode, setMode, setThemeId } = useTheme();
+  const [activeGroup, setActiveGroup] = React.useState<SettingsGroupId>("appearance");
   const [suiSettings, setSuiSettings] = React.useState<SuiAdapterSettings>({
     cliPath: null,
     source: "bundled",
@@ -147,182 +177,461 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
     setSuiCliPathInput(selectedPath);
     await saveSuiCliPath(selectedPath);
   }, [saveSuiCliPath]);
+  const activeSettingsGroup = settingsGroups.find((group) => group.id === activeGroup) ?? settingsGroups[0];
+  const ActiveGroupIcon = activeSettingsGroup.icon;
 
   return (
-    <main className="h-full min-h-0 overflow-auto bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-5 py-5 sm:px-8 sm:py-7">
-        <header className="flex items-center justify-between gap-4 border-b pb-5">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
-            <p className="text-sm text-muted-foreground">
-              Appearance · {resolvedMode}
-            </p>
-          </div>
-          <Button variant="outline" onClick={onBack}>
-            Done
-          </Button>
-        </header>
+    <main className="grid h-full min-h-0 bg-background text-foreground lg:grid-cols-[260px_minmax(0,1fr)]">
+      <aside className="flex min-h-0 flex-col border-b border-[color:var(--app-border)] bg-[var(--app-panel)] px-4 py-4 lg:border-b-0 lg:border-r">
+        <Button
+          className="mb-4 w-fit justify-start px-2 text-muted-foreground hover:text-foreground"
+          onClick={onBack}
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          <ArrowLeft aria-hidden="true" />
+          Back to app
+        </Button>
 
-        <section className="grid gap-4 md:grid-cols-[240px_1fr]">
-          <div className="grid h-fit gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Appearance</CardTitle>
-                <CardDescription>Mode</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-1 rounded-lg border bg-muted p-1 md:grid-cols-1">
-                  {modeOptions.map((option) => (
-                    <Button
-                      key={option.value}
-                      variant={mode === option.value ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setMode(option.value)}
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+        <nav className="flex gap-1 overflow-x-auto lg:grid lg:overflow-visible" aria-label="Settings sections">
+          {settingsGroups.map((group) => (
+            <SettingsNavButton
+              active={activeGroup === group.id}
+              group={group}
+              key={group.id}
+              onClick={() => setActiveGroup(group.id)}
+            />
+          ))}
+        </nav>
+      </aside>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Sui CLI</CardTitle>
-                <CardDescription>{suiSourceLabel(effectiveSuiSource)}</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3">
-                <div className="grid grid-cols-2 gap-1 rounded-lg border bg-muted p-1 md:grid-cols-1">
-                  {suiSourceOptions.map((option) => {
-                    const unavailableSystem =
-                      option.value === "system" && suiStatus ? !suiStatus.system.available : false;
+      <section className="min-h-0 overflow-auto">
+        <div className="mx-auto flex w-full max-w-4xl flex-col px-6 pb-24 pt-10 sm:px-8 lg:px-12 lg:pt-20">
+          <header className="mb-10">
+            <div className="mb-3 flex size-10 items-center justify-center rounded-lg border border-[color:var(--app-border)] bg-[var(--app-surface)] text-muted-foreground">
+              <ActiveGroupIcon className="size-5" aria-hidden="true" />
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight">{activeSettingsGroup.label}</h1>
+            <p className="mt-1 text-[13px] text-muted-foreground">{activeSettingsGroup.description}</p>
+          </header>
 
-                    return (
-                      <Button
-                        disabled={isSavingSuiSettings || unavailableSystem}
-                        key={option.value}
-                        onClick={() => void updateSuiSource(option.value)}
-                        size="sm"
-                        title={unavailableSystem ? suiStatus?.system.error ?? "Sui CLI not found on PATH." : undefined}
-                        variant={effectiveSuiSource === option.value ? "default" : "ghost"}
-                      >
-                        {option.label}
-                      </Button>
-                    );
-                  })}
-                </div>
+          {activeGroup === "appearance" ? (
+            <AppearanceSettings
+              mode={mode}
+              resolvedMode={resolvedMode}
+              setMode={setMode}
+              setThemeId={setThemeId}
+              themeId={themeId}
+              themes={themes}
+            />
+          ) : null}
 
-                <div className="grid gap-2 text-xs text-muted-foreground">
-                  <SuiSourceStatusRow
-                    active={effectiveSuiSource === "bundled"}
-                    label="Bundled crate"
-                    path={suiStatus?.bundled.path ?? null}
-                    version={suiStatus?.bundled.version ?? null}
-                    available={suiStatus?.bundled.available ?? false}
-                  />
-                  <SuiSourceStatusRow
-                    active={effectiveSuiSource === "system"}
-                    label="User installed"
-                    path={suiStatus?.system.path ?? null}
-                    version={suiStatus?.system.version ?? null}
-                    available={suiStatus?.system.available ?? false}
-                  />
-                  <div className="grid gap-2 rounded border bg-card p-2">
-                    <label className="text-xs font-medium text-foreground" htmlFor="sui-cli-path">
-                      Sui CLI path
-                    </label>
-                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                      <Input
-                        autoComplete="off"
-                        id="sui-cli-path"
-                        onChange={(event) => setSuiCliPathInput(event.target.value)}
-                        placeholder="Use bundled crate or PATH"
-                        type="text"
-                        value={suiCliPathInput}
-                      />
-                      <Button
-                        disabled={isSavingSuiSettings}
-                        onClick={() => void chooseSuiCliPath()}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <FolderOpen aria-hidden="true" />
-                        Browse
-                      </Button>
-                      <Button
-                        disabled={isSavingSuiSettings || suiCliPathInput === (suiSettings.cliPath ?? "")}
-                        onClick={() => void saveSuiCliPath(suiCliPathInput)}
-                        size="sm"
-                        type="button"
-                      >
-                        Save
-                      </Button>
-                    </div>
-                    <p>
-                      Set a CLI path to make project creation and package commands use that binary instead of the embedded toolchain.
-                    </p>
-                  </div>
-                  {suiSettingsError ? (
-                    <p className="rounded border border-destructive/30 bg-destructive/10 px-2 py-1 text-destructive">
-                      {suiSettingsError}
-                    </p>
-                  ) : null}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Themes</CardTitle>
-              <CardDescription>shadcn families</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {themes.map((theme) => (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    onClick={() => setThemeId(theme.id as ThemeId)}
-                    className={cn(
-                      "group rounded-lg border bg-card p-3 text-left text-card-foreground transition hover:border-ring hover:shadow-sm focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                      themeId === theme.id && "border-ring ring-[3px] ring-ring/20",
-                    )}
-                  >
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <div>
-                        <div className="font-medium leading-none">{theme.name}</div>
-                        <div className="mt-1 text-xs capitalize text-muted-foreground">
-                          {theme.family}
-                        </div>
-                      </div>
-                      <span
-                        className="size-5 rounded-full border shadow-xs"
-                        style={{ background: theme.swatch }}
-                      />
-                    </div>
-
-                    <div className="overflow-hidden rounded-md border">
-                      <div className="flex h-9 items-center gap-1.5 px-2">
-                        <span className="h-2.5 w-10 rounded-full" style={{ background: theme.light.primary }} />
-                        <span className="h-2.5 w-6 rounded-full" style={{ background: theme.light.accent }} />
-                        <span className="h-2.5 w-4 rounded-full" style={{ background: theme.light.border }} />
-                      </div>
-                      <div className="flex h-9 items-center gap-1.5 border-t px-2">
-                        <span className="h-2.5 w-10 rounded-full" style={{ background: theme.dark.primary }} />
-                        <span className="h-2.5 w-6 rounded-full" style={{ background: theme.dark.accent }} />
-                        <span className="h-2.5 w-4 rounded-full" style={{ background: theme.dark.border }} />
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-      </div>
+          {activeGroup === "toolchain" ? (
+            <ToolchainSettings
+              chooseSuiCliPath={chooseSuiCliPath}
+              effectiveSuiSource={effectiveSuiSource}
+              isSavingSuiSettings={isSavingSuiSettings}
+              saveSuiCliPath={saveSuiCliPath}
+              suiCliPathInput={suiCliPathInput}
+              suiSettings={suiSettings}
+              suiSettingsError={suiSettingsError}
+              suiStatus={suiStatus}
+              updateSuiSource={updateSuiSource}
+              setSuiCliPathInput={setSuiCliPathInput}
+            />
+          ) : null}
+        </div>
+      </section>
     </main>
+  );
+}
+
+function AppearanceSettings({
+  mode,
+  resolvedMode,
+  setMode,
+  setThemeId,
+  themeId,
+  themes,
+}: {
+  mode: ThemeMode;
+  resolvedMode: ThemeMode;
+  setMode: (mode: ThemeMode) => void;
+  setThemeId: (themeId: ThemeId) => void;
+  themeId: string;
+  themes: ReturnType<typeof useTheme>["themes"];
+}) {
+  const selectedTheme = themes.find((theme) => theme.id === themeId) ?? themes[0];
+
+  return (
+    <>
+      <SettingsSection title="Mode">
+        <SettingsRow
+          label="Color mode"
+          description={`Currently rendering ${resolvedMode} surfaces.`}
+        >
+          <SegmentedControl>
+            {modeOptions.map((option) => (
+              <Button
+                key={option.value}
+                variant={mode === option.value ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setMode(option.value)}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </SegmentedControl>
+        </SettingsRow>
+      </SettingsSection>
+
+      <SettingsSection title="Themes">
+        <SettingsRow
+          label="Theme"
+          description="Choose the base color family used across the app."
+          align="start"
+        >
+          <ThemeDropdown
+            selectedTheme={selectedTheme}
+            setThemeId={setThemeId}
+            themeId={themeId}
+            themes={themes}
+          />
+        </SettingsRow>
+      </SettingsSection>
+    </>
+  );
+}
+
+function ThemeDropdown({
+  selectedTheme,
+  setThemeId,
+  themeId,
+  themes,
+}: {
+  selectedTheme: ReturnType<typeof useTheme>["themes"][number];
+  setThemeId: (themeId: ThemeId) => void;
+  themeId: string;
+  themes: ReturnType<typeof useTheme>["themes"];
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          className="h-auto w-full min-w-0 justify-between rounded-xl px-3 py-2 sm:w-[28rem]"
+          type="button"
+          variant="outline"
+        >
+          <ThemeSelectSummary theme={selectedTheme} />
+          <ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="max-h-[min(28rem,var(--radix-dropdown-menu-content-available-height))] w-[min(32rem,calc(100vw-2rem))] p-1.5"
+      >
+        {themes.map((theme) => (
+          <DropdownMenuItem
+            className="grid cursor-default grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-lg p-2"
+            key={theme.id}
+            onSelect={() => setThemeId(theme.id as ThemeId)}
+          >
+            <ThemeSelectSummary theme={theme} />
+            <span
+              className={cn(
+                "mt-1 flex size-5 items-center justify-center rounded-full border text-primary",
+                themeId === theme.id
+                  ? "border-primary/50 bg-primary/10"
+                  : "border-border text-transparent",
+              )}
+              aria-hidden="true"
+            >
+              <Check className="size-3" />
+            </span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ThemeSelectSummary({
+  theme,
+}: {
+  theme: ReturnType<typeof useTheme>["themes"][number];
+}) {
+  return (
+    <span className="grid min-w-0 flex-1 gap-2 text-left">
+      <span className="flex min-w-0 items-center gap-3">
+        <span
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-card text-sm font-semibold shadow-xs"
+          style={{ color: theme.swatch }}
+        >
+          Aa
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium text-foreground">
+            {theme.name}
+          </span>
+          <span className="block text-xs capitalize text-muted-foreground">
+            {theme.family}
+          </span>
+        </span>
+      </span>
+      <span className="grid min-w-0 gap-2 sm:grid-cols-2">
+        <ThemePreviewStrip label="Light" tokens={theme.light} />
+        <ThemePreviewStrip label="Dark" tokens={theme.dark} />
+      </span>
+    </span>
+  );
+}
+
+function ThemePreviewStrip({
+  label,
+  tokens,
+}: {
+  label: string;
+  tokens: ReturnType<typeof useTheme>["themes"][number]["light"];
+}) {
+  return (
+    <div
+      className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border px-2 py-1.5"
+      style={{
+        background: tokens.background,
+        borderColor: tokens.border,
+        color: tokens.foreground,
+      }}
+    >
+      <span className="text-[10px] font-medium uppercase tracking-normal opacity-70">
+        {label}
+      </span>
+      <span className="flex min-w-0 items-center justify-end gap-1.5">
+        <ThemePreviewPill color={tokens.primary} width="2.25rem" />
+        <ThemePreviewPill color={tokens.accent} width="1.5rem" />
+        <ThemePreviewPill color={tokens.muted} width="1rem" />
+      </span>
+    </div>
+  );
+}
+
+function ThemePreviewPill({
+  color,
+  width,
+}: {
+  color: string;
+  width: string;
+}) {
+  return (
+    <span
+      className="h-2 rounded-full border border-black/5"
+      style={{ background: color, width }}
+    />
+  );
+}
+
+function ToolchainSettings({
+  chooseSuiCliPath,
+  effectiveSuiSource,
+  isSavingSuiSettings,
+  saveSuiCliPath,
+  setSuiCliPathInput,
+  suiCliPathInput,
+  suiSettings,
+  suiSettingsError,
+  suiStatus,
+  updateSuiSource,
+}: {
+  chooseSuiCliPath: () => Promise<void>;
+  effectiveSuiSource: SuiAdapterSource;
+  isSavingSuiSettings: boolean;
+  saveSuiCliPath: (path: string) => Promise<void>;
+  setSuiCliPathInput: (path: string) => void;
+  suiCliPathInput: string;
+  suiSettings: SuiAdapterSettings;
+  suiSettingsError: string | null;
+  suiStatus: SuiAdapterStatus | null;
+  updateSuiSource: (source: SuiAdapterSource) => Promise<void>;
+}) {
+  return (
+    <SettingsSection title="Sui CLI">
+      <SettingsRow
+        label="Source"
+        description={suiSourceLabel(effectiveSuiSource)}
+      >
+        <SegmentedControl>
+          {suiSourceOptions.map((option) => {
+            const unavailableSystem =
+              option.value === "system" && suiStatus ? !suiStatus.system.available : false;
+
+            return (
+              <Button
+                disabled={isSavingSuiSettings || unavailableSystem}
+                key={option.value}
+                onClick={() => void updateSuiSource(option.value)}
+                size="sm"
+                title={unavailableSystem ? suiStatus?.system.error ?? "Sui CLI not found on PATH." : undefined}
+                variant={effectiveSuiSource === option.value ? "default" : "ghost"}
+              >
+                {option.label}
+              </Button>
+            );
+          })}
+        </SegmentedControl>
+      </SettingsRow>
+
+      <div className="border-t border-border/70">
+        <div className="grid gap-2 px-4 py-3.5 text-xs text-muted-foreground">
+          <SuiSourceStatusRow
+            active={effectiveSuiSource === "bundled"}
+            label="Bundled crate"
+            path={suiStatus?.bundled.path ?? null}
+            version={suiStatus?.bundled.version ?? null}
+            available={suiStatus?.bundled.available ?? false}
+          />
+          <SuiSourceStatusRow
+            active={effectiveSuiSource === "system"}
+            label="User installed"
+            path={suiStatus?.system.path ?? null}
+            version={suiStatus?.system.version ?? null}
+            available={suiStatus?.system.available ?? false}
+          />
+        </div>
+      </div>
+
+      <div className="border-t border-border/70">
+        <SettingsRow
+          label="CLI path"
+          description="Set a binary path instead of the embedded toolchain."
+          align="start"
+        >
+          <div className="grid w-full min-w-0 gap-2 sm:w-[22rem]">
+            <Input
+              autoComplete="off"
+              id="sui-cli-path"
+              onChange={(event) => setSuiCliPathInput(event.target.value)}
+              placeholder="Use bundled crate or PATH"
+              type="text"
+              value={suiCliPathInput}
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                disabled={isSavingSuiSettings}
+                onClick={() => void chooseSuiCliPath()}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <FolderOpen aria-hidden="true" />
+                Browse
+              </Button>
+              <Button
+                disabled={isSavingSuiSettings || suiCliPathInput === (suiSettings.cliPath ?? "")}
+                onClick={() => void saveSuiCliPath(suiCliPathInput)}
+                size="sm"
+                type="button"
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        </SettingsRow>
+      </div>
+
+      {suiSettingsError ? (
+        <div className="border-t border-border/70 px-4 py-3.5">
+          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {suiSettingsError}
+          </p>
+        </div>
+      ) : null}
+    </SettingsSection>
+  );
+}
+
+function SettingsNavButton({
+  active,
+  group,
+  onClick,
+}: {
+  active: boolean;
+  group: (typeof settingsGroups)[number];
+  onClick: () => void;
+}) {
+  const Icon = group.icon;
+
+  return (
+    <button
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex min-w-[12rem] items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition lg:min-w-0",
+        active
+          ? "bg-accent text-foreground"
+          : "text-muted-foreground hover:bg-accent/55 hover:text-foreground",
+      )}
+      onClick={onClick}
+      type="button"
+    >
+      <Icon className="size-4 shrink-0" aria-hidden="true" />
+      <span className="min-w-0">
+        <span className="block truncate font-medium">{group.label}</span>
+        <span className="block truncate text-xs opacity-75">{group.description}</span>
+      </span>
+    </button>
+  );
+}
+
+function SettingsSection({
+  children,
+  title,
+}: {
+  children: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <section className="mb-10">
+      <h2 className="mb-3 text-[13px] font-medium text-muted-foreground">{title}</h2>
+      <div className="-mx-4 overflow-hidden rounded-2xl border border-border/70 bg-card">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function SettingsRow({
+  align = "center",
+  children,
+  description,
+  label,
+}: {
+  align?: "center" | "start";
+  children: React.ReactNode;
+  description?: string;
+  label: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col justify-between gap-3 px-4 py-3.5 sm:flex-row",
+        align === "center" ? "sm:items-center" : "sm:items-start",
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] font-medium text-foreground">{label}</div>
+        {description ? (
+          <div className="mt-0.5 text-[13px] text-muted-foreground">{description}</div>
+        ) : null}
+      </div>
+      <div className="flex min-w-0 shrink-0 items-center justify-end">{children}</div>
+    </div>
+  );
+}
+
+function SegmentedControl({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid grid-flow-col auto-cols-fr gap-1 rounded-lg border bg-muted p-1">
+      {children}
+    </div>
   );
 }
 

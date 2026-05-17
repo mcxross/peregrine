@@ -2,7 +2,6 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Titlebar } from "@/app/titlebar";
 import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
-import { Sidebar } from "@/app/sidebar";
 import { Workspace } from "@/app/workspace";
 import { Button } from "@/components/ui/button";
 import {
@@ -84,7 +83,6 @@ export function AppShell({
   const latestPackageTreeRef = useRef<PackageTree | null>(packageTree);
   const layout = defaultLayoutSettings;
   const isSettings = screen === "settings";
-  const showSidebar = isSettings;
   const activeMovePackage = useMemo(
     () => resolveActiveMovePackage(packageTree, activePackageManifestPath),
     [activePackageManifestPath, packageTree],
@@ -651,7 +649,6 @@ export function AppShell({
       />
 
       <section className="flex min-h-0">
-        {showSidebar ? <Sidebar layout={layout} /> : null}
         <div className="min-w-0 flex-1">
           {isSettings ? (
             <SettingsScreen onBack={onCloseSettings} />
