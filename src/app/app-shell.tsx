@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Titlebar } from "@/app/titlebar";
 import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
@@ -27,6 +27,10 @@ import {
   type PackageLoadAssessment,
   type PackageLoadAssessmentState,
 } from "@/features/project-workspace/package-load-assessment";
+import {
+  type LaunchIndexState,
+  useLaunchIndexer,
+} from "@/features/project-workspace/indexer/use-launch-indexer";
 import { defaultLayoutSettings } from "@/layout/layout-store";
 import { titlebarHeight } from "@/layout/window-chrome";
 import { SettingsScreen } from "@/screens/settings-screen";
@@ -67,6 +71,12 @@ export function AppShell({
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
   const [lastScannedAt, setLastScannedAt] = useState<number | null>(null);
   const [launchBuild, setLaunchBuild] = useState<LaunchBuildState | null>(null);
+  const {
+    launchIndex,
+    resetLaunchIndex,
+    setLaunchIndex,
+    startLaunchIndex,
+  } = useLaunchIndexer();
   const currentCommandLogIdRef = useRef<number | null>(null);
   const detailHydratedRootRef = useRef<string | null>(null);
   const launchBuildKeysRef = useRef<Set<string>>(new Set());
@@ -101,12 +111,13 @@ export function AppShell({
   }, [packageTree]);
 
   useEffect(() => {
+    resetLaunchIndex();
     setActivePackageManifestPath(packageTree?.activePackageManifestPath ?? null);
     setBuildRuns([]);
     setIsBuildSheetOpen(false);
     setLaunchBuild(null);
     setLastScannedAt(packageTree ? Date.now() : null);
-  }, [packageTree?.rootPath, packageTree?.activePackageManifestPath]);
+  }, [packageTree?.rootPath, packageTree?.activePackageManifestPath, resetLaunchIndex]);
 
   useEffect(() => {
     if (!packageTree) {
@@ -219,6 +230,7 @@ export function AppShell({
 
         if (lastSuccessfulBuildAt && Date.now() - lastSuccessfulBuildAt < BUILD_FRESHNESS_WINDOW_MS) {
           launchBuildKeysRef.current.delete(launchBuildKey);
+          startLaunchIndex(packageTree, activeMovePackage);
           return;
         }
 
@@ -307,6 +319,10 @@ export function AppShell({
                 : current,
             );
 
+            if (latestPackageTreeRef.current?.rootPath === packageTree.rootPath) {
+              startLaunchIndex(packageTree, activeMovePackage);
+            }
+
             if (state === "success" && latestPackageTreeRef.current?.rootPath === packageTree.rootPath) {
               try {
                 const rescannedPackageTree = await loadPackageTree(packageTree.rootPath);
@@ -346,6 +362,10 @@ export function AppShell({
                 ? { ...current, message: "Project build failed.", state: "error" }
                 : current,
             );
+
+            if (latestPackageTreeRef.current?.rootPath === packageTree.rootPath) {
+              startLaunchIndex(packageTree, activeMovePackage);
+            }
           })
           .finally(() => {
             window.clearInterval(messageTimer);
@@ -356,7 +376,7 @@ export function AppShell({
     return () => {
       isCancelled = true;
     };
-  }, [activeMovePackage, handleProjectSelected, packageTree]);
+  }, [activeMovePackage, handleProjectSelected, packageTree, startLaunchIndex]);
 
   useEffect(() => {
     if (!launchBuild || launchBuild.state === "running") {
@@ -369,6 +389,18 @@ export function AppShell({
 
     return () => window.clearTimeout(timer);
   }, [launchBuild]);
+
+  useEffect(() => {
+    if (!launchIndex || launchIndex.state === "running") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setLaunchIndex((current) => current?.key === launchIndex.key ? null : current);
+    }, launchIndex.state === "success" ? 3_500 : 7_000);
+
+    return () => window.clearTimeout(timer);
+  }, [launchIndex]);
 
   const runBuild = useCallback(async () => {
     if (!packageTree || !activeMovePackage || isCommandRunning) {
@@ -643,8 +675,9 @@ export function AppShell({
         </div>
       </section>
 
-      <LaunchBuildStatusToast
-        state={launchBuild}
+      <LaunchStatusToasts
+        buildState={launchBuild}
+        indexState={launchIndex}
         onOpenLogs={() => {
           if (launchBuild) {
             currentCommandLogIdRef.current = launchBuild.runId;
@@ -656,42 +689,76 @@ export function AppShell({
   );
 }
 
-function LaunchBuildStatusToast({
+function LaunchStatusToasts({
+  buildState,
+  indexState,
   onOpenLogs,
-  state,
 }: {
+  buildState: LaunchBuildState | null;
+  indexState: LaunchIndexState | null;
   onOpenLogs: () => void;
-  state: LaunchBuildState | null;
 }) {
-  if (!state) {
+  if (!buildState && !indexState) {
     return null;
   }
 
-  const isRunning = state.state === "running";
-  const isSuccess = state.state === "success";
+  return (
+    <div className="pointer-events-none fixed bottom-4 right-4 z-[120] flex max-w-[22rem] flex-col gap-2">
+      {buildState ? (
+        <LaunchStatusToastCard
+          action={
+            buildState.state === "error" ? (
+              <Button className="h-7 shrink-0 px-2 text-xs" onClick={onOpenLogs} type="button" variant="outline">
+                Logs
+              </Button>
+            ) : null
+          }
+          message={buildState.message}
+          packageName={buildState.packageName}
+          state={buildState.state}
+        />
+      ) : null}
+      {indexState ? (
+        <LaunchStatusToastCard
+          message={indexState.message}
+          packageName={indexState.packageName}
+          state={indexState.state}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function LaunchStatusToastCard({
+  action,
+  message,
+  packageName,
+  state,
+}: {
+  action?: ReactNode;
+  message: string;
+  packageName: string;
+  state: "running" | "success" | "error";
+}) {
+  const isRunning = state === "running";
+  const isSuccess = state === "success";
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[120] max-w-[22rem]">
-      <div className="pointer-events-auto flex items-center gap-3 rounded-md border border-[color:var(--app-border)] bg-[color-mix(in_oklch,var(--app-panel)_88%,transparent)] px-3 py-2 text-sm shadow-2xl shadow-black/35 backdrop-blur-md">
-        <div className="grid size-8 shrink-0 place-items-center rounded bg-[var(--app-subtle)]">
-          {isRunning ? <Loader2 className="size-4 animate-spin text-sky-300" aria-hidden="true" /> : null}
-          {isSuccess ? <CheckCircle2 className="size-4 text-emerald-400" aria-hidden="true" /> : null}
-          {!isRunning && !isSuccess ? <XCircle className="size-4 text-red-400" aria-hidden="true" /> : null}
-        </div>
-        <div className="min-w-0">
-          <div className="truncate text-xs font-semibold text-foreground">
-            {state.message}
-          </div>
-          <div className="truncate text-[11px] text-muted-foreground">
-            {state.packageName}
-          </div>
-        </div>
-        {!isRunning && !isSuccess ? (
-          <Button className="h-7 shrink-0 px-2 text-xs" onClick={onOpenLogs} type="button" variant="outline">
-            Logs
-          </Button>
-        ) : null}
+    <div className="pointer-events-auto flex items-center gap-3 rounded-md border border-[color:var(--app-border)] bg-[color-mix(in_oklch,var(--app-panel)_88%,transparent)] px-3 py-2 text-sm shadow-2xl shadow-black/35 backdrop-blur-md">
+      <div className="grid size-8 shrink-0 place-items-center rounded bg-[var(--app-subtle)]">
+        {isRunning ? <Loader2 className="size-4 animate-spin text-sky-300" aria-hidden="true" /> : null}
+        {isSuccess ? <CheckCircle2 className="size-4 text-emerald-400" aria-hidden="true" /> : null}
+        {!isRunning && !isSuccess ? <XCircle className="size-4 text-red-400" aria-hidden="true" /> : null}
       </div>
+      <div className="min-w-0">
+        <div className="truncate text-xs font-semibold text-foreground">
+          {message}
+        </div>
+        <div className="truncate text-[11px] text-muted-foreground">
+          {packageName}
+        </div>
+      </div>
+      {action}
     </div>
   );
 }

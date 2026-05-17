@@ -80,8 +80,9 @@ async fn index_package(
     app: tauri::AppHandle,
     state: tauri::State<'_, IndexerCommandState>,
     root_path: String,
+    run_id: Option<String>,
 ) -> Result<IndexReport, String> {
-    let run_id = new_index_run_id();
+    let run_id = run_id.unwrap_or_else(new_index_run_id);
     emit_index_event(
         &app,
         index_events::INDEX_STARTED,

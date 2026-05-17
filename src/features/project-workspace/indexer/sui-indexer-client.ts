@@ -103,8 +103,8 @@ export type IndexEventPayload = {
   packageId: string | null;
 };
 
-export function indexPackage(rootPath: string) {
-  return invoke<IndexReport>("index_package", { rootPath });
+export function indexPackage(rootPath: string, runId = createIndexRunId()) {
+  return invoke<IndexReport>("index_package", { rootPath, runId });
 }
 
 export function reindexPackage(packageId: string) {
@@ -217,4 +217,8 @@ export function listenToIndexProgress(
   handler: (event: IndexEventPayload) => void,
 ) {
   return listen<IndexEventPayload>("index_progress", (event) => handler(event.payload));
+}
+
+export function createIndexRunId() {
+  return `index-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
