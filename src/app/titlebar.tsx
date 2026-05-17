@@ -38,12 +38,14 @@ import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 type TitlebarProps = {
   activeWorkspaceTab?: WorkspaceTab;
   buildActionState?: WorkspaceActionState;
+  coverageActionState?: WorkspaceActionState;
   fuzzActionState?: WorkspaceActionState;
   isLeftPanelOpen?: boolean;
   layout: LayoutSettings;
   hasWorkspace?: boolean;
   mode?: WorkspaceMode;
   onBuildPackage?: () => void;
+  onCheckCoverage?: () => void;
   onFuzzPackage?: () => void;
   onOpenProjectConfig?: () => void;
   onTestPackage?: () => void;
@@ -55,12 +57,14 @@ type TitlebarProps = {
 
 export function Titlebar({
   buildActionState,
+  coverageActionState,
   fuzzActionState,
   isLeftPanelOpen = true,
   layout,
   hasWorkspace = true,
   mode = "security",
   onBuildPackage,
+  onCheckCoverage,
   onFuzzPackage,
   onOpenProjectConfig,
   onTestPackage,
@@ -127,18 +131,22 @@ export function Titlebar({
                     ? buildActionState
                     : action.id === "test"
                       ? testActionState
-                      : action.id === "fuzzing"
-                        ? fuzzActionState
-                        : undefined
+                      : action.id === "coverage"
+                        ? coverageActionState
+                        : action.id === "fuzzing"
+                          ? fuzzActionState
+                          : undefined
                 }
                 onClick={
                   action.id === "build"
                     ? onBuildPackage
                     : action.id === "test"
                       ? onTestPackage
-                      : action.id === "fuzzing"
-                        ? onFuzzPackage
-                        : undefined
+                      : action.id === "coverage"
+                        ? onCheckCoverage
+                        : action.id === "fuzzing"
+                          ? onFuzzPackage
+                          : undefined
                 }
               />
             ))}

@@ -29,6 +29,7 @@ export type ProjectPackageConfig = {
 };
 
 export type ProjectCommandConfig = {
+  moveCoverageScriptPath?: string | null;
   moveTestScriptPath?: string | null;
 };
 
@@ -523,6 +524,10 @@ export type CommandOutputStreamOptions = {
   onOutput?: (output: CommandOutput) => void;
 };
 
+export type CommandScriptOutputStreamOptions = CommandOutputStreamOptions & {
+  args?: string[];
+};
+
 type CommandOutputChunk = {
   streamId: string;
   stream: "stderr" | "stdout";
@@ -534,6 +539,7 @@ const SUI_ADAPTER_SETTINGS_CHANGED_EVENT = "sui-adapter-settings-changed";
 
 export type SecurityCommandKind =
   | "move-coverage"
+  | "move-coverage-summary"
   | "move-fuzz"
   | "move-test"
   | "publish-dry-run-localnet"
@@ -741,11 +747,12 @@ export async function runSecurityScript(
   packageTree: PackageTree,
   packagePath: string,
   scriptPath: string,
-  options?: CommandOutputStreamOptions,
+  options?: CommandScriptOutputStreamOptions,
 ) {
   return invokeCommandOutput("run_security_script", {
     rootPath: packageTree.rootPath,
     packagePath,
+    scriptArgs: options?.args ?? [],
     scriptPath,
   }, options);
 }

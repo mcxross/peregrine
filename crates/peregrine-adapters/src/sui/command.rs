@@ -155,6 +155,7 @@ pub enum SuiCommandKind {
     MoveBuild,
     MoveTest,
     MoveCoverage,
+    MoveCoverageSummary,
     MoveFuzz,
     PublishDryRun(SuiNetwork),
     Publish(SuiNetwork),
@@ -166,6 +167,7 @@ impl SuiCommandKind {
             "move-build" => Ok(Self::MoveBuild),
             "move-test" => Ok(Self::MoveTest),
             "move-coverage" => Ok(Self::MoveCoverage),
+            "move-coverage-summary" => Ok(Self::MoveCoverageSummary),
             "move-fuzz" => Ok(Self::MoveFuzz),
             "publish-dry-run-localnet" => Ok(Self::PublishDryRun(SuiNetwork::Localnet)),
             "publish-dry-run-devnet" => Ok(Self::PublishDryRun(SuiNetwork::Devnet)),
@@ -216,6 +218,11 @@ fn command_parts(command_kind: SuiCommandKind) -> (Vec<String>, String, Option<P
         SuiCommandKind::MoveCoverage => (
             command_args(&["move", "test", "--coverage"]),
             "sui move test --coverage".to_string(),
+            None,
+        ),
+        SuiCommandKind::MoveCoverageSummary => (
+            command_args(&["move", "coverage", "summary"]),
+            "sui move coverage summary".to_string(),
             None,
         ),
         SuiCommandKind::MoveFuzz => (
@@ -272,6 +279,11 @@ fn bundled_args_for_package(command_kind: SuiCommandKind, package_root: &Path) -
             push_os_args(&mut args, ["move", "--path"]);
             args.push(package_root.to_os_string());
             push_os_args(&mut args, ["test", "--coverage"]);
+        }
+        SuiCommandKind::MoveCoverageSummary => {
+            push_os_args(&mut args, ["move", "--path"]);
+            args.push(package_root.to_os_string());
+            push_os_args(&mut args, ["coverage", "summary"]);
         }
         SuiCommandKind::MoveFuzz => {
             push_os_args(&mut args, ["move", "--path"]);

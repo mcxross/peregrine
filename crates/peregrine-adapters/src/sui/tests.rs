@@ -74,6 +74,33 @@ fn bundled_move_args_pin_the_package_path() {
 }
 
 #[test]
+fn coverage_summary_command_inspects_existing_coverage() {
+    let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
+    let command = adapter
+        .package_command("move-coverage-summary")
+        .expect("command");
+    let args = command
+        .bundled_args_for_package(Path::new("/tmp/package"))
+        .into_iter()
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+
+    assert_eq!(command.args, ["move", "coverage", "summary"]);
+    assert_eq!(command.display, "sui move coverage summary");
+    assert_eq!(
+        args,
+        [
+            "sui",
+            "move",
+            "--path",
+            "/tmp/package",
+            "coverage",
+            "summary"
+        ]
+    );
+}
+
+#[test]
 fn publish_dry_run_command_does_not_use_pubfile_with_publish() {
     let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
     let command = adapter

@@ -59,6 +59,7 @@ export function ProjectConfigDialog({
   packageTree,
 }: ProjectConfigDialogProps) {
   const [activeCategory, setActiveCategory] = React.useState<ProjectConfigCategory>("tests");
+  const [draftMoveCoverageScriptPath, setDraftMoveCoverageScriptPath] = React.useState("");
   const [draftMoveTestScriptPath, setDraftMoveTestScriptPath] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -85,6 +86,9 @@ export function ProjectConfigDialog({
 
         setDraftMoveTestScriptPath(
           metadata.packageConfigs?.[packageKey]?.commands?.moveTestScriptPath ?? "",
+        );
+        setDraftMoveCoverageScriptPath(
+          metadata.packageConfigs?.[packageKey]?.commands?.moveCoverageScriptPath ?? "",
         );
       })
       .catch((loadError) => {
@@ -139,6 +143,42 @@ export function ProjectConfigDialog({
     }
   }, [activeMovePackage, isPicking, packageTree]);
 
+  const chooseMoveCoverageScript = React.useCallback(async () => {
+    if (!activeMovePackage || isPicking) {
+      return;
+    }
+
+    setIsPicking(true);
+    setError(null);
+
+    try {
+      const packageDirectory = absolutePackagePath(packageTree, activeMovePackage.path);
+      const selectedPath = await open({
+        defaultPath: packageDirectory,
+        directory: false,
+        multiple: false,
+        title: "Choose Move coverage script",
+      });
+
+      if (!selectedPath || Array.isArray(selectedPath)) {
+        return;
+      }
+
+      const relativePath = packageRelativePath(packageDirectory, selectedPath);
+
+      if (!relativePath) {
+        setError("Choose a script inside the selected Move package.");
+        return;
+      }
+
+      setDraftMoveCoverageScriptPath(relativePath);
+    } catch (pickError) {
+      setError(getProjectConfigError(pickError, "Could not choose script."));
+    } finally {
+      setIsPicking(false);
+    }
+  }, [activeMovePackage, isPicking, packageTree]);
+
   const saveConfig = React.useCallback(async () => {
     if (!activeMovePackage || !packageKey || isSaving) {
       return;
@@ -149,6 +189,7 @@ export function ProjectConfigDialog({
 
     try {
       const metadata = await loadProjectMetadata(packageTree.rootPath);
+      const normalizedCoverageScriptPath = normalizeScriptPath(draftMoveCoverageScriptPath);
       const normalizedScriptPath = normalizeScriptPath(draftMoveTestScriptPath);
       const nextMetadata: ProjectMetadata = {
         ...metadata,
@@ -158,6 +199,7 @@ export function ProjectConfigDialog({
             ...(metadata.packageConfigs?.[packageKey] ?? {}),
             commands: {
               ...(metadata.packageConfigs?.[packageKey]?.commands ?? {}),
+              moveCoverageScriptPath: normalizedCoverageScriptPath,
               moveTestScriptPath: normalizedScriptPath,
             },
           },
@@ -165,6 +207,7 @@ export function ProjectConfigDialog({
       };
 
       await saveProjectMetadata(packageTree.rootPath, nextMetadata);
+      setDraftMoveCoverageScriptPath(normalizedCoverageScriptPath ?? "");
       setDraftMoveTestScriptPath(normalizedScriptPath ?? "");
       onOpenChange(false);
     } catch (saveError) {
@@ -174,6 +217,7 @@ export function ProjectConfigDialog({
     }
   }, [
     activeMovePackage,
+    draftMoveCoverageScriptPath,
     draftMoveTestScriptPath,
     isSaving,
     onOpenChange,
@@ -233,7 +277,17 @@ export function ProjectConfigDialog({
                   />
                 ) : null}
 
-                {activeCategory === "coverage" ? <CoverageConfigSection /> : null}
+                {activeCategory === "coverage" ? (
+                  <CoverageConfigSection
+                    activeMovePackage={activeMovePackage}
+                    draftMoveCoverageScriptPath={draftMoveCoverageScriptPath}
+                    isLoading={isLoading}
+                    isPicking={isPicking}
+                    isSaving={isSaving}
+                    onChooseMoveCoverageScript={() => void chooseMoveCoverageScript()}
+                    onDraftMoveCoverageScriptPathChange={setDraftMoveCoverageScriptPath}
+                  />
+                ) : null}
 
                 {activeCategory === "commands" ? (
                   <CommandsConfigSection
@@ -330,16 +384,54 @@ function TestsConfigSection({
   );
 }
 
-function CoverageConfigSection() {
+function CoverageConfigSection({
+  activeMovePackage,
+  draftMoveCoverageScriptPath,
+  isLoading,
+  isPicking,
+  isSaving,
+  onChooseMoveCoverageScript,
+  onDraftMoveCoverageScriptPathChange,
+}: {
+  activeMovePackage: MovePackage | null;
+  draftMoveCoverageScriptPath: string;
+  isLoading: boolean;
+  isPicking: boolean;
+  isSaving: boolean;
+  onChooseMoveCoverageScript: () => void;
+  onDraftMoveCoverageScriptPathChange: (path: string) => void;
+}) {
   return (
     <div className="overflow-hidden rounded-lg border border-[color:var(--app-border)] bg-[var(--app-panel)]">
       <ConfigRow
-        description="Built-in default."
-        label="Command"
+        description="Runs the full coverage flow."
+        label="Coverage script"
       >
-        <div className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 py-2 font-mono text-sm">
-          sui move test --coverage
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <Input
+            autoComplete="off"
+            disabled={isLoading || isSaving || !activeMovePackage}
+            onChange={(event) => onDraftMoveCoverageScriptPathChange(event.target.value)}
+            placeholder="scripts/coverage.sh"
+            value={draftMoveCoverageScriptPath}
+          />
+          <Button
+            disabled={isLoading || isPicking || isSaving || !activeMovePackage}
+            onClick={onChooseMoveCoverageScript}
+            type="button"
+            variant="outline"
+          >
+            {isPicking ? (
+              <Loader2 className="animate-spin" aria-hidden="true" />
+            ) : (
+              <FolderOpen aria-hidden="true" />
+            )}
+            Browse
+          </Button>
         </div>
+      </ConfigRow>
+      <ConfigRow description="Used when no coverage script is set." label="Default">
+        <ReadOnlyValue value="sui move test --coverage; sui move coverage summary" />
       </ConfigRow>
     </div>
   );

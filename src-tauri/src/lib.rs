@@ -33,7 +33,7 @@ use std::{
     process::{Command, Stdio},
     sync::{mpsc, Mutex},
     thread,
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tauri::{
     menu::{AboutMetadata, Menu, MenuItemBuilder, PredefinedMenuItem, Submenu},
@@ -562,6 +562,7 @@ struct ProjectPackageConfig {
 #[derive(Deserialize, Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 struct ProjectCommandConfig {
+    move_coverage_script_path: Option<String>,
     move_test_script_path: Option<String>,
 }
 
@@ -905,6 +906,7 @@ async fn run_security_script(
     root_path: String,
     package_path: String,
     script_path: String,
+    script_args: Vec<String>,
     stream_id: Option<String>,
 ) -> Result<CommandOutput, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -912,6 +914,7 @@ async fn run_security_script(
             &root_path,
             &package_path,
             &script_path,
+            &script_args,
             command_output_stream(app, stream_id),
         )
     })
@@ -1893,6 +1896,7 @@ fn run_package_script(
     root_path: &str,
     package_path: &str,
     script_path: &str,
+    script_args: &[String],
     stream: Option<CommandOutputStream>,
 ) -> Result<CommandOutput, String> {
     let package_root = resolve_package_child_path(root_path, package_path)?;
@@ -1910,6 +1914,16 @@ fn run_package_script(
         return Err("Bash script path contains an invalid null byte.".to_string());
     }
 
+    for script_arg in script_args {
+        if script_arg.contains('\0') {
+            return Err("Bash script argument contains an invalid null byte.".to_string());
+        }
+
+        if script_arg.len() > 1_024 {
+            return Err("Bash script argument is too long.".to_string());
+        }
+    }
+
     if !package_root.is_dir() {
         return Err("Selected package path is not a directory.".to_string());
     }
@@ -1919,19 +1933,101 @@ fn run_package_script(
     }
 
     let script_path = resolve_package_script_path(&package_root, script_path)?;
+    let bundled_sui_shim_dir = create_bundled_sui_shim_dir()?;
+    let bundled_sui_shim = bundled_sui_shim_dir.join("sui");
+    let original_path = std::env::var_os("PATH").unwrap_or_default();
+    let mut path_entries = vec![bundled_sui_shim_dir.clone()];
+    path_entries.extend(std::env::split_paths(&original_path));
+    let script_path_env = std::env::join_paths(path_entries)
+        .map_err(|error| format!("Could not prepare script PATH: {error}"))?;
 
     let mut process = Command::new("bash");
-    run_configured_command(
-        configure_plain_command_output(process.arg(&script_path).current_dir(&package_root)),
+    let output = run_configured_command(
+        configure_plain_command_output(
+            process
+                .arg(&script_path)
+                .args(script_args)
+                .current_dir(&package_root)
+                .env("PATH", script_path_env)
+                .env("PEREGRINE_BUNDLED_SUI", &bundled_sui_shim)
+                .env(
+                    "PEREGRINE_COVERAGE_MAP_PATH",
+                    package_root.join(".coverage_map.mvcov"),
+                )
+                .env("PEREGRINE_PACKAGE_ROOT", &package_root)
+                .env("PEREGRINE_PROJECT_ROOT", root_path),
+        ),
         stream,
-    )
-    .map_err(|error| {
+    );
+    let _ = fs::remove_dir_all(&bundled_sui_shim_dir);
+
+    output.map_err(|error| {
         format!(
             "Could not execute bash script {} in {}: {error}",
             script_path.display(),
             package_root.display()
         )
     })
+}
+
+fn create_bundled_sui_shim_dir() -> Result<PathBuf, String> {
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let shim_dir = std::env::temp_dir().join(format!(
+        "peregrine-bundled-sui-{}-{nonce}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&shim_dir).map_err(|error| {
+        format!(
+            "Could not create bundled Sui shim directory {}: {error}",
+            shim_dir.display()
+        )
+    })?;
+
+    let shim_path = shim_dir.join("sui");
+    let script = format!(
+        "#!/usr/bin/env bash\nexec {} {} sui \"$@\"\n",
+        shell_quote(&executable.to_string_lossy()),
+        shell_quote(BUNDLED_SUI_HELPER_ARG),
+    );
+
+    fs::write(&shim_path, script).map_err(|error| {
+        format!(
+            "Could not write bundled Sui shim {}: {error}",
+            shim_path.display()
+        )
+    })?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        let mut permissions = fs::metadata(&shim_path)
+            .map_err(|error| {
+                format!(
+                    "Could not read bundled Sui shim metadata {}: {error}",
+                    shim_path.display()
+                )
+            })?
+            .permissions();
+        permissions.set_mode(0o700);
+        fs::set_permissions(&shim_path, permissions).map_err(|error| {
+            format!(
+                "Could not make bundled Sui shim executable {}: {error}",
+                shim_path.display()
+            )
+        })?;
+    }
+
+    Ok(shim_dir)
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 fn resolve_package_script_path(package_root: &Path, script_path: &str) -> Result<PathBuf, String> {

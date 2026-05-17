@@ -578,6 +578,155 @@ export function AppShell({
     }
   }, [activeMovePackage, isCommandRunning, packageTree]);
 
+  const checkCoverage = useCallback(async () => {
+    if (!packageTree || !activeMovePackage || isCommandRunning) {
+      return;
+    }
+
+    const startedAt = new Date();
+    const workingDirectory = packagePathLabel(activeMovePackage, packageTree);
+    const metadata = await loadProjectMetadata(packageTree.rootPath).catch((error) => {
+      console.warn("Could not load project metadata; running default Move coverage.", error);
+      return defaultProjectMetadata();
+    });
+    const moveCoverageScriptPath = projectMoveCoverageScriptPath(metadata, activeMovePackage);
+    const moveTestScriptPath = projectMoveTestScriptPath(metadata, activeMovePackage);
+    const coverageScriptPath = moveCoverageScriptPath ?? moveTestScriptPath;
+    const coverageScriptArgs = moveCoverageScriptPath ? [] : moveTestScriptPath ? ["--coverage"] : [];
+    const coverageRun: BuildLogRun = {
+      canRerun: false,
+      command: coverageScriptPath
+        ? `bash ${coverageScriptPath}${coverageScriptArgs.length ? ` ${coverageScriptArgs.join(" ")}` : ""}`
+        : "sui move test --coverage",
+      error: null,
+      finishedAt: null,
+      id: startedAt.getTime(),
+      metadata: coverageScriptPath
+        ? [
+            { label: "Mode", value: moveCoverageScriptPath ? "Project coverage script" : "Project test script" },
+            { label: "Default", value: "sui move test --coverage" },
+          ]
+        : undefined,
+      output: null,
+      packageName: activeMovePackage.name,
+      packagePath: activeMovePackage.path || ".",
+      runningText: "Running tests with coverage...",
+      startedAt,
+      state: "running",
+      title: "Coverage test run",
+      workingDirectory,
+    };
+
+    currentCommandLogIdRef.current = coverageRun.id;
+    setBuildRuns([coverageRun]);
+    setIsBuildSheetOpen(true);
+
+    try {
+      const coverageOutput = coverageScriptPath
+        ? await runSecurityScript(packageTree, activeMovePackage.path, coverageScriptPath, {
+            args: coverageScriptArgs,
+            streamId: coverageRun.id,
+            onOutput: (output) => {
+              setBuildRuns((current) =>
+                updateLogRun(current, coverageRun.id, (run) =>
+                  run.state === "running" ? { ...run, output } : run,
+                ),
+              );
+            },
+          })
+        : await runSecurityCommand(packageTree, activeMovePackage.path, "move-coverage", {
+            streamId: coverageRun.id,
+            onOutput: (output) => {
+              setBuildRuns((current) =>
+                updateLogRun(current, coverageRun.id, (run) =>
+                  run.state === "running" ? { ...run, output } : run,
+                ),
+              );
+            },
+          });
+      const coverageState = coverageOutput.status === 0 ? "success" : "error";
+
+      setBuildRuns((current) =>
+        updateLogRun(current, coverageRun.id, (run) => ({
+          ...run,
+          finishedAt: new Date(),
+          output: coverageOutput,
+          state: coverageState,
+        })),
+      );
+
+      if (coverageState !== "success") {
+        return;
+      }
+
+      if (moveCoverageScriptPath) {
+        return;
+      }
+
+      const summaryStartedAt = new Date();
+      const summaryRun: BuildLogRun = {
+        canRerun: false,
+        command: "sui move coverage summary",
+        error: null,
+        finishedAt: null,
+        id: summaryStartedAt.getTime(),
+        output: null,
+        packageName: activeMovePackage.name,
+        packagePath: activeMovePackage.path || ".",
+        runningText: "Reading coverage summary...",
+        startedAt: summaryStartedAt,
+        state: "running",
+        title: "Coverage summary",
+        workingDirectory,
+      };
+
+      currentCommandLogIdRef.current = summaryRun.id;
+      setBuildRuns((current) => [...current, summaryRun]);
+
+      const summaryOutput = await runSecurityCommand(
+        packageTree,
+        activeMovePackage.path,
+        "move-coverage-summary",
+        {
+          streamId: summaryRun.id,
+          onOutput: (output) => {
+            setBuildRuns((current) =>
+              updateLogRun(current, summaryRun.id, (run) =>
+                run.state === "running" ? { ...run, output } : run,
+              ),
+            );
+          },
+        },
+      );
+      const summaryState = summaryOutput.status === 0 ? "success" : "error";
+
+      setBuildRuns((current) =>
+        updateLogRun(current, summaryRun.id, (run) => ({
+          ...run,
+          finishedAt: new Date(),
+          output: summaryOutput,
+          state: summaryState,
+        })),
+      );
+    } catch (error) {
+      const activeRunId = currentCommandLogIdRef.current ?? coverageRun.id;
+
+      setBuildRuns((current) =>
+        updateLogRun(current, activeRunId, (run) => ({
+          ...run,
+          error: getCommandErrorMessage(
+            error,
+            coverageScriptPath
+              ? `Could not run project coverage script ${coverageScriptPath}.`
+              : "Could not run coverage. Peregrine runs `sui move test --coverage` before reading the summary.",
+          ),
+          finishedAt: new Date(),
+          state: "error",
+        })),
+      );
+    }
+  }, [activeMovePackage, isCommandRunning, packageTree]);
+
   const runFuzz = useCallback(async () => {
     if (!packageTree || !activeMovePackage || isCommandRunning) {
       return;
@@ -666,12 +815,17 @@ export function AppShell({
         hasWorkspace={!isSettings && Boolean(packageTree)}
         mode={workspaceMode}
         onBuildPackage={runBuild}
+        onCheckCoverage={checkCoverage}
         onFuzzPackage={runFuzz}
         onOpenProjectConfig={() => setIsProjectConfigOpen(true)}
         onTestPackage={runTests}
         onToggleMode={() => setWorkspaceMode((mode) => mode === "security" ? "editor" : "security")}
         onToggleLeftPanel={() => setIsLeftPanelOpen((isOpen) => !isOpen)}
         testActionState={{
+          disabled: !activeMovePackage,
+          running: isCommandRunning,
+        }}
+        coverageActionState={{
           disabled: !activeMovePackage,
           running: isCommandRunning,
         }}
@@ -873,6 +1027,13 @@ function defaultProjectMetadata(): ProjectMetadata {
 function projectMoveTestScriptPath(metadata: ProjectMetadata, movePackage: MovePackage) {
   return (
     metadata.packageConfigs?.[projectPackageMetadataKey(movePackage)]?.commands?.moveTestScriptPath?.trim()
+    || null
+  );
+}
+
+function projectMoveCoverageScriptPath(metadata: ProjectMetadata, movePackage: MovePackage) {
+  return (
+    metadata.packageConfigs?.[projectPackageMetadataKey(movePackage)]?.commands?.moveCoverageScriptPath?.trim()
     || null
   );
 }
