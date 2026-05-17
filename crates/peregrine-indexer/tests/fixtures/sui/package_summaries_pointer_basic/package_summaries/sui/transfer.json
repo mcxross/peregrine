@@ -1,0 +1,14 @@
+{
+  "id": { "address": "sui", "name": "transfer" },
+  "immediate_dependencies": [],
+  "structs": {},
+  "functions": {
+    "public_transfer": {
+      "visibility": "Public",
+      "entry": false,
+      "parameters": [{ "type_": "T" }, { "type_": "address" }],
+      "return_": []
+    }
+  }
+}
+

@@ -1,0 +1,10 @@
+pub const INDEX_STARTED: &str = "index_started";
+pub const INDEX_PROGRESS: &str = "index_progress";
+pub const INDEX_COMPILING: &str = "index_compiling";
+pub const INDEX_DISCOVERING_SUMMARIES: &str = "index_discovering_summaries";
+pub const INDEX_EXTRACTING_SUMMARY_POINTERS: &str = "index_extracting_summary_pointers";
+pub const INDEX_MATERIALIZING_ROOT_SUMMARIES: &str = "index_materializing_root_summaries";
+pub const INDEX_ENRICHING_FULL: &str = "index_enriching_full";
+pub const INDEX_PERSISTING: &str = "index_persisting";
+pub const INDEX_COMPLETED: &str = "index_completed";
+pub const INDEX_FAILED: &str = "index_failed";

@@ -1,0 +1,14 @@
+{
+  "id": { "address": "deepbook_margin", "name": "margin_pool" },
+  "immediate_dependencies": [],
+  "structs": {
+    "MarginPool": {
+      "abilities": ["key", "store"],
+      "fields": { "fields": { "id": { "type_": "sui::object::UID" } } }
+    }
+  },
+  "functions": {
+    "borrow": { "visibility": "Public", "entry": false, "parameters": [], "return_": [] }
+  }
+}
+
