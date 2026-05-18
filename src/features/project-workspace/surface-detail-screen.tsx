@@ -93,6 +93,7 @@ const OBJECT_LIFECYCLE_STAGE_GROUPS = [
 export type SurfaceDetailKind =
   | "entry-functions"
   | "capabilities"
+  | "objects"
   | "shared-objects"
   | "address-owned"
   | "immutable-objects"
@@ -107,6 +108,8 @@ type SurfaceDetailScreenProps = {
   movePackage: MovePackage | null;
 };
 
+type ObjectDetailTabKind = "capabilities" | ObjectOwnershipFinding["ownershipKind"];
+
 const detailMeta = {
   "entry-functions": {
     icon: GitBranch,
@@ -117,6 +120,11 @@ const detailMeta = {
     icon: KeyRound,
     title: "Capabilities",
     description: "Authority-bearing structs and the privileged functions they protect.",
+  },
+  objects: {
+    icon: Boxes,
+    title: "Objects",
+    description: "Shared, owned, immutable, wrapped, and party objects detected in the active package.",
   },
   "shared-objects": {
     icon: Boxes,
@@ -172,10 +180,10 @@ export function SurfaceDetailScreen({
   const Icon = meta.icon;
   const ownershipKind = ownershipKindForDetail(detail);
 
-  if (ownershipKind) {
+  if (detail === "objects" || detail === "capabilities" || ownershipKind) {
     return (
       <ObjectOwnershipTreeScreen
-        kind={ownershipKind}
+        initialKind={detail === "capabilities" ? "capabilities" : ownershipKind ?? "capabilities"}
         movePackage={movePackage}
       />
     );
@@ -205,13 +213,14 @@ export function SurfaceDetailScreen({
 }
 
 function ObjectOwnershipTreeScreen({
-  kind,
+  initialKind,
   movePackage,
 }: {
-  kind: ObjectOwnershipFinding["ownershipKind"];
+  initialKind: ObjectDetailTabKind;
   movePackage: MovePackage | null;
 }) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const [activeKind, setActiveKind] = React.useState<ObjectDetailTabKind>(initialKind);
   const [query, setQuery] = React.useState("");
   const [highRiskOnly, setHighRiskOnly] = React.useState(false);
   const [showTestFunctions, setShowTestFunctions] = React.useState(false);
@@ -233,8 +242,12 @@ function ObjectOwnershipTreeScreen({
     [allLifecycleMaps, movePackage, showTestFunctions],
   );
   const groups = React.useMemo(
-    () => objectLifecycleGroups(lifecycleMaps, kind, query, highRiskOnly),
-    [highRiskOnly, kind, lifecycleMaps, query],
+    () => activeKind === "capabilities" ? [] : objectLifecycleGroups(lifecycleMaps, activeKind, query, highRiskOnly),
+    [activeKind, highRiskOnly, lifecycleMaps, query],
+  );
+  const tabs = React.useMemo(
+    () => objectOwnershipTabs(movePackage),
+    [movePackage],
   );
   const lifecycleByKey = React.useMemo(
     () =>
@@ -252,8 +265,12 @@ function ObjectOwnershipTreeScreen({
   const selectedLifecycleMap = selectedKey ? lifecycleByKey.get(selectedKey) ?? null : null;
 
   React.useEffect(() => {
+    setActiveKind(initialKind);
+  }, [initialKind, movePackage?.manifestPath]);
+
+  React.useEffect(() => {
     setCollapsedGroups(new Set());
-  }, [kind, movePackage?.manifestPath, showTestFunctions]);
+  }, [activeKind, movePackage?.manifestPath, showTestFunctions]);
 
   React.useEffect(() => {
     if (!groups.length) {
@@ -307,41 +324,81 @@ function ObjectOwnershipTreeScreen({
       style={{ gridTemplateColumns: `${treePaneWidth}px 6px minmax(0, 1fr)` }}
     >
       <div className="grid min-h-0 grid-rows-[auto_1fr]">
-        <div className="border-b border-[color:var(--app-border)] px-5 py-4">
-          <div className="flex h-9 items-center gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3">
-            <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <input
-              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search modules / objects"
-              value={query}
-            />
-            <button
-              aria-pressed={highRiskOnly}
-              className="inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
-              data-active={highRiskOnly}
-              onClick={() => setHighRiskOnly((active) => !active)}
-              title="Show high-risk objects"
-              type="button"
-            >
-              <Filter className="size-3.5" aria-hidden="true" />
-            </button>
-            <button
-              aria-pressed={showTestFunctions}
-              className="inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
-              data-active={showTestFunctions}
-              onClick={() => setShowTestFunctions((visible) => !visible)}
-              title={showTestFunctions ? "Hide test helpers" : "Show test helpers"}
-              type="button"
-            >
-              <TestTube2 className="size-3.5" aria-hidden="true" />
-            </button>
+        <div className="grid gap-3 border-b border-[color:var(--app-border)] px-5 py-4">
+          <div className="grid grid-cols-5 gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-1">
+            {tabs.map((tab) => {
+              const TabIcon = tab.icon;
+              const active = activeKind === tab.kind;
+
+              return (
+                <button
+                  aria-pressed={active}
+                  className={cn(
+                    "grid min-w-0 gap-1 rounded px-2 py-2 text-left transition hover:bg-[var(--app-subtle)]",
+                    active && "bg-[var(--app-subtle)] text-foreground shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--primary)_32%,transparent)]",
+                    !active && "text-muted-foreground",
+                  )}
+                  key={tab.kind}
+                  onClick={() => setActiveKind(tab.kind)}
+                  title={tab.title}
+                  type="button"
+                >
+                  <span className="flex min-w-0 items-center justify-between gap-2">
+                    <TabIcon className="size-3.5 shrink-0" aria-hidden="true" />
+                    <span className={cn(
+                      "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                      active ? tab.activeCountClassName : "bg-[var(--app-subtle)] text-muted-foreground",
+                    )}>
+                      {tab.count}
+                    </span>
+                  </span>
+                  <span className="truncate text-[11px] font-medium leading-4">{tab.shortTitle}</span>
+                </button>
+              );
+            })}
           </div>
+          {activeKind === "capabilities" ? null : (
+            <div className="flex h-9 items-center gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3">
+              <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <input
+                className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search modules / objects"
+                value={query}
+              />
+              <button
+                aria-pressed={highRiskOnly}
+                className="inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
+                data-active={highRiskOnly}
+                onClick={() => setHighRiskOnly((active) => !active)}
+                title="Show high-risk objects"
+                type="button"
+              >
+                <Filter className="size-3.5" aria-hidden="true" />
+              </button>
+              <button
+                aria-pressed={showTestFunctions}
+                className="inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
+                data-active={showTestFunctions}
+                onClick={() => setShowTestFunctions((visible) => !visible)}
+                title={showTestFunctions ? "Hide test helpers" : "Show test helpers"}
+                type="button"
+              >
+                <TestTube2 className="size-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          )}
         </div>
 
         <ScrollArea className="min-h-0">
           <div className="px-5 py-4">
-            {movePackage ? (
+            {activeKind === "capabilities" ? (
+              movePackage ? (
+                <CapabilitiesDetail movePackage={movePackage} />
+              ) : (
+                <ObjectTreeEmpty label="No active Move package selected." />
+              )
+            ) : movePackage ? (
               groups.length ? (
                 <div className="grid gap-3">
                   {groups.map((group) => {
@@ -415,7 +472,11 @@ function ObjectOwnershipTreeScreen({
         />
       </div>
 
-      <ObjectLifecycleDetail lifecycleMap={selectedLifecycleMap} />
+      {activeKind === "capabilities" ? (
+        <CapabilityOverview movePackage={movePackage} />
+      ) : (
+        <ObjectLifecycleDetail lifecycleMap={selectedLifecycleMap} />
+      )}
     </section>
   );
 }
@@ -546,23 +607,8 @@ function renderDetail(detail: SurfaceDetailKind, movePackage: MovePackage) {
     case "entry-functions":
       return <EntryFunctionsDetail movePackage={movePackage} />;
     case "capabilities":
-      return (
-        <FindingList
-          emptyLabel="No capability-like structs found."
-          items={movePackage.surface.capabilityFindings.filter((finding) => finding.confidence !== "low")}
-          renderItem={(finding) => (
-            <FindingCard
-              key={finding.qualifiedName}
-              badge={finding.confidence}
-              evidence={finding.evidence}
-              title={finding.qualifiedName}
-              subtitle={finding.protectedFunctions.length ? "Protects privileged functions" : "Capability candidate"}
-            >
-              <InlineList label="Protected functions" values={finding.protectedFunctions} />
-            </FindingCard>
-          )}
-        />
-      );
+      return <CapabilitiesDetail movePackage={movePackage} />;
+    case "objects":
     case "shared-objects":
     case "address-owned":
     case "immutable-objects":
@@ -615,6 +661,114 @@ function ownershipKindForDetail(detail: SurfaceDetailKind): ObjectOwnershipFindi
     default:
       return null;
   }
+}
+
+function objectOwnershipTabs(movePackage: MovePackage | null) {
+  const surface = movePackage?.surface;
+
+  return [
+    {
+      activeCountClassName: "bg-amber-500/20 text-amber-200",
+      count: surface?.capabilityCount ?? 0,
+      icon: KeyRound,
+      kind: "capabilities" as const,
+      shortTitle: "Caps",
+      title: "Capabilities",
+    },
+    {
+      activeCountClassName: "bg-yellow-500/20 text-yellow-200",
+      count: surface?.sharedObjectCount ?? 0,
+      icon: Boxes,
+      kind: "shared" as const,
+      shortTitle: "Shared",
+      title: "Shared Objects",
+    },
+    {
+      activeCountClassName: "bg-muted text-foreground",
+      count: surface?.addressOwnedObjectCount ?? 0,
+      icon: Box,
+      kind: "addressOwned" as const,
+      shortTitle: "Owned",
+      title: "Address-Owned Objects",
+    },
+    {
+      activeCountClassName: "bg-emerald-500/20 text-emerald-200",
+      count: surface?.immutableObjectCount ?? 0,
+      icon: Lock,
+      kind: "immutable" as const,
+      shortTitle: "Immutable",
+      title: "Immutable Objects",
+    },
+    {
+      activeCountClassName: "bg-violet-500/20 text-violet-200",
+      count: surface?.wrappedObjectCount ?? 0,
+      icon: Boxes,
+      kind: "wrapped" as const,
+      shortTitle: "Wrapped",
+      title: "Wrapped Objects",
+    },
+    {
+      activeCountClassName: "bg-purple-500/20 text-purple-200",
+      count: surface?.partyObjectCount ?? 0,
+      icon: UsersRound,
+      kind: "party" as const,
+      shortTitle: "Party",
+      title: "Party Objects",
+    },
+  ];
+}
+
+function CapabilitiesDetail({ movePackage }: { movePackage: MovePackage }) {
+  return (
+    <FindingList
+      emptyLabel="No capability-like structs found."
+      items={movePackage.surface.capabilityFindings.filter((finding) => finding.confidence !== "low")}
+      renderItem={(finding) => (
+        <FindingCard
+          key={finding.qualifiedName}
+          badge={finding.confidence}
+          evidence={finding.evidence}
+          title={finding.qualifiedName}
+          subtitle={finding.protectedFunctions.length ? "Protects privileged functions" : "Capability candidate"}
+        >
+          <InlineList label="Protected functions" values={finding.protectedFunctions} />
+        </FindingCard>
+      )}
+    />
+  );
+}
+
+function CapabilityOverview({ movePackage }: { movePackage: MovePackage | null }) {
+  const findings = movePackage?.surface.capabilityFindings.filter((finding) => finding.confidence !== "low") ?? [];
+  const protectedFunctionCount = new Set(findings.flatMap((finding) => finding.protectedFunctions)).size;
+
+  return (
+    <div className="grid h-full min-h-0 place-items-center bg-[var(--app-window)] p-6">
+      <div className="w-full max-w-xl rounded-lg border border-[color:var(--app-border)] bg-[var(--app-panel)] p-5">
+        <div className="flex items-center gap-3">
+          <span className="grid size-10 place-items-center rounded-md bg-amber-500/10 text-amber-200">
+            <KeyRound className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold">Capabilities</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Authority-bearing structs and the privileged functions they protect.
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-md bg-[var(--app-subtle)] p-3">
+            <div className="text-2xl font-semibold">{findings.length}</div>
+            <div className="mt-1 text-xs text-muted-foreground">capability structs</div>
+          </div>
+          <div className="rounded-md bg-[var(--app-subtle)] p-3">
+            <div className="text-2xl font-semibold">{protectedFunctionCount}</div>
+            <div className="mt-1 text-xs text-muted-foreground">protected functions</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function objectLifecycleViewMaps(movePackage: MovePackage): ObjectLifecycleMap[] {

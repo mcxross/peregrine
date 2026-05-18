@@ -1,22 +1,18 @@
 import React from "react";
 import {
   Boxes,
-  Box,
   Binary,
   Check,
   ChevronDown,
   Gauge,
   GitBranch,
-  KeyRound,
   Link2,
-  Lock,
   Network,
   PanelLeftOpen,
   PanelRightClose,
   ScanEye,
   ShieldAlert,
   Sparkles,
-  UsersRound,
   Workflow,
 } from "lucide-react";
 
@@ -623,46 +619,18 @@ function packageSurfaceItems(movePackage: MovePackage | null) {
       tone: "danger",
     },
     {
-      icon: KeyRound,
-      detail: "capabilities" as const,
-      label: "Capabilities",
-      value: String(surface?.capabilityCount ?? 0),
-      tone: "warning",
-    },
-    {
       icon: Boxes,
-      detail: "shared-objects" as const,
-      label: "Shared Objects",
-      value: String(surface?.sharedObjectCount ?? 0),
+      detail: "objects" as const,
+      label: "Objects",
+      value: String(
+        (surface?.capabilityCount ?? 0) +
+        (surface?.sharedObjectCount ?? 0) +
+        (surface?.addressOwnedObjectCount ?? 0) +
+        (surface?.immutableObjectCount ?? 0) +
+        (surface?.wrappedObjectCount ?? 0) +
+        (surface?.partyObjectCount ?? 0),
+      ),
       tone: "yellow",
-    },
-    {
-      icon: Box,
-      detail: "address-owned" as const,
-      label: "Address-Owned",
-      value: String(surface?.addressOwnedObjectCount ?? 0),
-      tone: "muted",
-    },
-    {
-      icon: Lock,
-      detail: "immutable-objects" as const,
-      label: "Immutable Objects",
-      value: String(surface?.immutableObjectCount ?? 0),
-      tone: "success",
-    },
-    {
-      icon: Boxes,
-      detail: "wrapped-objects" as const,
-      label: "Wrapped Objects",
-      value: String(surface?.wrappedObjectCount ?? 0),
-      tone: "violet",
-    },
-    {
-      icon: UsersRound,
-      detail: "party-objects" as const,
-      label: "Party Objects",
-      value: String(surface?.partyObjectCount ?? 0),
-      tone: "violet",
     },
     {
       icon: ShieldAlert,
