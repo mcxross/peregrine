@@ -26,4 +26,5 @@ tokio = { workspace = true }
 peregrine-adapters = { workspace = true }
 peregrine-dynamic-analysis = { workspace = true }
 peregrine-indexer = { workspace = true }
+peregrine-package-resolution = { workspace = true }
 peregrine-static-analysis = { workspace = true }

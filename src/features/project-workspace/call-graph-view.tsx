@@ -39,6 +39,7 @@ import type {
   MoveSourceSpan,
   MoveUnresolvedCall,
 } from "@/features/empty-project/filesystem-tree";
+import { displayMovePackageName } from "@/features/empty-project/filesystem-tree";
 import { cn } from "@/lib/utils";
 
 type CallGraphViewProps = {
@@ -638,7 +639,7 @@ function CallGraphEmptyState({
         <Workflow className="mx-auto size-6 text-muted-foreground" aria-hidden="true" />
         <h3 className="mt-3 text-sm font-semibold text-foreground">No call graph available</h3>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          No function call relationships were found for {packageName}.
+          No function call relationships were found for {displayMovePackageName(packageName)}.
         </p>
       </div>
     </div>
@@ -665,6 +666,7 @@ function buildPackageFunctionCallRenderGraph(
 ): CallRenderGraph {
   const packagePath = movePackage?.path ?? null;
   const packageLabel = movePackage?.name ?? packageName;
+  const displayPackageLabel = displayMovePackageName(packageLabel);
   const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
   const localNodes = graph.nodes
     .filter((node) => isPackageCallNode(node, packagePath, packageLabel))
@@ -709,7 +711,7 @@ function buildPackageFunctionCallRenderGraph(
       roleLabel: callNodeRoleLabel(kind, node),
       showGroupLabel: false,
       sourceLocation: node.span,
-      subtitle: `${node.packageName ?? node.address ?? "unresolved"}::${node.moduleName}`,
+      subtitle: `${displayMovePackageName(node.packageName ?? node.address ?? "unresolved")}::${node.moduleName}`,
       tags: callNodeTags(kind, node),
       x: 80 + column * (CALL_NODE_WIDTH + CALL_COLUMN_GAP),
       y: 0,
@@ -741,7 +743,7 @@ function buildPackageFunctionCallRenderGraph(
     mode: "functions",
     nodeCount: renderNodes.length,
     nodes: renderNodes,
-    packageLabel,
+    packageLabel: displayPackageLabel,
     unresolvedCalls: graph.unresolvedCalls.filter((call) => localIds.has(call.source)),
   };
 }
@@ -753,6 +755,7 @@ function buildPackageModuleCallRenderGraph(
 ): CallRenderGraph {
   const packagePath = movePackage?.path ?? null;
   const packageLabel = movePackage?.name ?? packageName;
+  const displayPackageLabel = displayMovePackageName(packageLabel);
   const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
   const localNodes = graph.nodes
     .filter((node) => isPackageCallNode(node, packagePath, packageLabel))
@@ -797,7 +800,7 @@ function buildPackageModuleCallRenderGraph(
       kind: node.isEntry || node.isTransactionCallable ? "entry" : "module",
       label: node.moduleName,
       moduleName: node.moduleName,
-      packageLabel,
+      packageLabel: displayPackageLabel,
       representativeNode: node,
     });
 
@@ -850,13 +853,13 @@ function buildPackageModuleCallRenderGraph(
       targetKind = targetNode.isEntry || targetNode.isTransactionCallable ? "entry" : "module";
       targetLabel = targetNode.moduleName;
       targetModuleName = targetNode.moduleName;
-      targetPackageLabel = packageLabel;
+      targetPackageLabel = displayPackageLabel;
     } else {
       targetId = callExternalModuleNodeId(targetNode.packageName, targetNode.moduleName, targetNode.address);
       targetKind = "external";
       targetLabel = targetNode.moduleName;
       targetModuleName = targetNode.moduleName;
-      targetPackageLabel = targetNode.packageName ?? targetNode.address ?? "external";
+      targetPackageLabel = displayMovePackageName(targetNode.packageName ?? targetNode.address ?? "external");
       isExternal = true;
       sourceSummary.externalCallCount += edge.callCount;
     }
@@ -972,7 +975,7 @@ function buildPackageModuleCallRenderGraph(
     mode: "modules",
     nodeCount: renderNodes.length,
     nodes: renderNodes,
-    packageLabel,
+    packageLabel: displayPackageLabel,
     unresolvedCalls: graph.unresolvedCalls.filter((call) => localIds.has(call.source)),
   };
 }

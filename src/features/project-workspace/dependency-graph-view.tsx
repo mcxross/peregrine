@@ -27,6 +27,7 @@ import type {
   PackageDependencyGraph,
   PackageDependencyNode,
 } from "@/features/empty-project/filesystem-tree";
+import { displayMovePackageName } from "@/features/empty-project/filesystem-tree";
 
 type DependencyGraphViewProps = {
   className?: string;
@@ -335,7 +336,7 @@ function PackageGraphNode({ data }: NodeProps<Node<PackageNodeData>>) {
           style={{ backgroundColor: data.color }}
         />
         <span className="min-w-0 truncate text-sm font-semibold text-card-foreground">
-          {data.id}
+          {displayMovePackageName(data.id)}
         </span>
       </div>
 
@@ -378,7 +379,7 @@ function PackageGraphNode({ data }: NodeProps<Node<PackageNodeData>>) {
         position={Position.Bottom}
       >
         <div className="w-72 rounded-lg border border-[color:var(--app-border)] bg-popover p-3 text-popover-foreground shadow-2xl">
-          <div className="text-sm font-semibold">{data.id}</div>
+          <div className="text-sm font-semibold">{displayMovePackageName(data.id)}</div>
           <dl className="mt-2 space-y-1 text-xs">
             <MetadataRow label="Role" value={data.role} />
             <MetadataRow label="Address" value={data.address ?? "unresolved"} />
@@ -415,7 +416,7 @@ function EmptyGraphState({
       <div className="max-w-md">
         <div className="text-sm font-semibold text-foreground">No dependency summary found</div>
         <p className="mt-2 text-sm text-muted-foreground">
-          Peregrine needs package summary data for {packageName} before it can draw the real package dependency graph.
+          Peregrine needs package summary data for {displayMovePackageName(packageName)} before it can draw the real package dependency graph.
         </p>
       </div>
     </div>

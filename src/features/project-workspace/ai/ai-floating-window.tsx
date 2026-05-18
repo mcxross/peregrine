@@ -22,6 +22,7 @@ import type {
   MovePackage,
   PackageTree,
 } from "@/features/empty-project/filesystem-tree";
+import { displayMovePackageName } from "@/features/empty-project/filesystem-tree";
 import { MarkdownMessage } from "@/features/project-workspace/ai/markdown-message";
 import { buildMovePackageAiContext } from "@/features/project-workspace/ai/move-package-ai-context";
 import {
@@ -368,7 +369,7 @@ export function AiFloatingWindow({
               </span>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold leading-5 text-foreground">
-                  {activeMovePackage.name}
+                  {displayMovePackageName(activeMovePackage.name)}
                 </p>
               </div>
             </div>
@@ -654,7 +655,7 @@ function toAiMessage(message: ChatMessage): AiChatMessage {
 function initialAssistantMessage(packageName?: string): ChatMessage {
   return {
     content: packageName
-      ? `I can answer security questions about ${packageName} using the loaded package surface and source context.`
+      ? `I can answer security questions about ${displayMovePackageName(packageName)} using the loaded package surface and source context.`
       : "I can answer security questions about the loaded Move package.",
     id: 1,
     role: "assistant",

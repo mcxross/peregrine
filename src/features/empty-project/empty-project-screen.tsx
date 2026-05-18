@@ -1,5 +1,5 @@
 import React from "react";
-import { FolderOpen, Package, Plus } from "lucide-react";
+import { ChevronDown, FolderOpen, Package, PackagePlus, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,10 +11,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  networkOptions,
+  suiGraphQlUrlForSelection,
+  suiNetworkLabel,
+  type NetworkId,
+  type SuiNetworkSelection,
+} from "@/app/sui-network";
+import {
   createMoveProject,
+  displayMovePackageName,
+  importMovePackageById,
   loadPackageTree,
   moveProjectPathExists,
   type MovePackage,
@@ -36,6 +54,8 @@ type EmptyProjectScreenProps = {
   onOpenRecentProject?: (project: RecentProject) => void;
   onClearRecentProjects?: () => void;
   onProjectSelected?: (packageTree: PackageTree) => void;
+  network: SuiNetworkSelection;
+  onNetworkChange: (network: SuiNetworkSelection) => void;
 };
 
 export function EmptyProjectScreen({
@@ -44,13 +64,18 @@ export function EmptyProjectScreen({
   onOpenRecentProject,
   onClearRecentProjects,
   onProjectSelected,
+  network,
+  onNetworkChange,
 }: EmptyProjectScreenProps) {
   const [storedRecentProjects, setStoredRecentProjects] = React.useState<RecentProject[]>(() => loadRecentProjects());
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = React.useState(false);
+  const [isImportPackageOpen, setIsImportPackageOpen] = React.useState(false);
   const [pendingPackageTree, setPendingPackageTree] = React.useState<PackageTree | null>(null);
   const visibleRecentProjects = recentProjects ?? storedRecentProjects;
+  const graphQlUrl = suiGraphQlUrlForSelection(network);
+  const networkLabel = suiNetworkLabel(network);
   const selectProject = React.useCallback(
     (packageTree: PackageTree) => {
       const nextRecentProjects = rememberRecentProject(loadRecentProjects(), packageTree);
@@ -109,6 +134,29 @@ export function EmptyProjectScreen({
     },
     [selectProject],
   );
+  const handleImportPackage = React.useCallback(
+    async (packageId: string) => {
+      setLoadError(null);
+      setPendingPackageTree(null);
+      setIsLoading(true);
+
+      try {
+        if (!graphQlUrl) {
+          throw new Error(`${networkLabel} does not have a GraphQL endpoint configured.`);
+        }
+
+        const packageTree = await importMovePackageById(packageId, network.id, graphQlUrl);
+
+        setIsImportPackageOpen(false);
+        selectProject(withActivePackage(packageTree, packageTree.movePackages[0] ?? null));
+      } catch (error) {
+        setLoadError(getOpenPackageErrorMessage(error));
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [graphQlUrl, network.id, networkLabel, selectProject],
+  );
   const handleOpenRecentProject = onOpenRecentProject ?? (async (project: RecentProject) => {
     setLoadError(null);
     setPendingPackageTree(null);
@@ -156,8 +204,10 @@ export function EmptyProjectScreen({
       <div className="flex max-h-full w-full max-w-[660px] flex-col items-stretch gap-4">
         <ProjectDropzone
           onCreateProject={() => setIsCreateProjectOpen(true)}
+          onImportPackage={() => setIsImportPackageOpen(true)}
           onOpenProject={handleOpenProject}
           isLoading={isLoading}
+          networkLabel={networkLabel}
         />
         <Dialog
           open={isCreateProjectOpen}
@@ -171,6 +221,24 @@ export function EmptyProjectScreen({
             isLoading={isLoading}
             onCancel={() => setIsCreateProjectOpen(false)}
             onCreateProject={handleCreateProject}
+          />
+        </Dialog>
+        <Dialog
+          open={isImportPackageOpen}
+          onOpenChange={(isOpen) => {
+            if (!isLoading) {
+              setIsImportPackageOpen(isOpen);
+            }
+          }}
+        >
+          <ImportMovePackageDialog
+            graphQlUrl={graphQlUrl}
+            isLoading={isLoading}
+            network={network}
+            networkLabel={networkLabel}
+            onCancel={() => setIsImportPackageOpen(false)}
+            onImportPackage={handleImportPackage}
+            onNetworkChange={onNetworkChange}
           />
         </Dialog>
         {loadError ? (
@@ -361,6 +429,187 @@ function CreateMoveProjectDialog({
   );
 }
 
+function ImportMovePackageDialog({
+  graphQlUrl,
+  isLoading,
+  network,
+  networkLabel,
+  onCancel,
+  onImportPackage,
+  onNetworkChange,
+}: {
+  graphQlUrl: string | null;
+  isLoading: boolean;
+  network: SuiNetworkSelection;
+  networkLabel: string;
+  onCancel: () => void;
+  onImportPackage: (packageId: string) => void;
+  onNetworkChange: (network: SuiNetworkSelection) => void;
+}) {
+  const [packageId, setPackageId] = React.useState("");
+  const [customGraphQlDraft, setCustomGraphQlDraft] = React.useState(network.customGraphQlUrl ?? "");
+  const trimmedPackageId = packageId.trim();
+  const packageIdError = trimmedPackageId && !isValidSuiPackageId(trimmedPackageId)
+    ? "Use a Sui package ID: 0x followed by up to 64 hex characters."
+    : null;
+  const endpointError = graphQlUrl ? null : `${networkLabel} does not have a GraphQL endpoint configured.`;
+  const canImport = Boolean(
+    trimmedPackageId
+      && !packageIdError
+      && graphQlUrl
+      && !isLoading,
+  );
+
+  React.useEffect(() => {
+    setCustomGraphQlDraft(network.customGraphQlUrl ?? "");
+  }, [network.customGraphQlUrl]);
+
+  return (
+    <DialogContent
+      onInteractOutside={(event) => {
+        event.preventDefault();
+      }}
+    >
+      <form
+        className="grid gap-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+
+          if (!canImport) {
+            return;
+          }
+
+          onImportPackage(trimmedPackageId);
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>Import Package ID</DialogTitle>
+          <DialogDescription>
+            Fetch and decompile an on-chain package from {networkLabel}.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-2">
+          <label className="text-sm font-medium" htmlFor="import-package-id">
+            Package ID
+          </label>
+          <Input
+            autoComplete="off"
+            autoFocus
+            id="import-package-id"
+            onChange={(event) => setPackageId(event.target.value)}
+            placeholder="0x2"
+            spellCheck={false}
+            type="text"
+            value={packageId}
+            aria-invalid={Boolean(packageIdError)}
+          />
+          {packageIdError ? (
+            <p className="text-xs text-destructive">{packageIdError}</p>
+          ) : null}
+        </div>
+
+        <div className="grid gap-2">
+          <label className="text-sm font-medium" htmlFor="import-package-network">
+            Network
+          </label>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                className="h-10 justify-between rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 text-sm font-medium text-foreground hover:bg-[var(--app-elevated)]"
+                id="import-package-network"
+                type="button"
+                variant="ghost"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="size-2.5 shrink-0 rounded-full bg-emerald-400" />
+                  <span className="truncate">{networkLabel}</span>
+                </span>
+                <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-80">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Sui network
+              </DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={network.id}
+                onValueChange={(value) => {
+                  onNetworkChange({
+                    id: value as NetworkId,
+                    customGraphQlUrl: network.customGraphQlUrl,
+                  });
+                }}
+              >
+                {networkOptions.map((option) => (
+                  <DropdownMenuRadioItem key={option.id} value={option.id}>
+                    <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                      <span>{option.label}</span>
+                      {option.id === "testnet" ? (
+                        <span className="text-[11px] text-muted-foreground">default</span>
+                      ) : null}
+                    </span>
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+
+              <DropdownMenuSeparator />
+
+              <div className="grid gap-2 p-2" onKeyDown={(event) => event.stopPropagation()}>
+                <DropdownMenuLabel className="px-0 py-0 text-xs text-muted-foreground">
+                  Custom GraphQL endpoint
+                </DropdownMenuLabel>
+                <Input
+                  className="h-8 text-xs"
+                  onChange={(event) => setCustomGraphQlDraft(event.target.value)}
+                  onKeyDown={(event) => event.stopPropagation()}
+                  placeholder="https://graphql.testnet.sui.io/graphql"
+                  value={customGraphQlDraft}
+                />
+                <Button
+                  className="h-8 justify-center text-xs"
+                  disabled={!customGraphQlDraft.trim()}
+                  onClick={() => {
+                    onNetworkChange({
+                      id: "custom",
+                      customGraphQlUrl: customGraphQlDraft.trim(),
+                    });
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  Use custom GraphQL
+                </Button>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="grid gap-2">
+          <p className="truncate rounded-md border bg-[var(--app-surface)] px-3 py-2 font-mono text-xs text-muted-foreground">
+            {graphQlUrl ?? "No GraphQL endpoint configured"}
+          </p>
+          {endpointError ? (
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
+              {endpointError}
+            </p>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={!canImport}>
+            <PackagePlus aria-hidden="true" />
+            {isLoading ? "Importing..." : "Import Package"}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  );
+}
+
 function PackageLoadSelection({
   onCancel,
   onSelectPackage,
@@ -401,7 +650,9 @@ function PackageLoadSelection({
                   <div className="flex min-w-0 items-start gap-3">
                     <Package className="mt-0.5 size-5 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
                     <div className="min-w-0">
-                      <h2 className="truncate text-base font-semibold">{movePackage.name}</h2>
+                      <h2 className="truncate text-base font-semibold">
+                        {displayMovePackageName(movePackage.name)}
+                      </h2>
                       <p className="mt-1 truncate text-sm text-muted-foreground">
                         {movePackage.path || "."}
                       </p>
@@ -476,6 +727,10 @@ async function chooseProjectParentDirectory(): Promise<string | null> {
 
 function isValidMoveProjectName(projectName: string) {
   return /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(projectName);
+}
+
+function isValidSuiPackageId(packageId: string) {
+  return /^0x[0-9a-fA-F]{1,64}$/.test(packageId);
 }
 
 function getOpenPackageErrorMessage(error: unknown) {

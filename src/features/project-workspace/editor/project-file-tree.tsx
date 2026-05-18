@@ -1,7 +1,10 @@
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import React, { type CSSProperties } from "react";
 
-import type { PackageTree } from "@/features/empty-project/filesystem-tree";
+import {
+  displayMovePackageName,
+  type PackageTree,
+} from "@/features/empty-project/filesystem-tree";
 import { cn } from "@/lib/utils";
 
 type FileTreeModel = ReturnType<typeof useFileTree>["model"];
@@ -27,7 +30,9 @@ export function ProjectFileTree({
       )}
     >
       <header className="min-w-0 border-b px-4 py-3">
-        <h2 className="truncate text-sm font-semibold">{packageTree.rootName}</h2>
+        <h2 className="truncate text-sm font-semibold">
+          {displayMovePackageName(packageTree.rootName)}
+        </h2>
         <p className="mt-1 truncate text-xs text-muted-foreground">
           {packageTree.rootPath}
         </p>

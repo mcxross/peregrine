@@ -31,6 +31,7 @@ import {
   highlightActiveLineGutter,
   keymap,
   lineNumbers,
+  WidgetType,
 } from "@codemirror/view";
 import React from "react";
 
@@ -60,6 +61,7 @@ export type ComplexityHighlight = {
 const EMPTY_COMPLEXITY_HIGHLIGHTS: ComplexityHighlight[] = [];
 
 const setComplexityHighlights = StateEffect.define<ComplexityHighlight[]>();
+const LONG_MOVE_ADDRESS_PATTERN = /(?:0x)?[0-9a-fA-F]{33,64}(?=::)/g;
 
 const complexityHighlightField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
@@ -76,6 +78,44 @@ const complexityHighlightField = StateField.define<DecorationSet>({
   },
   provide: (field) => EditorView.decorations.from(field),
 });
+
+const compactMoveAddressField = StateField.define<DecorationSet>({
+  create(state) {
+    return buildCompactMoveAddressDecorations(state);
+  },
+  update(decorations, transaction) {
+    if (transaction.docChanged) {
+      return buildCompactMoveAddressDecorations(transaction.state);
+    }
+
+    return decorations.map(transaction.changes);
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+class CompactMoveAddressWidget extends WidgetType {
+  constructor(
+    private readonly fullAddress: string,
+    private readonly compactAddress: string,
+  ) {
+    super();
+  }
+
+  eq(other: CompactMoveAddressWidget) {
+    return this.fullAddress === other.fullAddress
+      && this.compactAddress === other.compactAddress;
+  }
+
+  toDOM() {
+    const element = document.createElement("span");
+
+    element.className = "cm-compact-move-address";
+    element.textContent = this.compactAddress;
+    element.title = this.fullAddress;
+
+    return element;
+  }
+}
 
 export function CodeEditor({
   complexityHighlights = EMPTY_COMPLEXITY_HIGHLIGHTS,
@@ -194,6 +234,7 @@ function editorExtensions(language: string, onChange: (value: string) => void) {
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
     keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
     complexityHighlightField,
+    language.toLowerCase() === "move" ? compactMoveAddressField : [],
     editorTheme,
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
@@ -202,6 +243,48 @@ function editorExtensions(language: string, onChange: (value: string) => void) {
     }),
     languageExtension(language),
   ];
+}
+
+function buildCompactMoveAddressDecorations(state: EditorState) {
+  const builder = new RangeSetBuilder<Decoration>();
+  const text = state.doc.toString();
+
+  LONG_MOVE_ADDRESS_PATTERN.lastIndex = 0;
+
+  for (const match of text.matchAll(LONG_MOVE_ADDRESS_PATTERN)) {
+    if (match.index == null) {
+      continue;
+    }
+
+    const fullAddress = match[0];
+    const compactAddress = compactMoveAddress(fullAddress);
+
+    if (compactAddress === fullAddress) {
+      continue;
+    }
+
+    builder.add(
+      match.index,
+      match.index + fullAddress.length,
+      Decoration.replace({
+        widget: new CompactMoveAddressWidget(fullAddress, compactAddress),
+      }),
+    );
+  }
+
+  return builder.finish();
+}
+
+function compactMoveAddress(address: string) {
+  const hasPrefix = address.startsWith("0x") || address.startsWith("0X");
+  const prefix = hasPrefix ? address.slice(0, 2) : "";
+  const hex = hasPrefix ? address.slice(2) : address;
+
+  if (hex.length <= 16) {
+    return address;
+  }
+
+  return `${prefix}${hex.slice(0, 8)}...${hex.slice(-4)}`;
 }
 
 function languageExtension(language: string): Extension {
@@ -363,6 +446,11 @@ const editorTheme = EditorView.theme(
     ".cm-activeLineGutter": {
       backgroundColor: "var(--muted)",
       color: "var(--foreground)",
+    },
+    ".cm-compact-move-address": {
+      color: "inherit",
+      textDecoration: "underline dotted color-mix(in oklch, var(--muted-foreground) 70%, transparent)",
+      textUnderlineOffset: "3px",
     },
     ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
       backgroundColor: "color-mix(in oklch, var(--primary) 30%, transparent)",

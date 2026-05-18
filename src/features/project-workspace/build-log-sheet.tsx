@@ -4,7 +4,10 @@ import { CheckCircle2, GripHorizontal, Loader2, RotateCcw, Terminal, X, XCircle 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { CommandOutput } from "@/features/empty-project/filesystem-tree";
+import {
+  displayMovePackageName,
+  type CommandOutput,
+} from "@/features/empty-project/filesystem-tree";
 import { cn } from "@/lib/utils";
 
 export type BuildRunState = "running" | "success" | "error";
@@ -135,7 +138,7 @@ export function BuildLogSheet({
             <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
           </div>
           <p className="mt-1 truncate text-xs text-muted-foreground" title={latestRun.workingDirectory}>
-            {latestRun.packageName} - {latestRun.workingDirectory}
+            {displayMovePackageName(latestRun.packageName)} - {latestRun.workingDirectory}
           </p>
         </div>
 

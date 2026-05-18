@@ -1,11 +1,13 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Titlebar } from "@/app/titlebar";
+import { defaultSuiNetworkSelection, type SuiNetworkSelection } from "@/app/sui-network";
 import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 import { Workspace } from "@/app/workspace";
 import { Button } from "@/components/ui/button";
 import {
   buildMovePackage,
+  displayMovePackageName,
   loadPackageTree,
   loadPackageTreeDetails,
   loadProjectMetadata,
@@ -73,6 +75,7 @@ export function AppShell({
   const [isProjectConfigOpen, setIsProjectConfigOpen] = useState(false);
   const [lastScannedAt, setLastScannedAt] = useState<number | null>(null);
   const [launchBuild, setLaunchBuild] = useState<LaunchBuildState | null>(null);
+  const [network, setNetwork] = useState<SuiNetworkSelection>(defaultSuiNetworkSelection);
   const {
     launchIndex,
     resetLaunchIndex,
@@ -814,9 +817,11 @@ export function AppShell({
         layout={layout}
         hasWorkspace={!isSettings && Boolean(packageTree)}
         mode={workspaceMode}
+        network={network}
         onBuildPackage={runBuild}
         onCheckCoverage={checkCoverage}
         onFuzzPackage={runFuzz}
+        onNetworkChange={setNetwork}
         onOpenProjectConfig={() => setIsProjectConfigOpen(true)}
         onTestPackage={runTests}
         onToggleMode={() => setWorkspaceMode((mode) => mode === "security" ? "editor" : "security")}
@@ -834,6 +839,7 @@ export function AppShell({
           running: isCommandRunning,
         }}
         onWorkspaceTabChange={setActiveWorkspaceTab}
+        showNetworkSelector={!isSettings && Boolean(packageTree)}
       />
 
       <section className="flex min-h-0">
@@ -850,6 +856,8 @@ export function AppShell({
               lastScannedAt={lastScannedAt}
               loadAssessment={loadAssessment}
               mode={workspaceMode}
+              network={network}
+              onNetworkChange={setNetwork}
               onActivePackageManifestPathChange={setActivePackageManifestPath}
               onWorkspaceTabChange={setActiveWorkspaceTab}
               packageTree={packageTree}
@@ -949,7 +957,7 @@ function LaunchStatusToastCard({
           {message}
         </div>
         <div className="truncate text-[11px] text-muted-foreground">
-          {packageName}
+          {displayMovePackageName(packageName)}
         </div>
       </div>
       {action}

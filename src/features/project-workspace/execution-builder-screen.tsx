@@ -48,6 +48,7 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   buildMovePackage,
+  displayMovePackageName,
   loadFilePreview,
   loadPackageTree,
   runSecurityScript,
@@ -1893,8 +1894,8 @@ async function executeScriptStep({
   return {
     detail:
       output.status === 0
-        ? `Bash script completed in ${movePackage.name}.`
-        : `Bash script exited with a non-zero status in ${movePackage.name}.`,
+        ? `Bash script completed in ${displayMovePackageName(movePackage.name)}.`
+        : `Bash script exited with a non-zero status in ${displayMovePackageName(movePackage.name)}.`,
     finishedAt,
     output,
     startedAt,

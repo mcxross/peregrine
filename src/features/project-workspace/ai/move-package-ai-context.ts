@@ -1,4 +1,5 @@
 import {
+  displayMovePackageName,
   loadFilePreview,
   type MoveModule,
   type MovePackage,
@@ -34,7 +35,7 @@ export async function buildMovePackageAiContext({
 function packageOverviewContext(packageTree: PackageTree, movePackage: MovePackage) {
   return [
     "# Active Move Package",
-    `Name: ${movePackage.name}`,
+    `Name: ${displayMovePackageName(movePackage.name)}`,
     `Path: ${movePackage.path || "."}`,
     `Manifest: ${movePackage.manifestPath}`,
     `Workspace root: ${packageTree.rootPath}`,

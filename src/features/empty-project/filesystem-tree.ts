@@ -47,6 +47,20 @@ export type MovePackage = {
   modules: MoveModule[];
 };
 
+export function displayMovePackageName(packageName: string) {
+  const normalizedName = packageName.replace(/^onchain_/, "");
+  const hexPrefix = normalizedName.startsWith("0x") || normalizedName.startsWith("0X")
+    ? normalizedName.slice(0, 2)
+    : "";
+  const hex = hexPrefix ? normalizedName.slice(2) : normalizedName;
+
+  if (hex.length > 18 && /^[0-9a-fA-F]+$/.test(hex)) {
+    return `${hexPrefix}${hex.slice(0, 8)}…${hex.slice(-6)}`;
+  }
+
+  return normalizedName;
+}
+
 export type MovePackageSurface = {
   entryFunctionCount: number;
   capabilityCount: number;
@@ -652,6 +666,18 @@ export async function createMoveProject(
   return invoke<PackageTree>("create_move_project", {
     parentPath,
     projectName,
+  });
+}
+
+export async function importMovePackageById(
+  packageId: string,
+  networkId: string,
+  graphQlUrl: string,
+): Promise<PackageTree> {
+  return invoke<PackageTree>("import_move_package_by_id", {
+    graphQlUrl,
+    networkId,
+    packageId,
   });
 }
 

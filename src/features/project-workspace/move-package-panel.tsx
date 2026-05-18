@@ -11,6 +11,7 @@ import type {
   MoveModule,
   MovePackage,
 } from "@/features/empty-project/filesystem-tree";
+import { displayMovePackageName } from "@/features/empty-project/filesystem-tree";
 import { cn } from "@/lib/utils";
 
 export type PackageBuildStatus = {
@@ -121,7 +122,9 @@ function PackageSection({
           <Package className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span className="min-w-0">
             <span className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-sm font-medium">{movePackage.name}</span>
+              <span className="truncate text-sm font-medium">
+                {displayMovePackageName(movePackage.name)}
+              </span>
               {isRoot ? (
                 <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                   root

@@ -46,6 +46,7 @@ import type {
   MoveTypeGraphEdge,
   MoveTypeGraphNode,
 } from "@/features/empty-project/filesystem-tree";
+import { displayMovePackageName } from "@/features/empty-project/filesystem-tree";
 import { cn } from "@/lib/utils";
 
 type TypeGraphViewProps = {
@@ -1263,7 +1264,7 @@ function TypeInspectorOverview({
         <InspectorRow label="Entry functions" value={String(node.entryFunctionCount)} />
         <InspectorRow label="Visible edges" value={String(renderGraph.rawEdgeCount)} />
         {node.addressLabel ? <InspectorRow label="Address" value={node.addressLabel} /> : null}
-        {node.node?.packageName ? <InspectorRow label="Package" value={node.node.packageName} /> : null}
+        {node.node?.packageName ? <InspectorRow label="Package" value={displayMovePackageName(node.node.packageName)} /> : null}
         {node.node?.moduleName ? <InspectorRow label="Module" value={node.node.moduleName} /> : null}
         {source ? <InspectorRow label="Source" value={`${compactPath(source.filePath)}:${source.startLine}`} /> : null}
       </dl>
@@ -1953,7 +1954,7 @@ function EmptyTypeGraphState({
       <div className="max-w-md">
         <div className="text-sm font-semibold text-foreground">No type graph found</div>
         <p className="mt-2 text-sm text-muted-foreground">
-          Peregrine did not find graphable types for {packageName}.
+          Peregrine did not find graphable types for {displayMovePackageName(packageName)}.
         </p>
       </div>
     </div>
@@ -4502,7 +4503,7 @@ function nodeRiskTags(node: MoveTypeGraphNode) {
 
 function nodeSubtitle(node: MoveTypeGraphNode, kind: TypeNodeKind) {
   if (kind === "local") {
-    return node.moduleName ? `${node.packageName ?? "local"}::${node.moduleName}` : "local package";
+    return node.moduleName ? `${displayMovePackageName(node.packageName ?? "local")}::${node.moduleName}` : "local package";
   }
 
   if (kind === "builtin") {

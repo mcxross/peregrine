@@ -40,6 +40,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { CodeEditorJumpRequest } from "@/features/project-workspace/editor/code-editor";
 import {
+  displayMovePackageName,
   loadFilePreview,
   loadMoveBytecodeView,
   type FilePreview,
@@ -435,7 +436,9 @@ function BytecodeHeader({
     <header className="flex min-w-0 items-center border-b border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 py-2">
       <div className="flex min-w-0 items-center gap-2 text-sm">
         <Package className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span className="truncate font-semibold">{activeMovePackage.name}</span>
+        <span className="truncate font-semibold">
+          {displayMovePackageName(activeMovePackage.name)}
+        </span>
         <Chevron className="text-muted-foreground" />
         <span className="truncate text-muted-foreground">{selectedModule?.name ?? "module"}</span>
         <Chevron className="text-muted-foreground" />
@@ -1919,8 +1922,8 @@ function groupBytecodeModules(
       id,
       isDependency: module.isDependency,
       label: module.isDependency
-        ? `Dependency: ${module.packageName}`
-        : `Package: ${view.packageName}`,
+        ? `Dependency: ${displayMovePackageName(module.packageName)}`
+        : `Package: ${displayMovePackageName(view.packageName)}`,
       moduleCount: 1,
       modules: [visibleModule],
     });

@@ -15,6 +15,9 @@ use peregrine_indexer::{
     tauri::events as index_events,
     IndexerConfig, SuiMoveIndexer,
 };
+use peregrine_package_resolution::sui::{
+    import_move_package_by_id as resolve_move_package_by_id, MovePackageImportRequest,
+};
 use peregrine_static_analysis::sui::bytecode_view::{
     load_package_bytecode, MoveBytecodePackageView,
 };
@@ -743,6 +746,36 @@ async fn create_move_project(
     })
     .await
     .map_err(|error| format!("Could not join Move project creation task: {error}"))?
+}
+
+#[tauri::command]
+async fn import_move_package_by_id(
+    app: tauri::AppHandle,
+    network_id: String,
+    graph_ql_url: String,
+    package_id: String,
+) -> Result<PackageTree, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not resolve app data directory: {error}"))?;
+
+    let imported_package = resolve_move_package_by_id(MovePackageImportRequest {
+        app_data_dir,
+        network_id,
+        graph_ql_url,
+        package_id,
+    })
+    .await?;
+
+    tauri::async_runtime::spawn_blocking(move || {
+        build_package_tree(
+            imported_package.root_path.to_string_lossy().into_owned(),
+            PackageTreeMode::Shallow,
+        )
+    })
+    .await
+    .map_err(|error| format!("Could not join imported package scan task: {error}"))?
 }
 
 #[tauri::command]
@@ -2432,6 +2465,7 @@ pub fn run() {
             load_move_graphs,
             load_move_state_access_graph,
             create_move_project,
+            import_move_package_by_id,
             move_project_path_exists,
             load_file_preview,
             save_text_file,

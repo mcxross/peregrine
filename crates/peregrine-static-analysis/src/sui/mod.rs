@@ -9,10 +9,10 @@ pub use attack_surface::{
     MovePackageSurface, ObjectOwnershipFinding, PublicPackageRelationship,
 };
 pub use bytecode_view::{
-    load_package_bytecode, MoveBytecodeBasicBlockView, MoveBytecodeCallView,
-    MoveBytecodeControlFlowEdgeView, MoveBytecodeControlFlowView, MoveBytecodeFunctionView,
-    MoveBytecodeInstructionView, MoveBytecodeModuleView, MoveBytecodePackageView,
-    MoveBytecodeSourceSpan,
+    decompile_module_bytecode, load_package_bytecode, DecompiledMoveModule,
+    MoveBytecodeBasicBlockView, MoveBytecodeCallView, MoveBytecodeControlFlowEdgeView,
+    MoveBytecodeControlFlowView, MoveBytecodeFunctionView, MoveBytecodeInstructionView,
+    MoveBytecodeModuleView, MoveBytecodePackageView, MoveBytecodeSourceSpan,
 };
 pub use complexity::ComplexityRuleSetProvider;
 pub use object_lifecycle::{

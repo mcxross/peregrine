@@ -20,7 +20,11 @@ import type {
   MovePackage,
   PackageTree,
 } from "@/features/empty-project/filesystem-tree";
-import { analyzeMovePackage, loadFilePreview } from "@/features/empty-project/filesystem-tree";
+import {
+  analyzeMovePackage,
+  displayMovePackageName,
+  loadFilePreview,
+} from "@/features/empty-project/filesystem-tree";
 import type {
   CodeEditorJumpRequest,
   ComplexityHighlight,
@@ -441,7 +445,9 @@ function PackageCard({
         <Package className="size-5 justify-self-center text-muted-foreground" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h2 className="truncate text-base font-semibold">{movePackage.name}</h2>
+            <h2 className="truncate text-base font-semibold">
+              {displayMovePackageName(movePackage.name)}
+            </h2>
             {isRoot ? (
               <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                 root

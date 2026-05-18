@@ -33,6 +33,12 @@ import {
   trafficLightInset,
   workspaceSidebarWidth,
 } from "@/layout/window-chrome";
+import {
+  networkOptions,
+  suiNetworkLabel,
+  type NetworkId,
+  type SuiNetworkSelection,
+} from "@/app/sui-network";
 import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 
 type TitlebarProps = {
@@ -44,13 +50,16 @@ type TitlebarProps = {
   layout: LayoutSettings;
   hasWorkspace?: boolean;
   mode?: WorkspaceMode;
+  network: SuiNetworkSelection;
   onBuildPackage?: () => void;
   onCheckCoverage?: () => void;
   onFuzzPackage?: () => void;
+  onNetworkChange: (network: SuiNetworkSelection) => void;
   onOpenProjectConfig?: () => void;
   onTestPackage?: () => void;
   onToggleMode?: () => void;
   onToggleLeftPanel?: () => void;
+  showNetworkSelector?: boolean;
   testActionState?: WorkspaceActionState;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
 };
@@ -63,13 +72,16 @@ export function Titlebar({
   layout,
   hasWorkspace = true,
   mode = "security",
+  network,
   onBuildPackage,
   onCheckCoverage,
   onFuzzPackage,
+  onNetworkChange,
   onOpenProjectConfig,
   onTestPackage,
   onToggleMode,
   onToggleLeftPanel,
+  showNetworkSelector = true,
   testActionState,
 }: TitlebarProps) {
   const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
@@ -174,7 +186,13 @@ export function Titlebar({
             onClick={onToggleMode}
           />
           <TitlebarAction icon={Share} label="Export" />
-          <NetworkSelector />
+          {showNetworkSelector ? (
+            <NetworkSelector network={network} onNetworkChange={onNetworkChange} />
+          ) : null}
+        </div>
+      ) : showNetworkSelector ? (
+        <div className="flex h-full items-center justify-end pr-5" onPointerDown={(event) => event.stopPropagation()}>
+          <NetworkSelector network={network} onNetworkChange={onNetworkChange} />
         </div>
       ) : (
         <div data-tauri-drag-region />
@@ -182,16 +200,6 @@ export function Titlebar({
     </header>
   );
 }
-
-const networkOptions = [
-  { id: "testnet", label: "Testnet" },
-  { id: "devnet", label: "Devnet" },
-  { id: "localnet", label: "Localnet" },
-  { id: "mainnet", label: "Mainnet" },
-  { id: "custom", label: "Custom RPC" },
-] as const;
-
-type NetworkId = (typeof networkOptions)[number]["id"];
 
 const workspaceActions = [
   { id: "build", icon: Hammer, label: "Build package", tone: "success" },
@@ -248,12 +256,19 @@ function WorkspaceActionButton({
   );
 }
 
-function NetworkSelector() {
-  const [network, setNetwork] = React.useState<NetworkId>("testnet");
-  const [customRpc, setCustomRpc] = React.useState("");
-  const [customRpcDraft, setCustomRpcDraft] = React.useState("");
-  const activeNetwork = networkOptions.find((option) => option.id === network) ?? networkOptions[0];
-  const label = network === "custom" && customRpc ? "Custom RPC" : activeNetwork.label;
+function NetworkSelector({
+  network,
+  onNetworkChange,
+}: {
+  network: SuiNetworkSelection;
+  onNetworkChange: (network: SuiNetworkSelection) => void;
+}) {
+  const [customGraphQlDraft, setCustomGraphQlDraft] = React.useState(network.customGraphQlUrl ?? "");
+  const label = suiNetworkLabel(network);
+
+  React.useEffect(() => {
+    setCustomGraphQlDraft(network.customGraphQlUrl ?? "");
+  }, [network.customGraphQlUrl]);
 
   return (
     <DropdownMenu>
@@ -277,8 +292,13 @@ function NetworkSelector() {
           Sui network
         </DropdownMenuLabel>
         <DropdownMenuRadioGroup
-          value={network}
-          onValueChange={(value) => setNetwork(value as NetworkId)}
+          value={network.id}
+          onValueChange={(value) => {
+            onNetworkChange({
+              id: value as NetworkId,
+              customGraphQlUrl: network.customGraphQlUrl,
+            });
+          }}
         >
           {networkOptions.map((option) => (
             <DropdownMenuRadioItem key={option.id} value={option.id}>
@@ -296,30 +316,32 @@ function NetworkSelector() {
 
         <div className="grid gap-2 p-2" onKeyDown={(event) => event.stopPropagation()}>
           <DropdownMenuLabel className="px-0 py-0 text-xs text-muted-foreground">
-            Custom RPC endpoint
+            Custom GraphQL endpoint
           </DropdownMenuLabel>
           <Input
             className="h-8 text-xs"
-            onChange={(event) => setCustomRpcDraft(event.target.value)}
+            onChange={(event) => setCustomGraphQlDraft(event.target.value)}
             onKeyDown={(event) => event.stopPropagation()}
-            placeholder="https://fullnode.testnet.sui.io:443"
-            value={customRpcDraft}
+            placeholder="https://graphql.testnet.sui.io/graphql"
+            value={customGraphQlDraft}
           />
           <Button
             className="h-8 justify-center text-xs"
-            disabled={!customRpcDraft.trim()}
+            disabled={!customGraphQlDraft.trim()}
             onClick={() => {
-              setCustomRpc(customRpcDraft.trim());
-              setNetwork("custom");
+              onNetworkChange({
+                id: "custom",
+                customGraphQlUrl: customGraphQlDraft.trim(),
+              });
             }}
             type="button"
             variant="outline"
           >
-            Use custom RPC
+            Use custom GraphQL
           </Button>
-          {network === "custom" && customRpc ? (
-            <p className="truncate text-[11px] text-muted-foreground" title={customRpc}>
-              Active: {customRpc}
+          {network.id === "custom" && network.customGraphQlUrl ? (
+            <p className="truncate text-[11px] text-muted-foreground" title={network.customGraphQlUrl}>
+              Active: {network.customGraphQlUrl}
             </p>
           ) : null}
         </div>

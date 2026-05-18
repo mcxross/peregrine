@@ -27,6 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 import {
+  displayMovePackageName,
   type MoveModule,
   type MovePackage,
   type PackageTree,
@@ -699,7 +700,7 @@ function ProjectSwitcher({
   const [isOpen, setIsOpen] = React.useState(false);
   const packages = packageTree.movePackages;
   const hasMultiplePackages = packages.length > 1;
-  const name = activeMovePackage?.name ?? packageTree.rootName;
+  const name = displayMovePackageName(activeMovePackage?.name ?? packageTree.rootName);
   const path = activeMovePackage
     ? packagePathLabel(activeMovePackage, packageTree)
     : compactPath(packageTree.rootPath);
@@ -763,7 +764,9 @@ function ProjectSwitcher({
                 type="button"
               >
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">{movePackage.name}</span>
+                  <span className="block truncate text-sm font-semibold">
+                    {displayMovePackageName(movePackage.name)}
+                  </span>
                   <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                     {packagePathLabel(movePackage, packageTree)}
                   </span>

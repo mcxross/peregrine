@@ -32,7 +32,10 @@ import type {
   MoveStateAccessGraphEdge,
   MoveStateAccessGraphNode,
 } from "@/features/empty-project/filesystem-tree";
-import { loadMoveStateAccessGraph } from "@/features/empty-project/filesystem-tree";
+import {
+  displayMovePackageName,
+  loadMoveStateAccessGraph,
+} from "@/features/empty-project/filesystem-tree";
 import { cn } from "@/lib/utils";
 
 export type SelectedMoveModule = {
@@ -260,7 +263,7 @@ export function ModuleSignatureScreen({
                 {moveModule.name}::{selectedFunction.name}
               </span>
               <span className="hidden min-w-0 truncate text-[11px] text-muted-foreground xl:inline">
-                {movePackage.name} / {moveModule.filePath}
+                {displayMovePackageName(movePackage.name)} / {moveModule.filePath}
               </span>
             </div>
           ) : (
@@ -269,7 +272,7 @@ export function ModuleSignatureScreen({
                 {moveModule.name}
               </h2>
               <p className="mt-0.5 truncate text-[11px] leading-4 text-muted-foreground">
-                {movePackage.name} / {moveModule.filePath}
+                {displayMovePackageName(movePackage.name)} / {moveModule.filePath}
               </p>
             </div>
           )}

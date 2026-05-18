@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
+  displayMovePackageName,
   loadProjectMetadata,
   saveProjectMetadata,
   type MovePackage,
@@ -66,7 +67,7 @@ export function ProjectConfigDialog({
   const [isPicking, setIsPicking] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const packageKey = activeMovePackage ? projectPackageConfigKey(activeMovePackage) : null;
-  const activePackageName = activeMovePackage?.name ?? packageTree.rootName;
+  const activePackageName = displayMovePackageName(activeMovePackage?.name ?? packageTree.rootName);
 
   React.useEffect(() => {
     if (!isOpen || !activeMovePackage || !packageKey) {
@@ -449,7 +450,7 @@ function CommandsConfigSection({
   return (
     <div className="overflow-hidden rounded-lg border border-[color:var(--app-border)] bg-[var(--app-panel)]">
       <ConfigRow label="Package">
-        <ReadOnlyValue value={activeMovePackage?.name ?? packageTree.rootName} />
+        <ReadOnlyValue value={displayMovePackageName(activeMovePackage?.name ?? packageTree.rootName)} />
       </ConfigRow>
       <ConfigRow label="Path">
         <ReadOnlyValue value={activeMovePackage?.path || "."} />

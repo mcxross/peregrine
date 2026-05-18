@@ -1,4 +1,5 @@
 import { EmptyProjectScreen } from "@/features/empty-project/empty-project-screen";
+import type { SuiNetworkSelection } from "@/app/sui-network";
 import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 import type { PackageTree } from "@/features/empty-project/filesystem-tree";
 import type {
@@ -18,6 +19,8 @@ type WorkspaceProps = {
   lastScannedAt: number | null;
   loadAssessment: PackageLoadAssessment | null;
   mode: WorkspaceMode;
+  network: SuiNetworkSelection;
+  onNetworkChange: (network: SuiNetworkSelection) => void;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   packageTree: PackageTree | null;
@@ -34,6 +37,8 @@ export function Workspace({
   lastScannedAt,
   loadAssessment,
   mode,
+  network,
+  onNetworkChange,
   onActivePackageManifestPathChange,
   onCommandLog,
   onWorkspaceTabChange,
@@ -60,5 +65,11 @@ export function Workspace({
     );
   }
 
-  return <EmptyProjectScreen onProjectSelected={onProjectSelected} />;
+  return (
+    <EmptyProjectScreen
+      network={network}
+      onNetworkChange={onNetworkChange}
+      onProjectSelected={onProjectSelected}
+    />
+  );
 }

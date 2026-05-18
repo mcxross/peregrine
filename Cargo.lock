@@ -7814,7 +7814,7 @@ dependencies = [
  "pin-project",
  "rustls",
  "rustls-pki-types",
- "rustls-platform-verifier",
+ "rustls-platform-verifier 0.5.3",
  "soketto",
  "thiserror 1.0.69",
  "tokio",
@@ -7865,7 +7865,7 @@ dependencies = [
  "jsonrpsee-core",
  "jsonrpsee-types",
  "rustls",
- "rustls-platform-verifier",
+ "rustls-platform-verifier 0.5.3",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -11601,6 +11601,7 @@ dependencies = [
  "peregrine-adapters",
  "peregrine-dynamic-analysis",
  "peregrine-indexer",
+ "peregrine-package-resolution",
  "peregrine-static-analysis",
  "pulldown-cmark 0.12.2",
  "reqwest 0.13.2",
@@ -11688,6 +11689,18 @@ dependencies = [
  "tempfile",
  "toml 0.8.23",
  "walkdir",
+]
+
+[[package]]
+name = "peregrine-package-resolution"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "hex",
+ "peregrine-static-analysis",
+ "reqwest 0.13.2",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -12738,6 +12751,7 @@ version = "0.11.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "434b42fec591c96ef50e21e886936e66d3cc3f737104fdb9b737c40ffb94c098"
 dependencies = [
+ "aws-lc-rs",
  "bytes",
  "fastbloom",
  "getrandom 0.3.4",
@@ -13325,15 +13339,21 @@ dependencies = [
  "http-body 1.0.1",
  "http-body-util",
  "hyper",
+ "hyper-rustls",
  "hyper-util",
  "js-sys",
  "log",
  "percent-encoding",
  "pin-project-lite",
+ "quinn",
+ "rustls",
+ "rustls-pki-types",
+ "rustls-platform-verifier 0.6.2",
  "serde",
  "serde_json",
  "sync_wrapper",
  "tokio",
+ "tokio-rustls",
  "tokio-util 0.7.18",
  "tower 0.5.3",
  "tower-http 0.6.8",
@@ -13675,6 +13695,27 @@ dependencies = [
  "security-framework-sys",
  "webpki-root-certs 0.26.11",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "rustls-platform-verifier"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d99feebc72bae7ab76ba994bb5e121b8d83d910ca40b36e0921f53becc41784"
+dependencies = [
+ "core-foundation 0.10.1",
+ "core-foundation-sys",
+ "jni",
+ "log",
+ "once_cell",
+ "rustls",
+ "rustls-native-certs",
+ "rustls-platform-verifier-android",
+ "rustls-webpki",
+ "security-framework",
+ "security-framework-sys",
+ "webpki-root-certs 1.0.7",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

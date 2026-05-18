@@ -11,7 +11,10 @@ import type {
   PackageDependencyGraph,
 } from "@/features/empty-project/filesystem-tree";
 import type { TypeGraphSourceLocation } from "@/features/project-workspace/type-graph-view";
-import { loadMoveGraphs } from "@/features/empty-project/filesystem-tree";
+import {
+  displayMovePackageName,
+  loadMoveGraphs,
+} from "@/features/empty-project/filesystem-tree";
 import { cn } from "@/lib/utils";
 
 const DependencyGraphView = React.lazy(() =>
@@ -179,7 +182,7 @@ export function DependencyGraphScreen({
       <div className="row-start-2 min-h-0 px-5 pb-3">
         {graphMode === "types" && !typeGraphReady ? (
           <DeferredGraphState
-            description={`Mapping storage, authority, generics, and external type links for ${activeMovePackage?.name ?? packageName}.`}
+            description={`Mapping storage, authority, generics, and external type links for ${displayMovePackageName(activeMovePackage?.name ?? packageName)}.`}
             error={moveGraphError ?? (!rootPath ? "Move graph loading is unavailable in this view." : null)}
             graphLabel="Type Graph"
             isLoading={isLoadingMoveGraphs}
@@ -187,7 +190,7 @@ export function DependencyGraphScreen({
           />
         ) : graphMode === "calls" && !callGraphReady ? (
           <DeferredGraphState
-            description={`Resolving package entrypoints, internal calls, external calls, and unresolved targets for ${activeMovePackage?.name ?? packageName}.`}
+            description={`Resolving package entrypoints, internal calls, external calls, and unresolved targets for ${displayMovePackageName(activeMovePackage?.name ?? packageName)}.`}
             error={moveGraphError ?? (!rootPath ? "Move graph loading is unavailable in this view." : null)}
             graphLabel="Call Graph"
             isLoading={isLoadingMoveGraphs}

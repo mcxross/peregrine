@@ -16,6 +16,7 @@ import type {
   MoveTypeGraph,
   MoveTypeGraphNode,
 } from "@/features/empty-project/filesystem-tree";
+import { displayMovePackageName } from "@/features/empty-project/filesystem-tree";
 import { cn } from "@/lib/utils";
 
 type TypeGraphPanelProps = {
@@ -181,7 +182,7 @@ export function TypeGraphPanel({
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold leading-5">Type Graph</h2>
             <p className="truncate text-[11px] leading-4 text-muted-foreground">
-              {movePackage?.name ?? packageName}
+              {displayMovePackageName(movePackage?.name ?? packageName)}
             </p>
           </div>
         </div>
@@ -260,7 +261,7 @@ export function CollapsedTypeGraphPanel({
       <div className="flex min-w-0 flex-1 items-center gap-2 lg:min-h-0 lg:flex-col">
         <Boxes className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground lg:min-h-0 lg:[writing-mode:vertical-rl]">
-          {packageName}
+          {displayMovePackageName(packageName)}
         </span>
       </div>
       <CountPill value={typeCount} />
@@ -545,7 +546,7 @@ function buildPackageGroup(
     id: "group:package",
     kind: "package",
     modules,
-    title: movePackage?.name ?? packageName,
+    title: displayMovePackageName(movePackage?.name ?? packageName),
   };
 }
 

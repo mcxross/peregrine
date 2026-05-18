@@ -1,4 +1,8 @@
-import type { MovePackage, PackageTree } from "@/features/empty-project/filesystem-tree";
+import {
+  displayMovePackageName,
+  type MovePackage,
+  type PackageTree,
+} from "@/features/empty-project/filesystem-tree";
 import type { RecentProject } from "@/features/empty-project/types";
 
 const RECENT_PROJECTS_STORAGE_KEY = "peregrine.recentProjects.v1";
@@ -76,7 +80,7 @@ export function recentProjectFromPackageTree(packageTree: PackageTree): RecentPr
     id,
     lastOpenedAt: Date.now(),
     moduleCount: activePackage?.modules.length ?? 0,
-    name: activePackage?.name ?? packageTree.rootName,
+    name: displayMovePackageName(activePackage?.name ?? packageTree.rootName),
     packageCount: packageTree.movePackages.length,
     packagePath,
     rootPath: packageTree.rootPath,
@@ -99,7 +103,7 @@ export function activeManifestPathForRecentProject(
   const matchingPackage = packageTree.movePackages.find((movePackage) => {
     const packagePath = resolvePackagePath(packageTree, movePackage);
 
-    return movePackage.name === project.name && packagePath === project.packagePath;
+    return displayMovePackageName(movePackage.name) === project.name && packagePath === project.packagePath;
   });
 
   return matchingPackage?.manifestPath ?? packageTree.movePackages[0]?.manifestPath ?? null;
