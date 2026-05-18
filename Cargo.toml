@@ -4,6 +4,7 @@ members = [
   "crates/peregrine-adapters",
   "crates/peregrine-dynamic-analysis",
   "crates/peregrine-indexer",
+  "crates/peregrine-import-engine",
   "crates/peregrine-package-resolution",
   "crates/peregrine-scanner",
   "crates/peregrine-static-analysis",
@@ -32,12 +33,14 @@ movy = { path = "../oss/movy/crates/movy", default-features = false, features = 
 peregrine-adapters = { path = "crates/peregrine-adapters" }
 peregrine-dynamic-analysis = { path = "crates/peregrine-dynamic-analysis" }
 peregrine-indexer = { path = "crates/peregrine-indexer" }
+peregrine-import-engine = { path = "crates/peregrine-import-engine" }
 peregrine-package-resolution = { path = "crates/peregrine-package-resolution" }
 peregrine-scanner = { path = "crates/peregrine-scanner" }
 peregrine-static-analysis = { path = "crates/peregrine-static-analysis" }
 peregrine-types = { path = "crates/peregrine-types" }
 pulldown-cmark = "0.12"
 reqwest = { version = "0.13.2", default-features = false, features = ["rustls"] }
+regex = "1"
 rusqlite = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

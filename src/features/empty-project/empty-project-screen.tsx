@@ -135,7 +135,7 @@ export function EmptyProjectScreen({
     [selectProject],
   );
   const handleImportPackage = React.useCallback(
-    async (packageId: string) => {
+    async (packageId: string, saveRootPath: string, generateBuildable: boolean) => {
       setLoadError(null);
       setPendingPackageTree(null);
       setIsLoading(true);
@@ -145,7 +145,13 @@ export function EmptyProjectScreen({
           throw new Error(`${networkLabel} does not have a GraphQL endpoint configured.`);
         }
 
-        const packageTree = await importMovePackageById(packageId, network.id, graphQlUrl);
+        const packageTree = await importMovePackageById(
+          packageId,
+          network.id,
+          graphQlUrl,
+          saveRootPath,
+          generateBuildable,
+        );
 
         setIsImportPackageOpen(false);
         selectProject(withActivePackage(packageTree, packageTree.movePackages[0] ?? null));
@@ -443,10 +449,12 @@ function ImportMovePackageDialog({
   network: SuiNetworkSelection;
   networkLabel: string;
   onCancel: () => void;
-  onImportPackage: (packageId: string) => void;
+  onImportPackage: (packageId: string, saveRootPath: string, generateBuildable: boolean) => void;
   onNetworkChange: (network: SuiNetworkSelection) => void;
 }) {
   const [packageId, setPackageId] = React.useState("");
+  const [saveRootPath, setSaveRootPath] = React.useState<string | null>(null);
+  const [generateBuildable, setGenerateBuildable] = React.useState(false);
   const [customGraphQlDraft, setCustomGraphQlDraft] = React.useState(network.customGraphQlUrl ?? "");
   const trimmedPackageId = packageId.trim();
   const packageIdError = trimmedPackageId && !isValidSuiPackageId(trimmedPackageId)
@@ -457,6 +465,7 @@ function ImportMovePackageDialog({
     trimmedPackageId
       && !packageIdError
       && graphQlUrl
+      && saveRootPath
       && !isLoading,
   );
 
@@ -475,11 +484,11 @@ function ImportMovePackageDialog({
         onSubmit={(event) => {
           event.preventDefault();
 
-          if (!canImport) {
+          if (!canImport || !saveRootPath) {
             return;
           }
 
-          onImportPackage(trimmedPackageId);
+          onImportPackage(trimmedPackageId, saveRootPath, generateBuildable);
         }}
       >
         <DialogHeader>
@@ -595,6 +604,52 @@ function ImportMovePackageDialog({
             </p>
           ) : null}
         </div>
+
+        <div className="grid gap-2">
+          <label className="text-sm font-medium" htmlFor="import-package-save-location">
+            Save location
+          </label>
+          <div className="flex min-w-0 gap-2">
+            <p
+              className="min-w-0 flex-1 truncate rounded-md border bg-[var(--app-surface)] px-3 py-2 font-mono text-xs text-muted-foreground"
+              id="import-package-save-location"
+            >
+              {saveRootPath ?? "No folder selected"}
+            </p>
+            <Button
+              className="shrink-0"
+              disabled={isLoading}
+              onClick={() => {
+                void chooseImportSaveDirectory().then((selectedPath) => {
+                  if (selectedPath) {
+                    setSaveRootPath(selectedPath);
+                  }
+                });
+              }}
+              type="button"
+              variant="outline"
+            >
+              <FolderOpen aria-hidden="true" />
+              Choose
+            </Button>
+          </div>
+        </div>
+
+        <label className="flex items-start gap-3 rounded-md border bg-[var(--app-surface)] px-3 py-3">
+          <input
+            checked={generateBuildable}
+            className="mt-1 size-4 accent-emerald-400"
+            disabled={isLoading}
+            onChange={(event) => setGenerateBuildable(event.target.checked)}
+            type="checkbox"
+          />
+          <span className="grid gap-1">
+            <span className="text-sm font-medium">Generate buildable package</span>
+            <span className="text-xs leading-5 text-muted-foreground">
+              Resolve dependencies, rewrite package IDs, and run Sui build verification.
+            </span>
+          </span>
+        </label>
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
@@ -720,6 +775,19 @@ async function chooseProjectParentDirectory(): Promise<string | null> {
     multiple: false,
     recursive: false,
     title: "Choose Project Directory",
+  });
+
+  return typeof selectedPath === "string" ? selectedPath : null;
+}
+
+async function chooseImportSaveDirectory(): Promise<string | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+
+  const selectedPath = await open({
+    directory: true,
+    multiple: false,
+    recursive: false,
+    title: "Choose Import Save Location",
   });
 
   return typeof selectedPath === "string" ? selectedPath : null;

@@ -7,7 +7,6 @@ description = "On-chain package resolution and materialization for Peregrine"
 [dependencies]
 base64 = { workspace = true }
 hex = { workspace = true }
-peregrine-static-analysis = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

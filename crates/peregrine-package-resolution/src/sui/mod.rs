@@ -1,6 +1,6 @@
 mod package_import;
 
 pub use package_import::{
-    import_move_package_by_id, refresh_imported_move_package_sources, ImportedMovePackage,
-    MovePackageImportRequest,
+    decode_graphql_module_bytes, fetch_move_package_from_graphql, normalize_sui_package_id,
+    validated_graphql_url, FetchedMoveModule, FetchedMovePackage,
 };

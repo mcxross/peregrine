@@ -11600,8 +11600,8 @@ dependencies = [
  "base64 0.22.1",
  "peregrine-adapters",
  "peregrine-dynamic-analysis",
+ "peregrine-import-engine",
  "peregrine-indexer",
- "peregrine-package-resolution",
  "peregrine-static-analysis",
  "pulldown-cmark 0.12.2",
  "reqwest 0.13.2",
@@ -11673,6 +11673,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "peregrine-import-engine"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "move-binary-format",
+ "peregrine-package-resolution",
+ "peregrine-static-analysis",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "peregrine-indexer"
 version = "0.1.0"
 dependencies = [
@@ -11697,7 +11713,6 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "hex",
- "peregrine-static-analysis",
  "reqwest 0.13.2",
  "serde",
  "serde_json",

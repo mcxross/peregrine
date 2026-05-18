@@ -673,11 +673,15 @@ export async function importMovePackageById(
   packageId: string,
   networkId: string,
   graphQlUrl: string,
+  saveRootPath: string | null,
+  generateBuildable: boolean,
 ): Promise<PackageTree> {
   return invoke<PackageTree>("import_move_package_by_id", {
+    generateBuildable,
     graphQlUrl,
     networkId,
     packageId,
+    saveRootPath,
   });
 }
 

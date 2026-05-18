@@ -6,6 +6,10 @@ use peregrine_adapters::sui::{
     SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus, SuiExecutionTarget,
     SuiMoveNewCommand, SuiPackageCommand,
 };
+use peregrine_import_engine::sui::{
+    default_import_root, BuildVerification, BuildableImportRequest, ImportEngine,
+    ImportEngineConfig,
+};
 use peregrine_indexer::{
     core::{ContextBudget, Diagnostic as IndexDiagnostic, Operation as IndexOperation},
     sui::model::{
@@ -14,10 +18,6 @@ use peregrine_indexer::{
     },
     tauri::events as index_events,
     IndexerConfig, SuiMoveIndexer,
-};
-use peregrine_package_resolution::sui::{
-    import_move_package_by_id as resolve_move_package_by_id, refresh_imported_move_package_sources,
-    MovePackageImportRequest,
 };
 use peregrine_static_analysis::sui::bytecode_view::{
     load_package_bytecode, MoveBytecodePackageView,
@@ -755,23 +755,44 @@ async fn import_move_package_by_id(
     network_id: String,
     graph_ql_url: String,
     package_id: String,
+    save_root_path: Option<String>,
+    generate_buildable: bool,
 ) -> Result<PackageTree, String> {
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| format!("Could not resolve app data directory: {error}"))?;
+    let import_root = if let Some(save_root_path) = save_root_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+    {
+        PathBuf::from(save_root_path)
+    } else {
+        let app_data_dir = app
+            .path()
+            .app_data_dir()
+            .map_err(|error| format!("Could not resolve app data directory: {error}"))?;
+        default_import_root(&app_data_dir, &network_id, &package_id)?
+    };
+    let engine = ImportEngine::new(ImportEngineConfig {
+        max_dependency_depth: 3,
+        max_dependency_packages: 64,
+        build_verification: BuildVerification::SystemSui {
+            executable: PathBuf::from("sui"),
+            default_move_flavor: None,
+        },
+    });
 
-    let imported_package = resolve_move_package_by_id(MovePackageImportRequest {
-        app_data_dir,
-        network_id,
-        graph_ql_url,
-        package_id,
-    })
-    .await?;
+    let imported_package = engine
+        .import_buildable_package(BuildableImportRequest {
+            import_root,
+            network_id,
+            graph_ql_url,
+            package_id,
+            generate_buildable,
+        })
+        .await?;
 
     tauri::async_runtime::spawn_blocking(move || {
         build_package_tree(
-            imported_package.root_path.to_string_lossy().into_owned(),
+            imported_package.project_root.to_string_lossy().into_owned(),
             PackageTreeMode::Shallow,
         )
     })
@@ -2101,7 +2122,6 @@ fn build_package_tree(root_path: String, mode: PackageTreeMode) -> Result<Packag
     let root = root
         .canonicalize()
         .map_err(|error| format!("Could not read package directory {root_path}: {error}"))?;
-    refresh_imported_move_package_sources(&root)?;
     let root_name = root
         .file_name()
         .and_then(|name| name.to_str())
