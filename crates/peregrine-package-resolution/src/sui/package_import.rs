@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose, Engine};
-use peregrine_static_analysis::sui::decompile_module_bytecode;
+use peregrine_static_analysis::sui::{decompile_package_bytecode_modules, MoveModuleBytecodeInput};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -42,6 +42,12 @@ pub struct MovePackageImportRequest {
 
 pub struct ImportedMovePackage {
     pub root_path: PathBuf,
+}
+
+struct MaterializedMoveModule {
+    name: String,
+    bytecode: Vec<u8>,
+    decompiled: peregrine_static_analysis::sui::DecompiledMoveModule,
 }
 
 #[derive(Deserialize)]
@@ -374,24 +380,14 @@ edition = "2024.beta"
     fs::write(package_root.join("Move.toml"), manifest)
         .map_err(|error| format!("Could not write imported Move.toml: {error}"))?;
 
-    for module in fetched_package.modules {
-        let decompiled =
-            decompile_module_bytecode(&module.bytecode, module.disassembly.as_deref())?;
-        let file_stem = module_file_stem(&module.name, &decompiled.name);
-        let source_path = sources_dir.join(format!("{file_stem}.move"));
-        let build_source_path = build_sources_dir.join(format!("{file_stem}.move"));
-        let bytecode_path = bytecode_dir.join(format!("{file_stem}.mv"));
-        let disassembly_path = decompiled_dir.join(format!("{file_stem}.moveasm"));
-
-        fs::write(&source_path, &decompiled.source)
-            .map_err(|error| format!("Could not write {}: {error}", source_path.display()))?;
-        fs::write(&build_source_path, &decompiled.source)
-            .map_err(|error| format!("Could not write {}: {error}", build_source_path.display()))?;
-        fs::write(&bytecode_path, module.bytecode)
-            .map_err(|error| format!("Could not write {}: {error}", bytecode_path.display()))?;
-        fs::write(&disassembly_path, decompiled.disassembly)
-            .map_err(|error| format!("Could not write {}: {error}", disassembly_path.display()))?;
-    }
+    let materialized_modules = decompile_fetched_modules(&fetched_package.modules)?;
+    write_materialized_modules(
+        &sources_dir,
+        &build_sources_dir,
+        &bytecode_dir,
+        &decompiled_dir,
+        materialized_modules,
+    )?;
 
     let metadata = ImportedMovePackageMetadata {
         package_id: fetched_package.address,
@@ -411,6 +407,162 @@ edition = "2024.beta"
     Ok(package_root)
 }
 
+pub fn refresh_imported_move_package_sources(package_root: &Path) -> Result<(), String> {
+    if !package_root
+        .join(PROJECT_METADATA_DIRECTORY)
+        .join(IMPORT_METADATA_FILE)
+        .is_file()
+    {
+        return Ok(());
+    }
+
+    let Some(build_root) = imported_package_build_root(package_root) else {
+        return Ok(());
+    };
+    let bytecode_dir = build_root.join("bytecode_modules");
+    let modules = load_materialized_bytecode_modules(package_root, &bytecode_dir)?;
+
+    if modules.is_empty() {
+        return Ok(());
+    }
+
+    let materialized_modules = decompile_fetched_modules(&modules)?;
+    let sources_dir = package_root.join("sources");
+    let build_sources_dir = build_root.join("sources");
+    let decompiled_dir = package_root.join("decompiled");
+
+    fs::create_dir_all(&sources_dir)
+        .map_err(|error| format!("Could not create {}: {error}", sources_dir.display()))?;
+    fs::create_dir_all(&build_sources_dir)
+        .map_err(|error| format!("Could not create {}: {error}", build_sources_dir.display()))?;
+    fs::create_dir_all(&decompiled_dir)
+        .map_err(|error| format!("Could not create {}: {error}", decompiled_dir.display()))?;
+
+    write_materialized_modules(
+        &sources_dir,
+        &build_sources_dir,
+        &bytecode_dir,
+        &decompiled_dir,
+        materialized_modules,
+    )
+}
+
+fn imported_package_build_root(package_root: &Path) -> Option<PathBuf> {
+    let build_dir = package_root.join("build");
+    let manifest_name = fs::read_to_string(package_root.join("Move.toml"))
+        .ok()
+        .and_then(|manifest| package_name(&manifest));
+
+    if let Some(name) = manifest_name {
+        let candidate = build_dir.join(name);
+
+        if candidate.join("bytecode_modules").is_dir() {
+            return Some(candidate);
+        }
+    }
+
+    let mut candidates = fs::read_dir(build_dir)
+        .ok()?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.join("bytecode_modules").is_dir())
+        .collect::<Vec<_>>();
+    candidates.sort();
+
+    match candidates.as_slice() {
+        [candidate] => Some(candidate.clone()),
+        _ => None,
+    }
+}
+
+fn load_materialized_bytecode_modules(
+    package_root: &Path,
+    bytecode_dir: &Path,
+) -> Result<Vec<FetchedMoveModule>, String> {
+    let mut bytecode_paths = fs::read_dir(bytecode_dir)
+        .map_err(|error| format!("Could not read {}: {error}", bytecode_dir.display()))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|extension| extension.to_str()) == Some("mv"))
+        .collect::<Vec<_>>();
+    bytecode_paths.sort();
+
+    bytecode_paths
+        .into_iter()
+        .map(|bytecode_path| {
+            let name = bytecode_path
+                .file_stem()
+                .and_then(|name| name.to_str())
+                .unwrap_or("module")
+                .to_string();
+            let bytecode = fs::read(&bytecode_path)
+                .map_err(|error| format!("Could not read {}: {error}", bytecode_path.display()))?;
+            let disassembly_path = package_root
+                .join("decompiled")
+                .join(format!("{name}.moveasm"));
+            let disassembly = fs::read_to_string(disassembly_path).ok();
+
+            Ok(FetchedMoveModule {
+                name,
+                bytecode,
+                disassembly,
+            })
+        })
+        .collect()
+}
+
+fn decompile_fetched_modules(
+    modules: &[FetchedMoveModule],
+) -> Result<Vec<MaterializedMoveModule>, String> {
+    let decompile_inputs = modules
+        .iter()
+        .map(|module| MoveModuleBytecodeInput {
+            name: module.name.clone(),
+            bytecode: module.bytecode.clone(),
+            disassembly: module.disassembly.clone(),
+        })
+        .collect::<Vec<_>>();
+    let decompiled_modules = decompile_package_bytecode_modules(&decompile_inputs)?;
+
+    Ok(modules
+        .iter()
+        .cloned()
+        .zip(decompiled_modules)
+        .map(|(module, decompiled)| MaterializedMoveModule {
+            name: module.name,
+            bytecode: module.bytecode,
+            decompiled,
+        })
+        .collect())
+}
+
+fn write_materialized_modules(
+    sources_dir: &Path,
+    build_sources_dir: &Path,
+    bytecode_dir: &Path,
+    decompiled_dir: &Path,
+    modules: Vec<MaterializedMoveModule>,
+) -> Result<(), String> {
+    for module in modules {
+        let file_stem = module_file_stem(&module.name, &module.decompiled.name);
+        let source_path = sources_dir.join(format!("{file_stem}.move"));
+        let build_source_path = build_sources_dir.join(format!("{file_stem}.move"));
+        let bytecode_path = bytecode_dir.join(format!("{file_stem}.mv"));
+        let disassembly_path = decompiled_dir.join(format!("{file_stem}.moveasm"));
+
+        fs::write(&source_path, &module.decompiled.source)
+            .map_err(|error| format!("Could not write {}: {error}", source_path.display()))?;
+        fs::write(&build_source_path, &module.decompiled.source)
+            .map_err(|error| format!("Could not write {}: {error}", build_source_path.display()))?;
+        fs::write(&bytecode_path, module.bytecode)
+            .map_err(|error| format!("Could not write {}: {error}", bytecode_path.display()))?;
+        fs::write(&disassembly_path, module.decompiled.disassembly)
+            .map_err(|error| format!("Could not write {}: {error}", disassembly_path.display()))?;
+    }
+
+    Ok(())
+}
+
 fn move_package_name_for_id(package_id: &str) -> String {
     let hex = package_id
         .trim_start_matches("0x")
@@ -426,6 +578,41 @@ fn move_package_name_for_id(package_id: &str) -> String {
         let visible = hex.chars().take(8).collect::<String>();
         format!("pkg_{visible}")
     }
+}
+
+fn package_name(manifest: &str) -> Option<String> {
+    let mut in_package_section = false;
+
+    for line in manifest.lines() {
+        let line = line.split('#').next().unwrap_or("").trim();
+
+        if line.starts_with('[') && line.ends_with(']') {
+            in_package_section = line == "[package]";
+            continue;
+        }
+
+        if !in_package_section {
+            continue;
+        }
+
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+
+        if key.trim() != "name" {
+            continue;
+        }
+
+        return Some(
+            value
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'')
+                .to_string(),
+        );
+    }
+
+    None
 }
 
 fn module_file_stem(graphql_name: &str, decompiled_name: &str) -> String {
@@ -472,5 +659,70 @@ fn describe_reqwest_error(error: &reqwest::Error) -> String {
         format!("{error} (could not connect)")
     } else {
         error.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn fixture_path(relative: &str) -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("package-resolution crate should have a crates parent")
+            .join("peregrine-indexer/tests/fixtures/sui")
+            .join(relative)
+    }
+
+    #[test]
+    fn refresh_imported_package_replaces_interface_stub_from_bytecode() {
+        let temp = tempdir().expect("tempdir");
+        let package_root = temp.path();
+        let build_root = package_root.join("build/pkg_test");
+        let bytecode_dir = build_root.join("bytecode_modules");
+
+        fs::create_dir_all(package_root.join(".peregrine")).expect("metadata dir");
+        fs::create_dir_all(package_root.join("sources")).expect("sources dir");
+        fs::create_dir_all(&bytecode_dir).expect("bytecode dir");
+        fs::write(package_root.join(".peregrine/import.json"), "{}").expect("import metadata");
+        fs::write(
+            package_root.join("Move.toml"),
+            r#"
+[package]
+name = "pkg_test"
+"#,
+        )
+        .expect("manifest");
+        fs::write(
+            package_root.join("sources/vault.move"),
+            r#"
+module bytecode_fixture::vault;
+
+public fun create(): u64 {
+    abort 0
+}
+"#,
+        )
+        .expect("old stub");
+        fs::copy(
+            fixture_path("bytecode_full_mode/build/bytecode_fixture/bytecode_modules/vault.mv"),
+            bytecode_dir.join("vault.mv"),
+        )
+        .expect("copy bytecode");
+
+        refresh_imported_move_package_sources(package_root).expect("refresh import");
+
+        let source =
+            fs::read_to_string(package_root.join("sources/vault.move")).expect("refreshed source");
+        let build_source =
+            fs::read_to_string(build_root.join("sources/vault.move")).expect("build source");
+
+        assert!(!source.contains("Fallback interface"));
+        assert!(source.contains("fun create"));
+        assert!(source.contains("fun deposit"));
+        assert!(source.contains("Vault {"));
+        assert_eq!(source, build_source);
+        assert!(package_root.join("decompiled/vault.moveasm").is_file());
     }
 }

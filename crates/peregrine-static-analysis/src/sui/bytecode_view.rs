@@ -7,6 +7,7 @@ use move_bytecode_source_map::{
 };
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Loc;
+use move_model_2::{compiled_model as compiled_move_model, model as move_model};
 use serde::Serialize;
 use std::{
     collections::BTreeMap,
@@ -134,7 +135,137 @@ pub struct DecompiledMoveModule {
     pub disassembly: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct MoveModuleBytecodeInput {
+    pub name: String,
+    pub bytecode: Vec<u8>,
+    pub disassembly: Option<String>,
+}
+
 pub fn decompile_module_bytecode(
+    bytecode: &[u8],
+    fallback_disassembly: Option<&str>,
+) -> Result<DecompiledMoveModule, String> {
+    let input = MoveModuleBytecodeInput {
+        name: "module".to_string(),
+        bytecode: bytecode.to_vec(),
+        disassembly: fallback_disassembly.map(ToString::to_string),
+    };
+    let mut modules = decompile_package_bytecode_modules(&[input])?;
+    modules
+        .pop()
+        .ok_or_else(|| "Move decompiler did not return a module.".to_string())
+}
+
+pub fn decompile_package_bytecode_modules(
+    modules: &[MoveModuleBytecodeInput],
+) -> Result<Vec<DecompiledMoveModule>, String> {
+    let mut compiled_modules = Vec::new();
+
+    for module in modules {
+        let compiled = CompiledModule::deserialize_with_defaults(&module.bytecode)
+            .map_err(|error| format!("Could not deserialize module `{}`: {error}", module.name))?;
+        compiled_modules.push(compiled);
+    }
+
+    let decompiled_sources = decompile_modules_with_sui_pipeline(&compiled_modules);
+    let decompiler_error = decompiled_sources
+        .as_ref()
+        .err()
+        .map(|error| error.to_string());
+    let decompiled_sources = decompiled_sources.unwrap_or_default();
+
+    modules
+        .iter()
+        .zip(compiled_modules.iter())
+        .map(|(input, module)| {
+            let name = module.self_id().name().to_string();
+            let address = module.self_id().address().to_hex_literal();
+            let disassembly = match input.disassembly.as_deref() {
+                Some(disassembly) if !disassembly.trim().is_empty() => disassembly.to_string(),
+                _ => disassemble_module(module, None)
+                    .map_err(|error| format!("Could not disassemble module {name}: {error}"))?,
+            };
+            let source = decompiled_sources.get(&name).cloned().unwrap_or_else(|| {
+                let fallback_reason = decompiler_error
+                    .as_deref()
+                    .unwrap_or("Sui Move decompiler did not return source for this module.");
+                fallback_module_source(module, Some(fallback_reason))
+            });
+
+            Ok(DecompiledMoveModule {
+                name,
+                address,
+                source,
+                disassembly,
+            })
+        })
+        .collect()
+}
+
+fn decompile_modules_with_sui_pipeline(
+    modules: &[CompiledModule],
+) -> Result<BTreeMap<String, String>, String> {
+    let model_config = move_model::ModelConfig {
+        allow_missing_dependencies: true,
+    };
+    let model = compiled_move_model::Model::from_compiled_with_config(
+        model_config,
+        &BTreeMap::new(),
+        modules.to_vec(),
+    );
+    let decompiled = move_decompiler::translate::model(model)
+        .map_err(|error| format!("Sui Move decompiler failed: {error}"))?;
+    let move_decompiler::ast::Decompiled { model, packages } = decompiled;
+    let mut sources = BTreeMap::new();
+
+    for package in packages {
+        let package_name = package
+            .name
+            .map(|name| name.as_str().to_owned())
+            .unwrap_or_else(|| package.address.to_string());
+        let Some(model_package) = model.maybe_package(&package.address) else {
+            continue;
+        };
+
+        for (_, module) in package.modules {
+            let module_name = module.name.as_str().to_string();
+            let Some(model_module) = model_package.maybe_module(module.name) else {
+                continue;
+            };
+            let source = move_decompiler::pretty_printer::module(
+                &model,
+                &package_name,
+                model_module,
+                &module,
+            )
+            .map_err(|error| {
+                format!("Sui Move decompiler could not print module {module_name}: {error}")
+            })?
+            .render(100);
+
+            sources.insert(module_name, source);
+        }
+    }
+
+    Ok(sources)
+}
+
+fn fallback_module_source(module: &CompiledModule, decompiler_error: Option<&str>) -> String {
+    let mut source = String::new();
+
+    if let Some(error) = decompiler_error {
+        source.push_str("// Sui Move decompiler could not reconstruct this module.\n");
+        source.push_str(&format!(
+            "// Fallback interface was generated instead: {error}\n\n"
+        ));
+    }
+
+    source.push_str(&module_interface_source(module));
+    source
+}
+
+pub fn decompile_module_interface_bytecode(
     bytecode: &[u8],
     fallback_disassembly: Option<&str>,
 ) -> Result<DecompiledMoveModule, String> {
@@ -927,4 +1058,72 @@ fn disassemble_module(
     disassembler
         .disassemble()
         .map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture_path(relative: &str) -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("static-analysis crate should have a workspace parent")
+            .join("peregrine-indexer/tests/fixtures/sui")
+            .join(relative)
+    }
+
+    fn fixture_module_input(relative: &str) -> MoveModuleBytecodeInput {
+        let path = fixture_path(relative);
+        let name = path
+            .file_stem()
+            .and_then(|file_stem| file_stem.to_str())
+            .expect("fixture module should have a utf-8 stem")
+            .to_string();
+        let bytecode = fs::read(&path)
+            .unwrap_or_else(|error| panic!("could not read {}: {error}", path.display()));
+
+        MoveModuleBytecodeInput {
+            name,
+            bytecode,
+            disassembly: None,
+        }
+    }
+
+    #[test]
+    fn decompiles_function_bodies_from_bytecode() {
+        let input = fixture_module_input(
+            "bytecode_full_mode/build/bytecode_fixture/bytecode_modules/vault.mv",
+        );
+        let modules = decompile_package_bytecode_modules(&[input]).expect("decompile vault module");
+        let source = &modules
+            .iter()
+            .find(|module| module.name == "vault")
+            .expect("vault module should be returned")
+            .source;
+
+        assert!(!source.contains("Fallback interface"));
+        assert!(source.contains("fun create"));
+        assert!(source.contains("fun deposit"));
+        assert!(source.contains("Vault {"));
+    }
+
+    #[test]
+    fn decompiles_modules_as_one_package_model() {
+        let inputs = vec![
+            fixture_module_input("friend_function/build/friend_function/bytecode_modules/a.mv"),
+            fixture_module_input("friend_function/build/friend_function/bytecode_modules/b.mv"),
+        ];
+        let modules = decompile_package_bytecode_modules(&inputs).expect("decompile package");
+        let source = modules
+            .iter()
+            .map(|module| module.source.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert_eq!(modules.len(), 2);
+        assert!(!source.contains("Fallback interface"));
+        assert!(source.contains("fun friend_only"));
+        assert!(source.contains("fun call_friend"));
+        assert!(!source.contains("abort 0"));
+    }
 }

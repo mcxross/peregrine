@@ -11701,6 +11701,7 @@ dependencies = [
  "reqwest 0.13.2",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -11722,8 +11723,10 @@ dependencies = [
  "move-bytecode-source-map",
  "move-command-line-common",
  "move-compiler",
+ "move-decompiler",
  "move-disassembler",
  "move-ir-types",
+ "move-model-2",
  "peregrine-scanner",
  "peregrine-types",
  "serde",

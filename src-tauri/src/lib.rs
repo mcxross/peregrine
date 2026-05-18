@@ -16,7 +16,8 @@ use peregrine_indexer::{
     IndexerConfig, SuiMoveIndexer,
 };
 use peregrine_package_resolution::sui::{
-    import_move_package_by_id as resolve_move_package_by_id, MovePackageImportRequest,
+    import_move_package_by_id as resolve_move_package_by_id, refresh_imported_move_package_sources,
+    MovePackageImportRequest,
 };
 use peregrine_static_analysis::sui::bytecode_view::{
     load_package_bytecode, MoveBytecodePackageView,
@@ -2100,6 +2101,7 @@ fn build_package_tree(root_path: String, mode: PackageTreeMode) -> Result<Packag
     let root = root
         .canonicalize()
         .map_err(|error| format!("Could not read package directory {root_path}: {error}"))?;
+    refresh_imported_move_package_sources(&root)?;
     let root_name = root
         .file_name()
         .and_then(|name| name.to_str())

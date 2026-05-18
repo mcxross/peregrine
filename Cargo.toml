@@ -24,8 +24,10 @@ move-command-line-common = { path = "../oss/sui/external-crates/move/crates/move
 move-binary-format = { path = "../oss/sui/external-crates/move/crates/move-binary-format" }
 move-bytecode-source-map = { path = "../oss/sui/external-crates/move/crates/move-bytecode-source-map" }
 move-compiler = { path = "../oss/sui/external-crates/move/crates/move-compiler" }
+move-decompiler = { path = "../oss/sui/external-crates/move/crates/move-decompiler" }
 move-disassembler = { path = "../oss/sui/external-crates/move/crates/move-disassembler" }
 move-ir-types = { path = "../oss/sui/external-crates/move/crates/move-ir-types" }
+move-model-2 = { path = "../oss/sui/external-crates/move/crates/move-model-2" }
 movy = { path = "../oss/movy/crates/movy", default-features = false, features = ["sui-fuzz"] }
 peregrine-adapters = { path = "crates/peregrine-adapters" }
 peregrine-dynamic-analysis = { path = "crates/peregrine-dynamic-analysis" }
