@@ -7,7 +7,7 @@ use peregrine_types::sui::move_model::{
 use serde::Serialize;
 use std::path::Path;
 
-use crate::sui::attack_surface::package_surface;
+use crate::sui::attack_surface::package_surface_for_package;
 
 pub use crate::sui::attack_surface::{
     AdminControlFinding, CapabilityFinding, ExternalCallFinding, MovePackageSurface,
@@ -46,17 +46,17 @@ pub struct MovePackage {
 
 pub fn discover_move_project(root: &Path) -> MoveProject {
     let model = discover_move_project_model(root);
-    build_move_project(model)
+    build_move_project(root, model)
 }
 
 pub fn discover_move_project_fast(root: &Path) -> MoveProject {
     let model = discover_move_project_model_fast(root);
-    build_move_project(model)
+    build_move_project(root, model)
 }
 
 pub fn discover_move_project_shallow(root: &Path) -> MoveProject {
     let model = discover_move_project_model_shallow(root);
-    build_move_project(model)
+    build_move_project(root, model)
 }
 
 pub fn discover_project_graphs(root: &Path) -> MoveProjectGraphs {
@@ -83,11 +83,14 @@ pub fn discover_state_access_graph_for_function(
     )
 }
 
-fn build_move_project(model: peregrine_types::sui::move_model::MoveProjectModel) -> MoveProject {
+fn build_move_project(
+    root: &Path,
+    model: peregrine_types::sui::move_model::MoveProjectModel,
+) -> MoveProject {
     let packages = model
         .packages
         .into_iter()
-        .map(build_move_package)
+        .map(|package| build_move_package(root, package))
         .collect::<Vec<_>>();
 
     MoveProject {
@@ -99,8 +102,10 @@ fn build_move_project(model: peregrine_types::sui::move_model::MoveProjectModel)
     }
 }
 
-fn build_move_package(model: MovePackageModel) -> MovePackage {
-    let surface = package_surface(&model.modules);
+fn build_move_package(root: &Path, model: MovePackageModel) -> MovePackage {
+    let package_root = root.join(&model.path);
+    let build_root = package_root.join("build").join(&model.name);
+    let surface = package_surface_for_package(&model, Some(package_root), Some(build_root));
 
     MovePackage {
         name: model.name,

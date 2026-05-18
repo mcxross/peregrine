@@ -1,8 +1,22 @@
-use peregrine_types::sui::move_model::{MoveFunctionSignature, MoveModule, MoveStructSignature};
+use peregrine_scanner::{
+    core::{ScanInput, ScannerOutput, SourceMode},
+    sui::{
+        objects::{
+            ObjectLifecycleFunctionRef as ScannerLifecycleFunctionRef,
+            ObjectLifecycleModel as ScannerLifecycleModel,
+            ObjectLifecycleStageModel as ScannerLifecycleStageModel, ObjectScanReport,
+        },
+        scan_package,
+    },
+};
+use peregrine_types::sui::move_model::{MoveFunctionSignature, MoveModule, MovePackageModel};
 use serde::Serialize;
 use std::collections::HashSet;
+use std::path::PathBuf;
 
-use super::object_lifecycle::{object_lifecycle_maps, ObjectLifecycleMap};
+use super::object_lifecycle::{
+    object_lifecycle_risks, ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleStage,
+};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -82,42 +96,40 @@ pub struct PublicPackageRelationship {
 }
 
 pub fn package_surface(modules: &[MoveModule]) -> MovePackageSurface {
+    let model = MovePackageModel {
+        name: "package".to_string(),
+        path: String::new(),
+        manifest_path: String::new(),
+        modules: modules.to_vec(),
+    };
+
+    package_surface_for_package(&model, None, None)
+}
+
+pub fn package_surface_for_package(
+    model: &MovePackageModel,
+    package_root: Option<PathBuf>,
+    build_root: Option<PathBuf>,
+) -> MovePackageSurface {
+    let modules = &model.modules;
     let entry_function_count = modules
         .iter()
         .flat_map(|module| module.functions.iter())
         .filter(|function| function.is_transaction_callable)
         .count();
-    let capability_findings = capability_findings(modules);
+    let object_scan = scanner_object_report(model, package_root, build_root);
+    let capability_findings = scanner_capability_findings(&object_scan);
     let mut capability_structs = capability_findings
         .iter()
         .filter(|finding| finding.confidence != "low")
         .map(|finding| finding.qualified_name.clone())
         .collect::<Vec<_>>();
-    let object_ownership_findings = object_ownership_findings(modules, &capability_structs);
-    let object_lifecycle_maps = object_lifecycle_maps(modules, &capability_structs);
+    let object_ownership_findings = scanner_object_ownership_findings(&object_scan);
+    let object_lifecycle_maps = scanner_object_lifecycle_maps(&object_scan, modules);
     let admin_control_findings = admin_control_findings(modules, &capability_structs);
     let external_call_findings = external_call_findings(modules);
     let public_package_relationships = public_package_relationships(modules);
-    let mut shared_object_structs = Vec::new();
-    let shared_object_mentions = shared_object_mentions(modules);
-
-    for module in modules {
-        for move_struct in &module.structs {
-            let qualified_name = format!("{}::{}", module.name, move_struct.name);
-
-            if capability_structs.contains(&qualified_name) {
-                continue;
-            }
-
-            if is_shared_object_struct(move_struct)
-                && (shared_object_mentions.is_empty()
-                    || shared_object_mentions.contains(&move_struct.name)
-                    || shared_object_mentions.contains(&qualified_name))
-            {
-                shared_object_structs.push(qualified_name);
-            }
-        }
-    }
+    let mut shared_object_structs = object_scan.shared_object_structs.clone();
 
     capability_structs.sort();
     capability_structs.dedup();
@@ -147,6 +159,147 @@ pub fn package_surface(modules: &[MoveModule]) -> MovePackageSurface {
     }
 }
 
+fn scanner_object_report(
+    model: &MovePackageModel,
+    package_root: Option<PathBuf>,
+    build_root: Option<PathBuf>,
+) -> ObjectScanReport {
+    let report = scan_package(ScanInput {
+        package_model: model,
+        package_root,
+        build_root,
+        source_mode: SourceMode::BestAvailable,
+    });
+
+    report
+        .scanners
+        .into_iter()
+        .find_map(|output| match output {
+            ScannerOutput::Objects(objects) => Some(objects),
+        })
+        .unwrap_or_else(|| ObjectScanReport {
+            capability_findings: Vec::new(),
+            ownership_findings: Vec::new(),
+            lifecycle_maps: Vec::new(),
+            shared_object_structs: Vec::new(),
+            diagnostics: report.diagnostics,
+        })
+}
+
+fn scanner_capability_findings(report: &ObjectScanReport) -> Vec<CapabilityFinding> {
+    report
+        .capability_findings
+        .iter()
+        .map(|finding| CapabilityFinding {
+            type_name: finding.type_name.clone(),
+            module_name: finding.module_name.clone(),
+            qualified_name: finding.qualified_name.clone(),
+            confidence: finding.confidence.as_str().to_string(),
+            evidence: finding
+                .evidence
+                .iter()
+                .map(|evidence| evidence.message.clone())
+                .collect(),
+            protected_functions: finding.protected_functions.clone(),
+        })
+        .collect()
+}
+
+fn scanner_object_ownership_findings(report: &ObjectScanReport) -> Vec<ObjectOwnershipFinding> {
+    report
+        .ownership_findings
+        .iter()
+        .map(|finding| ObjectOwnershipFinding {
+            type_name: finding.type_name.clone(),
+            module_name: finding.module_name.clone(),
+            qualified_name: finding.qualified_name.clone(),
+            ownership_kind: finding.ownership_kind.as_str().to_string(),
+            confidence: finding.confidence.as_str().to_string(),
+            evidence: finding
+                .evidence
+                .iter()
+                .map(|evidence| evidence.message.clone())
+                .collect(),
+            related_functions: finding.related_functions.clone(),
+            wrapped_types: finding.wrapped_types.clone(),
+        })
+        .collect()
+}
+
+fn scanner_object_lifecycle_maps(
+    report: &ObjectScanReport,
+    modules: &[MoveModule],
+) -> Vec<ObjectLifecycleMap> {
+    report
+        .lifecycle_maps
+        .iter()
+        .map(|lifecycle| {
+            let mut map = scanner_lifecycle_map(lifecycle);
+            map.risks = object_lifecycle_risks(modules, &map);
+            map
+        })
+        .collect()
+}
+
+fn scanner_lifecycle_map(lifecycle: &ScannerLifecycleModel) -> ObjectLifecycleMap {
+    ObjectLifecycleMap {
+        type_name: lifecycle.type_name.clone(),
+        module_name: lifecycle.module_name.clone(),
+        qualified_name: lifecycle.qualified_name.clone(),
+        file_path: lifecycle.file_path.clone(),
+        abilities: lifecycle.abilities.clone(),
+        is_capability_like: lifecycle.is_capability_like,
+        stages: lifecycle
+            .stages
+            .iter()
+            .map(scanner_lifecycle_stage)
+            .collect(),
+        touched_by: lifecycle
+            .touched_by
+            .iter()
+            .map(scanner_lifecycle_function_ref)
+            .collect(),
+        risks: Vec::new(),
+    }
+}
+
+fn scanner_lifecycle_stage(stage: &ScannerLifecycleStageModel) -> ObjectLifecycleStage {
+    ObjectLifecycleStage {
+        kind: stage.kind.as_str().to_string(),
+        functions: stage
+            .functions
+            .iter()
+            .map(scanner_lifecycle_function_ref)
+            .collect(),
+        evidence: stage
+            .evidence
+            .iter()
+            .map(|evidence| evidence.message.clone())
+            .collect(),
+    }
+}
+
+fn scanner_lifecycle_function_ref(
+    function: &ScannerLifecycleFunctionRef,
+) -> ObjectLifecycleFunctionRef {
+    ObjectLifecycleFunctionRef {
+        module_name: function.module_name.clone(),
+        function_name: function.function_name.clone(),
+        qualified_name: function.qualified_name.clone(),
+        file_path: function.file_path.clone(),
+        visibility: function.visibility.clone(),
+        is_entry: function.is_entry,
+        is_transaction_callable: function.is_transaction_callable,
+        direct: function.direct,
+        call_path: function.call_path.clone(),
+        evidence: function
+            .evidence
+            .iter()
+            .map(|evidence| evidence.message.clone())
+            .collect(),
+    }
+}
+
 fn ownership_count(findings: &[ObjectOwnershipFinding], kind: &str) -> usize {
     findings
         .iter()
@@ -154,158 +307,6 @@ fn ownership_count(findings: &[ObjectOwnershipFinding], kind: &str) -> usize {
         .map(|finding| finding.qualified_name.as_str())
         .collect::<HashSet<_>>()
         .len()
-}
-
-fn capability_findings(modules: &[MoveModule]) -> Vec<CapabilityFinding> {
-    let mut findings = Vec::new();
-
-    for module in modules {
-        for move_struct in &module.structs {
-            let mut score = 0;
-            let mut evidence = Vec::new();
-            let mut protected_functions = Vec::new();
-            let qualified_name = format!("{}::{}", module.name, move_struct.name);
-            let mut is_used_in_transaction_callable_function = false;
-            let mut guards_privileged_function = false;
-            let mut is_created_and_transferred = false;
-            let has_capability_name = capability_like_name(&move_struct.name);
-
-            if struct_has_ability(move_struct, "key") {
-                score += 2;
-                evidence.push("struct has key ability".to_string());
-            }
-
-            if has_capability_name {
-                score += 3;
-                evidence.push("type name follows capability/authority naming pattern".to_string());
-            }
-
-            for function_module in modules {
-                for function in &function_module.functions {
-                    let parameter_uses_type =
-                        function_parameters_contain_type(&function.signature, &move_struct.name)
-                            || function_parameters_contain_type(
-                                &function.signature,
-                                &qualified_name,
-                            );
-
-                    if parameter_uses_type && function.is_transaction_callable {
-                        is_used_in_transaction_callable_function = true;
-                        evidence.push(format!(
-                            "used as a parameter in transaction-callable function {}::{}",
-                            function_module.name, function.name
-                        ));
-                    }
-
-                    if parameter_uses_type && privileged_function(function) {
-                        guards_privileged_function = true;
-                        evidence.push(format!(
-                            "guards privileged-looking function {}::{}",
-                            function_module.name, function.name
-                        ));
-                        protected_functions
-                            .push(format!("{}::{}", function_module.name, function.name));
-                    }
-
-                    if created_and_transferred(function, &move_struct.name) {
-                        is_created_and_transferred = true;
-                        evidence.push(format!(
-                            "created and transferred in {}::{}",
-                            function_module.name, function.name
-                        ));
-                    }
-                }
-            }
-
-            if is_used_in_transaction_callable_function {
-                score += 2;
-            }
-
-            if guards_privileged_function {
-                score += 2;
-            }
-
-            if is_created_and_transferred {
-                score += 2;
-            }
-
-            evidence.sort();
-            evidence.dedup();
-            protected_functions.sort();
-            protected_functions.dedup();
-
-            let confidence = if has_capability_name {
-                capability_confidence(score)
-            } else {
-                "low"
-            };
-
-            if confidence == "low" && evidence.is_empty() {
-                continue;
-            }
-
-            findings.push(CapabilityFinding {
-                type_name: move_struct.name.clone(),
-                module_name: module.name.clone(),
-                qualified_name,
-                confidence: confidence.to_string(),
-                evidence,
-                protected_functions,
-            });
-        }
-    }
-
-    findings.sort_by(|left, right| {
-        confidence_rank(&right.confidence)
-            .cmp(&confidence_rank(&left.confidence))
-            .then_with(|| left.qualified_name.cmp(&right.qualified_name))
-    });
-
-    findings
-}
-
-fn capability_confidence(score: i32) -> &'static str {
-    if score >= 7 {
-        "high"
-    } else if score >= 4 {
-        "medium"
-    } else {
-        "low"
-    }
-}
-
-fn confidence_rank(confidence: &str) -> u8 {
-    match confidence {
-        "high" => 3,
-        "medium" => 2,
-        "low" => 1,
-        _ => 0,
-    }
-}
-
-fn capability_like_name(name: &str) -> bool {
-    let name = name.to_ascii_lowercase();
-
-    name.ends_with("cap")
-        || name.ends_with("capability")
-        || name.contains("_cap")
-        || name.contains("admin")
-        || name.contains("authority")
-        || name.contains("owner")
-        || name.contains("publisher")
-        || name.contains("operator")
-        || name.contains("guardian")
-}
-
-fn struct_has_ability(move_struct: &MoveStructSignature, ability: &str) -> bool {
-    move_struct
-        .abilities
-        .iter()
-        .any(|candidate| candidate == ability)
-}
-
-fn is_shared_object_struct(move_struct: &MoveStructSignature) -> bool {
-    struct_has_ability(move_struct, "key") && !capability_like_name(&move_struct.name)
 }
 
 fn function_parameters_contain_type(signature: &str, type_name: &str) -> bool {
@@ -371,470 +372,6 @@ fn privileged_function(function: &MoveFunctionSignature) -> bool {
 
     PRIVILEGED_TERMS.iter().any(|term| name.contains(term))
         || PRIVILEGED_BODY_TERMS.iter().any(|term| body.contains(term))
-}
-
-fn created_and_transferred(function: &MoveFunctionSignature, type_name: &str) -> bool {
-    let Some(body) = function.body.as_deref() else {
-        return false;
-    };
-    let lower_body = body.to_ascii_lowercase();
-
-    body.contains(type_name)
-        && lower_body.contains("object::new")
-        && (lower_body.contains("transfer::transfer")
-            || lower_body.contains("transfer::public_transfer")
-            || lower_body.contains("share_object"))
-}
-
-fn object_ownership_findings(
-    modules: &[MoveModule],
-    capability_structs: &[String],
-) -> Vec<ObjectOwnershipFinding> {
-    let key_structs = key_structs(modules);
-    let mut findings = Vec::new();
-
-    for (module_name, move_struct) in &key_structs {
-        let qualified_name = format!("{module_name}::{}", move_struct.name);
-
-        if capability_structs.contains(&qualified_name) {
-            continue;
-        }
-
-        for kind in ["shared", "addressOwned", "immutable", "party"] {
-            let (evidence, related_functions) =
-                ownership_evidence(modules, &move_struct.name, &qualified_name, kind);
-
-            if evidence.is_empty() {
-                continue;
-            }
-
-            findings.push(ObjectOwnershipFinding {
-                type_name: move_struct.name.clone(),
-                module_name: module_name.clone(),
-                qualified_name: qualified_name.clone(),
-                ownership_kind: kind.to_string(),
-                confidence: if related_functions.is_empty() {
-                    "medium".to_string()
-                } else {
-                    "high".to_string()
-                },
-                evidence,
-                related_functions,
-                wrapped_types: Vec::new(),
-            });
-        }
-    }
-
-    findings.extend(wrapped_object_findings(
-        modules,
-        &key_structs,
-        capability_structs,
-    ));
-    findings.sort_by(|left, right| {
-        left.ownership_kind
-            .cmp(&right.ownership_kind)
-            .then_with(|| left.qualified_name.cmp(&right.qualified_name))
-    });
-    findings
-}
-
-fn key_structs(modules: &[MoveModule]) -> Vec<(String, &MoveStructSignature)> {
-    modules
-        .iter()
-        .filter(|module| !is_test_module(module))
-        .flat_map(|module| {
-            module
-                .structs
-                .iter()
-                .filter(|move_struct| {
-                    struct_has_ability(move_struct, "key")
-                        && !has_test_attribute(&move_struct.attributes)
-                })
-                .map(|move_struct| (module.name.clone(), move_struct))
-        })
-        .collect()
-}
-
-fn ownership_evidence(
-    modules: &[MoveModule],
-    type_name: &str,
-    qualified_name: &str,
-    kind: &str,
-) -> (Vec<String>, Vec<String>) {
-    let mut evidence = Vec::new();
-    let mut related_functions = Vec::new();
-
-    for module in modules {
-        if is_test_module(module) {
-            continue;
-        }
-
-        for function in &module.functions {
-            if has_test_attribute(&function.attributes) {
-                continue;
-            }
-
-            let Some(body) = function.body.as_deref() else {
-                continue;
-            };
-
-            let returns_type = function_returns_type(&function.signature, type_name)
-                || function_returns_type(&function.signature, qualified_name);
-            let matched = match kind {
-                "shared" => operation_touches_type(
-                    body,
-                    &function.signature,
-                    type_name,
-                    qualified_name,
-                    &[
-                        "transfer::share_object",
-                        "transfer::public_share_object",
-                        "share_object",
-                    ],
-                ),
-                "addressOwned" => {
-                    operation_touches_type(
-                        body,
-                        &function.signature,
-                        type_name,
-                        qualified_name,
-                        &[
-                            "transfer::transfer",
-                            "transfer::public_transfer",
-                            "public_transfer",
-                        ],
-                    ) || (function.is_transaction_callable && returns_type)
-                }
-                "immutable" => operation_touches_type(
-                    body,
-                    &function.signature,
-                    type_name,
-                    qualified_name,
-                    &[
-                        "transfer::freeze_object",
-                        "transfer::public_freeze_object",
-                        "freeze_object",
-                    ],
-                ),
-                "party" => operation_touches_type(
-                    body,
-                    &function.signature,
-                    type_name,
-                    qualified_name,
-                    &[
-                        "transfer::party_transfer",
-                        "transfer::public_party_transfer",
-                        "party_transfer",
-                        "party::",
-                    ],
-                ),
-                _ => false,
-            };
-
-            if matched {
-                evidence.push(ownership_evidence_label(
-                    kind,
-                    module,
-                    function,
-                    type_name,
-                    qualified_name,
-                ));
-                related_functions.push(format!("{}::{}", module.name, function.name));
-            }
-        }
-    }
-
-    evidence.sort();
-    evidence.dedup();
-    related_functions.sort();
-    related_functions.dedup();
-    (evidence, related_functions)
-}
-
-fn ownership_evidence_label(
-    kind: &str,
-    module: &MoveModule,
-    function: &MoveFunctionSignature,
-    type_name: &str,
-    qualified_name: &str,
-) -> String {
-    match kind {
-        "addressOwned"
-            if function.is_transaction_callable
-                && (function_returns_type(&function.signature, type_name)
-                    || function_returns_type(&function.signature, qualified_name)) =>
-        {
-            format!(
-                "owned object returned from transaction-callable {}::{}",
-                module.name, function.name
-            )
-        }
-        "shared" => format!(
-            "object shared via transfer::share_object in {}::{}",
-            module.name, function.name
-        ),
-        "immutable" => format!(
-            "object frozen via transfer::freeze_object in {}::{}",
-            module.name, function.name
-        ),
-        "party" => format!(
-            "object moved through party transfer API in {}::{}",
-            module.name, function.name
-        ),
-        _ => format!(
-            "{kind} ownership evidence in {}::{}",
-            module.name, function.name
-        ),
-    }
-}
-
-fn body_constructs_type(body: &str, type_name: &str) -> bool {
-    let short_name = type_name.rsplit("::").next().unwrap_or(type_name);
-    body.contains(&format!("{short_name} {{")) || body.contains(&format!("{short_name}<"))
-}
-
-fn function_returns_type(signature: &str, type_name: &str) -> bool {
-    if type_name.is_empty() {
-        return false;
-    }
-
-    let Some(close_parameters) = signature.rfind(')') else {
-        return false;
-    };
-
-    let after_parameters = signature[close_parameters + 1..].trim_start();
-    let Some(return_type) = after_parameters.strip_prefix(':') else {
-        return false;
-    };
-
-    type_reference_matches(return_type, type_name)
-}
-
-fn operation_touches_type(
-    body: &str,
-    signature: &str,
-    type_name: &str,
-    qualified_name: &str,
-    operations: &[&str],
-) -> bool {
-    let value_names = owned_or_constructed_value_names(body, signature, type_name, qualified_name);
-
-    operation_call_snippets(body, operations)
-        .iter()
-        .any(|snippet| {
-            body_constructs_type(snippet, type_name)
-                || body_constructs_type(snippet, qualified_name)
-                || value_names
-                    .iter()
-                    .any(|value_name| source_contains_identifier(snippet, value_name))
-        })
-}
-
-fn owned_or_constructed_value_names(
-    body: &str,
-    signature: &str,
-    type_name: &str,
-    qualified_name: &str,
-) -> HashSet<String> {
-    let mut names = HashSet::new();
-
-    names.extend(owned_parameter_names(signature, type_name));
-    names.extend(owned_parameter_names(signature, qualified_name));
-    names.extend(constructed_value_names(body, type_name));
-    names.extend(constructed_value_names(body, qualified_name));
-    names
-}
-
-fn owned_parameter_names(signature: &str, type_name: &str) -> HashSet<String> {
-    let mut names = HashSet::new();
-    let Some(parameters) = function_parameters(signature) else {
-        return names;
-    };
-
-    for parameter in split_top_level(parameters, ',') {
-        let Some((name, parameter_type)) = parameter.split_once(':') else {
-            continue;
-        };
-        let parameter_type = parameter_type.trim();
-
-        if parameter_type.starts_with('&') || !type_reference_matches(parameter_type, type_name) {
-            continue;
-        }
-
-        let name = name
-            .split_whitespace()
-            .last()
-            .unwrap_or("")
-            .trim_matches(|character: char| !is_identifier_character(character));
-
-        if !name.is_empty() {
-            names.insert(name.to_string());
-        }
-    }
-
-    names
-}
-
-fn constructed_value_names(body: &str, type_name: &str) -> HashSet<String> {
-    let mut names = HashSet::new();
-
-    for statement in body.split(';') {
-        let Some((left, right)) = statement.split_once('=') else {
-            continue;
-        };
-
-        if !left.contains("let") || !body_constructs_type(right, type_name) {
-            continue;
-        }
-
-        let Some(raw_name) = left
-            .split("let")
-            .last()
-            .and_then(|binding| binding.split(':').next())
-        else {
-            continue;
-        };
-
-        let name = raw_name
-            .split_whitespace()
-            .filter(|part| *part != "mut")
-            .next_back()
-            .unwrap_or("")
-            .trim_matches(|character: char| !is_identifier_character(character));
-
-        if !name.is_empty() {
-            names.insert(name.to_string());
-        }
-    }
-
-    names
-}
-
-fn operation_call_snippets(body: &str, operations: &[&str]) -> Vec<String> {
-    let lower_body = body.to_ascii_lowercase();
-    let mut snippets = Vec::new();
-
-    for operation in operations {
-        let operation = operation.to_ascii_lowercase();
-        let mut search_start = 0;
-
-        while let Some(relative_start) = lower_body[search_start..].find(&operation) {
-            let start = search_start + relative_start;
-            let end = lower_body[start..]
-                .find(';')
-                .map(|offset| start + offset)
-                .unwrap_or(body.len());
-
-            snippets.push(body[start..end].to_string());
-            search_start = end.saturating_add(1);
-        }
-    }
-
-    snippets
-}
-
-fn split_top_level(source: &str, delimiter: char) -> Vec<&str> {
-    let mut parts = Vec::new();
-    let mut start = 0;
-    let mut angle_depth = 0_i32;
-    let mut paren_depth = 0_i32;
-
-    for (index, character) in source.char_indices() {
-        match character {
-            '<' => angle_depth += 1,
-            '>' => angle_depth -= 1,
-            '(' => paren_depth += 1,
-            ')' => paren_depth -= 1,
-            _ if character == delimiter && angle_depth == 0 && paren_depth == 0 => {
-                parts.push(source[start..index].trim());
-                start = index + character.len_utf8();
-            }
-            _ => {}
-        }
-    }
-
-    parts.push(source[start..].trim());
-    parts
-}
-
-fn source_contains_identifier(source: &str, identifier: &str) -> bool {
-    source
-        .split(|character: char| !is_identifier_character(character))
-        .any(|token| token == identifier)
-}
-
-fn is_identifier_character(character: char) -> bool {
-    character.is_ascii_alphanumeric() || character == '_'
-}
-
-fn is_test_module(module: &MoveModule) -> bool {
-    module
-        .file_path
-        .split('/')
-        .any(|segment| segment == "tests")
-        || has_test_attribute(&module.attributes)
-}
-
-fn has_test_attribute(attributes: &[String]) -> bool {
-    attributes.iter().any(|attribute| {
-        let attribute = attribute.to_ascii_lowercase();
-        attribute.contains("test")
-            || attribute.contains("test_only")
-            || attribute.contains("random_test")
-            || attribute.contains("expected_failure")
-    })
-}
-
-fn wrapped_object_findings(
-    modules: &[MoveModule],
-    key_structs: &[(String, &MoveStructSignature)],
-    capability_structs: &[String],
-) -> Vec<ObjectOwnershipFinding> {
-    let key_names = key_structs
-        .iter()
-        .map(|(_, move_struct)| move_struct.name.clone())
-        .collect::<HashSet<_>>();
-    let mut findings = Vec::new();
-
-    for module in modules {
-        for wrapper in &module.structs {
-            let qualified_name = format!("{}::{}", module.name, wrapper.name);
-
-            if capability_structs.contains(&qualified_name) {
-                continue;
-            }
-
-            let wrapped_types = wrapper
-                .fields
-                .iter()
-                .filter_map(|field| {
-                    key_names
-                        .iter()
-                        .find(|key_name| type_reference_matches(&field.type_name, key_name))
-                        .cloned()
-                })
-                .collect::<HashSet<_>>()
-                .into_iter()
-                .collect::<Vec<_>>();
-
-            if wrapped_types.is_empty() {
-                continue;
-            }
-
-            findings.push(ObjectOwnershipFinding {
-                type_name: wrapper.name.clone(),
-                module_name: module.name.clone(),
-                qualified_name,
-                ownership_kind: "wrapped".to_string(),
-                confidence: "high".to_string(),
-                evidence: vec!["struct stores another key object type as a field".to_string()],
-                related_functions: Vec::new(),
-                wrapped_types,
-            });
-        }
-    }
-
-    findings
 }
 
 fn admin_control_findings(
@@ -1026,29 +563,4 @@ fn call_targets(source: &str) -> Vec<String> {
             }
         })
         .collect()
-}
-
-fn shared_object_mentions(modules: &[MoveModule]) -> HashSet<String> {
-    let mut mentions = HashSet::new();
-
-    for function in modules.iter().flat_map(|module| module.functions.iter()) {
-        let Some(body) = function.body.as_deref() else {
-            continue;
-        };
-
-        if !body.contains("share_object") {
-            continue;
-        }
-
-        for module in modules {
-            for move_struct in &module.structs {
-                if body.contains(&move_struct.name) {
-                    mentions.insert(move_struct.name.clone());
-                    mentions.insert(format!("{}::{}", module.name, move_struct.name));
-                }
-            }
-        }
-    }
-
-    mentions
 }

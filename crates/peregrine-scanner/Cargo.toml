@@ -1,0 +1,11 @@
+[package]
+name = "peregrine-scanner"
+version.workspace = true
+edition.workspace = true
+description = "Generic scanner models for Peregrine Move packages"
+
+[dependencies]
+move-binary-format = { workspace = true }
+peregrine-types = { workspace = true }
+serde = { workspace = true }
+walkdir = { workspace = true }

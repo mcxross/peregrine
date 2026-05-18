@@ -205,6 +205,21 @@ pub fn object_lifecycle_maps(
     maps
 }
 
+pub fn object_lifecycle_risks(
+    modules: &[MoveModule],
+    lifecycle_map: &ObjectLifecycleMap,
+) -> Vec<ObjectLifecycleRisk> {
+    let functions = function_index(modules);
+
+    lifecycle_risks(
+        &lifecycle_map.qualified_name,
+        &lifecycle_map.type_name,
+        lifecycle_map.is_capability_like,
+        &lifecycle_map.stages,
+        &functions,
+    )
+}
+
 fn key_object_candidates(modules: &[MoveModule]) -> Vec<ObjectCandidate<'_>> {
     modules
         .iter()

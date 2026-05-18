@@ -11704,6 +11704,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "peregrine-scanner"
+version = "0.1.0"
+dependencies = [
+ "move-binary-format",
+ "peregrine-types",
+ "serde",
+ "walkdir",
+]
+
+[[package]]
 name = "peregrine-static-analysis"
 version = "0.1.0"
 dependencies = [
@@ -11714,6 +11724,7 @@ dependencies = [
  "move-compiler",
  "move-disassembler",
  "move-ir-types",
+ "peregrine-scanner",
  "peregrine-types",
  "serde",
  "serde_json",

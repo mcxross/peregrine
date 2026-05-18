@@ -5,8 +5,8 @@ pub mod object_lifecycle;
 pub mod rules;
 
 pub use attack_surface::{
-    package_surface, AdminControlFinding, CapabilityFinding, ExternalCallFinding,
-    MovePackageSurface, ObjectOwnershipFinding, PublicPackageRelationship,
+    package_surface, package_surface_for_package, AdminControlFinding, CapabilityFinding,
+    ExternalCallFinding, MovePackageSurface, ObjectOwnershipFinding, PublicPackageRelationship,
 };
 pub use bytecode_view::{
     decompile_module_bytecode, load_package_bytecode, DecompiledMoveModule,
@@ -16,7 +16,7 @@ pub use bytecode_view::{
 };
 pub use complexity::ComplexityRuleSetProvider;
 pub use object_lifecycle::{
-    object_lifecycle_maps, ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleRisk,
-    ObjectLifecycleStage,
+    object_lifecycle_maps, object_lifecycle_risks, ObjectLifecycleFunctionRef, ObjectLifecycleMap,
+    ObjectLifecycleRisk, ObjectLifecycleStage,
 };
 pub use rules::{SuiRuleSet, SuiRuleSetProvider, RULESET_ID};

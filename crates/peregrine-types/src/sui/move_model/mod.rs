@@ -44,7 +44,7 @@ pub struct MoveProjectGraphs {
     pub state_access_graph: MoveStateAccessGraph,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MovePackageModel {
     pub name: String,
@@ -53,7 +53,7 @@ pub struct MovePackageModel {
     pub modules: Vec<MoveModule>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveModule {
     pub name: String,
@@ -64,7 +64,7 @@ pub struct MoveModule {
     pub functions: Vec<MoveFunctionSignature>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveStructSignature {
     pub name: String,
@@ -74,14 +74,14 @@ pub struct MoveStructSignature {
     pub attributes: Vec<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveStructField {
     pub name: String,
     pub type_name: String,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveFunctionSignature {
     pub name: String,
