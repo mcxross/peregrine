@@ -576,7 +576,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f70d83b765fdc080dbcd4f4db70d8d23fe4761f2f02ebfa9146b833900634b4"
 dependencies = [
  "alloy-rlp-derive",
- "arrayvec",
+ "arrayvec 0.7.6",
  "bytes",
 ]
 
@@ -838,7 +838,7 @@ checksum = "428aa0f0e0658ff091f8f667c406e034b431cb10abd39de4f507520968acc499"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
- "arrayvec",
+ "arrayvec 0.7.6",
  "derive_more 2.1.1",
  "nybbles",
  "serde",
@@ -1149,7 +1149,7 @@ dependencies = [
  "ark-ff-macros 0.5.0",
  "ark-serialize 0.5.0",
  "ark-std 0.5.0",
- "arrayvec",
+ "arrayvec 0.7.6",
  "digest 0.10.7",
  "educe 0.6.0",
  "itertools 0.13.0",
@@ -1317,7 +1317,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f4d068aaf107ebcd7dfb52bc748f8030e0fc930ac8e360146ca54c1203088f7"
 dependencies = [
  "ark-std 0.5.0",
- "arrayvec",
+ "arrayvec 0.7.6",
  "digest 0.10.7",
  "num-bigint 0.4.6",
 ]
@@ -1380,6 +1380,12 @@ name = "arrayref"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76a2e8124351fda1ef8aaaa3bbd7ebbcb486bbcd4225aca0aa0d84bb2db8fecb"
+
+[[package]]
+name = "arrayvec"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 
 [[package]]
 name = "arrayvec"
@@ -2039,9 +2045,9 @@ dependencies = [
  "aws-smithy-async",
  "aws-smithy-runtime-api",
  "aws-smithy-types",
- "h2",
+ "h2 0.4.14",
  "http 1.4.0",
- "hyper",
+ "hyper 1.9.0",
  "hyper-rustls",
  "hyper-util",
  "pin-project-lite",
@@ -2200,7 +2206,7 @@ dependencies = [
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
- "hyper",
+ "hyper 1.9.0",
  "hyper-util",
  "itoa",
  "matchit 0.7.3",
@@ -2214,7 +2220,7 @@ dependencies = [
  "serde_path_to_error",
  "serde_urlencoded",
  "sha1",
- "sync_wrapper",
+ "sync_wrapper 1.0.2",
  "tokio",
  "tokio-tungstenite 0.24.0",
  "tower 0.5.3",
@@ -2238,7 +2244,7 @@ dependencies = [
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
- "hyper",
+ "hyper 1.9.0",
  "hyper-util",
  "itoa",
  "matchit 0.8.4",
@@ -2251,7 +2257,7 @@ dependencies = [
  "serde_path_to_error",
  "serde_urlencoded",
  "sha1",
- "sync_wrapper",
+ "sync_wrapper 1.0.2",
  "tokio",
  "tokio-tungstenite 0.29.0",
  "tower 0.5.3",
@@ -2274,7 +2280,7 @@ dependencies = [
  "mime",
  "pin-project-lite",
  "rustversion",
- "sync_wrapper",
+ "sync_wrapper 1.0.2",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -2293,7 +2299,7 @@ dependencies = [
  "http-body-util",
  "mime",
  "pin-project-lite",
- "sync_wrapper",
+ "sync_wrapper 1.0.2",
  "tower-layer",
  "tower-service",
 ]
@@ -2356,7 +2362,7 @@ dependencies = [
  "fs-err",
  "http 1.4.0",
  "http-body 1.0.1",
- "hyper",
+ "hyper 1.9.0",
  "hyper-util",
  "pin-project-lite",
  "rustls",
@@ -2817,7 +2823,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b79834656f71332577234b50bfc009996f7449e0c056884e6a02492ded0ca2f3"
 dependencies = [
  "arrayref",
- "arrayvec",
+ "arrayvec 0.7.6",
  "constant_time_eq",
 ]
 
@@ -2828,7 +2834,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee29928bad1e3f94c9d1528da29e07a1d3d04817ae8332de1e8b846c8439f4b3"
 dependencies = [
  "arrayref",
- "arrayvec",
+ "arrayvec 0.7.6",
  "constant_time_eq",
 ]
 
@@ -3335,6 +3341,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "chrono-tz"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93698b29de5e97ad0ae26447b344c482a7284c737d9ddc5f9e52b74a336671bb"
+dependencies = [
+ "chrono",
+ "chrono-tz-build",
+ "phf 0.11.3",
+]
+
+[[package]]
+name = "chrono-tz-build"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c088aee841df9c3041febbb73934cfc39708749bf96dc827e3359cd39ef11b1"
+dependencies = [
+ "parse-zoneinfo",
+ "phf 0.11.3",
+ "phf_codegen 0.11.3",
+]
+
+[[package]]
 name = "ciborium"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3634,7 +3662,7 @@ dependencies = [
  "mysten-network",
  "nom",
  "parking_lot 0.12.5",
- "prometheus",
+ "prometheus 0.14.0",
  "prost 0.14.3",
  "quinn-proto",
  "rand 0.8.6",
@@ -4793,6 +4821,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "deunicode"
+version = "1.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abd57806937c9cc163efc8ea3910e00a62e2aeb0b8119f1793a978088f8f6b04"
+
+[[package]]
 name = "diesel"
 version = "2.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4905,6 +4939,27 @@ dependencies = [
  "const-oid 0.10.2",
  "crypto-common 0.2.1",
  "ctutils",
+]
+
+[[package]]
+name = "dir-test"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62c013fe825864f3e4593f36426c1fa7a74f5603f13ca8d1af7a990c1cd94a79"
+dependencies = [
+ "dir-test-macros",
+]
+
+[[package]]
+name = "dir-test-macros"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d42f54d7b4a6bc2400fe5b338e35d1a335787585375322f49c5d5fe7b243da7e"
+dependencies = [
+ "glob",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -5313,7 +5368,7 @@ dependencies = [
  "rustc_version 0.4.1",
  "toml 0.9.12+spec-1.1.0",
  "vswhom",
- "winreg",
+ "winreg 0.55.0",
 ]
 
 [[package]]
@@ -5373,6 +5428,14 @@ checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
 [[package]]
 name = "enum-compat-util"
 version = "0.1.0"
+dependencies = [
+ "serde_yaml",
+]
+
+[[package]]
+name = "enum-compat-util"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
 dependencies = [
  "serde_yaml",
 ]
@@ -5794,7 +5857,7 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "139834ddba373bbdd213dffe02c8d110508dcf1726c2be27e8d1f7d7e1856418"
 dependencies = [
- "arrayvec",
+ "arrayvec 0.7.6",
  "auto_impl",
  "bytes",
 ]
@@ -5805,7 +5868,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce8dba4714ef14b8274c371879b175aa55b16b30f269663f19d576f380018dc4"
 dependencies = [
- "arrayvec",
+ "arrayvec 0.7.6",
  "auto_impl",
  "bytes",
 ]
@@ -6265,7 +6328,7 @@ dependencies = [
  "chrono",
  "http 1.4.0",
  "http-body-util",
- "hyper",
+ "hyper 1.9.0",
  "hyper-rustls",
  "hyper-util",
  "ring",
@@ -6597,6 +6660,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "globwalk"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bf760ebf69878d9fd8f110c89703d90ce35095324d1f1edcb595c63945ee757"
+dependencies = [
+ "bitflags 2.11.1",
+ "ignore",
+ "walkdir",
+]
+
+[[package]]
 name = "gobject-sys"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6701,6 +6775,25 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "h2"
+version = "0.3.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0beca50380b1fc32983fc1cb4587bfa4bb9e78fc259aad4a0032d2080309222d"
+dependencies = [
+ "bytes",
+ "fnv",
+ "futures-core",
+ "futures-sink",
+ "futures-util",
+ "http 0.2.12",
+ "indexmap 2.14.0",
+ "slab",
+ "tokio",
+ "tokio-util 0.7.18",
+ "tracing",
 ]
 
 [[package]]
@@ -6895,7 +6988,7 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fda06d18ac606267c40c04e41b9947729bf8b9efe74bd4e82b61a5f26a510b9f"
 dependencies = [
- "arrayvec",
+ "arrayvec 0.7.6",
 ]
 
 [[package]]
@@ -7053,6 +7146,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
+name = "humansize"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6cb51c9a029ddc91b07a787f1d86b53ccfa49b0e86688c946ebe8d3555685dd7"
+dependencies = [
+ "libm",
+]
+
+[[package]]
 name = "humantime"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7069,6 +7171,30 @@ dependencies = [
 
 [[package]]
 name = "hyper"
+version = "0.14.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41dfc780fdec9373c01bae43289ea34c972e40ee3c9f6b3c8801a35f35586ce7"
+dependencies = [
+ "bytes",
+ "futures-channel",
+ "futures-core",
+ "futures-util",
+ "h2 0.3.27",
+ "http 0.2.12",
+ "http-body 0.4.6",
+ "httparse",
+ "httpdate",
+ "itoa",
+ "pin-project-lite",
+ "socket2 0.5.10",
+ "tokio",
+ "tower-service",
+ "tracing",
+ "want",
+]
+
+[[package]]
+name = "hyper"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6299f016b246a94207e63da54dbe807655bf9e00044f73ded42c3ac5305fbcca"
@@ -7077,7 +7203,7 @@ dependencies = [
  "bytes",
  "futures-channel",
  "futures-core",
- "h2",
+ "h2 0.4.14",
  "http 1.4.0",
  "http-body 1.0.1",
  "httparse",
@@ -7096,7 +7222,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33ca68d021ef39cf6463ab54c1d0f5daf03377b70561305bb89a8f83aab66e0f"
 dependencies = [
  "http 1.4.0",
- "hyper",
+ "hyper 1.9.0",
  "hyper-util",
  "log",
  "rustls",
@@ -7113,11 +7239,24 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b90d566bffbce6a75bd8b09a05aa8c2cb1fabb6cb348f8840c9e4c90a0d83b0"
 dependencies = [
- "hyper",
+ "hyper 1.9.0",
  "hyper-util",
  "pin-project-lite",
  "tokio",
  "tower-service",
+]
+
+[[package]]
+name = "hyper-tls"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6183ddfa99b85da61a140bea0efc93fdf56ceaa041b37d553518030827f9905"
+dependencies = [
+ "bytes",
+ "hyper 0.14.32",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
 ]
 
 [[package]]
@@ -7128,7 +7267,7 @@ checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
 dependencies = [
  "bytes",
  "http-body-util",
- "hyper",
+ "hyper 1.9.0",
  "hyper-util",
  "native-tls",
  "tokio",
@@ -7148,13 +7287,13 @@ dependencies = [
  "futures-util",
  "http 1.4.0",
  "http-body 1.0.1",
- "hyper",
+ "hyper 1.9.0",
  "ipnet",
  "libc",
  "percent-encoding",
  "pin-project-lite",
  "socket2 0.6.3",
- "system-configuration",
+ "system-configuration 0.7.0",
  "tokio",
  "tower-service",
  "tracing",
@@ -7308,6 +7447,22 @@ checksum = "3acae9609540aa318d1bc588455225fb2085b9ed0c4f6bd0d9d5bcd86f1a0344"
 dependencies = [
  "icu_normalizer",
  "icu_properties",
+]
+
+[[package]]
+name = "ignore"
+version = "0.4.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3d782a365a015e0f5c04902246139249abf769125006fbe7649e2ee88169b4a"
+dependencies = [
+ "crossbeam-deque",
+ "globset",
+ "log",
+ "memchr",
+ "regex-automata",
+ "same-file",
+ "walkdir",
+ "winapi-util",
 ]
 
 [[package]]
@@ -7494,6 +7649,19 @@ name = "integer-encoding"
 version = "3.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
+
+[[package]]
+name = "internment"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ab388864246d58a276e60e7569a833d9cc4cd75c66e5ca77c177dad38e59996"
+dependencies = [
+ "ahash 0.7.8",
+ "dashmap 5.5.3",
+ "hashbrown 0.12.3",
+ "once_cell",
+ "parking_lot 0.12.5",
+]
 
 [[package]]
 name = "inventory"
@@ -7859,7 +8027,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "http-body 1.0.1",
- "hyper",
+ "hyper 1.9.0",
  "hyper-rustls",
  "hyper-util",
  "jsonrpsee-core",
@@ -7898,7 +8066,7 @@ dependencies = [
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
- "hyper",
+ "hyper 1.9.0",
  "hyper-util",
  "jsonrpsee-core",
  "jsonrpsee-types",
@@ -9057,10 +9225,15 @@ name = "move-abstract-interpreter"
 version = "0.1.0"
 
 [[package]]
+name = "move-abstract-interpreter"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+
+[[package]]
 name = "move-abstract-interpreter-v2"
 version = "0.1.0"
 dependencies = [
- "move-binary-format",
+ "move-binary-format 0.0.3",
 ]
 
 [[package]]
@@ -9070,6 +9243,11 @@ version = "0.1.0"
 [[package]]
 name = "move-abstract-stack"
 version = "0.0.1"
+
+[[package]]
+name = "move-abstract-stack"
+version = "0.0.1"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
 
 [[package]]
 name = "move-analyzer"
@@ -9085,13 +9263,13 @@ dependencies = [
  "json_comments",
  "lsp-server",
  "lsp-types 0.95.1",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-ir-types",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-ir-types 0.1.0",
  "move-package-alt",
  "move-package-alt-compilation",
- "move-symbol-pool",
+ "move-symbol-pool 0.1.0",
  "serde",
  "serde_json",
  "sha2 0.9.9",
@@ -9107,11 +9285,27 @@ name = "move-binary-format"
 version = "0.0.3"
 dependencies = [
  "anyhow",
- "enum-compat-util",
+ "enum-compat-util 0.1.0",
  "indexmap 2.14.0",
- "move-abstract-interpreter",
- "move-core-types",
- "move-proc-macros",
+ "move-abstract-interpreter 0.1.0",
+ "move-core-types 0.0.4",
+ "move-proc-macros 0.1.0",
+ "ref-cast",
+ "serde",
+ "variant_count",
+]
+
+[[package]]
+name = "move-binary-format"
+version = "0.0.3"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "enum-compat-util 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "indexmap 2.14.0",
+ "move-abstract-interpreter 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-proc-macros 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "ref-cast",
  "serde",
  "variant_count",
@@ -9122,16 +9316,37 @@ name = "move-borrow-graph"
 version = "0.0.1"
 
 [[package]]
+name = "move-borrow-graph"
+version = "0.0.1"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+
+[[package]]
 name = "move-bytecode-source-map"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs",
- "move-binary-format",
- "move-command-line-common",
- "move-core-types",
- "move-ir-types",
- "move-symbol-pool",
+ "move-binary-format 0.0.3",
+ "move-command-line-common 0.1.0",
+ "move-core-types 0.0.4",
+ "move-ir-types 0.1.0",
+ "move-symbol-pool 0.1.0",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "move-bytecode-source-map"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "serde",
  "serde_json",
 ]
@@ -9142,8 +9357,21 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "indexmap 2.14.0",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
+ "petgraph 0.8.3",
+ "serde-reflection",
+]
+
+[[package]]
+name = "move-bytecode-utils"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "indexmap 2.14.0",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "petgraph 0.8.3",
  "serde-reflection",
 ]
@@ -9152,14 +9380,31 @@ dependencies = [
 name = "move-bytecode-verifier"
 version = "0.1.0"
 dependencies = [
- "move-abstract-interpreter",
- "move-abstract-stack",
- "move-binary-format",
- "move-borrow-graph",
- "move-bytecode-verifier-meter",
- "move-core-types",
- "move-regex-borrow-graph",
- "move-vm-config",
+ "move-abstract-interpreter 0.1.0",
+ "move-abstract-stack 0.0.1",
+ "move-binary-format 0.0.3",
+ "move-borrow-graph 0.0.1",
+ "move-bytecode-verifier-meter 0.1.0",
+ "move-core-types 0.0.4",
+ "move-regex-borrow-graph 0.0.1",
+ "move-vm-config 0.1.0",
+ "petgraph 0.8.3",
+ "serde",
+]
+
+[[package]]
+name = "move-bytecode-verifier"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "move-abstract-interpreter 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-abstract-stack 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-borrow-graph 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-bytecode-verifier-meter 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-regex-borrow-graph 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-vm-config 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "petgraph 0.8.3",
  "serde",
 ]
@@ -9168,9 +9413,19 @@ dependencies = [
 name = "move-bytecode-verifier-meter"
 version = "0.1.0"
 dependencies = [
- "move-binary-format",
- "move-core-types",
- "move-vm-config",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
+]
+
+[[package]]
+name = "move-bytecode-verifier-meter"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-vm-config 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
 ]
 
 [[package]]
@@ -9178,12 +9433,12 @@ name = "move-bytecode-verifier-v0"
 version = "0.1.0"
 dependencies = [
  "move-abstract-interpreter-v2",
- "move-abstract-stack",
- "move-binary-format",
- "move-borrow-graph",
- "move-bytecode-verifier-meter",
- "move-core-types",
- "move-vm-config",
+ "move-abstract-stack 0.0.1",
+ "move-binary-format 0.0.3",
+ "move-borrow-graph 0.0.1",
+ "move-bytecode-verifier-meter 0.1.0",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "petgraph 0.8.3",
 ]
 
@@ -9192,12 +9447,12 @@ name = "move-bytecode-verifier-v1"
 version = "0.1.0"
 dependencies = [
  "move-abstract-interpreter-v2",
- "move-abstract-stack",
- "move-binary-format",
- "move-borrow-graph",
- "move-bytecode-verifier-meter",
- "move-core-types",
- "move-vm-config",
+ "move-abstract-stack 0.0.1",
+ "move-binary-format 0.0.3",
+ "move-borrow-graph 0.0.1",
+ "move-bytecode-verifier-meter 0.1.0",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "petgraph 0.8.3",
 ]
 
@@ -9206,12 +9461,12 @@ name = "move-bytecode-verifier-v2"
 version = "0.1.0"
 dependencies = [
  "move-abstract-interpreter-v2",
- "move-abstract-stack",
- "move-binary-format",
- "move-borrow-graph",
- "move-bytecode-verifier-meter",
- "move-core-types",
- "move-vm-config",
+ "move-abstract-stack 0.0.1",
+ "move-binary-format 0.0.3",
+ "move-borrow-graph 0.0.1",
+ "move-bytecode-verifier-meter 0.1.0",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "petgraph 0.8.3",
 ]
 
@@ -9219,14 +9474,14 @@ dependencies = [
 name = "move-bytecode-verifier-v3"
 version = "0.1.0"
 dependencies = [
- "move-abstract-interpreter",
- "move-abstract-stack",
- "move-binary-format",
- "move-borrow-graph",
- "move-bytecode-verifier-meter",
- "move-core-types",
- "move-regex-borrow-graph",
- "move-vm-config",
+ "move-abstract-interpreter 0.1.0",
+ "move-abstract-stack 0.0.1",
+ "move-binary-format 0.0.3",
+ "move-borrow-graph 0.0.1",
+ "move-bytecode-verifier-meter 0.1.0",
+ "move-core-types 0.0.4",
+ "move-regex-borrow-graph 0.0.1",
+ "move-vm-config 0.1.0",
  "petgraph 0.8.3",
  "serde",
 ]
@@ -9238,9 +9493,9 @@ dependencies = [
  "anyhow",
  "clap",
  "crossterm 0.25.0",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-disassembler",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-disassembler 0.1.0",
  "ratatui",
  "regex",
 ]
@@ -9254,26 +9509,26 @@ dependencies = [
  "colored",
  "indexmap 2.14.0",
  "indoc",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-bytecode-utils",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-bytecode-utils 0.1.0",
  "move-bytecode-viewer",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-coverage",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-coverage 0.1.0",
  "move-decompiler",
- "move-disassembler",
- "move-docgen",
- "move-ir-types",
- "move-model-2",
+ "move-disassembler 0.1.0",
+ "move-docgen 0.1.0",
+ "move-ir-types 0.1.0",
+ "move-model-2 0.1.0",
  "move-package-alt",
  "move-package-alt-compilation",
  "move-stdlib",
- "move-symbol-pool",
- "move-trace-format",
+ "move-symbol-pool 0.1.0",
+ "move-trace-format 0.0.1",
  "move-unit-test",
- "move-vm-config",
+ "move-vm-config 0.1.0",
  "move-vm-profiler",
  "move-vm-runtime",
  "path-clean",
@@ -9298,9 +9553,29 @@ dependencies = [
  "dirs-next",
  "hex",
  "insta",
- "move-binary-format",
- "move-core-types",
- "move-symbol-pool",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
+ "move-symbol-pool 0.1.0",
+ "packed_struct",
+ "serde",
+ "sha2 0.9.9",
+ "vfs",
+ "walkdir",
+]
+
+[[package]]
+name = "move-command-line-common"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "dirs-next",
+ "hex",
+ "insta",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "packed_struct",
  "serde",
  "sha2 0.9.9",
@@ -9320,17 +9595,52 @@ dependencies = [
  "hex",
  "insta",
  "lsp-types 0.95.1",
- "move-abstract-interpreter",
- "move-binary-format",
- "move-borrow-graph",
- "move-bytecode-source-map",
- "move-bytecode-verifier",
- "move-command-line-common",
- "move-core-types",
- "move-ir-to-bytecode",
- "move-ir-types",
- "move-proc-macros",
- "move-symbol-pool",
+ "move-abstract-interpreter 0.1.0",
+ "move-binary-format 0.0.3",
+ "move-borrow-graph 0.0.1",
+ "move-bytecode-source-map 0.1.0",
+ "move-bytecode-verifier 0.1.0",
+ "move-command-line-common 0.1.0",
+ "move-core-types 0.0.4",
+ "move-ir-to-bytecode 0.1.0",
+ "move-ir-types 0.1.0",
+ "move-proc-macros 0.1.0",
+ "move-symbol-pool 0.1.0",
+ "petgraph 0.8.3",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_json",
+ "similar",
+ "stacker",
+ "tempfile",
+ "vfs",
+]
+
+[[package]]
+name = "move-compiler"
+version = "0.0.1"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "clap",
+ "codespan-reporting",
+ "dunce",
+ "hex",
+ "insta",
+ "lsp-types 0.95.1",
+ "move-abstract-interpreter 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-borrow-graph 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-bytecode-source-map 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-bytecode-verifier 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-to-bytecode 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-proc-macros 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "petgraph 0.8.3",
  "rayon",
  "regex",
@@ -9352,12 +9662,36 @@ dependencies = [
  "hex",
  "indexmap 2.14.0",
  "leb128",
- "move-proc-macros",
+ "move-proc-macros 0.1.0",
  "num",
  "primitive-types 0.10.1",
  "rand 0.8.6",
  "ref-cast",
  "serde",
+ "serde_with",
+ "thiserror 1.0.69",
+ "uint",
+]
+
+[[package]]
+name = "move-core-types"
+version = "0.0.4"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "enum-compat-util 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "ethnum",
+ "hex",
+ "indexmap 2.14.0",
+ "leb128",
+ "move-proc-macros 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "num",
+ "primitive-types 0.10.1",
+ "rand 0.8.6",
+ "ref-cast",
+ "serde",
+ "serde_bytes",
  "serde_with",
  "thiserror 1.0.69",
  "uint",
@@ -9374,17 +9708,42 @@ dependencies = [
  "colored",
  "indexmap 2.14.0",
  "lcov",
- "move-abstract-interpreter",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-bytecode-verifier",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-ir-types",
- "move-trace-format",
+ "move-abstract-interpreter 0.1.0",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-bytecode-verifier 0.1.0",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-ir-types 0.1.0",
+ "move-trace-format 0.0.1",
  "petgraph 0.8.3",
  "rayon",
+ "serde",
+]
+
+[[package]]
+name = "move-coverage"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "clap",
+ "codespan",
+ "colored",
+ "indexmap 2.14.0",
+ "lcov",
+ "move-abstract-interpreter 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-bytecode-source-map 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-bytecode-verifier 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-compiler 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-trace-format 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "petgraph 0.8.3",
  "serde",
 ]
 
@@ -9394,14 +9753,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "indexmap 2.14.0",
- "move-binary-format",
- "move-command-line-common",
- "move-core-types",
- "move-model-2",
+ "move-binary-format 0.0.3",
+ "move-command-line-common 0.1.0",
+ "move-core-types 0.0.4",
+ "move-model-2 0.1.0",
  "move-package-alt",
  "move-package-alt-compilation",
  "move-stackless-bytecode-2",
- "move-symbol-pool",
+ "move-symbol-pool 0.1.0",
  "petgraph 0.8.3",
  "pretty_simple",
  "tempfile",
@@ -9415,15 +9774,36 @@ dependencies = [
  "clap",
  "hex",
  "inline_colorization",
- "move-abstract-interpreter",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-coverage",
- "move-ir-types",
- "move-symbol-pool",
+ "move-abstract-interpreter 0.1.0",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-coverage 0.1.0",
+ "move-ir-types 0.1.0",
+ "move-symbol-pool 0.1.0",
+]
+
+[[package]]
+name = "move-disassembler"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "clap",
+ "hex",
+ "inline_colorization",
+ "move-abstract-interpreter 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-bytecode-source-map 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-compiler 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-coverage 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
 ]
 
 [[package]]
@@ -9434,12 +9814,34 @@ dependencies = [
  "clap",
  "codespan",
  "itertools 0.10.5",
- "move-binary-format",
- "move-compiler",
- "move-core-types",
- "move-ir-types",
- "move-model-2",
- "move-symbol-pool",
+ "move-binary-format 0.0.3",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-ir-types 0.1.0",
+ "move-model-2 0.1.0",
+ "move-symbol-pool 0.1.0",
+ "regex",
+ "serde",
+]
+
+[[package]]
+name = "move-docgen"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "clap",
+ "codespan",
+ "codespan-reporting",
+ "itertools 0.10.5",
+ "log",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-compiler 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-model-2 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "num",
  "regex",
  "serde",
 ]
@@ -9451,13 +9853,31 @@ dependencies = [
  "anyhow",
  "codespan-reporting",
  "log",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-command-line-common",
- "move-core-types",
- "move-ir-to-bytecode-syntax",
- "move-ir-types",
- "move-symbol-pool",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-command-line-common 0.1.0",
+ "move-core-types 0.0.4",
+ "move-ir-to-bytecode-syntax 0.1.0",
+ "move-ir-types 0.1.0",
+ "move-symbol-pool 0.1.0",
+ "ouroboros 0.17.2",
+]
+
+[[package]]
+name = "move-ir-to-bytecode"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "codespan-reporting",
+ "log",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-bytecode-source-map 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-to-bytecode-syntax 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "ouroboros 0.17.2",
 ]
 
@@ -9467,10 +9887,23 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "hex",
- "move-command-line-common",
- "move-core-types",
- "move-ir-types",
- "move-symbol-pool",
+ "move-command-line-common 0.1.0",
+ "move-core-types 0.0.4",
+ "move-ir-types 0.1.0",
+ "move-symbol-pool 0.1.0",
+]
+
+[[package]]
+name = "move-ir-to-bytecode-syntax"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "hex",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
 ]
 
 [[package]]
@@ -9478,9 +9911,21 @@ name = "move-ir-types"
 version = "0.1.0"
 dependencies = [
  "hex",
- "move-command-line-common",
- "move-core-types",
- "move-symbol-pool",
+ "move-command-line-common 0.1.0",
+ "move-core-types 0.0.4",
+ "move-symbol-pool 0.1.0",
+ "serde",
+]
+
+[[package]]
+name = "move-ir-types"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "hex",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "serde",
 ]
 
@@ -9493,15 +9938,63 @@ dependencies = [
  "codespan-reporting",
  "itertools 0.10.5",
  "log",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-disassembler",
- "move-ir-types",
- "move-symbol-pool",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-disassembler 0.1.0",
+ "move-ir-types 0.1.0",
+ "move-symbol-pool 0.1.0",
  "num",
+ "serde",
+]
+
+[[package]]
+name = "move-model"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "codespan",
+ "codespan-reporting",
+ "internment",
+ "itertools 0.10.5",
+ "log",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-bytecode-source-map 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-compiler 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-disassembler 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "num",
+ "regex",
+ "serde",
+]
+
+[[package]]
+name = "move-model"
+version = "0.1.1"
+source = "git+file:///Users/eieiron/dev/oss/sui-prover?branch=codex%2Fperegrine-bundled-prover#cfad074cf2c5f4734ed50ce239765eabe08518d9"
+dependencies = [
+ "anyhow",
+ "codespan",
+ "codespan-reporting",
+ "internment",
+ "itertools 0.13.0",
+ "log",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-bytecode-source-map 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-compiler 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-disassembler 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "num",
+ "regex",
  "serde",
 ]
 
@@ -9511,14 +10004,38 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "indexmap 2.14.0",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-compiler",
- "move-core-types",
- "move-ir-types",
- "move-symbol-pool",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-ir-types 0.1.0",
+ "move-symbol-pool 0.1.0",
  "pretty_simple",
  "serde",
+]
+
+[[package]]
+name = "move-model-2"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "codespan",
+ "codespan-reporting",
+ "indexmap 2.14.0",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-bytecode-source-map 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-compiler 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-disassembler 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "num",
+ "pretty_simple",
+ "serde",
+ "vfs",
 ]
 
 [[package]]
@@ -9530,16 +10047,52 @@ dependencies = [
  "colored",
  "dunce",
  "itertools 0.10.5",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-bytecode-utils",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-disassembler",
- "move-docgen",
- "move-model-2",
- "move-symbol-pool",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-bytecode-utils 0.1.0",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-disassembler 0.1.0",
+ "move-docgen 0.1.0",
+ "move-model-2 0.1.0",
+ "move-symbol-pool 0.1.0",
+ "named-lock",
+ "petgraph 0.8.3",
+ "regex",
+ "serde",
+ "serde_yaml",
+ "sha2 0.9.9",
+ "tempfile",
+ "toml 0.5.11",
+ "toml_edit 0.22.27",
+ "treeline",
+ "vfs",
+ "walkdir",
+ "whoami 1.6.1",
+]
+
+[[package]]
+name = "move-package"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "anyhow",
+ "clap",
+ "colored",
+ "dunce",
+ "itertools 0.10.5",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-bytecode-source-map 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-bytecode-utils 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-compiler 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-disassembler 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-docgen 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-model 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-model-2 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "named-lock",
  "petgraph 0.8.3",
  "regex",
@@ -9573,9 +10126,9 @@ dependencies = [
  "indoc",
  "itertools 0.10.5",
  "jsonrpc",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
  "path-clean",
  "petgraph 0.8.3",
  "pretty_assertions",
@@ -9602,17 +10155,17 @@ dependencies = [
  "clap",
  "colored",
  "dunce",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-bytecode-utils",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-disassembler",
- "move-docgen",
- "move-model-2",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-bytecode-utils 0.1.0",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-disassembler 0.1.0",
+ "move-docgen 0.1.0",
+ "move-model-2 0.1.0",
  "move-package-alt",
- "move-symbol-pool",
+ "move-symbol-pool 0.1.0",
  "serde",
  "serde_yaml",
  "toml_edit 0.22.27",
@@ -9624,9 +10177,55 @@ dependencies = [
 name = "move-proc-macros"
 version = "0.1.0"
 dependencies = [
- "enum-compat-util",
+ "enum-compat-util 0.1.0",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "move-proc-macros"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "enum-compat-util 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "move-prover-boogie-backend"
+version = "0.1.1"
+source = "git+file:///Users/eieiron/dev/oss/sui-prover?branch=codex%2Fperegrine-bundled-prover#cfad074cf2c5f4734ed50ce239765eabe08518d9"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bimap",
+ "clap",
+ "codespan",
+ "codespan-reporting",
+ "futures",
+ "itertools 0.13.0",
+ "log",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-compiler 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-docgen 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-model 0.1.1",
+ "move-stackless-bytecode 0.1.1",
+ "nix 0.29.0",
+ "num",
+ "pretty",
+ "rand 0.8.6",
+ "regex",
+ "reqwest 0.11.27",
+ "serde",
+ "serde_json",
+ "simplelog",
+ "tera",
+ "tokio",
+ "toml 0.7.8",
+ "wait-timeout",
 ]
 
 [[package]]
@@ -9634,9 +10233,24 @@ name = "move-regex-borrow-graph"
 version = "0.0.1"
 dependencies = [
  "indexmap 2.14.0",
- "move-binary-format",
- "move-command-line-common",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-command-line-common 0.1.0",
+ "move-core-types 0.0.4",
+ "proptest",
+]
+
+[[package]]
+name = "move-regex-borrow-graph"
+version = "0.0.1"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "indexmap 2.14.0",
+ "insta",
+ "itertools 0.10.5",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "petgraph 0.8.3",
  "proptest",
 ]
 
@@ -9650,12 +10264,39 @@ dependencies = [
  "im",
  "itertools 0.10.5",
  "log",
- "move-binary-format",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-model",
+ "move-binary-format 0.0.3",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-model 0.1.0",
  "num",
+ "petgraph 0.8.3",
+ "serde",
+]
+
+[[package]]
+name = "move-stackless-bytecode"
+version = "0.1.1"
+source = "git+file:///Users/eieiron/dev/oss/sui-prover?branch=codex%2Fperegrine-bundled-prover#cfad074cf2c5f4734ed50ce239765eabe08518d9"
+dependencies = [
+ "bimap",
+ "clap",
+ "codespan",
+ "codespan-reporting",
+ "ethnum",
+ "im",
+ "internment",
+ "itertools 0.13.0",
+ "log",
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-compiler 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-model 0.1.1",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "num",
+ "paste",
  "petgraph 0.8.3",
  "serde",
 ]
@@ -9665,15 +10306,15 @@ name = "move-stackless-bytecode-2"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "move-abstract-interpreter",
- "move-binary-format",
- "move-command-line-common",
- "move-core-types",
- "move-model-2",
+ "move-abstract-interpreter 0.1.0",
+ "move-binary-format 0.0.3",
+ "move-command-line-common 0.1.0",
+ "move-core-types 0.0.4",
+ "move-model-2 0.1.0",
  "move-package-alt",
  "move-package-alt-compilation",
- "move-stackless-bytecode",
- "move-symbol-pool",
+ "move-stackless-bytecode 0.1.0",
+ "move-symbol-pool 0.1.0",
  "tempfile",
 ]
 
@@ -9683,9 +10324,9 @@ version = "0.1.1"
 dependencies = [
  "anyhow",
  "hex",
- "move-command-line-common",
- "move-core-types",
- "move-docgen",
+ "move-command-line-common 0.1.0",
+ "move-core-types 0.0.4",
+ "move-docgen 0.1.0",
  "move-package-alt",
  "move-package-alt-compilation",
  "tokio",
@@ -9697,8 +10338,8 @@ name = "move-stdlib-natives-v0"
 version = "0.1.1"
 dependencies = [
  "hex",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "move-vm-runtime-v0",
  "move-vm-types-v0",
  "sha2 0.9.9",
@@ -9711,8 +10352,8 @@ name = "move-stdlib-natives-v1"
 version = "0.1.1"
 dependencies = [
  "hex",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "move-vm-runtime-v1",
  "move-vm-types-v1",
  "sha2 0.9.9",
@@ -9725,8 +10366,8 @@ name = "move-stdlib-natives-v2"
 version = "0.1.1"
 dependencies = [
  "hex",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "move-vm-runtime-v2",
  "move-vm-types-v2",
  "sha2 0.9.9",
@@ -9739,8 +10380,8 @@ name = "move-stdlib-natives-v3"
 version = "0.1.1"
 dependencies = [
  "hex",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "move-vm-runtime-v3",
  "move-vm-types-v3",
  "sha2 0.9.9",
@@ -9757,11 +10398,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-symbol-pool"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "phf 0.11.3",
+ "serde",
+]
+
+[[package]]
 name = "move-trace-format"
 version = "0.0.1"
 dependencies = [
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
+ "serde",
+ "serde_json",
+ "zstd 0.13.3",
+]
+
+[[package]]
+name = "move-trace-format"
+version = "0.0.1"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "serde",
  "serde_json",
  "zstd 0.13.3",
@@ -9775,14 +10437,14 @@ dependencies = [
  "bcs",
  "clap",
  "colored",
- "move-binary-format",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-ir-types",
+ "move-binary-format 0.0.3",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-ir-types 0.1.0",
  "move-stdlib",
- "move-trace-format",
- "move-vm-config",
+ "move-trace-format 0.0.1",
+ "move-vm-config 0.1.0",
  "move-vm-runtime",
  "parking_lot 0.11.2",
  "rand 0.8.6",
@@ -9794,15 +10456,23 @@ dependencies = [
 name = "move-vm-config"
 version = "0.1.0"
 dependencies = [
- "move-binary-format",
+ "move-binary-format 0.0.3",
+]
+
+[[package]]
+name = "move-vm-config"
+version = "0.1.0"
+source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
+dependencies = [
+ "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
 ]
 
 [[package]]
 name = "move-vm-profiler"
 version = "0.1.0"
 dependencies = [
- "move-trace-format",
- "move-vm-config",
+ "move-trace-format 0.0.1",
+ "move-vm-config 0.1.0",
  "serde",
  "serde_json",
  "tracing",
@@ -9822,12 +10492,12 @@ dependencies = [
  "indexmap 2.14.0",
  "lasso",
  "lru 0.13.0",
- "move-abstract-interpreter",
- "move-binary-format",
- "move-bytecode-verifier",
- "move-core-types",
- "move-trace-format",
- "move-vm-config",
+ "move-abstract-interpreter 0.1.0",
+ "move-binary-format 0.0.3",
+ "move-bytecode-verifier 0.1.0",
+ "move-core-types 0.0.4",
+ "move-trace-format 0.0.1",
+ "move-vm-config 0.1.0",
  "parking_lot 0.11.2",
  "quick_cache",
  "serde",
@@ -9843,10 +10513,10 @@ version = "0.1.0"
 dependencies = [
  "better_any",
  "fail",
- "move-binary-format",
+ "move-binary-format 0.0.3",
  "move-bytecode-verifier-v0",
- "move-core-types",
- "move-vm-config",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "move-vm-types-v0",
  "once_cell",
  "parking_lot 0.11.2",
@@ -9860,10 +10530,10 @@ version = "0.1.0"
 dependencies = [
  "better_any",
  "fail",
- "move-binary-format",
+ "move-binary-format 0.0.3",
  "move-bytecode-verifier-v1",
- "move-core-types",
- "move-vm-config",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "move-vm-types-v1",
  "once_cell",
  "parking_lot 0.11.2",
@@ -9877,10 +10547,10 @@ version = "0.1.0"
 dependencies = [
  "better_any",
  "fail",
- "move-binary-format",
+ "move-binary-format 0.0.3",
  "move-bytecode-verifier-v2",
- "move-core-types",
- "move-vm-config",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "move-vm-types-v2",
  "once_cell",
  "parking_lot 0.11.2",
@@ -9894,11 +10564,11 @@ version = "0.1.0"
 dependencies = [
  "better_any",
  "fail",
- "move-binary-format",
+ "move-binary-format 0.0.3",
  "move-bytecode-verifier-v3",
- "move-core-types",
- "move-trace-format",
- "move-vm-config",
+ "move-core-types 0.0.4",
+ "move-trace-format 0.0.1",
+ "move-vm-config 0.1.0",
  "move-vm-types-v3",
  "parking_lot 0.11.2",
  "smallvec",
@@ -9910,8 +10580,8 @@ name = "move-vm-types-v0"
 version = "0.1.0"
 dependencies = [
  "bcs",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "serde",
  "smallvec",
 ]
@@ -9921,8 +10591,8 @@ name = "move-vm-types-v1"
 version = "0.1.0"
 dependencies = [
  "bcs",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "serde",
  "smallvec",
 ]
@@ -9932,8 +10602,8 @@ name = "move-vm-types-v2"
 version = "0.1.0"
 dependencies = [
  "bcs",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "serde",
  "smallvec",
 ]
@@ -9943,8 +10613,8 @@ name = "move-vm-types-v3"
 version = "0.1.0"
 dependencies = [
  "bcs",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "serde",
  "smallvec",
 ]
@@ -9984,11 +10654,11 @@ dependencies = [
  "libafl",
  "libafl_bolts",
  "log",
- "move-binary-format",
- "move-core-types",
- "move-model",
- "move-stackless-bytecode",
- "move-trace-format",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
+ "move-model 0.1.0",
+ "move-stackless-bytecode 0.1.0",
+ "move-trace-format 0.0.1",
  "movy-fuzz-core",
  "movy-replay",
  "movy-sui",
@@ -10045,13 +10715,13 @@ dependencies = [
  "libafl_bolts",
  "log",
  "mdbx-derive",
- "move-binary-format",
- "move-core-types",
- "move-trace-format",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
+ "move-trace-format 0.0.1",
  "move-vm-runtime",
  "movy-sui",
  "movy-types",
- "prometheus",
+ "prometheus 0.14.0",
  "ptree",
  "rand 0.9.4",
  "reqwest 0.12.28",
@@ -10082,14 +10752,14 @@ dependencies = [
  "itertools 0.14.0",
  "log",
  "mdbx-derive",
- "move-binary-format",
- "move-compiler",
- "move-core-types",
- "move-package",
- "move-trace-format",
+ "move-binary-format 0.0.3",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-package 0.1.0",
+ "move-trace-format 0.0.1",
  "move-vm-runtime",
  "movy-types",
- "prometheus",
+ "prometheus 0.14.0",
  "rand 0.9.4",
  "reqwest 0.12.28",
  "serde",
@@ -10126,8 +10796,8 @@ dependencies = [
  "libafl",
  "log",
  "mdbx-derive",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "object_store 0.11.2",
  "reqwest 0.12.28",
  "serde",
@@ -10292,7 +10962,7 @@ dependencies = [
  "futures",
  "once_cell",
  "parking_lot 0.12.5",
- "prometheus",
+ "prometheus 0.14.0",
  "prometheus-closure-metric",
  "scopeguard",
  "simple-server-timing-header",
@@ -10322,7 +10992,7 @@ dependencies = [
  "mysten-metrics",
  "once_cell",
  "pin-project-lite",
- "prometheus",
+ "prometheus 0.14.0",
  "quinn-proto",
  "rand 0.8.6",
  "rustls",
@@ -10344,10 +11014,10 @@ dependencies = [
  "anyhow",
  "axum 0.8.9",
  "mysten-metrics",
- "prometheus",
+ "prometheus 0.14.0",
  "serde",
  "simple-server-timing-header",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "tokio",
  "tracing",
 ]
@@ -10997,7 +11667,7 @@ dependencies = [
  "http-body-util",
  "httparse",
  "humantime",
- "hyper",
+ "hyper 1.9.0",
  "itertools 0.14.0",
  "md-5 0.10.6",
  "parking_lot 0.12.5",
@@ -11056,6 +11726,20 @@ dependencies = [
  "is-wsl",
  "libc",
  "pathdiff",
+]
+
+[[package]]
+name = "openai_api_rust"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea95675c72f6830941af53fe95f5cf6c037ccb6c28ed736b61d2af2c16feac59"
+dependencies = [
+ "log",
+ "mime",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "ureq",
 ]
 
 [[package]]
@@ -11126,6 +11810,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentelemetry-jaeger"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e785d273968748578931e4dc3b4f5ec86b26e09d9e0d66b55adda7fce742f7a"
+dependencies = [
+ "async-trait",
+ "futures",
+ "futures-executor",
+ "once_cell",
+ "opentelemetry 0.18.0",
+ "opentelemetry-semantic-conventions",
+ "thiserror 1.0.69",
+ "thrift",
+ "tokio",
+]
+
+[[package]]
 name = "opentelemetry-otlp"
 version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11159,11 +11860,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentelemetry-semantic-conventions"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b02e0230abb0ab6636d18e2ba8fa02903ea63772281340ccac18e0af3ec9eeb"
+dependencies = [
+ "opentelemetry 0.18.0",
+]
+
+[[package]]
 name = "opentelemetry_api"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c24f96e21e7acc813c7a8394ee94978929db2bcc46cf6b5014fc612bf7760c22"
 dependencies = [
+ "fnv",
  "futures-channel",
  "futures-util",
  "indexmap 1.9.3",
@@ -11181,6 +11892,8 @@ checksum = "1ca41c4933371b61c2a2f214bf16931499af4ec90543604ec828f7a625c09113"
 dependencies = [
  "async-trait",
  "crossbeam-channel",
+ "dashmap 5.5.3",
+ "fnv",
  "futures-channel",
  "futures-executor",
  "futures-util",
@@ -11189,6 +11902,8 @@ dependencies = [
  "percent-encoding",
  "rand 0.8.6",
  "thiserror 1.0.69",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
@@ -11217,6 +11932,15 @@ name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+
+[[package]]
+name = "ordered-float"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3305af35278dd29f46fcdd139e0b1fbfae2153f0e5928b39b035542dd31e37b7"
+dependencies = [
+ "num-traits",
+]
 
 [[package]]
 name = "ordered-float"
@@ -11400,7 +12124,7 @@ version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "373b1a4c1338d9cd3d1fa53b3a11bdab5ab6bd80a20f7f7becd76953ae2be909"
 dependencies = [
- "arrayvec",
+ "arrayvec 0.7.6",
  "bitvec 0.20.4",
  "byte-slice-cast",
  "impl-trait-for-tuples",
@@ -11414,7 +12138,7 @@ version = "3.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "799781ae679d79a948e13d4824a40970bfa500058d245760dd857301059810fa"
 dependencies = [
- "arrayvec",
+ "arrayvec 0.7.6",
  "bitvec 1.0.1",
  "byte-slice-cast",
  "const_format",
@@ -11500,6 +12224,15 @@ dependencies = [
  "redox_syscall 0.5.18",
  "smallvec",
  "windows-link 0.2.1",
+]
+
+[[package]]
+name = "parse-zoneinfo"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f2a05b18d44e2957b88f96ba460715e295bc1d7510468a2f3d3b44535d26c24"
+dependencies = [
+ "regex",
 ]
 
 [[package]]
@@ -11665,8 +12398,11 @@ dependencies = [
 name = "peregrine-dynamic-analysis"
 version = "0.1.0"
 dependencies = [
+ "move-prover-boogie-backend",
+ "move-stackless-bytecode 0.1.1",
  "movy",
  "serde",
+ "sui-prover",
  "tempfile",
  "tokio",
  "walkdir",
@@ -11677,7 +12413,7 @@ name = "peregrine-import-engine"
 version = "0.1.0"
 dependencies = [
  "hex",
- "move-binary-format",
+ "move-binary-format 0.0.3",
  "peregrine-package-resolution",
  "peregrine-static-analysis",
  "regex",
@@ -11693,11 +12429,11 @@ name = "peregrine-indexer"
 version = "0.1.0"
 dependencies = [
  "hex",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-command-line-common",
- "move-compiler",
- "move-ir-types",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-ir-types 0.1.0",
  "rusqlite",
  "serde",
  "serde_json",
@@ -11723,7 +12459,7 @@ dependencies = [
 name = "peregrine-scanner"
 version = "0.1.0"
 dependencies = [
- "move-binary-format",
+ "move-binary-format 0.0.3",
  "peregrine-types",
  "serde",
  "walkdir",
@@ -11734,14 +12470,14 @@ name = "peregrine-static-analysis"
 version = "0.1.0"
 dependencies = [
  "globset",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-command-line-common",
- "move-compiler",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
  "move-decompiler",
- "move-disassembler",
- "move-ir-types",
- "move-model-2",
+ "move-disassembler 0.1.0",
+ "move-ir-types 0.1.0",
+ "move-model-2 0.1.0",
  "peregrine-scanner",
  "peregrine-types",
  "serde",
@@ -11757,8 +12493,8 @@ dependencies = [
 name = "peregrine-types"
 version = "0.1.0"
 dependencies = [
- "move-command-line-common",
- "move-compiler",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
  "serde",
  "serde_json",
  "tempfile",
@@ -12272,6 +13008,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pretty"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad9940b913ee56ddd94aec2d3cd179dd47068236f42a1a6415ccf9d880ce2a61"
+dependencies = [
+ "arrayvec 0.5.2",
+ "typed-arena",
+]
+
+[[package]]
 name = "pretty_assertions"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12437,6 +13183,21 @@ dependencies = [
 
 [[package]]
 name = "prometheus"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d33c28a30771f7f96db69893f78b857f7450d7e0237e9c8fc6427a81bae7ed1"
+dependencies = [
+ "cfg-if",
+ "fnv",
+ "lazy_static",
+ "memchr",
+ "parking_lot 0.12.5",
+ "protobuf 2.28.0",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "prometheus"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ca5326d8d0b950a9acd87e6a3f94745394f62e4dae1b1ee22b2bc0c394af43a"
@@ -12446,7 +13207,7 @@ dependencies = [
  "lazy_static",
  "memchr",
  "parking_lot 0.12.5",
- "protobuf",
+ "protobuf 3.7.2",
  "thiserror 2.0.18",
 ]
 
@@ -12455,7 +13216,7 @@ name = "prometheus-closure-metric"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "prometheus",
+ "prometheus 0.14.0",
 ]
 
 [[package]]
@@ -12584,6 +13345,12 @@ checksum = "8991c4cbdb8bc5b11f0b074ffe286c30e523de90fee5ba8132f1399f23cb3dd7"
 dependencies = [
  "prost 0.14.3",
 ]
+
+[[package]]
+name = "protobuf"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "protobuf"
@@ -13307,6 +14074,46 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "reqwest"
+version = "0.11.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd67538700a17451e7cba03ac727fb961abb7607553461627b97de0b89cf4a62"
+dependencies = [
+ "base64 0.21.7",
+ "bytes",
+ "encoding_rs",
+ "futures-core",
+ "futures-util",
+ "h2 0.3.27",
+ "http 0.2.12",
+ "http-body 0.4.6",
+ "hyper 0.14.32",
+ "hyper-tls 0.5.0",
+ "ipnet",
+ "js-sys",
+ "log",
+ "mime",
+ "native-tls",
+ "once_cell",
+ "percent-encoding",
+ "pin-project-lite",
+ "rustls-pemfile",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "sync_wrapper 0.1.2",
+ "system-configuration 0.5.1",
+ "tokio",
+ "tokio-native-tls",
+ "tower-service",
+ "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "winreg 0.50.0",
+]
+
+[[package]]
+name = "reqwest"
 version = "0.12.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eddd3ca559203180a307f12d114c268abf583f59b03cb906fd0b3ff8646c1147"
@@ -13317,13 +14124,13 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "futures-util",
- "h2",
+ "h2 0.4.14",
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
- "hyper",
+ "hyper 1.9.0",
  "hyper-rustls",
- "hyper-tls",
+ "hyper-tls 0.6.0",
  "hyper-util",
  "js-sys",
  "log",
@@ -13338,7 +14145,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
- "sync_wrapper",
+ "sync_wrapper 1.0.2",
  "tokio",
  "tokio-native-tls",
  "tokio-rustls",
@@ -13367,7 +14174,7 @@ dependencies = [
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
- "hyper",
+ "hyper 1.9.0",
  "hyper-rustls",
  "hyper-util",
  "js-sys",
@@ -13380,7 +14187,7 @@ dependencies = [
  "rustls-platform-verifier 0.6.2",
  "serde",
  "serde_json",
- "sync_wrapper",
+ "sync_wrapper 1.0.2",
  "tokio",
  "tokio-rustls",
  "tokio-util 0.7.18",
@@ -13696,6 +14503,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls-pemfile"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c74cae0a4cf6ccbbf5f359f08efdf8ee7e1dc532573bf0db71968cb56b1448c"
+dependencies = [
+ "base64 0.21.7",
+]
+
+[[package]]
 name = "rustls-pki-types"
 version = "1.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13744,7 +14560,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs 1.0.7",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -14191,6 +15007,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_bytes"
+version = "0.11.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5d440709e79d88e51ac01c4b72fc6cb7314017bb7da9eeff678aa94c10e3ea8"
+dependencies = [
+ "serde",
+ "serde_core",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14599,6 +15425,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "simplelog"
+version = "0.9.0"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "siphasher"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14633,6 +15466,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4be0ff28bf14f9610a342169084e87a4f435ad798ec528dc7579a3678fa9dc9a"
 dependencies = [
  "hmac-sha512",
+]
+
+[[package]]
+name = "slug"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "882a80f72ee45de3cc9a5afeb2da0331d58df69e4e7d8eeb5d3c7784ae67e724"
+dependencies = [
+ "deunicode",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -15072,25 +15915,25 @@ dependencies = [
  "json_to_table",
  "miette",
  "move-analyzer",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-bytecode-utils",
- "move-bytecode-verifier-meter",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-bytecode-utils 0.1.0",
+ "move-bytecode-verifier-meter 0.1.0",
  "move-cli",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-ir-types",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
+ "move-ir-types 0.1.0",
  "move-package-alt",
  "move-package-alt-compilation",
- "move-symbol-pool",
- "move-trace-format",
+ "move-symbol-pool 0.1.0",
+ "move-trace-format 0.0.1",
  "move-vm-profiler",
  "msim",
  "mysten-common",
  "normalize-line-endings",
  "num-bigint 0.4.6",
- "prometheus",
+ "prometheus 0.14.0",
  "rand 0.8.6",
  "regex",
  "reqwest 0.12.28",
@@ -15132,7 +15975,7 @@ dependencies = [
  "sui-types",
  "tabled",
  "tap",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "tempfile",
  "test-cluster",
  "thiserror 1.0.69",
@@ -15151,14 +15994,14 @@ dependencies = [
  "either",
  "indexmap 2.14.0",
  "leb128",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier",
- "move-bytecode-verifier-meter",
- "move-core-types",
- "move-regex-borrow-graph",
- "move-trace-format",
- "move-vm-config",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-bytecode-verifier 0.1.0",
+ "move-bytecode-verifier-meter 0.1.0",
+ "move-core-types 0.0.4",
+ "move-regex-borrow-graph 0.0.1",
+ "move-trace-format 0.0.1",
+ "move-vm-config 0.1.0",
  "move-vm-profiler",
  "move-vm-runtime",
  "mysten-common",
@@ -15183,12 +16026,12 @@ dependencies = [
  "anyhow",
  "bcs",
  "leb128",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier-meter",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-bytecode-verifier-meter 0.1.0",
  "move-bytecode-verifier-v0",
- "move-core-types",
- "move-vm-config",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "move-vm-profiler",
  "move-vm-runtime-v0",
  "move-vm-types-v0",
@@ -15210,12 +16053,12 @@ dependencies = [
  "anyhow",
  "bcs",
  "leb128",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier-meter",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-bytecode-verifier-meter 0.1.0",
  "move-bytecode-verifier-v1",
- "move-core-types",
- "move-vm-config",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "move-vm-profiler",
  "move-vm-runtime-v1",
  "move-vm-types-v1",
@@ -15236,12 +16079,12 @@ dependencies = [
  "anyhow",
  "bcs",
  "leb128",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier-meter",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-bytecode-verifier-meter 0.1.0",
  "move-bytecode-verifier-v2",
- "move-core-types",
- "move-vm-config",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "move-vm-profiler",
  "move-vm-runtime-v2",
  "move-vm-types-v2",
@@ -15264,14 +16107,14 @@ dependencies = [
  "either",
  "indexmap 2.14.0",
  "leb128",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier-meter",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-bytecode-verifier-meter 0.1.0",
  "move-bytecode-verifier-v3",
- "move-core-types",
- "move-regex-borrow-graph",
- "move-trace-format",
- "move-vm-config",
+ "move-core-types 0.0.4",
+ "move-regex-borrow-graph 0.0.1",
+ "move-trace-format 0.0.1",
+ "move-vm-config 0.1.0",
  "move-vm-profiler",
  "move-vm-runtime-v3",
  "move-vm-types-v3",
@@ -15318,12 +16161,12 @@ dependencies = [
  "eyre",
  "fastcrypto",
  "futures",
- "move-core-types",
+ "move-core-types 0.0.4",
  "mysten-common",
  "mysten-metrics",
  "num_enum 0.6.1",
  "once_cell",
- "prometheus",
+ "prometheus 0.14.0",
  "rand 0.8.6",
  "reqwest 0.12.28",
  "serde",
@@ -15344,7 +16187,7 @@ dependencies = [
  "sui-test-transaction-builder",
  "sui-types",
  "tap",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
@@ -15367,12 +16210,12 @@ dependencies = [
  "csv",
  "dirs 4.0.0",
  "fastcrypto",
- "move-vm-config",
+ "move-vm-config 0.1.0",
  "mysten-common",
  "nonzero_ext",
  "object_store 0.13.2",
  "once_cell",
- "prometheus",
+ "prometheus 0.14.0",
  "rand 0.8.6",
  "reqwest 0.12.28",
  "serde",
@@ -15419,10 +16262,10 @@ dependencies = [
  "lru 0.10.1",
  "mockall",
  "moka",
- "move-binary-format",
- "move-bytecode-utils",
- "move-core-types",
- "move-symbol-pool",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-core-types 0.0.4",
+ "move-symbol-pool 0.1.0",
  "mysten-common",
  "mysten-metrics",
  "mysten-network",
@@ -15433,7 +16276,7 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.5",
  "pin-project-lite",
- "prometheus",
+ "prometheus 0.14.0",
  "prost 0.14.3",
  "prost-build",
  "protox",
@@ -15468,7 +16311,7 @@ dependencies = [
  "sui-types",
  "sysinfo",
  "tap",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
@@ -15546,7 +16389,7 @@ dependencies = [
  "futures",
  "indexmap 2.14.0",
  "itertools 0.13.0",
- "move-core-types",
+ "move-core-types 0.0.4",
  "mysten-common",
  "serde",
  "serde_json",
@@ -15566,18 +16409,18 @@ dependencies = [
 name = "sui-execution"
 version = "0.1.0"
 dependencies = [
- "move-abstract-interpreter",
+ "move-abstract-interpreter 0.1.0",
  "move-abstract-interpreter-v2",
  "move-abstract-interpreter-v3",
- "move-binary-format",
- "move-bytecode-verifier",
- "move-bytecode-verifier-meter",
+ "move-binary-format 0.0.3",
+ "move-bytecode-verifier 0.1.0",
+ "move-bytecode-verifier-meter 0.1.0",
  "move-bytecode-verifier-v0",
  "move-bytecode-verifier-v1",
  "move-bytecode-verifier-v2",
  "move-bytecode-verifier-v3",
- "move-trace-format",
- "move-vm-config",
+ "move-trace-format 0.0.1",
+ "move-vm-config 0.1.0",
  "move-vm-runtime",
  "move-vm-runtime-v0",
  "move-vm-runtime-v1",
@@ -15650,8 +16493,8 @@ name = "sui-framework"
 version = "0.1.0"
 dependencies = [
  "bcs",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "serde",
  "sui-types",
  "tracing",
@@ -15691,9 +16534,9 @@ dependencies = [
  "bcs",
  "camino",
  "fastcrypto",
- "move-core-types",
+ "move-core-types 0.0.4",
  "mysten-common",
- "prometheus",
+ "prometheus 0.14.0",
  "rand 0.8.6",
  "serde",
  "serde_with",
@@ -15718,7 +16561,7 @@ dependencies = [
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
- "hyper",
+ "hyper 1.9.0",
  "hyper-util",
  "pin-project-lite",
  "socket2 0.5.10",
@@ -15743,7 +16586,7 @@ dependencies = [
  "diesel-async",
  "futures",
  "itertools 0.13.0",
- "prometheus",
+ "prometheus 0.14.0",
  "serde",
  "sui-default-config",
  "sui-indexer-alt-framework",
@@ -15751,7 +16594,7 @@ dependencies = [
  "sui-indexer-alt-schema",
  "sui-protocol-config",
  "sui-types",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "tokio",
  "toml 0.7.8",
  "tracing",
@@ -15787,13 +16630,13 @@ dependencies = [
  "futures",
  "http 1.4.0",
  "integer-encoding",
- "move-core-types",
+ "move-core-types 0.0.4",
  "mysten-common",
  "mysten-network",
  "object_store 0.13.2",
  "ouroboros 0.17.2",
  "pin-project",
- "prometheus",
+ "prometheus 0.14.0",
  "reqwest 0.12.28",
  "rocksdb",
  "scoped-futures",
@@ -15805,7 +16648,7 @@ dependencies = [
  "sui-indexer-alt-framework",
  "sui-indexer-alt-metrics",
  "sui-storage",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
@@ -15838,7 +16681,7 @@ dependencies = [
  "mysten-network",
  "num_cpus",
  "object_store 0.13.2",
- "prometheus",
+ "prometheus 0.14.0",
  "prost 0.14.3",
  "prost-types 0.14.3",
  "rand 0.8.6",
@@ -15897,12 +16740,12 @@ dependencies = [
  "headers",
  "im",
  "itertools 0.13.0",
- "move-binary-format",
- "move-core-types",
- "move-disassembler",
- "move-ir-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
+ "move-disassembler 0.1.0",
+ "move-ir-types 0.1.0",
  "pin-project",
- "prometheus",
+ "prometheus 0.14.0",
  "prost-types 0.14.3",
  "rustls",
  "serde",
@@ -15922,7 +16765,7 @@ dependencies = [
  "sui-sdk-types",
  "sui-sql-macro",
  "sui-types",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "thiserror 1.0.69",
  "timeout-tracing",
  "tokio",
@@ -15941,7 +16784,7 @@ dependencies = [
  "anyhow",
  "axum 0.8.9",
  "clap",
- "prometheus",
+ "prometheus 0.14.0",
  "prometheus-closure-metric",
  "sui-futures",
  "sui-pg-db",
@@ -15962,9 +16805,9 @@ dependencies = [
  "diesel-async",
  "futures",
  "http 1.4.0",
- "move-core-types",
+ "move-core-types 0.0.4",
  "mysten-common",
- "prometheus",
+ "prometheus 0.14.0",
  "prost-types 0.14.3",
  "sui-futures",
  "sui-indexer-alt-consistent-api",
@@ -15993,7 +16836,7 @@ dependencies = [
  "bcs",
  "diesel",
  "diesel_migrations",
- "move-core-types",
+ "move-core-types 0.0.4",
  "serde",
  "siphasher 1.0.2",
  "sui-field-count",
@@ -16008,9 +16851,9 @@ dependencies = [
  "anyhow",
  "bcs",
  "fastcrypto",
- "move-binary-format",
- "move-bytecode-utils",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-core-types 0.0.4",
  "schemars 0.8.22",
  "serde",
  "serde_json",
@@ -16033,18 +16876,18 @@ dependencies = [
  "fastcrypto",
  "fastcrypto-zkp",
  "futures",
- "hyper",
+ "hyper 1.9.0",
  "im",
  "indexmap 2.14.0",
  "itertools 0.13.0",
  "jsonrpsee",
- "move-binary-format",
- "move-bytecode-utils",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-core-types 0.0.4",
  "mysten-common",
  "mysten-metrics",
  "once_cell",
- "prometheus",
+ "prometheus 0.14.0",
  "serde",
  "serde_json",
  "shared-crypto",
@@ -16080,7 +16923,7 @@ dependencies = [
  "jsonrpsee",
  "mysten-metrics",
  "once_cell",
- "prometheus",
+ "prometheus 0.14.0",
  "sui-json",
  "sui-json-rpc-types",
  "sui-open-rpc",
@@ -16101,12 +16944,12 @@ dependencies = [
  "fastcrypto",
  "itertools 0.13.0",
  "json_to_table",
- "move-binary-format",
- "move-bytecode-utils",
- "move-command-line-common",
- "move-core-types",
- "move-disassembler",
- "move-ir-types",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-command-line-common 0.1.0",
+ "move-core-types 0.0.4",
+ "move-disassembler 0.1.0",
+ "move-ir-types 0.1.0",
  "mysten-common",
  "mysten-metrics",
  "nonempty",
@@ -16165,7 +17008,7 @@ dependencies = [
  "gcp_auth",
  "governor",
  "http 1.4.0",
- "prometheus",
+ "prometheus 0.14.0",
  "prost 0.14.3",
  "prost-types 0.14.3",
  "rand 0.8.6",
@@ -16177,7 +17020,7 @@ dependencies = [
  "sui-indexer-alt-metrics",
  "sui-protocol-config",
  "sui-types",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "tokio",
  "toml 0.7.8",
  "tonic 0.14.6",
@@ -16202,7 +17045,7 @@ dependencies = [
  "anyhow",
  "fastcrypto",
  "mysten-metrics",
- "prometheus",
+ "prometheus 0.14.0",
  "reqwest 0.12.28",
  "snap",
  "sui-tls",
@@ -16220,18 +17063,18 @@ dependencies = [
  "clap",
  "colored",
  "indoc",
- "move-binary-format",
- "move-bytecode-source-map",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
  "move-cli",
- "move-compiler",
- "move-disassembler",
- "move-ir-types",
+ "move-compiler 0.0.1",
+ "move-disassembler 0.1.0",
+ "move-ir-types 0.1.0",
  "move-package-alt",
  "move-package-alt-compilation",
  "move-unit-test",
- "move-vm-config",
+ "move-vm-config 0.1.0",
  "move-vm-runtime",
- "prometheus",
+ "prometheus 0.14.0",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -16243,7 +17086,7 @@ dependencies = [
  "sui-protocol-config",
  "sui-sdk",
  "sui-types",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "tikv-jemalloc-ctl",
  "tokio",
  "toml 0.7.8",
@@ -16256,14 +17099,14 @@ version = "1.71.1"
 dependencies = [
  "anyhow",
  "fastcrypto",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier",
- "move-compiler",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-bytecode-verifier 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
  "move-package-alt",
  "move-package-alt-compilation",
- "move-symbol-pool",
+ "move-symbol-pool 0.1.0",
  "mysten-common",
  "serde-reflection",
  "sui-package-alt",
@@ -16285,8 +17128,8 @@ dependencies = [
  "fastcrypto-vdf",
  "fastcrypto-zkp",
  "indexmap 2.14.0",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "move-vm-runtime",
  "rand 0.8.6",
  "smallvec",
@@ -16304,8 +17147,8 @@ dependencies = [
  "fastcrypto",
  "fastcrypto-zkp",
  "linked-hash-map",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "move-stdlib-natives-v0",
  "move-vm-runtime-v0",
  "move-vm-types-v0",
@@ -16324,8 +17167,8 @@ dependencies = [
  "fastcrypto",
  "fastcrypto-zkp",
  "linked-hash-map",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "move-stdlib-natives-v1",
  "move-vm-runtime-v1",
  "move-vm-types-v1",
@@ -16344,8 +17187,8 @@ dependencies = [
  "fastcrypto",
  "fastcrypto-zkp",
  "indexmap 2.14.0",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "move-stdlib-natives-v2",
  "move-vm-runtime-v2",
  "move-vm-types-v2",
@@ -16365,8 +17208,8 @@ dependencies = [
  "fastcrypto-vdf",
  "fastcrypto-zkp",
  "indexmap 2.14.0",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "move-stdlib-natives-v3",
  "move-vm-runtime-v3",
  "move-vm-types-v3",
@@ -16382,7 +17225,7 @@ name = "sui-name-service"
 version = "1.71.1"
 dependencies = [
  "bcs",
- "move-core-types",
+ "move-core-types 0.0.4",
  "serde",
  "sui-types",
  "thiserror 1.0.69",
@@ -16411,7 +17254,7 @@ dependencies = [
  "mysten-network",
  "object_store 0.13.2",
  "once_cell",
- "prometheus",
+ "prometheus 0.14.0",
  "prost 0.14.3",
  "rand 0.8.6",
  "serde",
@@ -16460,12 +17303,12 @@ dependencies = [
  "futures",
  "http 1.4.0",
  "humantime",
- "move-vm-config",
+ "move-vm-config 0.1.0",
  "mysten-common",
  "mysten-metrics",
  "mysten-network",
  "mysten-service",
- "prometheus",
+ "prometheus 0.14.0",
  "reqwest 0.12.28",
  "serde",
  "sui-config",
@@ -16486,7 +17329,7 @@ dependencies = [
  "sui-tls",
  "sui-types",
  "tap",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "tikv-jemallocator",
  "tokio",
  "tower 0.5.3",
@@ -16525,7 +17368,7 @@ version = "1.71.1"
 dependencies = [
  "anyhow",
  "indexmap 2.14.0",
- "move-compiler",
+ "move-compiler 0.0.1",
  "move-package-alt",
  "serde",
  "sui-package-management",
@@ -16552,9 +17395,9 @@ dependencies = [
  "bcs",
  "itertools 0.13.0",
  "lru 0.10.1",
- "move-binary-format",
- "move-command-line-common",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-command-line-common 0.1.0",
+ "move-core-types 0.0.4",
  "sui-types",
  "thiserror 1.0.69",
  "tokio",
@@ -16573,7 +17416,7 @@ dependencies = [
  "diesel-async",
  "diesel_migrations",
  "futures",
- "prometheus",
+ "prometheus 0.14.0",
  "rustls",
  "scoped-futures",
  "sui-field-count",
@@ -16605,9 +17448,9 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "fastcrypto",
- "move-binary-format",
- "move-core-types",
- "move-vm-config",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "mysten-common",
  "rand 0.8.6",
  "schemars 0.8.22",
@@ -16629,6 +17472,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "sui-prover"
+version = "1.5.3"
+source = "git+file:///Users/eieiron/dev/oss/sui-prover?branch=codex%2Fperegrine-bundled-prover#cfad074cf2c5f4734ed50ce239765eabe08518d9"
+dependencies = [
+ "anyhow",
+ "clap",
+ "codespan-reporting",
+ "colored",
+ "dir-test",
+ "glob",
+ "insta",
+ "itertools 0.13.0",
+ "log",
+ "move-compiler 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-model 0.1.1",
+ "move-package 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "move-prover-boogie-backend",
+ "move-stackless-bytecode 0.1.1",
+ "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
+ "openai_api_rust",
+ "petgraph 0.8.3",
+ "regex",
+ "serde",
+ "sha2 0.10.9",
+ "telemetry-subscribers 0.4.1",
+ "tempfile",
+ "termcolor",
+ "tokio",
+ "toml 0.7.8",
+ "tracing",
+]
+
+[[package]]
 name = "sui-replay-2"
 version = "0.1.0"
 dependencies = [
@@ -16638,16 +17515,16 @@ dependencies = [
  "clap",
  "csv",
  "indicatif",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-command-line-common",
- "move-core-types",
- "move-disassembler",
- "move-ir-types",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-command-line-common 0.1.0",
+ "move-core-types 0.0.4",
+ "move-disassembler 0.1.0",
+ "move-ir-types 0.1.0",
  "move-package-alt",
  "move-package-alt-compilation",
- "move-trace-format",
- "prometheus",
+ "move-trace-format 0.0.1",
+ "prometheus 0.14.0",
  "serde",
  "serde_json",
  "similar",
@@ -16659,7 +17536,7 @@ dependencies = [
  "sui-package-alt",
  "sui-types",
  "tabled",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "tokio",
  "toml 0.7.8",
  "tracing",
@@ -16703,11 +17580,11 @@ dependencies = [
  "futures",
  "http 1.4.0",
  "itertools 0.13.0",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "mysten-common",
  "mysten-network",
- "prometheus",
+ "prometheus 0.14.0",
  "prost 0.14.3",
  "prost-types 0.14.3",
  "protox",
@@ -16751,7 +17628,7 @@ dependencies = [
  "futures",
  "futures-core",
  "jsonrpsee",
- "move-core-types",
+ "move-core-types 0.0.4",
  "mysten-common",
  "reqwest 0.12.28",
  "serde",
@@ -16813,7 +17690,7 @@ dependencies = [
  "sui-framework",
  "sui-move-build",
  "sui-types",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "tempfile",
  "tower 0.5.3",
  "tracing",
@@ -16833,7 +17710,7 @@ dependencies = [
  "integer-encoding",
  "num_enum 0.6.1",
  "object_store 0.13.2",
- "prometheus",
+ "prometheus 0.14.0",
  "serde",
  "sui-config",
  "sui-core",
@@ -16854,14 +17731,14 @@ dependencies = [
  "colored",
  "flate2",
  "futures",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "move-core-types 0.0.4",
  "move-package-alt",
  "move-package-alt-compilation",
- "move-symbol-pool",
+ "move-symbol-pool 0.1.0",
  "msim",
  "mysten-common",
  "serde",
@@ -16904,23 +17781,23 @@ dependencies = [
  "eyre",
  "fastcrypto",
  "futures",
- "hyper",
+ "hyper 1.9.0",
  "hyper-rustls",
  "indicatif",
  "integer-encoding",
  "itertools 0.13.0",
  "lru 0.10.1",
  "moka",
- "move-binary-format",
- "move-bytecode-utils",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-core-types 0.0.4",
  "mysten-common",
  "mysten-metrics",
  "num_enum 0.6.1",
  "object_store 0.13.2",
  "parking_lot 0.12.5",
  "percent-encoding",
- "prometheus",
+ "prometheus 0.14.0",
  "prost 0.14.3",
  "reqwest 0.12.28",
  "serde",
@@ -16931,7 +17808,7 @@ dependencies = [
  "sui-rpc",
  "sui-types",
  "tap",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "tempfile",
  "tokio",
  "tracing",
@@ -16948,7 +17825,7 @@ dependencies = [
  "futures",
  "mysten-metrics",
  "mysten-network",
- "prometheus",
+ "prometheus 0.14.0",
  "rand 0.8.6",
  "sui-config",
  "sui-macros",
@@ -16959,7 +17836,7 @@ dependencies = [
  "sui-tls",
  "sui-types",
  "tap",
- "telemetry-subscribers",
+ "telemetry-subscribers 0.2.0",
  "tempfile",
  "tokio",
  "tonic-health",
@@ -16975,7 +17852,7 @@ dependencies = [
  "bcs",
  "fastcrypto",
  "mysten-common",
- "prometheus",
+ "prometheus 0.14.0",
  "rand 0.8.6",
  "serde",
  "serde_with",
@@ -17005,7 +17882,7 @@ name = "sui-test-transaction-builder"
 version = "0.1.0"
 dependencies = [
  "bcs",
- "move-core-types",
+ "move-core-types 0.0.4",
  "shared-crypto",
  "sui-genesis-builder",
  "sui-move-build",
@@ -17043,8 +17920,8 @@ dependencies = [
  "async-trait",
  "bcs",
  "futures",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "sui-json",
  "sui-json-rpc-types",
  "sui-types",
@@ -17090,10 +17967,10 @@ dependencies = [
  "indexmap 2.14.0",
  "itertools 0.13.0",
  "lru 0.10.1",
- "move-binary-format",
- "move-bytecode-utils",
- "move-core-types",
- "move-trace-format",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-core-types 0.0.4",
+ "move-trace-format 0.0.1",
  "move-vm-profiler",
  "mysten-common",
  "mysten-metrics",
@@ -17106,7 +17983,7 @@ dependencies = [
  "p384",
  "parking_lot 0.12.5",
  "passkey-types",
- "prometheus",
+ "prometheus 0.14.0",
  "proptest",
  "proptest-derive",
  "prost 0.14.3",
@@ -17141,13 +18018,13 @@ dependencies = [
 name = "sui-verifier-latest"
 version = "0.1.0"
 dependencies = [
- "move-abstract-stack",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier",
- "move-bytecode-verifier-meter",
- "move-core-types",
- "move-vm-config",
+ "move-abstract-stack 0.0.1",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-bytecode-verifier 0.1.0",
+ "move-bytecode-verifier-meter 0.1.0",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "mysten-common",
  "sui-protocol-config",
  "sui-types",
@@ -17157,13 +18034,13 @@ dependencies = [
 name = "sui-verifier-v0"
 version = "0.1.0"
 dependencies = [
- "move-abstract-stack",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier-meter",
+ "move-abstract-stack 0.0.1",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-bytecode-verifier-meter 0.1.0",
  "move-bytecode-verifier-v0",
- "move-core-types",
- "move-vm-config",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "sui-protocol-config",
  "sui-types",
 ]
@@ -17172,13 +18049,13 @@ dependencies = [
 name = "sui-verifier-v1"
 version = "0.1.0"
 dependencies = [
- "move-abstract-stack",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier-meter",
+ "move-abstract-stack 0.0.1",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-bytecode-verifier-meter 0.1.0",
  "move-bytecode-verifier-v1",
- "move-core-types",
- "move-vm-config",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "sui-types",
 ]
 
@@ -17186,13 +18063,13 @@ dependencies = [
 name = "sui-verifier-v2"
 version = "0.1.0"
 dependencies = [
- "move-abstract-stack",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier-meter",
+ "move-abstract-stack 0.0.1",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-bytecode-verifier-meter 0.1.0",
  "move-bytecode-verifier-v2",
- "move-core-types",
- "move-vm-config",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "sui-protocol-config",
  "sui-types",
 ]
@@ -17201,13 +18078,13 @@ dependencies = [
 name = "sui-verifier-v3"
 version = "0.1.0"
 dependencies = [
- "move-abstract-stack",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier-meter",
+ "move-abstract-stack 0.0.1",
+ "move-binary-format 0.0.3",
+ "move-bytecode-utils 0.1.0",
+ "move-bytecode-verifier-meter 0.1.0",
  "move-bytecode-verifier-v3",
- "move-core-types",
- "move-vm-config",
+ "move-core-types 0.0.4",
+ "move-vm-config 0.1.0",
  "sui-protocol-config",
  "sui-types",
 ]
@@ -17286,6 +18163,12 @@ dependencies = [
 
 [[package]]
 name = "sync_wrapper"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2047c6ded9c721764247e62cd3b03c09ffc529b2ba5b10ec482ae507a4a70160"
+
+[[package]]
+name = "sync_wrapper"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bf256ce5efdfa370213c1dabab5935a12e49f2c58d15e9eac2870d3b4f27263"
@@ -17341,13 +18224,34 @@ dependencies = [
 
 [[package]]
 name = "system-configuration"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba3a3adc5c275d719af8cb4272ea1c4a6d668a777f37e115f6d11ddbc1c8e0e7"
+dependencies = [
+ "bitflags 1.3.2",
+ "core-foundation 0.9.4",
+ "system-configuration-sys 0.5.0",
+]
+
+[[package]]
+name = "system-configuration"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a13f3d0daba03132c0aa9767f98351b3488edc2c100cda2d2ec2b04f3d8d3c8b"
 dependencies = [
  "bitflags 2.11.1",
  "core-foundation 0.9.4",
- "system-configuration-sys",
+ "system-configuration-sys 0.6.0",
+]
+
+[[package]]
+name = "system-configuration-sys"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a75fb188eb626b924683e3b95e3a48e63551fcfb51949de2f06a9d91dbee93c9"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
 ]
 
 [[package]]
@@ -17821,7 +18725,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-proto",
  "opentelemetry_sdk 0.27.1",
- "prometheus",
+ "prometheus 0.14.0",
  "prost 0.13.5",
  "tokio",
  "tonic 0.12.3",
@@ -17829,6 +18733,24 @@ dependencies = [
  "tracing-appender",
  "tracing-error",
  "tracing-opentelemetry 0.28.0",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "telemetry-subscribers"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa0bb7a19276b949be8ea0aab39f56692520596211b7ca837a572fd8cd555df4"
+dependencies = [
+ "crossterm 0.25.0",
+ "once_cell",
+ "opentelemetry 0.18.0",
+ "opentelemetry-jaeger",
+ "prometheus 0.13.4",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-opentelemetry 0.18.0",
  "tracing-subscriber",
 ]
 
@@ -17864,6 +18786,28 @@ checksum = "c4790fc369d5a530f4b544b094e31388b9b3a37c0f4652ade4505945f5660d24"
 dependencies = [
  "new_debug_unreachable",
  "utf-8",
+]
+
+[[package]]
+name = "tera"
+version = "1.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8004bca281f2d32df3bacd59bc67b312cb4c70cea46cbd79dbe8ac5ed206722"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "globwalk",
+ "humansize",
+ "lazy_static",
+ "percent-encoding",
+ "pest",
+ "pest_derive",
+ "rand 0.8.6",
+ "regex",
+ "serde",
+ "serde_json",
+ "slug",
+ "unicode-segmentation",
 ]
 
 [[package]]
@@ -17944,7 +18888,7 @@ dependencies = [
  "nix 0.29.0",
  "num-derive",
  "num-traits",
- "ordered-float",
+ "ordered-float 4.6.0",
  "pest",
  "pest_derive",
  "phf 0.11.3",
@@ -17974,10 +18918,10 @@ dependencies = [
  "fastcrypto-zkp",
  "futures",
  "jsonrpsee",
- "move-binary-format",
- "move-core-types",
+ "move-binary-format 0.0.3",
+ "move-core-types 0.0.4",
  "mysten-common",
- "prometheus",
+ "prometheus 0.14.0",
  "rand 0.8.6",
  "sui-config",
  "sui-core",
@@ -18073,6 +19017,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d050e60b33d41c19108b32cea32164033a9013fe3b46cbd4457559bfbf77afaa"
 dependencies = [
  "num_cpus",
+]
+
+[[package]]
+name = "thrift"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09678c4cdbb4eed72e18b7c2af1329c69825ed16fcbac62d083fc3e2b0590ff0"
+dependencies = [
+ "byteorder",
+ "integer-encoding",
+ "log",
+ "ordered-float 1.1.1",
+ "threadpool",
 ]
 
 [[package]]
@@ -18561,11 +19518,11 @@ dependencies = [
  "axum 0.7.9",
  "base64 0.22.1",
  "bytes",
- "h2",
+ "h2 0.4.14",
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
- "hyper",
+ "hyper 1.9.0",
  "hyper-timeout",
  "hyper-util",
  "percent-encoding",
@@ -18590,18 +19547,18 @@ dependencies = [
  "axum 0.8.9",
  "base64 0.22.1",
  "bytes",
- "h2",
+ "h2 0.4.14",
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
- "hyper",
+ "hyper 1.9.0",
  "hyper-timeout",
  "hyper-util",
  "percent-encoding",
  "pin-project",
  "rustls-native-certs",
  "socket2 0.6.3",
- "sync_wrapper",
+ "sync_wrapper 1.0.2",
  "tokio",
  "tokio-rustls",
  "tokio-stream",
@@ -18687,11 +19644,11 @@ checksum = "9b2874b26095e47313b6126f9e8144580a916af2151f778a4fec01a0120fed85"
 dependencies = [
  "async-stream",
  "bytes",
- "h2",
+ "h2 0.4.14",
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
- "hyper",
+ "hyper 1.9.0",
  "hyper-timeout",
  "hyper-util",
  "pin-project",
@@ -18757,7 +19714,7 @@ dependencies = [
  "indexmap 2.14.0",
  "pin-project-lite",
  "slab",
- "sync_wrapper",
+ "sync_wrapper 1.0.2",
  "tokio",
  "tokio-util 0.7.18",
  "tower-layer",
@@ -18896,6 +19853,17 @@ dependencies = [
 
 [[package]]
 name = "tracing-log"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f751112709b4e791d8ce53e32c4ed2d353565a795ce84da2285393f41557bdf2"
+dependencies = [
+ "log",
+ "once_cell",
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-log"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee855f1f400bd0e5c02d150ae5de3840039a3f54b025156404e34c23c03f47c3"
@@ -18915,6 +19883,7 @@ dependencies = [
  "opentelemetry 0.18.0",
  "tracing",
  "tracing-core",
+ "tracing-log 0.1.4",
  "tracing-subscriber",
 ]
 
@@ -18931,7 +19900,7 @@ dependencies = [
  "smallvec",
  "tracing",
  "tracing-core",
- "tracing-log",
+ "tracing-log 0.2.0",
  "tracing-subscriber",
  "web-time",
 ]
@@ -18964,7 +19933,7 @@ dependencies = [
  "time",
  "tracing",
  "tracing-core",
- "tracing-log",
+ "tracing-log 0.2.0",
  "tracing-serde",
 ]
 
@@ -19084,6 +20053,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "typed-arena"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6af6ae20167a9ece4bcb41af5b80f8a1f1df981f6391189ce00fd257af04126a"
+
+[[package]]
 name = "typed-builder"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -19119,7 +20094,7 @@ dependencies = [
  "mysten-common",
  "mysten-metrics",
  "once_cell",
- "prometheus",
+ "prometheus 0.14.0",
  "rocksdb",
  "serde",
  "sui-macros",
@@ -19400,6 +20375,8 @@ dependencies = [
  "once_cell",
  "rustls",
  "rustls-pki-types",
+ "serde",
+ "serde_json",
  "url",
  "webpki-roots 0.26.11",
 ]
@@ -20280,7 +21257,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f2ab60e120fd6eaa68d9567f3226e876684639d22a4219b313ff69ec0ccd5ac"
 dependencies = [
  "log",
- "ordered-float",
+ "ordered-float 4.6.0",
  "strsim 0.11.1",
  "thiserror 1.0.69",
  "wezterm-dynamic-derive",
@@ -20954,6 +21931,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ee1708bef14716a11bae175f579062d4554d95be2c6829f518df847b7b3fdd0"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "winreg"
+version = "0.50.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "524e57b2c537c0f9b1e69f1965311ec12182b4122e45035b1508cd24d2adadb1"
+dependencies = [
+ "cfg-if",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

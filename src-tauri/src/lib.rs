@@ -78,6 +78,7 @@ pub fn run() {
             commands::sui::build_move_package,
             commands::sui::run_security_command,
             commands::sui::run_movy_fuzz,
+            commands::sui::run_formal_verification,
             commands::sui::run_security_script,
             commands::files::analyze_move_package,
             commands::files::load_move_bytecode_view,

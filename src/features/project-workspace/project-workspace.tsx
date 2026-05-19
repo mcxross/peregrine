@@ -22,7 +22,11 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
+import type {
+  FormalVerificationTarget,
+  WorkspaceMode,
+  WorkspaceTab,
+} from "@/app/workspace-types";
 import {
   displayMovePackageName,
   type MoveModule,
@@ -68,6 +72,7 @@ type ProjectWorkspaceProps = {
   mode: WorkspaceMode;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
+  onFormalVerificationTargetChange: (target: FormalVerificationTarget | null) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
   packageTree: PackageTree;
@@ -147,6 +152,7 @@ export function ProjectWorkspace({
   mode,
   onActivePackageManifestPathChange,
   onCommandLog,
+  onFormalVerificationTargetChange,
   onProjectSelected,
   onWorkspaceTabChange,
   packageTree,
@@ -178,7 +184,21 @@ export function ProjectWorkspace({
   React.useEffect(() => {
     setSelectedModule(null);
     setActiveSurfaceDetail(null);
-  }, [activePackageManifestPath, packageTree.rootPath]);
+    onFormalVerificationTargetChange(null);
+  }, [activePackageManifestPath, onFormalVerificationTargetChange, packageTree.rootPath]);
+
+  React.useEffect(() => {
+    onFormalVerificationTargetChange(
+      selectedModule
+        ? {
+            filePath: selectedModule.moveModule.filePath,
+            moduleName: selectedModule.moveModule.name,
+            packageName: selectedModule.movePackage.name,
+            packagePath: selectedModule.movePackage.path || ".",
+          }
+        : null,
+    );
+  }, [onFormalVerificationTargetChange, selectedModule]);
 
   React.useEffect(() => {
     const firstModule = activeMovePackage?.modules[0] ?? null;
@@ -406,6 +426,7 @@ function WorkspaceMainPanel({
     return (
       <ProjectSourceEditorWorkspace
         activeMovePackage={activeMovePackage}
+        onClearSelectedModule={onClearSelectedModule}
         onSelectModule={onSelectModule}
         packageTree={packageTree}
       />

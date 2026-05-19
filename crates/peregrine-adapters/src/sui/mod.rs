@@ -9,6 +9,7 @@ mod bundled;
 mod command;
 mod environment;
 mod error;
+mod formal;
 mod settings;
 mod status;
 mod system;
@@ -20,6 +21,10 @@ pub use command::{
 };
 pub use environment::SuiAdapterEnvironment;
 pub use error::SuiAdapterError;
+pub use formal::{
+    SuiFormalVerificationCommand, SuiFormalVerificationOptions,
+    DEFAULT_FORMAL_VERIFICATION_TIMEOUT_SECONDS,
+};
 pub use settings::{SuiAdapterSettings, SuiAdapterSource};
 pub use status::{SuiAdapterSourceStatus, SuiAdapterStatus};
 

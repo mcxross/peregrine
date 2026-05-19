@@ -45,6 +45,7 @@ type TitlebarProps = {
   activeWorkspaceTab?: WorkspaceTab;
   buildActionState?: WorkspaceActionState;
   coverageActionState?: WorkspaceActionState;
+  formalActionState?: WorkspaceActionState;
   fuzzActionState?: WorkspaceActionState;
   isLeftPanelOpen?: boolean;
   layout: LayoutSettings;
@@ -53,6 +54,7 @@ type TitlebarProps = {
   network: SuiNetworkSelection;
   onBuildPackage?: () => void;
   onCheckCoverage?: () => void;
+  onFormalVerification?: () => void;
   onFuzzPackage?: () => void;
   onNetworkChange: (network: SuiNetworkSelection) => void;
   onOpenProjectConfig?: () => void;
@@ -67,6 +69,7 @@ type TitlebarProps = {
 export function Titlebar({
   buildActionState,
   coverageActionState,
+  formalActionState,
   fuzzActionState,
   isLeftPanelOpen = true,
   layout,
@@ -75,6 +78,7 @@ export function Titlebar({
   network,
   onBuildPackage,
   onCheckCoverage,
+  onFormalVerification,
   onFuzzPackage,
   onNetworkChange,
   onOpenProjectConfig,
@@ -147,6 +151,8 @@ export function Titlebar({
                         ? coverageActionState
                         : action.id === "fuzzing"
                           ? fuzzActionState
+                          : action.id === "formal"
+                            ? formalActionState
                           : undefined
                 }
                 onClick={
@@ -158,6 +164,8 @@ export function Titlebar({
                         ? onCheckCoverage
                         : action.id === "fuzzing"
                           ? onFuzzPackage
+                          : action.id === "formal"
+                            ? onFormalVerification
                           : undefined
                 }
               />

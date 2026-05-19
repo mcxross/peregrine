@@ -14,12 +14,14 @@ import { findModuleByPath } from "@/features/project-workspace/source-paths";
 
 type ProjectSourceEditorWorkspaceProps = {
   activeMovePackage: MovePackage | null;
+  onClearSelectedModule: () => void;
   onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
   packageTree: PackageTree;
 };
 
 export function ProjectSourceEditorWorkspace({
   activeMovePackage,
+  onClearSelectedModule,
   onSelectModule,
   packageTree,
 }: ProjectSourceEditorWorkspaceProps) {
@@ -103,9 +105,31 @@ export function ProjectSourceEditorWorkspace({
           selectedMoveModule.movePackage,
           selectedMoveModule.moveModule,
         );
+      } else {
+        onClearSelectedModule();
       }
     },
-    [activeMovePackage, onSelectModule, packageTree],
+    [activeMovePackage, onClearSelectedModule, onSelectModule, packageTree],
+  );
+
+  const selectOpenModule = React.useCallback(
+    (path: string) => {
+      const selectedMoveModule = findModuleByPath(
+        packageTree.movePackages,
+        path,
+        activeMovePackage,
+      );
+
+      if (selectedMoveModule) {
+        onSelectModule(
+          selectedMoveModule.movePackage,
+          selectedMoveModule.moveModule,
+        );
+      } else {
+        onClearSelectedModule();
+      }
+    },
+    [activeMovePackage, onClearSelectedModule, onSelectModule, packageTree.movePackages],
   );
 
   const closeTab = React.useCallback(
@@ -126,8 +150,13 @@ export function ProjectSourceEditorWorkspace({
 
       setActivePath(nextActivePath);
       setSelectedPath(nextActivePath);
+      if (nextActivePath) {
+        selectOpenModule(nextActivePath);
+      } else {
+        onClearSelectedModule();
+      }
     },
-    [activePath, tabs],
+    [activePath, onClearSelectedModule, selectOpenModule, tabs],
   );
 
   const updateTabSource = React.useCallback((path: string, source: string) => {
@@ -176,6 +205,7 @@ export function ProjectSourceEditorWorkspace({
         onActivateTab={(path) => {
           setActivePath(path);
           setSelectedPath(path);
+          selectOpenModule(path);
         }}
         onCloseTab={closeTab}
         onUpdateTabSource={updateTabSource}

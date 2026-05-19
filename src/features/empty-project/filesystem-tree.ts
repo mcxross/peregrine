@@ -774,6 +774,22 @@ export async function runMovyFuzz(
   }, options);
 }
 
+export async function runFormalVerification(
+  packageTree: PackageTree,
+  packagePath: string,
+  filePath: string,
+  moduleName: string,
+  options?: CommandOutputStreamOptions & { timeoutSeconds?: number },
+) {
+  return invokeCommandOutput("run_formal_verification", {
+    rootPath: packageTree.rootPath,
+    packagePath,
+    filePath,
+    moduleName,
+    timeoutSeconds: options?.timeoutSeconds ?? null,
+  }, options);
+}
+
 export async function runSecurityScript(
   packageTree: PackageTree,
   packagePath: string,

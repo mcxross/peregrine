@@ -5,8 +5,11 @@ edition.workspace = true
 description = "Dynamic analysis tools for Peregrine grouped by blockchain"
 
 [dependencies]
+move-prover-boogie-backend = { workspace = true }
+move-stackless-bytecode = { workspace = true }
 movy = { workspace = true }
 serde = { workspace = true }
+sui-prover = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 walkdir = { workspace = true }

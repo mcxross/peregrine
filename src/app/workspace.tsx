@@ -1,6 +1,10 @@
 import { EmptyProjectScreen } from "@/features/empty-project/empty-project-screen";
 import type { SuiNetworkSelection } from "@/app/sui-network";
-import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
+import type {
+  FormalVerificationTarget,
+  WorkspaceMode,
+  WorkspaceTab,
+} from "@/app/workspace-types";
 import type { PackageTree } from "@/features/empty-project/filesystem-tree";
 import type {
   BuildLogRun,
@@ -23,6 +27,7 @@ type WorkspaceProps = {
   onNetworkChange: (network: SuiNetworkSelection) => void;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
+  onFormalVerificationTargetChange: (target: FormalVerificationTarget | null) => void;
   packageTree: PackageTree | null;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
@@ -41,6 +46,7 @@ export function Workspace({
   onNetworkChange,
   onActivePackageManifestPathChange,
   onCommandLog,
+  onFormalVerificationTargetChange,
   onWorkspaceTabChange,
   packageTree,
   onProjectSelected,
@@ -58,6 +64,7 @@ export function Workspace({
         mode={mode}
         onActivePackageManifestPathChange={onActivePackageManifestPathChange}
         onCommandLog={onCommandLog}
+        onFormalVerificationTargetChange={onFormalVerificationTargetChange}
         onProjectSelected={onProjectSelected}
         onWorkspaceTabChange={onWorkspaceTabChange}
         packageTree={packageTree}

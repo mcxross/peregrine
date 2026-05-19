@@ -29,6 +29,8 @@ move-decompiler = { path = "../oss/sui/external-crates/move/crates/move-decompil
 move-disassembler = { path = "../oss/sui/external-crates/move/crates/move-disassembler" }
 move-ir-types = { path = "../oss/sui/external-crates/move/crates/move-ir-types" }
 move-model-2 = { path = "../oss/sui/external-crates/move/crates/move-model-2" }
+move-prover-boogie-backend = { git = "file:///Users/eieiron/dev/oss/sui-prover", branch = "codex/peregrine-bundled-prover" }
+move-stackless-bytecode = { git = "file:///Users/eieiron/dev/oss/sui-prover", branch = "codex/peregrine-bundled-prover" }
 movy = { path = "../oss/movy/crates/movy", default-features = false, features = ["sui-fuzz"] }
 peregrine-adapters = { path = "crates/peregrine-adapters" }
 peregrine-dynamic-analysis = { path = "crates/peregrine-dynamic-analysis" }
@@ -46,6 +48,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 sui = { path = "../oss/sui/crates/sui", package = "sui", features = ["tracing"] }
+sui-prover = { git = "file:///Users/eieiron/dev/oss/sui-prover", branch = "codex/peregrine-bundled-prover" }
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
@@ -63,3 +66,4 @@ async-graphql = { git = "https://github.com/amnn/async-graphql", branch = "v7.0.
 async-graphql-axum = { git = "https://github.com/amnn/async-graphql", branch = "v7.0.1-react-18-graphiql-4" }
 async-graphql-value = { git = "https://github.com/amnn/async-graphql", branch = "v7.0.1-react-18-graphiql-4" }
 core2 = { path = "vendor/core2-0.4.0" }
+simplelog = { path = "vendor/simplelog-0.9.0" }

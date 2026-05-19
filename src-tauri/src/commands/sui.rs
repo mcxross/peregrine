@@ -1,7 +1,11 @@
 use crate::{commands::files, validated_move_project_name};
 use peregrine_adapters::sui::{
     SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus, SuiExecutionTarget,
-    SuiMoveNewCommand, SuiPackageCommand,
+    SuiFormalVerificationCommand, SuiFormalVerificationOptions, SuiMoveNewCommand,
+    SuiPackageCommand,
+};
+use peregrine_dynamic_analysis::sui::formal_verification::{
+    formal_verification_manifest, FormalVerificationOptions,
 };
 use peregrine_import_engine::sui::{
     default_import_root, BuildVerification, BuildableImportRequest, ImportEngine,
@@ -25,6 +29,7 @@ const SUI_ADAPTER_SETTINGS_FILE: &str = "sui-adapter-settings.json";
 const COMMAND_OUTPUT_EVENT: &str = "command-output";
 const BUNDLED_SUI_HELPER_ARG: &str = "--peregrine-bundled-sui";
 const MOVY_FUZZ_HELPER_ARG: &str = "--peregrine-movy-fuzz";
+const FORMAL_VERIFICATION_HELPER_ARG: &str = "--peregrine-formal-verification";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -196,6 +201,35 @@ pub(crate) async fn run_movy_fuzz(
     .map_err(|error| format!("Could not join Movy fuzz task: {error}"))?
 }
 
+#[tauri::command]
+pub(crate) async fn run_formal_verification(
+    app: tauri::AppHandle,
+    root_path: String,
+    package_path: String,
+    file_path: String,
+    module_name: String,
+    timeout_seconds: Option<usize>,
+    stream_id: Option<String>,
+) -> Result<CommandOutput, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_formal_verification_worker(
+            &root_path,
+            &package_path,
+            FormalVerificationOptions {
+                file_path,
+                module_name,
+                timeout_seconds,
+                verbose: true,
+                trace: false,
+                keep_temp: false,
+            },
+            command_output_stream(app, stream_id),
+        )
+    })
+    .await
+    .map_err(|error| format!("Could not join formal verification task: {error}"))?
+}
+
 fn run_movy_fuzz_worker(
     root_path: &str,
     package_path: &str,
@@ -211,6 +245,53 @@ fn run_movy_fuzz_worker(
         .arg(MOVY_FUZZ_HELPER_ARG)
         .arg(root_path)
         .arg(package_path);
+
+    let mut output = run_configured_command(configure_plain_command_output(&mut process), stream)?;
+    output.stdout = format!("{header}{}", output.stdout);
+
+    Ok(output)
+}
+
+fn run_formal_verification_worker(
+    root_path: &str,
+    package_path: &str,
+    options: FormalVerificationOptions,
+    stream: Option<CommandOutputStream>,
+) -> Result<CommandOutput, String> {
+    let manifest = formal_verification_manifest(root_path, package_path, &options)
+        .map_err(|error| error.to_string())?;
+    let command = SuiFormalVerificationCommand::new(&SuiFormalVerificationOptions {
+        module_name: options.module_name.clone(),
+        file_path: options.file_path.clone(),
+        timeout_seconds: options.timeout_seconds,
+        verbose: options.verbose,
+        trace: options.trace,
+        keep_temp: options.keep_temp,
+    });
+    let header = format!(
+        "Starting bundled Sui Prover formal verification...\nCommand: {}\nPackage: {}\nFile: {}\nModule filter: {}\n\n",
+        command.display,
+        manifest.package_root.display(),
+        manifest.file_path,
+        manifest.module_name,
+    );
+    emit_command_output_chunk(stream.as_ref(), "stdout", &header);
+
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let mut process = Command::new(executable);
+    process
+        .arg(FORMAL_VERIFICATION_HELPER_ARG)
+        .arg(root_path)
+        .arg(package_path)
+        .arg(&options.file_path)
+        .arg(&options.module_name)
+        .arg(
+            options
+                .timeout_seconds
+                .unwrap_or(command.timeout_seconds)
+                .to_string(),
+        );
 
     let mut output = run_configured_command(configure_plain_command_output(&mut process), stream)?;
     output.stdout = format!("{header}{}", output.stdout);

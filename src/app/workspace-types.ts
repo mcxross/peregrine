@@ -14,3 +14,10 @@ export const workspaceTabs = [
 
 export type WorkspaceTab = (typeof workspaceTabs)[number];
 export type WorkspaceMode = "security" | "editor";
+
+export type FormalVerificationTarget = {
+  packageName: string;
+  packagePath: string;
+  filePath: string;
+  moduleName: string;
+};

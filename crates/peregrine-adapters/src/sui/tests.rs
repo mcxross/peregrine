@@ -51,6 +51,23 @@ fn move_build_command_uses_bundled_execution_by_default() {
 }
 
 #[test]
+fn formal_verification_command_describes_bundled_prover_target() {
+    let options = SuiFormalVerificationOptions::new("vault", "sources/vault.move");
+    let command = SuiFormalVerificationCommand::new(&options);
+
+    assert_eq!(command.module_name, "vault");
+    assert_eq!(command.file_path, "sources/vault.move");
+    assert_eq!(
+        command.timeout_seconds,
+        DEFAULT_FORMAL_VERIFICATION_TIMEOUT_SECONDS
+    );
+    assert_eq!(
+        command.display,
+        "bundled sui-prover --path <package> --modules vault --timeout 45"
+    );
+}
+
+#[test]
 fn bundled_move_args_pin_the_package_path() {
     let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
     let command = adapter.package_command("move-coverage").expect("command");

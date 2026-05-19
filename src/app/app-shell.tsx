@@ -2,7 +2,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Titlebar } from "@/app/titlebar";
 import { defaultSuiNetworkSelection, type SuiNetworkSelection } from "@/app/sui-network";
-import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
+import type { FormalVerificationTarget, WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 import { Workspace } from "@/app/workspace";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,7 @@ import {
   loadPackageTree,
   loadPackageTreeDetails,
   loadProjectMetadata,
+  runFormalVerification,
   runMovyFuzz,
   runSecurityScript,
   runSecurityCommand,
@@ -73,6 +74,8 @@ export function AppShell({
   const [isBuildSheetOpen, setIsBuildSheetOpen] = useState(false);
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
   const [isProjectConfigOpen, setIsProjectConfigOpen] = useState(false);
+  const [formalVerificationTarget, setFormalVerificationTarget] =
+    useState<FormalVerificationTarget | null>(null);
   const [lastScannedAt, setLastScannedAt] = useState<number | null>(null);
   const [launchBuild, setLaunchBuild] = useState<LaunchBuildState | null>(null);
   const [network, setNetwork] = useState<SuiNetworkSelection>(defaultSuiNetworkSelection);
@@ -118,6 +121,7 @@ export function AppShell({
     resetLaunchIndex();
     setActivePackageManifestPath(packageTree?.activePackageManifestPath ?? null);
     setBuildRuns([]);
+    setFormalVerificationTarget(null);
     setIsBuildSheetOpen(false);
     setLaunchBuild(null);
     setLastScannedAt(packageTree ? Date.now() : null);
@@ -792,6 +796,84 @@ export function AppShell({
       );
     }
   }, [activeMovePackage, isCommandRunning, packageTree]);
+
+  const runFormalChecks = useCallback(async () => {
+    if (!packageTree || !formalVerificationTarget || isCommandRunning) {
+      return;
+    }
+
+    const startedAt = new Date();
+    const nextRun: BuildLogRun = {
+      canRerun: false,
+      command: `bundled sui-prover --path ${formalVerificationTarget.packagePath || "."} --modules ${formalVerificationTarget.moduleName}`,
+      error: null,
+      finishedAt: null,
+      id: startedAt.getTime(),
+      metadata: [
+        { label: "Mode", value: "Bundled Sui Prover" },
+        { label: "File", value: formalVerificationTarget.filePath },
+        { label: "Module filter", value: formalVerificationTarget.moduleName },
+        { label: "Timeout", value: "45 seconds" },
+      ],
+      output: null,
+      packageName: formalVerificationTarget.packageName,
+      packagePath: formalVerificationTarget.packagePath || ".",
+      runningText: "Running bundled Sui Prover...",
+      startedAt,
+      state: "running",
+      title: "Formal verification",
+      workingDirectory:
+        formalVerificationTarget.packagePath && formalVerificationTarget.packagePath !== "."
+          ? `${packageTree.rootPath}/${formalVerificationTarget.packagePath}`
+          : packageTree.rootPath,
+    };
+
+    currentCommandLogIdRef.current = nextRun.id;
+    setBuildRuns([nextRun]);
+    setIsBuildSheetOpen(true);
+
+    try {
+      const output = await runFormalVerification(
+        packageTree,
+        formalVerificationTarget.packagePath,
+        formalVerificationTarget.filePath,
+        formalVerificationTarget.moduleName,
+        {
+          streamId: nextRun.id,
+          timeoutSeconds: 45,
+          onOutput: (output) => {
+            setBuildRuns((current) =>
+              updateLogRun(current, nextRun.id, (run) =>
+                run.state === "running"
+                  ? { ...run, output, runningText: "Verifying formal specifications..." }
+                  : run,
+              ),
+            );
+          },
+        },
+      );
+      const state = output.status === 0 ? "success" : "error";
+
+      setBuildRuns((current) =>
+        updateLogRun(current, nextRun.id, (run) => ({
+          ...run,
+          finishedAt: new Date(),
+          output,
+          state,
+        })),
+      );
+    } catch (error) {
+      setBuildRuns((current) =>
+        updateLogRun(current, nextRun.id, (run) => ({
+          ...run,
+          error: getCommandErrorMessage(error, "Could not run bundled Sui Prover."),
+          finishedAt: new Date(),
+          state: "error",
+        })),
+      );
+    }
+  }, [formalVerificationTarget, isCommandRunning, packageTree]);
+
   const buildLogSheet = useMemo<BuildLogSheetController>(
     () => ({
       isOpen: isBuildSheetOpen,
@@ -838,6 +920,11 @@ export function AppShell({
           disabled: !activeMovePackage,
           running: isCommandRunning,
         }}
+        formalActionState={{
+          disabled: !formalVerificationTarget,
+          running: isCommandRunning,
+        }}
+        onFormalVerification={runFormalChecks}
         onWorkspaceTabChange={setActiveWorkspaceTab}
         showNetworkSelector={!isSettings && Boolean(packageTree)}
       />
@@ -858,6 +945,7 @@ export function AppShell({
               mode={workspaceMode}
               network={network}
               onNetworkChange={setNetwork}
+              onFormalVerificationTargetChange={setFormalVerificationTarget}
               onActivePackageManifestPathChange={setActivePackageManifestPath}
               onWorkspaceTabChange={setActiveWorkspaceTab}
               packageTree={packageTree}
