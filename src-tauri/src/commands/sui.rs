@@ -1,3 +1,6 @@
+use crate::helper_args::{
+    BUNDLED_SUI_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG, MOVY_FUZZ_HELPER_ARG,
+};
 use crate::{commands::files, validated_move_project_name};
 use peregrine_adapters::sui::{
     SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus, SuiExecutionTarget,
@@ -27,10 +30,6 @@ const SUI_ADAPTER_SETTINGS_CHANGED_EVENT: &str = "sui-adapter-settings-changed";
 const SUI_ADAPTER_SETTINGS_FILE: &str = "sui-adapter-settings.json";
 
 const COMMAND_OUTPUT_EVENT: &str = "command-output";
-const BUNDLED_SUI_HELPER_ARG: &str = "--peregrine-bundled-sui";
-const MOVY_FUZZ_HELPER_ARG: &str = "--peregrine-movy-fuzz";
-const FORMAL_VERIFICATION_HELPER_ARG: &str = "--peregrine-formal-verification";
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CommandOutput {

@@ -1,7 +1,4 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
-use peregrine_lib::helper_args::{
+use peregrine_cli::helper_args::{
     BUNDLED_SUI_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG, MOVY_FUZZ_HELPER_ARG,
 };
 
@@ -19,7 +16,14 @@ fn main() {
         Some(arg) if arg.as_os_str() == std::ffi::OsStr::new(FORMAL_VERIFICATION_HELPER_ARG) => {
             run_formal_verification_helper(args);
         }
-        _ => peregrine_lib::run(),
+        Some(arg) => {
+            let exit_code = peregrine_cli::run_from_args(std::iter::once(arg).chain(args));
+            std::process::exit(exit_code);
+        }
+        None => {
+            let exit_code = peregrine_cli::run_from_args(std::iter::empty());
+            std::process::exit(exit_code);
+        }
     }
 }
 

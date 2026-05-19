@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "src-tauri",
+  "crates/peregrine",
   "crates/peregrine-adapters",
   "crates/peregrine-dynamic-analysis",
   "crates/peregrine-indexer",
