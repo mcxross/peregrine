@@ -1,0 +1,833 @@
+use crate::{commands::files, validated_move_project_name};
+use peregrine_adapters::sui::{
+    SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus, SuiExecutionTarget,
+    SuiMoveNewCommand, SuiPackageCommand,
+};
+use peregrine_import_engine::sui::{
+    default_import_root, BuildVerification, BuildableImportRequest, ImportEngine,
+    ImportEngineConfig,
+};
+use serde::Serialize;
+use std::{
+    fs,
+    io::Read,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    sync::mpsc,
+    thread,
+    time::{SystemTime, UNIX_EPOCH},
+};
+use tauri::{Emitter, Manager};
+
+const SUI_ADAPTER_SETTINGS_CHANGED_EVENT: &str = "sui-adapter-settings-changed";
+const SUI_ADAPTER_SETTINGS_FILE: &str = "sui-adapter-settings.json";
+
+const COMMAND_OUTPUT_EVENT: &str = "command-output";
+const BUNDLED_SUI_HELPER_ARG: &str = "--peregrine-bundled-sui";
+const MOVY_FUZZ_HELPER_ARG: &str = "--peregrine-movy-fuzz";
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CommandOutput {
+    status: Option<i32>,
+    stdout: String,
+    stderr: String,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct CommandOutputChunk {
+    stream_id: String,
+    stream: &'static str,
+    chunk: String,
+}
+
+#[derive(Clone)]
+struct CommandOutputStream {
+    app: tauri::AppHandle,
+    stream_id: String,
+}
+
+struct CommandReaderChunk {
+    stream: &'static str,
+    bytes: Vec<u8>,
+}
+
+#[tauri::command]
+pub(crate) async fn create_move_project(
+    app: tauri::AppHandle,
+    parent_path: String,
+    project_name: String,
+    stream_id: Option<String>,
+) -> Result<files::PackageTree, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let sui = sui_adapter(&app)?;
+        let command = sui
+            .move_new_command(&project_name)
+            .map_err(|error| error.to_string())?;
+        let project_root = run_create_move_project_command(
+            &parent_path,
+            &project_name,
+            command,
+            command_output_stream(app, stream_id),
+        )?;
+
+        files::build_package_tree(
+            project_root.to_string_lossy().into_owned(),
+            files::PackageTreeMode::Shallow,
+        )
+    })
+    .await
+    .map_err(|error| format!("Could not join Move project creation task: {error}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn import_move_package_by_id(
+    app: tauri::AppHandle,
+    network_id: String,
+    graph_ql_url: String,
+    package_id: String,
+    save_root_path: Option<String>,
+    generate_buildable: bool,
+) -> Result<files::PackageTree, String> {
+    let import_root = if let Some(save_root_path) = save_root_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+    {
+        PathBuf::from(save_root_path)
+    } else {
+        let app_data_dir = app
+            .path()
+            .app_data_dir()
+            .map_err(|error| format!("Could not resolve app data directory: {error}"))?;
+        default_import_root(&app_data_dir, &network_id, &package_id)?
+    };
+    let engine = ImportEngine::new(ImportEngineConfig {
+        max_dependency_depth: 3,
+        max_dependency_packages: 64,
+        build_verification: BuildVerification::SystemSui {
+            executable: PathBuf::from("sui"),
+            default_move_flavor: None,
+        },
+    });
+
+    let imported_package = engine
+        .import_buildable_package(BuildableImportRequest {
+            import_root,
+            network_id,
+            graph_ql_url,
+            package_id,
+            generate_buildable,
+        })
+        .await?;
+
+    tauri::async_runtime::spawn_blocking(move || {
+        files::build_package_tree(
+            imported_package.project_root.to_string_lossy().into_owned(),
+            files::PackageTreeMode::Shallow,
+        )
+    })
+    .await
+    .map_err(|error| format!("Could not join imported package scan task: {error}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn build_move_package(
+    app: tauri::AppHandle,
+    root_path: String,
+    package_path: String,
+    stream_id: Option<String>,
+) -> Result<CommandOutput, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let sui = sui_adapter(&app)?;
+        run_package_command(
+            &root_path,
+            &package_path,
+            sui.package_command("move-build")
+                .map_err(|error| error.to_string())?,
+            command_output_stream(app, stream_id),
+        )
+    })
+    .await
+    .map_err(|error| format!("Could not join package build task: {error}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn run_security_command(
+    app: tauri::AppHandle,
+    root_path: String,
+    package_path: String,
+    command_kind: String,
+    stream_id: Option<String>,
+) -> Result<CommandOutput, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let sui = sui_adapter(&app)?;
+        let command = sui
+            .package_command(&command_kind)
+            .map_err(|error| error.to_string())?;
+
+        run_package_command(
+            &root_path,
+            &package_path,
+            command,
+            command_output_stream(app, stream_id),
+        )
+    })
+    .await
+    .map_err(|error| format!("Could not join security command task: {error}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn run_movy_fuzz(
+    app: tauri::AppHandle,
+    root_path: String,
+    package_path: String,
+    stream_id: Option<String>,
+) -> Result<CommandOutput, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_movy_fuzz_worker(
+            &root_path,
+            &package_path,
+            command_output_stream(app, stream_id),
+        )
+    })
+    .await
+    .map_err(|error| format!("Could not join Movy fuzz task: {error}"))?
+}
+
+fn run_movy_fuzz_worker(
+    root_path: &str,
+    package_path: &str,
+    stream: Option<CommandOutputStream>,
+) -> Result<CommandOutput, String> {
+    let header = "Deploying package into Movy's local Sui executor and starting Movy fuzzing...\n";
+    emit_command_output_chunk(stream.as_ref(), "stdout", header);
+
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let mut process = Command::new(executable);
+    process
+        .arg(MOVY_FUZZ_HELPER_ARG)
+        .arg(root_path)
+        .arg(package_path);
+
+    let mut output = run_configured_command(configure_plain_command_output(&mut process), stream)?;
+    output.stdout = format!("{header}{}", output.stdout);
+
+    Ok(output)
+}
+
+#[tauri::command]
+pub(crate) async fn run_security_script(
+    app: tauri::AppHandle,
+    root_path: String,
+    package_path: String,
+    script_path: String,
+    script_args: Vec<String>,
+    stream_id: Option<String>,
+) -> Result<CommandOutput, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_package_script(
+            &root_path,
+            &package_path,
+            &script_path,
+            &script_args,
+            command_output_stream(app, stream_id),
+        )
+    })
+    .await
+    .map_err(|error| format!("Could not join security script task: {error}"))?
+}
+
+fn run_package_command(
+    root_path: &str,
+    package_path: &str,
+    command: SuiPackageCommand,
+    stream: Option<CommandOutputStream>,
+) -> Result<CommandOutput, String> {
+    let package_root = files::resolve_package_child_path(root_path, package_path)?;
+
+    if !package_root.is_dir() {
+        return Err("Selected package path is not a directory.".to_string());
+    }
+
+    if !package_root.join("Move.toml").is_file() {
+        return Err("Selected package does not contain a Move.toml file.".to_string());
+    }
+
+    let output = match &command.execution {
+        SuiExecutionTarget::Bundled => run_bundled_package_command(&command, &package_root, stream)
+            .map_err(|error| {
+                format!(
+                    "Could not execute bundled `{}` for {}: {error}",
+                    command.display,
+                    package_root.display()
+                )
+            })?,
+        SuiExecutionTarget::System { executable } => {
+            let mut process = Command::new(executable);
+            run_configured_command(
+                configure_plain_command_output(
+                    process.args(&command.args).current_dir(&package_root),
+                ),
+                stream,
+            )
+            .map_err(|error| {
+                format!(
+                    "Could not execute `{}` in {}: {error}",
+                    command.display,
+                    package_root.display()
+                )
+            })?
+        }
+    };
+    cleanup_temp_pubfile(command.temp_pubfile_path.as_deref());
+
+    Ok(output)
+}
+
+fn run_create_move_project_command(
+    parent_path: &str,
+    project_name: &str,
+    command: SuiMoveNewCommand,
+    stream: Option<CommandOutputStream>,
+) -> Result<PathBuf, String> {
+    let project_name = validated_move_project_name(project_name)?;
+    let parent = PathBuf::from(parent_path)
+        .canonicalize()
+        .map_err(|error| format!("Could not read parent directory {parent_path}: {error}"))?;
+
+    if !parent.is_dir() {
+        return Err("Project parent path is not a directory.".to_string());
+    }
+
+    let project_root = parent.join(&project_name);
+
+    if project_root.exists() {
+        return Err(format!(
+            "A file or folder named `{project_name}` already exists in {}.",
+            parent.display()
+        ));
+    }
+
+    let output = match &command.execution {
+        SuiExecutionTarget::Bundled => run_bundled_move_new_command(&command, &parent, stream)
+            .map_err(|error| {
+                format!(
+                    "Could not execute bundled `{}` in {}: {error}",
+                    command.display,
+                    parent.display()
+                )
+            })?,
+        SuiExecutionTarget::System { executable } => {
+            let mut process = Command::new(executable);
+            run_configured_command(
+                configure_plain_command_output(process.args(&command.args).current_dir(&parent)),
+                stream,
+            )
+            .map_err(|error| {
+                format!(
+                    "Could not execute `{}` in {}: {error}",
+                    command.display,
+                    parent.display()
+                )
+            })?
+        }
+    };
+
+    if output.status != Some(0) {
+        let message = command_failure_message(&output);
+
+        return Err(if message.is_empty() {
+            format!(
+                "`{}` failed in {} with status {:?}.",
+                command.display,
+                parent.display(),
+                output.status
+            )
+        } else {
+            format!(
+                "`{}` failed in {} with status {:?}: {message}",
+                command.display,
+                parent.display(),
+                output.status
+            )
+        });
+    }
+
+    let project_root = project_root.canonicalize().map_err(|error| {
+        format!(
+            "`{}` completed but Peregrine could not read {}: {error}",
+            command.display,
+            project_root.display()
+        )
+    })?;
+
+    if !project_root.join("Move.toml").is_file() {
+        return Err(format!(
+            "`{}` completed but {} does not contain Move.toml.",
+            command.display,
+            project_root.display()
+        ));
+    }
+
+    Ok(project_root)
+}
+
+fn run_bundled_package_command(
+    command: &SuiPackageCommand,
+    package_root: &Path,
+    stream: Option<CommandOutputStream>,
+) -> Result<CommandOutput, String> {
+    let header = format!(
+        "Running bundled Sui crate from the linked app dependency: {}\n",
+        command.display
+    );
+
+    emit_command_output_chunk(stream.as_ref(), "stdout", &header);
+
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let mut process = Command::new(executable);
+    process
+        .arg(BUNDLED_SUI_HELPER_ARG)
+        .args(command.bundled_args_for_package(package_root));
+
+    let mut output = run_configured_command(&mut process, stream)?;
+    output.stdout = format!("{header}{}", output.stdout);
+
+    Ok(output)
+}
+
+fn run_bundled_move_new_command(
+    command: &SuiMoveNewCommand,
+    parent: &Path,
+    stream: Option<CommandOutputStream>,
+) -> Result<CommandOutput, String> {
+    let header = format!(
+        "Running bundled Sui crate from the linked app dependency: {}\n",
+        command.display
+    );
+
+    emit_command_output_chunk(stream.as_ref(), "stdout", &header);
+
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let mut process = Command::new(executable);
+    process
+        .arg(BUNDLED_SUI_HELPER_ARG)
+        .args(command.bundled_args())
+        .current_dir(parent);
+
+    let mut output = run_configured_command(&mut process, stream)?;
+    output.stdout = format!("{header}{}", output.stdout);
+
+    Ok(output)
+}
+
+fn command_failure_message(output: &CommandOutput) -> String {
+    output
+        .stderr
+        .lines()
+        .chain(output.stdout.lines())
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn emit_command_output_chunk(
+    stream: Option<&CommandOutputStream>,
+    stream_name: &'static str,
+    chunk: impl AsRef<str>,
+) {
+    let chunk = chunk.as_ref();
+
+    if chunk.is_empty() {
+        return;
+    }
+
+    if let Some(stream) = stream {
+        let _ = stream.app.emit(
+            COMMAND_OUTPUT_EVENT,
+            CommandOutputChunk {
+                stream_id: stream.stream_id.clone(),
+                stream: stream_name,
+                chunk: chunk.to_string(),
+            },
+        );
+    }
+}
+
+fn configure_plain_command_output(command: &mut Command) -> &mut Command {
+    command
+        .env("NO_COLOR", "1")
+        .env("CLICOLOR", "0")
+        .env("TERM", "dumb")
+}
+
+fn command_output_stream(
+    app: tauri::AppHandle,
+    stream_id: Option<String>,
+) -> Option<CommandOutputStream> {
+    let stream_id = stream_id?.trim().to_string();
+
+    if stream_id.is_empty() {
+        return None;
+    }
+
+    Some(CommandOutputStream { app, stream_id })
+}
+
+fn run_configured_command(
+    command: &mut Command,
+    stream: Option<CommandOutputStream>,
+) -> Result<CommandOutput, String> {
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("Could not start process: {error}"))?;
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    let (sender, receiver) = mpsc::channel::<CommandReaderChunk>();
+
+    if let Some(stdout) = stdout {
+        spawn_output_reader(stdout, "stdout", sender.clone());
+    }
+
+    if let Some(stderr) = stderr {
+        spawn_output_reader(stderr, "stderr", sender.clone());
+    }
+
+    drop(sender);
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+
+    for chunk in receiver {
+        match chunk.stream {
+            "stdout" => stdout.extend_from_slice(&chunk.bytes),
+            "stderr" => stderr.extend_from_slice(&chunk.bytes),
+            _ => {}
+        }
+
+        if let Some(stream) = stream.as_ref() {
+            let _ = stream.app.emit(
+                COMMAND_OUTPUT_EVENT,
+                CommandOutputChunk {
+                    stream_id: stream.stream_id.clone(),
+                    stream: chunk.stream,
+                    chunk: String::from_utf8_lossy(&chunk.bytes).into_owned(),
+                },
+            );
+        }
+    }
+
+    let status = child
+        .wait()
+        .map_err(|error| format!("Could not wait for process: {error}"))?;
+
+    Ok(CommandOutput {
+        status: status.code(),
+        stdout: String::from_utf8_lossy(&stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&stderr).into_owned(),
+    })
+}
+
+fn spawn_output_reader<R>(
+    mut reader: R,
+    stream: &'static str,
+    sender: mpsc::Sender<CommandReaderChunk>,
+) where
+    R: Read + Send + 'static,
+{
+    thread::spawn(move || {
+        let mut buffer = [0u8; 8192];
+
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(size) => {
+                    if sender
+                        .send(CommandReaderChunk {
+                            stream,
+                            bytes: buffer[..size].to_vec(),
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+    });
+}
+
+fn cleanup_temp_pubfile(path: Option<&Path>) {
+    if let Some(path) = path {
+        if path.exists() {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+
+fn run_package_script(
+    root_path: &str,
+    package_path: &str,
+    script_path: &str,
+    script_args: &[String],
+    stream: Option<CommandOutputStream>,
+) -> Result<CommandOutput, String> {
+    let package_root = files::resolve_package_child_path(root_path, package_path)?;
+    let script_path = script_path.trim();
+
+    if script_path.is_empty() {
+        return Err("Bash script path cannot be empty.".to_string());
+    }
+
+    if script_path.len() > 1_024 {
+        return Err("Bash script path is too long.".to_string());
+    }
+
+    if script_path.contains('\0') {
+        return Err("Bash script path contains an invalid null byte.".to_string());
+    }
+
+    for script_arg in script_args {
+        if script_arg.contains('\0') {
+            return Err("Bash script argument contains an invalid null byte.".to_string());
+        }
+
+        if script_arg.len() > 1_024 {
+            return Err("Bash script argument is too long.".to_string());
+        }
+    }
+
+    if !package_root.is_dir() {
+        return Err("Selected package path is not a directory.".to_string());
+    }
+
+    if !package_root.join("Move.toml").is_file() {
+        return Err("Selected package does not contain a Move.toml file.".to_string());
+    }
+
+    let script_path = resolve_package_script_path(&package_root, script_path)?;
+    let bundled_sui_shim_dir = create_bundled_sui_shim_dir()?;
+    let bundled_sui_shim = bundled_sui_shim_dir.join("sui");
+    let original_path = std::env::var_os("PATH").unwrap_or_default();
+    let mut path_entries = vec![bundled_sui_shim_dir.clone()];
+    path_entries.extend(std::env::split_paths(&original_path));
+    let script_path_env = std::env::join_paths(path_entries)
+        .map_err(|error| format!("Could not prepare script PATH: {error}"))?;
+
+    let mut process = Command::new("bash");
+    let output = run_configured_command(
+        configure_plain_command_output(
+            process
+                .arg(&script_path)
+                .args(script_args)
+                .current_dir(&package_root)
+                .env("PATH", script_path_env)
+                .env("PEREGRINE_BUNDLED_SUI", &bundled_sui_shim)
+                .env(
+                    "PEREGRINE_COVERAGE_MAP_PATH",
+                    package_root.join(".coverage_map.mvcov"),
+                )
+                .env("PEREGRINE_PACKAGE_ROOT", &package_root)
+                .env("PEREGRINE_PROJECT_ROOT", root_path),
+        ),
+        stream,
+    );
+    let _ = fs::remove_dir_all(&bundled_sui_shim_dir);
+
+    output.map_err(|error| {
+        format!(
+            "Could not execute bash script {} in {}: {error}",
+            script_path.display(),
+            package_root.display()
+        )
+    })
+}
+
+fn create_bundled_sui_shim_dir() -> Result<PathBuf, String> {
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let shim_dir = std::env::temp_dir().join(format!(
+        "peregrine-bundled-sui-{}-{nonce}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&shim_dir).map_err(|error| {
+        format!(
+            "Could not create bundled Sui shim directory {}: {error}",
+            shim_dir.display()
+        )
+    })?;
+
+    let shim_path = shim_dir.join("sui");
+    let script = format!(
+        "#!/usr/bin/env bash\nexec {} {} sui \"$@\"\n",
+        shell_quote(&executable.to_string_lossy()),
+        shell_quote(BUNDLED_SUI_HELPER_ARG),
+    );
+
+    fs::write(&shim_path, script).map_err(|error| {
+        format!(
+            "Could not write bundled Sui shim {}: {error}",
+            shim_path.display()
+        )
+    })?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        let mut permissions = fs::metadata(&shim_path)
+            .map_err(|error| {
+                format!(
+                    "Could not read bundled Sui shim metadata {}: {error}",
+                    shim_path.display()
+                )
+            })?
+            .permissions();
+        permissions.set_mode(0o700);
+        fs::set_permissions(&shim_path, permissions).map_err(|error| {
+            format!(
+                "Could not make bundled Sui shim executable {}: {error}",
+                shim_path.display()
+            )
+        })?;
+    }
+
+    Ok(shim_dir)
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+fn resolve_package_script_path(package_root: &Path, script_path: &str) -> Result<PathBuf, String> {
+    let relative_script_path = Path::new(script_path);
+
+    if relative_script_path.is_absolute() {
+        return Err("Use a script path relative to the selected Move package.".to_string());
+    }
+
+    let script_path = package_root.join(relative_script_path);
+    let script_path = script_path.canonicalize().map_err(|error| {
+        format!(
+            "Could not resolve bash script {}: {error}",
+            script_path.display()
+        )
+    })?;
+
+    if !script_path.starts_with(package_root) {
+        return Err("Bash script must be inside the selected Move package.".to_string());
+    }
+
+    if !script_path.is_file() {
+        return Err("Bash script path does not point to a file.".to_string());
+    }
+
+    Ok(script_path)
+}
+
+#[tauri::command]
+pub(crate) async fn check_sui_adapter(app: tauri::AppHandle) -> Result<SuiAdapterStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || Ok(sui_adapter(&app)?.status()))
+        .await
+        .map_err(|error| format!("Could not join Sui adapter check task: {error}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn get_sui_adapter_settings(
+    app: tauri::AppHandle,
+) -> Result<SuiAdapterSettings, String> {
+    tauri::async_runtime::spawn_blocking(move || load_sui_adapter_settings(&app))
+        .await
+        .map_err(|error| format!("Could not join Sui adapter settings load task: {error}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn save_sui_adapter_settings(
+    app: tauri::AppHandle,
+    settings: SuiAdapterSettings,
+) -> Result<SuiAdapterSettings, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        store_sui_adapter_settings(&app, &settings)?;
+        let _ = app.emit(SUI_ADAPTER_SETTINGS_CHANGED_EVENT, &settings);
+
+        Ok(settings)
+    })
+    .await
+    .map_err(|error| format!("Could not join Sui adapter settings save task: {error}"))?
+}
+
+pub(crate) fn sui_adapter(app: &tauri::AppHandle) -> Result<SuiAdapter, String> {
+    Ok(SuiAdapter::new(
+        load_sui_adapter_settings(app)?,
+        SuiAdapterEnvironment::new(),
+    ))
+}
+
+fn load_sui_adapter_settings(app: &tauri::AppHandle) -> Result<SuiAdapterSettings, String> {
+    let path = sui_adapter_settings_path(app)?;
+
+    if !path.is_file() {
+        return Ok(SuiAdapterSettings::default());
+    }
+
+    let contents = fs::read_to_string(&path).map_err(|error| {
+        format!(
+            "Could not read Sui adapter settings {}: {error}",
+            path.display()
+        )
+    })?;
+
+    serde_json::from_str(&contents).map_err(|error| {
+        format!(
+            "Could not parse Sui adapter settings {}: {error}",
+            path.display()
+        )
+    })
+}
+
+fn store_sui_adapter_settings(
+    app: &tauri::AppHandle,
+    settings: &SuiAdapterSettings,
+) -> Result<(), String> {
+    let path = sui_adapter_settings_path(app)?;
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "Could not create Sui adapter settings directory {}: {error}",
+                parent.display()
+            )
+        })?;
+    }
+
+    let contents = serde_json::to_string_pretty(settings)
+        .map_err(|error| format!("Could not serialize Sui adapter settings: {error}"))?;
+
+    fs::write(&path, format!("{contents}\n")).map_err(|error| {
+        format!(
+            "Could not write Sui adapter settings {}: {error}",
+            path.display()
+        )
+    })
+}
+
+fn sui_adapter_settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_config_dir()
+        .map_err(|error| format!("Could not resolve app config directory: {error}"))?
+        .join(SUI_ADAPTER_SETTINGS_FILE))
+}
