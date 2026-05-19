@@ -18,7 +18,7 @@ pub struct Cli {
     pub package: String,
 
     #[arg(long, global = true)]
-    pub pretty: bool,
+    pub json: bool,
 
     #[command(subcommand)]
     pub command: CliCommand,
@@ -129,5 +129,13 @@ mod tests {
             panic!("expected new-package command");
         };
         assert_eq!(args.package_name, "vault");
+    }
+
+    #[test]
+    fn parses_json_output_flag_after_subcommand() {
+        let cli = Cli::try_parse_from(["peregrine", "analyze", "--json"]).expect("cli args");
+
+        assert!(cli.json);
+        assert!(matches!(cli.command, CliCommand::Analyze(_)));
     }
 }

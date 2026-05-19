@@ -30,8 +30,8 @@ move-decompiler = { path = "../oss/sui/external-crates/move/crates/move-decompil
 move-disassembler = { path = "../oss/sui/external-crates/move/crates/move-disassembler" }
 move-ir-types = { path = "../oss/sui/external-crates/move/crates/move-ir-types" }
 move-model-2 = { path = "../oss/sui/external-crates/move/crates/move-model-2" }
-move-prover-boogie-backend = { git = "file:///Users/eieiron/dev/oss/sui-prover", branch = "codex/peregrine-bundled-prover" }
-move-stackless-bytecode = { git = "file:///Users/eieiron/dev/oss/sui-prover", branch = "codex/peregrine-bundled-prover" }
+move-prover-boogie-backend = { path = "../oss/sui-prover/crates/move-prover-boogie-backend" }
+move-stackless-bytecode = { path = "../oss/sui-prover/crates/move-stackless-bytecode" }
 movy = { path = "../oss/movy/crates/movy", default-features = false, features = ["sui-fuzz"] }
 peregrine-adapters = { path = "crates/peregrine-adapters" }
 peregrine-dynamic-analysis = { path = "crates/peregrine-dynamic-analysis" }
@@ -49,7 +49,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 sui = { path = "../oss/sui/crates/sui", package = "sui", features = ["tracing"] }
-sui-prover = { git = "file:///Users/eieiron/dev/oss/sui-prover", branch = "codex/peregrine-bundled-prover" }
+sui-prover = { path = "../oss/sui-prover/crates/sui-prover" }
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 tauri = { version = "=2.11.2", features = [] }
 tauri-build = { version = "=2.6.2", features = [] }

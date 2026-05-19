@@ -10006,7 +10006,6 @@ dependencies = [
 [[package]]
 name = "move-model"
 version = "0.1.1"
-source = "git+file:///Users/eieiron/dev/oss/sui-prover?branch=codex%2Fperegrine-bundled-prover#cfad074cf2c5f4734ed50ce239765eabe08518d9"
 dependencies = [
  "anyhow",
  "codespan",
@@ -10224,7 +10223,6 @@ dependencies = [
 [[package]]
 name = "move-prover-boogie-backend"
 version = "0.1.1"
-source = "git+file:///Users/eieiron/dev/oss/sui-prover?branch=codex%2Fperegrine-bundled-prover#cfad074cf2c5f4734ed50ce239765eabe08518d9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -10306,7 +10304,6 @@ dependencies = [
 [[package]]
 name = "move-stackless-bytecode"
 version = "0.1.1"
-source = "git+file:///Users/eieiron/dev/oss/sui-prover?branch=codex%2Fperegrine-bundled-prover#cfad074cf2c5f4734ed50ce239765eabe08518d9"
 dependencies = [
  "bimap",
  "clap",
@@ -17597,7 +17594,6 @@ dependencies = [
 [[package]]
 name = "sui-prover"
 version = "1.5.3"
-source = "git+file:///Users/eieiron/dev/oss/sui-prover?branch=codex%2Fperegrine-bundled-prover#cfad074cf2c5f4734ed50ce239765eabe08518d9"
 dependencies = [
  "anyhow",
  "clap",

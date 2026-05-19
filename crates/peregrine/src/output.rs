@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, time::Instant};
 
-pub const CLI_SCHEMA_VERSION: &str = "peregrine.cli.v1";
 pub const EXIT_SUCCESS: i32 = 0;
 pub const EXIT_WORKFLOW_FAILED: i32 = 1;
 pub const EXIT_USAGE: i32 = 2;
@@ -120,7 +119,6 @@ impl CliStep {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CliReport {
-    pub schema_version: String,
     pub command: String,
     pub status: CliStatus,
     pub exit_code: i32,
@@ -148,7 +146,6 @@ impl CliReport {
             .collect();
 
         Self {
-            schema_version: CLI_SCHEMA_VERSION.to_string(),
             command: command.into(),
             status,
             exit_code,
@@ -166,7 +163,6 @@ impl CliReport {
         diagnostic: CliDiagnostic,
     ) -> Self {
         Self {
-            schema_version: CLI_SCHEMA_VERSION.to_string(),
             command: command.into(),
             status: CliStatus::Failed,
             exit_code: EXIT_USAGE,
@@ -179,16 +175,79 @@ impl CliReport {
     }
 }
 
-pub fn write_report(report: &CliReport, pretty: bool) -> Result<(), String> {
-    let serialized = if pretty {
+pub fn write_report(report: &CliReport, json_output: bool) -> Result<(), String> {
+    let rendered = if json_output {
         serde_json::to_string_pretty(report)
+            .map_err(|error| format!("Could not serialize CLI report: {error}"))?
     } else {
-        serde_json::to_string(report)
-    }
-    .map_err(|error| format!("Could not serialize CLI report: {error}"))?;
+        human_report(report)
+    };
 
-    println!("{serialized}");
+    println!("{rendered}");
     Ok(())
+}
+
+pub fn human_report(report: &CliReport) -> String {
+    let mut lines = Vec::new();
+
+    lines.push(format!(
+        "peregrine {}: {} ({} ms)",
+        report.command,
+        status_label(report.status),
+        report.duration_ms
+    ));
+
+    if !report.project_root.is_empty() {
+        lines.push(format!("Project: {}", report.project_root));
+    }
+
+    if !report.package_path.is_empty() {
+        lines.push(format!("Package: {}", report.package_path));
+    }
+
+    if !report.diagnostics.is_empty() {
+        lines.push("Diagnostics:".to_string());
+        for diagnostic in &report.diagnostics {
+            lines.push(format!("  {}", human_diagnostic(diagnostic)));
+        }
+    }
+
+    if !report.steps.is_empty() {
+        lines.push("Steps:".to_string());
+        for step in &report.steps {
+            lines.push(format!(
+                "  {} {} ({} ms, exit {})",
+                status_label(step.status),
+                step.name,
+                step.duration_ms,
+                step.exit_code
+            ));
+
+            if let Some(command) = &step.command {
+                lines.push(format!("    Command: {command}"));
+            }
+
+            if !step.metadata.is_empty() {
+                lines.push(format!("    {}", human_metadata(&step.metadata)));
+            }
+
+            for diagnostic in &step.diagnostics {
+                lines.push(format!("    {}", human_diagnostic(diagnostic)));
+            }
+
+            if !step.stdout.trim().is_empty() {
+                lines.push("    stdout:".to_string());
+                append_indented_block(&mut lines, &step.stdout, 6);
+            }
+
+            if !step.stderr.trim().is_empty() {
+                lines.push("    stderr:".to_string());
+                append_indented_block(&mut lines, &step.stderr, 6);
+            }
+        }
+    }
+
+    lines.join("\n")
 }
 
 pub fn command_details(status: Option<i32>) -> Value {
@@ -224,12 +283,80 @@ fn status_exit_code(status: CliStatus) -> i32 {
     }
 }
 
+fn status_label(status: CliStatus) -> &'static str {
+    match status {
+        CliStatus::Passed => "PASS",
+        CliStatus::Failed => "FAIL",
+        CliStatus::Skipped => "SKIP",
+    }
+}
+
+fn severity_label(severity: CliDiagnosticSeverity) -> &'static str {
+    match severity {
+        CliDiagnosticSeverity::Info => "info",
+        CliDiagnosticSeverity::Warning => "warning",
+        CliDiagnosticSeverity::Error => "error",
+    }
+}
+
+fn human_diagnostic(diagnostic: &CliDiagnostic) -> String {
+    let mut label = format!(
+        "{} [{}]",
+        severity_label(diagnostic.severity),
+        diagnostic.source
+    );
+
+    if let Some(code) = &diagnostic.code {
+        label.push_str(&format!(" {code}"));
+    }
+
+    if let Some(file) = &diagnostic.file {
+        label.push_str(&format!(" {file}"));
+    }
+
+    if let Some(span) = &diagnostic.span {
+        label.push_str(&format!(":{}-{}", span.start_line, span.end_line));
+    }
+
+    format!("{label}: {}", diagnostic.message)
+}
+
+fn human_metadata(metadata: &BTreeMap<String, Value>) -> String {
+    metadata
+        .iter()
+        .map(|(key, value)| format!("{key}={}", human_value(value)))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn human_value(value: &Value) -> String {
+    match value {
+        Value::Null => "null".to_string(),
+        Value::Bool(value) => value.to_string(),
+        Value::Number(value) => value.to_string(),
+        Value::String(value) => value.clone(),
+        Value::Array(values) => {
+            let values = values.iter().map(human_value).collect::<Vec<_>>();
+            format!("[{}]", values.join(", "))
+        }
+        Value::Object(_) => "<object>".to_string(),
+    }
+}
+
+fn append_indented_block(lines: &mut Vec<String>, block: &str, spaces: usize) {
+    let indent = " ".repeat(spaces);
+
+    for line in block.trim_end().lines() {
+        lines.push(format!("{indent}{line}"));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn report_uses_standard_schema_and_exit_code() {
+    fn report_uses_exit_code_and_no_schema_version() {
         let started_at = Instant::now();
         let report = CliReport::from_steps(
             "analyze",
@@ -243,9 +370,29 @@ mod tests {
             )],
         );
 
-        assert_eq!(report.schema_version, CLI_SCHEMA_VERSION);
         assert_eq!(report.status, CliStatus::Failed);
         assert_eq!(report.exit_code, EXIT_WORKFLOW_FAILED);
         assert_eq!(report.diagnostics.len(), 1);
+
+        let serialized = serde_json::to_value(&report).expect("json report");
+        assert!(serialized.get("schemaVersion").is_none());
+    }
+
+    #[test]
+    fn human_report_is_default_readable_output() {
+        let started_at = Instant::now();
+        let report = CliReport::from_steps(
+            "analyze",
+            started_at,
+            "/workspace",
+            ".",
+            vec![CliStep::skipped("fuzz", "disabled")],
+        );
+
+        let rendered = human_report(&report);
+
+        assert!(rendered.contains("peregrine analyze: SKIP"));
+        assert!(rendered.contains("Project: /workspace"));
+        assert!(rendered.contains("SKIP fuzz"));
     }
 }

@@ -20,11 +20,11 @@ where
                 return exit_code;
             }
         };
-    let pretty = cli.pretty;
+    let json = cli.json;
     let report = workflow::execute(&cli);
     let exit_code = report.exit_code;
 
-    if let Err(error) = output::write_report(&report, pretty) {
+    if let Err(error) = output::write_report(&report, json) {
         eprintln!("{error}");
         return output::EXIT_USAGE;
     }
