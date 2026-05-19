@@ -29,8 +29,10 @@ type OllamaChatStreamEvent = {
 
 const OLLAMA_CHAT_STREAM_EVENT = "ollama-chat-stream";
 
-export async function listOllamaModels() {
-  return invoke<OllamaModel[]>("list_ollama_models");
+export async function listOllamaModels(endpoint?: string) {
+  return invoke<OllamaModel[]>("list_ollama_models", {
+    baseUrl: endpoint?.trim() || null,
+  });
 }
 
 export async function preloadOllamaModel(model: string) {

@@ -11,6 +11,14 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@peregrine/agent-runtime": path.resolve(
+        __dirname,
+        "./packages/agent-runtime/src/index.ts",
+      ),
+      "@peregrine/harness-control": path.resolve(
+        __dirname,
+        "./packages/harness-control/src/index.ts",
+      ),
     },
   },
 

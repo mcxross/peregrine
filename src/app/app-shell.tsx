@@ -1026,6 +1026,7 @@ async function rememberSuccessfulLaunchBuild(
 
 function defaultProjectMetadata(): ProjectMetadata {
   return {
+    agents: undefined,
     builds: {},
     packageConfigs: {},
     version: 1,

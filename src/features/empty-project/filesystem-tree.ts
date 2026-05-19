@@ -15,6 +15,7 @@ export type PackageTree = {
 };
 
 export type ProjectMetadata = {
+  agents?: unknown;
   version: number;
   builds: Record<string, ProjectBuildMetadata>;
   packageConfigs: Record<string, ProjectPackageConfig>;

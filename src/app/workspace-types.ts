@@ -2,6 +2,7 @@ export const workspaceTabs = [
   "Overview",
   "Explore",
   "Execution",
+  "Agents",
   "Bytecode",
   "Attack Surface",
   "Tests",

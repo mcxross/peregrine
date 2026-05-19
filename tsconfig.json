@@ -7,7 +7,9 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@peregrine/agent-runtime": ["./packages/agent-runtime/src/index.ts"],
+      "@peregrine/harness-control": ["./packages/harness-control/src/index.ts"]
     },
 
     /* Bundler mode */
@@ -24,6 +26,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"],
+  "include": ["src", "packages/*/src"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

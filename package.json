@@ -3,9 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "bun test packages/*/test",
     "preview": "vite preview",
     "tauri": "tauri"
   },
@@ -29,6 +33,8 @@
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "@tauri-apps/plugin-opener": "^2",
     "@xyflow/react": "^12.10.2",
+    "ai": "6.0.184",
+    "ai-sdk-ollama": "3.8.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.11.0",

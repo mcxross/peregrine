@@ -1,0 +1,14 @@
+{
+  "name": "@peregrine/harness-control",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "@peregrine/agent-runtime": "0.1.0",
+    "ai": "^6.0.184"
+  }
+}
+

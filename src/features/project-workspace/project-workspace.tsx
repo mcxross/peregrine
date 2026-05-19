@@ -2,6 +2,7 @@ import React from "react";
 import {
   Boxes,
   Binary,
+  Bot,
   Check,
   ChevronDown,
   Gauge,
@@ -29,6 +30,7 @@ import {
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
 import { AiFloatingWindow } from "@/features/project-workspace/ai/ai-floating-window";
+import { AgentsScreen } from "@/features/agents/agents-screen";
 import {
   BuildLogSheet,
   type BuildLogRun,
@@ -162,7 +164,7 @@ export function ProjectWorkspace({
         ) ?? null;
   const packageName = activeMovePackage?.name || packageTree.rootName || packageTree.movePackages[0]?.name || "savings_personal";
   const isEditorMode = mode === "editor";
-  const hasInspectorColumn = activeWorkspaceTab !== "Bytecode";
+  const hasInspectorColumn = activeWorkspaceTab !== "Bytecode" && activeWorkspaceTab !== "Agents";
   const workspaceColumns = isEditorMode
     ? "minmax(0, 1fr)"
     : isLeftPanelOpen
@@ -189,7 +191,7 @@ export function ProjectWorkspace({
   }, [activeMovePackage]);
 
   React.useEffect(() => {
-    if (activeWorkspaceTab === "Overview" || activeWorkspaceTab === "Execution" || activeWorkspaceTab === "Bytecode") {
+    if (activeWorkspaceTab === "Overview" || activeWorkspaceTab === "Execution" || activeWorkspaceTab === "Bytecode" || activeWorkspaceTab === "Agents") {
       setIsRightPanelOpen(false);
     }
   }, [activeWorkspaceTab]);
@@ -438,6 +440,10 @@ function WorkspaceMainPanel({
     );
   }
 
+  if (activeWorkspaceTab === "Agents") {
+    return <AgentsScreen projectRootPath={packageTree.rootPath} />;
+  }
+
   if (activeWorkspaceTab === "Bytecode") {
     return (
       <BytecodeViewScreen
@@ -518,6 +524,12 @@ function SecuritySidebar({
             icon={Workflow}
             label="Execution"
             onClick={() => onWorkspaceTabChange("Execution")}
+          />
+          <SidebarItem
+            active={activeWorkspaceTab === "Agents" && !activeSurfaceDetail}
+            icon={Bot}
+            label="Agents"
+            onClick={() => onWorkspaceTabChange("Agents")}
           />
           <SidebarItem
             active={activeWorkspaceTab === "Bytecode" && !activeSurfaceDetail}

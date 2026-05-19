@@ -535,6 +535,8 @@ struct ProjectMetadata {
     #[serde(default = "default_project_metadata_version")]
     version: u32,
     #[serde(default)]
+    agents: Option<serde_json::Value>,
+    #[serde(default)]
     builds: HashMap<String, ProjectBuildMetadata>,
     #[serde(default)]
     package_configs: HashMap<String, ProjectPackageConfig>,
@@ -544,6 +546,7 @@ impl Default for ProjectMetadata {
     fn default() -> Self {
         Self {
             version: default_project_metadata_version(),
+            agents: None,
             builds: HashMap::new(),
             package_configs: HashMap::new(),
         }
@@ -1074,11 +1077,15 @@ async fn save_project_metadata(
 }
 
 #[tauri::command]
-async fn list_ollama_models() -> Result<Vec<OllamaModel>, String> {
+async fn list_ollama_models(base_url: Option<String>) -> Result<Vec<OllamaModel>, String> {
     let client = ollama_client()?;
-    let body = send_ollama_request(&client, "/api/tags", "model list", |client, url| {
-        client.get(url).header("Accept", "application/json")
-    })
+    let body = send_ollama_request(
+        &client,
+        "/api/tags",
+        "model list",
+        base_url.as_deref(),
+        |client, url| client.get(url).header("Accept", "application/json"),
+    )
     .await?;
     let tags: OllamaTagsApiResponse = serde_json::from_str(&body)
         .map_err(|error| format!("Could not parse Ollama model list: {error}"))?;
@@ -1101,7 +1108,7 @@ async fn chat_with_ollama(
     let request_body = serde_json::to_string(&payload)
         .map_err(|error| format!("Could not serialize Ollama request: {error}"))?;
     let client = ollama_client()?;
-    let body = send_ollama_request(&client, "/api/chat", "chat", |client, url| {
+    let body = send_ollama_request(&client, "/api/chat", "chat", None, |client, url| {
         client
             .post(url)
             .header("Accept", "application/json")
@@ -1144,7 +1151,7 @@ async fn preload_ollama_model(model: String) -> Result<OllamaPreloadResponse, St
 
     eprintln!("[peregrine:ollama] Preloading model={model} keep_alive={OLLAMA_KEEP_ALIVE}");
 
-    let body = send_ollama_request(&client, "/api/generate", "preload", |client, url| {
+    let body = send_ollama_request(&client, "/api/generate", "preload", None, |client, url| {
         client
             .post(url)
             .header("Accept", "application/json")
@@ -1358,15 +1365,16 @@ async fn send_ollama_request<F>(
     client: &reqwest::Client,
     path: &str,
     action: &str,
+    preferred_base_url: Option<&str>,
     build_request: F,
 ) -> Result<String, String>
 where
     F: Fn(&reqwest::Client, String) -> reqwest::RequestBuilder,
 {
-    let base_urls = [OLLAMA_BASE_URL, OLLAMA_FALLBACK_BASE_URL];
+    let base_urls = ollama_base_urls(preferred_base_url);
     let mut errors = Vec::new();
 
-    for base_url in base_urls {
+    for base_url in &base_urls {
         let url = format!("{base_url}{path}");
         match send_single_ollama_request(build_request(client, url), action, base_url).await {
             Ok(body) => return Ok(body),
@@ -1379,6 +1387,32 @@ where
         base_urls.join(", "),
         errors.join(" ")
     ))
+}
+
+fn ollama_base_urls(preferred_base_url: Option<&str>) -> Vec<String> {
+    let mut urls = Vec::new();
+
+    if let Some(url) = preferred_base_url
+        .map(str::trim)
+        .filter(|url| !url.is_empty())
+        .map(trim_trailing_slash)
+    {
+        urls.push(url);
+    }
+
+    for fallback in [OLLAMA_BASE_URL, OLLAMA_FALLBACK_BASE_URL] {
+        let fallback = trim_trailing_slash(fallback);
+
+        if !urls.iter().any(|url| url == &fallback) {
+            urls.push(fallback);
+        }
+    }
+
+    urls
+}
+
+fn trim_trailing_slash(url: &str) -> String {
+    url.trim_end_matches('/').to_string()
 }
 
 async fn send_single_ollama_request(
