@@ -12427,6 +12427,7 @@ dependencies = [
  "peregrine-dynamic-analysis",
  "peregrine-import-engine",
  "peregrine-indexer",
+ "peregrine-plugins",
  "peregrine-static-analysis",
  "pulldown-cmark 0.12.2",
  "reqwest 0.13.2",
@@ -12567,6 +12568,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "peregrine-plugins"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "wasmtime",
+]
+
+[[package]]
 name = "peregrine-scanner"
 version = "0.1.0"
 dependencies = [
@@ -12589,15 +12601,14 @@ dependencies = [
  "move-disassembler 0.1.0",
  "move-ir-types 0.1.0",
  "move-model-2 0.1.0",
+ "peregrine-plugins",
  "peregrine-scanner",
  "peregrine-types",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "tempfile",
  "toml 0.8.23",
  "walkdir",
- "wasmtime",
  "wat",
 ]
 

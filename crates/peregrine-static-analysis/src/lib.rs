@@ -31,6 +31,10 @@ pub mod rules {
 
 pub use analyzer::Analyzer;
 pub use engine::{AnalysisEngine, AnalysisEngineOptions};
+pub use peregrine_plugins::{
+    InstalledPlugin, PluginInstallManifest, PluginKind, PluginRegistry, PluginRegistryFile,
+    PluginRuntimeKind,
+};
 pub use peregrine_types::analysis::{
     AnalysisConfig, AnalysisSection, PluginConfig, RuleConfig, RuleSetConfig,
 };

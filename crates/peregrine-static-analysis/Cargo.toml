@@ -14,14 +14,13 @@ move-decompiler = { workspace = true }
 move-disassembler = { workspace = true }
 move-ir-types = { workspace = true }
 move-model-2 = { workspace = true }
+peregrine-plugins = { workspace = true }
 peregrine-scanner = { workspace = true }
 peregrine-types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sha2 = { workspace = true }
 toml = { workspace = true }
 walkdir = { workspace = true }
-wasmtime = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

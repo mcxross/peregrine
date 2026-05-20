@@ -586,11 +586,19 @@ export type AnalyzerPluginManifest = {
 export type InstalledAnalyzerPlugin = {
   pluginId: string;
   version: string;
+  kind: string;
+  runtime: "wasm";
   path: string;
   checksum: string;
   enabled: boolean;
   installedAtUnixMs: number;
+  name?: string | null;
+  description?: string | null;
   manifest: AnalyzerPluginManifest;
+};
+
+export type InstalledPlugin = Omit<InstalledAnalyzerPlugin, "manifest"> & {
+  manifest: unknown;
 };
 
 export type AnalysisRuleConfigPatch = {
@@ -903,6 +911,22 @@ export async function removeAnalyzerPlugin(pluginId: string) {
 export async function setAnalyzerPluginEnabled(pluginId: string, enabled: boolean) {
   return invoke<InstalledAnalyzerPlugin[]>("set_analyzer_plugin_enabled", {
     enabled,
+    pluginId,
+  });
+}
+
+export async function listPlugins(kind?: string | null) {
+  return invoke<InstalledPlugin[]>("list_plugins", { kind });
+}
+
+export async function removePlugin(kind: string, pluginId: string) {
+  return invoke<InstalledPlugin[]>("remove_plugin", { kind, pluginId });
+}
+
+export async function setPluginEnabled(kind: string, pluginId: string, enabled: boolean) {
+  return invoke<InstalledPlugin[]>("set_plugin_enabled", {
+    enabled,
+    kind,
     pluginId,
   });
 }

@@ -7,6 +7,7 @@ members = [
   "crates/peregrine-indexer",
   "crates/peregrine-import-engine",
   "crates/peregrine-package-resolution",
+  "crates/peregrine-plugins",
   "crates/peregrine-scanner",
   "crates/peregrine-static-analysis",
   "crates/peregrine-types",
@@ -41,6 +42,7 @@ peregrine-dynamic-analysis = { path = "crates/peregrine-dynamic-analysis" }
 peregrine-indexer = { path = "crates/peregrine-indexer" }
 peregrine-import-engine = { path = "crates/peregrine-import-engine" }
 peregrine-package-resolution = { path = "crates/peregrine-package-resolution" }
+peregrine-plugins = { path = "crates/peregrine-plugins" }
 peregrine-scanner = { path = "crates/peregrine-scanner" }
 peregrine-static-analysis = { path = "crates/peregrine-static-analysis" }
 peregrine-types = { path = "crates/peregrine-types" }

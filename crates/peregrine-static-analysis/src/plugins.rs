@@ -1,24 +1,19 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
-    fs,
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
 };
-use wasmtime::{Engine, Instance, Memory, Module, Store};
 
 use crate::model::{AnalysisContext, AnalysisDiagnostic, AnalysisReport, Finding, RuleMetric};
+pub use peregrine_plugins::{resolve_plugin_path, PluginManifestInput};
+use peregrine_plugins::{
+    InstalledPlugin, PluginInstallManifest, PluginKind, PluginRegistry, PluginRegistryFile,
+    PluginRuntimeKind, WasmPluginRuntime, PLUGIN_SCHEMA_VERSION,
+};
 use peregrine_types::analysis::{
     RuleConfig, RuleConfigProperty, RuleConfigValueKind, RuleMetadata, RuleSetMetadata, Severity,
 };
-
-pub const PLUGIN_SCHEMA_VERSION: u32 = 1;
-const REGISTRY_VERSION: u32 = 1;
-const APP_CONFIG_DIR_NAME: &str = "xyz.mcxross.peregrine";
-const PLUGIN_REGISTRY_FILE: &str = "analyzer-plugins.json";
-const PLUGIN_INSTALL_DIR: &str = "analyzer-plugins";
 
 /// Stable v1 WASM ABI for third-party rulesets.
 ///
@@ -28,12 +23,6 @@ const PLUGIN_INSTALL_DIR: &str = "analyzer-plugins";
 /// input into plugin memory. The plugin returns a packed `(ptr, len)` pair where
 /// the high 32 bits are the output pointer and the low 32 bits are the output
 /// length. The output bytes must also be UTF-8 JSON.
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PluginManifestInput {
-    pub schema_version: u32,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -128,7 +117,7 @@ impl WasmPluginHost {
         &self,
         plugin_path: impl AsRef<Path>,
     ) -> Result<PluginManifest, String> {
-        let mut runtime = PluginRuntime::load(plugin_path.as_ref())?;
+        let mut runtime = WasmPluginRuntime::load(plugin_path.as_ref())?;
         let input = PluginManifestInput {
             schema_version: PLUGIN_SCHEMA_VERSION,
         };
@@ -152,7 +141,7 @@ impl WasmPluginHost {
         plugin_path: &Path,
         active_rules: &[PluginActiveRuleConfig],
     ) -> Result<PluginAnalysisReport, String> {
-        let mut runtime = PluginRuntime::load(plugin_path)?;
+        let mut runtime = WasmPluginRuntime::load(plugin_path)?;
         let manifest_input = PluginManifestInput {
             schema_version: PLUGIN_SCHEMA_VERSION,
         };
@@ -221,139 +210,59 @@ pub struct PluginAnalysisReport {
     pub metrics: Vec<RuleMetric>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InstalledAnalyzerPlugin {
-    pub plugin_id: String,
-    pub version: String,
-    pub path: PathBuf,
-    pub checksum: String,
-    pub enabled: bool,
-    pub installed_at_unix_ms: u64,
-    pub manifest: PluginManifest,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AnalyzerPluginRegistryFile {
-    pub version: u32,
-    pub plugins: Vec<InstalledAnalyzerPlugin>,
-}
-
-impl Default for AnalyzerPluginRegistryFile {
-    fn default() -> Self {
-        Self {
-            version: REGISTRY_VERSION,
-            plugins: Vec::new(),
-        }
-    }
-}
+pub type InstalledAnalyzerPlugin = InstalledPlugin;
+pub type AnalyzerPluginRegistryFile = PluginRegistryFile;
 
 #[derive(Debug, Clone)]
 pub struct AnalyzerPluginRegistry {
-    root: PathBuf,
+    registry: PluginRegistry,
 }
 
 impl AnalyzerPluginRegistry {
     pub fn default_root() -> Result<PathBuf, String> {
-        if let Ok(config_dir) = std::env::var("PEREGRINE_CONFIG_DIR") {
-            let trimmed = config_dir.trim();
-            if !trimmed.is_empty() {
-                return Ok(PathBuf::from(trimmed));
-            }
-        }
-
-        platform_config_root().map(|root| root.join(APP_CONFIG_DIR_NAME))
+        PluginRegistry::default_root()
     }
 
     pub fn default() -> Result<Self, String> {
         Ok(Self {
-            root: Self::default_root()?,
+            registry: PluginRegistry::default()?,
         })
     }
 
     pub fn at_root(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+        Self {
+            registry: PluginRegistry::at_root(root),
+        }
     }
 
     pub fn root(&self) -> &Path {
-        &self.root
+        self.registry.root()
     }
 
     pub fn registry_path(&self) -> PathBuf {
-        self.root.join(PLUGIN_REGISTRY_FILE)
+        self.registry.registry_path()
     }
 
     pub fn install_dir(&self) -> PathBuf {
-        self.root.join(PLUGIN_INSTALL_DIR)
+        self.registry.install_dir()
     }
 
     pub fn load(&self) -> Result<AnalyzerPluginRegistryFile, String> {
-        let path = self.registry_path();
-
-        if !path.is_file() {
-            return Ok(AnalyzerPluginRegistryFile::default());
-        }
-
-        let contents = fs::read_to_string(&path).map_err(|error| {
-            format!(
-                "Could not read analyzer plugin registry {}: {error}",
-                path.display()
-            )
-        })?;
-        let mut registry =
-            serde_json::from_str::<AnalyzerPluginRegistryFile>(&contents).map_err(|error| {
-                format!(
-                    "Could not parse analyzer plugin registry {}: {error}",
-                    path.display()
-                )
-            })?;
-
-        if registry.version != REGISTRY_VERSION {
-            return Err(format!(
-                "Unsupported analyzer plugin registry version {}. Expected {}.",
-                registry.version, REGISTRY_VERSION
-            ));
-        }
-
-        registry.plugins.sort_by(|left, right| {
-            left.plugin_id
-                .cmp(&right.plugin_id)
-                .then(left.version.cmp(&right.version))
-        });
-
-        Ok(registry)
+        self.registry.load()
     }
 
     pub fn save(&self, registry: &AnalyzerPluginRegistryFile) -> Result<(), String> {
-        fs::create_dir_all(&self.root).map_err(|error| {
-            format!(
-                "Could not create analyzer plugin registry directory {}: {error}",
-                self.root.display()
-            )
-        })?;
-        let contents = serde_json::to_string_pretty(registry)
-            .map_err(|error| format!("Could not serialize analyzer plugin registry: {error}"))?;
-        fs::write(self.registry_path(), contents).map_err(|error| {
-            format!(
-                "Could not write analyzer plugin registry {}: {error}",
-                self.registry_path().display()
-            )
-        })
+        self.registry.save(registry)
     }
 
     pub fn list_plugins(&self) -> Result<Vec<InstalledAnalyzerPlugin>, String> {
-        Ok(self.load()?.plugins)
+        self.registry
+            .list_plugins_by_kind(&PluginKind::static_analysis())
     }
 
     pub fn enabled_plugin_paths(&self) -> Result<Vec<PathBuf>, String> {
-        Ok(self
-            .load()?
-            .plugins
-            .into_iter()
-            .filter(|plugin| plugin.enabled)
-            .map(|plugin| plugin.path)
-            .collect())
+        self.registry
+            .enabled_plugin_paths_for_kind(&PluginKind::static_analysis())
     }
 
     pub fn install_plugin(
@@ -363,79 +272,23 @@ impl AnalyzerPluginRegistry {
     ) -> Result<InstalledAnalyzerPlugin, String> {
         let source_path = source_path.as_ref();
         let manifest = host.discover_manifest(source_path)?;
-        let bytes = fs::read(source_path).map_err(|error| {
-            format!(
-                "Could not read analyzer plugin {}: {error}",
-                source_path.display()
-            )
-        })?;
-        let checksum = sha256_hex(&bytes);
-        let plugin_dir = self
-            .install_dir()
-            .join(&manifest.plugin_id)
-            .join(&manifest.version);
-        fs::create_dir_all(&plugin_dir).map_err(|error| {
-            format!(
-                "Could not create analyzer plugin directory {}: {error}",
-                plugin_dir.display()
-            )
-        })?;
-        let installed_path = plugin_dir.join(format!("{checksum}.wasm"));
-        fs::write(&installed_path, bytes).map_err(|error| {
-            format!(
-                "Could not install analyzer plugin {}: {error}",
-                installed_path.display()
-            )
-        })?;
-
-        let mut registry = self.load()?;
-        registry.plugins.retain(|plugin| {
-            !(plugin.plugin_id == manifest.plugin_id && plugin.version == manifest.version)
-        });
-        let installed = InstalledAnalyzerPlugin {
+        let install_manifest = PluginInstallManifest {
             plugin_id: manifest.plugin_id.clone(),
             version: manifest.version.clone(),
-            path: installed_path,
-            checksum,
-            enabled: true,
-            installed_at_unix_ms: unix_ms_now(),
-            manifest,
+            kind: PluginKind::static_analysis(),
+            runtime: PluginRuntimeKind::Wasm,
+            name: manifest.name.clone(),
+            description: manifest.description.clone(),
+            manifest: serde_json::to_value(&manifest).map_err(|error| {
+                format!("Could not serialize analyzer plugin manifest: {error}")
+            })?,
         };
-        registry.plugins.push(installed.clone());
-        self.save(&registry)?;
-
-        Ok(installed)
+        self.registry.install_plugin(source_path, install_manifest)
     }
 
     pub fn remove_plugin(&self, plugin_id: &str) -> Result<Vec<InstalledAnalyzerPlugin>, String> {
-        let mut registry = self.load()?;
-        let mut removed = Vec::new();
-        registry.plugins.retain(|plugin| {
-            if plugin.plugin_id == plugin_id {
-                removed.push(plugin.clone());
-                false
-            } else {
-                true
-            }
-        });
-
-        if removed.is_empty() {
-            return Err(format!("Analyzer plugin {plugin_id} is not installed."));
-        }
-
-        for plugin in &removed {
-            if plugin.path.is_file() {
-                fs::remove_file(&plugin.path).map_err(|error| {
-                    format!(
-                        "Could not remove analyzer plugin file {}: {error}",
-                        plugin.path.display()
-                    )
-                })?;
-            }
-        }
-
-        self.save(&registry)?;
-        Ok(removed)
+        self.registry
+            .remove_plugin(&PluginKind::static_analysis(), plugin_id)
     }
 
     pub fn set_plugin_enabled(
@@ -443,84 +296,8 @@ impl AnalyzerPluginRegistry {
         plugin_id: &str,
         enabled: bool,
     ) -> Result<Vec<InstalledAnalyzerPlugin>, String> {
-        let mut registry = self.load()?;
-        let mut updated = Vec::new();
-
-        for plugin in &mut registry.plugins {
-            if plugin.plugin_id == plugin_id {
-                plugin.enabled = enabled;
-                updated.push(plugin.clone());
-            }
-        }
-
-        if updated.is_empty() {
-            return Err(format!("Analyzer plugin {plugin_id} is not installed."));
-        }
-
-        self.save(&registry)?;
-        Ok(updated)
-    }
-}
-
-struct PluginRuntime {
-    store: Store<()>,
-    instance: Instance,
-    memory: Memory,
-}
-
-impl PluginRuntime {
-    fn load(plugin_path: &Path) -> Result<Self, String> {
-        let engine = Engine::default();
-        let module = Module::from_file(&engine, plugin_path)
-            .map_err(|error| format!("Could not load WASM plugin: {error}"))?;
-        let mut store = Store::new(&engine, ());
-        let instance = Instance::new(&mut store, &module, &[])
-            .map_err(|error| format!("Could not instantiate WASM plugin: {error}"))?;
-        let memory = instance
-            .get_memory(&mut store, "memory")
-            .ok_or_else(|| "WASM plugin must export memory.".to_string())?;
-
-        Ok(Self {
-            store,
-            instance,
-            memory,
-        })
-    }
-
-    fn call_json<T: Serialize>(
-        &mut self,
-        function_name: &str,
-        input: &T,
-    ) -> Result<String, String> {
-        let input = serde_json::to_vec(input)
-            .map_err(|error| format!("Could not serialize plugin input: {error}"))?;
-        let alloc = self
-            .instance
-            .get_typed_func::<i32, i32>(&mut self.store, "peregrine_alloc")
-            .map_err(|error| format!("WASM plugin must export peregrine_alloc: {error}"))?;
-        let function = self
-            .instance
-            .get_typed_func::<(i32, i32), i64>(&mut self.store, function_name)
-            .map_err(|error| format!("WASM plugin must export {function_name}: {error}"))?;
-        let input_ptr = alloc
-            .call(&mut self.store, input.len() as i32)
-            .map_err(|error| format!("Plugin allocation failed: {error}"))?;
-
-        self.memory
-            .write(&mut self.store, input_ptr as usize, &input)
-            .map_err(|error| format!("Could not write plugin input memory: {error}"))?;
-
-        let packed = function
-            .call(&mut self.store, (input_ptr, input.len() as i32))
-            .map_err(|error| format!("Plugin function {function_name} failed: {error}"))?;
-        let (output_ptr, output_len) = unpack_plugin_result(packed)?;
-        let mut output = vec![0_u8; output_len as usize];
-
-        self.memory
-            .read(&mut self.store, output_ptr as usize, &mut output)
-            .map_err(|error| format!("Could not read plugin output memory: {error}"))?;
-
-        String::from_utf8(output).map_err(|error| format!("Plugin output is not UTF-8: {error}"))
+        self.registry
+            .set_plugin_enabled(&PluginKind::static_analysis(), plugin_id, enabled)
     }
 }
 
@@ -563,73 +340,6 @@ pub fn plugin_manifest_rulesets(manifest: &PluginManifest) -> Vec<RuleSetMetadat
 
 pub fn plugin_rule_config_value(config: &RuleConfig) -> Value {
     serde_json::to_value(config).unwrap_or(Value::Null)
-}
-
-pub fn resolve_plugin_path(package_path: &Path, plugin_path: &Path) -> PathBuf {
-    if plugin_path.is_absolute() {
-        plugin_path.to_path_buf()
-    } else {
-        package_path.join(plugin_path)
-    }
-}
-
-fn unpack_plugin_result(result: i64) -> Result<(u32, u32), String> {
-    if result < 0 {
-        return Err("Plugin returned a negative result pointer/length pair.".to_string());
-    }
-
-    let result = result as u64;
-    let ptr = (result >> 32) as u32;
-    let len = (result & 0xffff_ffff) as u32;
-
-    Ok((ptr, len))
-}
-
-fn sha256_hex(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
-    let mut output = String::with_capacity(digest.len() * 2);
-
-    for byte in digest {
-        output.push_str(&format!("{byte:02x}"));
-    }
-
-    output
-}
-
-fn unix_ms_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as u64)
-        .unwrap_or_default()
-}
-
-fn platform_config_root() -> Result<PathBuf, String> {
-    #[cfg(target_os = "windows")]
-    {
-        std::env::var_os("APPDATA")
-            .map(PathBuf::from)
-            .ok_or_else(|| "Could not resolve APPDATA for analyzer plugin registry.".to_string())
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        std::env::var_os("HOME")
-            .map(PathBuf::from)
-            .map(|home| home.join("Library").join("Application Support"))
-            .ok_or_else(|| "Could not resolve HOME for analyzer plugin registry.".to_string())
-    }
-
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        if let Some(config_home) = std::env::var_os("XDG_CONFIG_HOME") {
-            return Ok(PathBuf::from(config_home));
-        }
-
-        std::env::var_os("HOME")
-            .map(PathBuf::from)
-            .map(|home| home.join(".config"))
-            .ok_or_else(|| "Could not resolve HOME for analyzer plugin registry.".to_string())
-    }
 }
 
 #[cfg(test)]

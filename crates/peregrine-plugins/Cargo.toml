@@ -1,0 +1,14 @@
+[package]
+name = "peregrine-plugins"
+version.workspace = true
+edition.workspace = true
+description = "System-wide Peregrine plugin registry and runtimes"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+wasmtime = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

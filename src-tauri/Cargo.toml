@@ -27,4 +27,5 @@ peregrine-adapters = { workspace = true }
 peregrine-dynamic-analysis = { workspace = true }
 peregrine-indexer = { workspace = true }
 peregrine-import-engine = { workspace = true }
+peregrine-plugins = { workspace = true }
 peregrine-static-analysis = { workspace = true }
