@@ -84,6 +84,7 @@ const BYTECODE_EDITOR_MIN_WIDTH = 420;
 const BYTECODE_INSTRUCTION_COLUMN_MAX_WIDTH = 820;
 const BYTECODE_RESIZE_HANDLE_WIDTH = 8;
 const BYTECODE_TREE_ANIMATION_MS = 160;
+const BYTECODE_SOURCE_SPAN_EXIT_MS = 280;
 
 type BytecodeModuleGroup = {
   id: string;
@@ -987,22 +988,27 @@ function BytecodeSourceEditorPanel({
   const [jumpRequest, setJumpRequest] = React.useState<CodeEditorJumpRequest | null>(null);
   const [sourceSelectionRequest, setSourceSelectionRequest] =
     React.useState<CodeEditorSourceSelectionRequest | null>(null);
+  const [exitingSourceSpanHighlights, setExitingSourceSpanHighlights] = React.useState<
+    CodeEditorSourceSpanHighlight[]
+  >([]);
+  const activeSourceSpanHighlightRef = React.useRef<CodeEditorSourceSpanHighlight | null>(null);
+  const sourceSpanExitTimersRef = React.useRef<number[]>([]);
   const sourceInstructionIndex = React.useMemo(
     () => module && source ? buildBytecodeSourceInstructionIndex(module, source) : [],
     [module, source],
   );
-  const sourceSpanHighlights = React.useMemo<CodeEditorSourceSpanHighlight[]>(() => {
+  const activeSourceSpanHighlight = React.useMemo<CodeEditorSourceSpanHighlight | null>(() => {
     if (!selectedInstruction?.source) {
-      return [];
+      return null;
     }
 
-    return [{
+    return {
       endByte: selectedInstruction.source.endByte,
       id: `instruction:${selectedFunction?.name ?? target.functionName ?? "unknown"}:${selectedInstruction.offset}`,
       isActive: true,
       startByte: selectedInstruction.source.startByte,
       title: `${formatOpcode(selectedInstruction.opcode)} ${operandText(selectedInstruction)}`.trim(),
-    }];
+    };
   }, [
     selectedFunction?.name,
     selectedInstruction?.offset,
@@ -1011,6 +1017,51 @@ function BytecodeSourceEditorPanel({
     selectedInstruction?.source,
     target.functionName,
   ]);
+  const sourceSpanHighlights = React.useMemo<CodeEditorSourceSpanHighlight[]>(() => [
+    ...exitingSourceSpanHighlights,
+    ...(activeSourceSpanHighlight ? [activeSourceSpanHighlight] : []),
+  ], [activeSourceSpanHighlight, exitingSourceSpanHighlights]);
+
+  React.useEffect(() => {
+    const previousHighlight = activeSourceSpanHighlightRef.current;
+    const nextHighlight = activeSourceSpanHighlight;
+    const hasChanged = previousHighlight
+      && (!nextHighlight
+        || previousHighlight.id !== nextHighlight.id
+        || previousHighlight.startByte !== nextHighlight.startByte
+        || previousHighlight.endByte !== nextHighlight.endByte);
+
+    if (hasChanged) {
+      const exitHighlight = {
+        ...previousHighlight,
+        id: `${previousHighlight.id}:exit:${Date.now()}`,
+        isActive: false,
+        isExiting: true,
+      };
+
+      setExitingSourceSpanHighlights((current) => [
+        ...current.filter((item) =>
+          item.startByte !== exitHighlight.startByte || item.endByte !== exitHighlight.endByte
+        ),
+        exitHighlight,
+      ].slice(-6));
+
+      const timer = window.setTimeout(() => {
+        setExitingSourceSpanHighlights((current) =>
+          current.filter((item) => item.id !== exitHighlight.id),
+        );
+      }, BYTECODE_SOURCE_SPAN_EXIT_MS);
+      sourceSpanExitTimersRef.current.push(timer);
+    }
+
+    activeSourceSpanHighlightRef.current = nextHighlight;
+  }, [activeSourceSpanHighlight]);
+
+  React.useEffect(() => () => {
+    for (const timer of sourceSpanExitTimersRef.current) {
+      window.clearTimeout(timer);
+    }
+  }, []);
 
   React.useEffect(() => {
     let isCancelled = false;
@@ -1359,7 +1410,10 @@ function InstructionPanel({
       `[data-bytecode-offset="${selectedInstruction.offset}"]`,
     );
 
-    row?.scrollIntoView({ block: "nearest" });
+    row?.scrollIntoView({
+      behavior: preferredScrollBehavior(),
+      block: "nearest",
+    });
   }, [selectedInstruction?.offset]);
 
   const selectInstructionAt = React.useCallback((index: number) => {
@@ -1442,8 +1496,8 @@ function InstructionPanel({
               return (
                 <tr
                   className={cn(
-                    "cursor-default border-b border-transparent text-muted-foreground hover:bg-[var(--app-subtle)]",
-                    isSelected && "bg-primary/20 text-foreground hover:bg-primary/20",
+                    "cursor-default border-b border-transparent text-muted-foreground transition-[background-color,color,box-shadow] duration-200 ease-out hover:bg-[var(--app-subtle)]",
+                    isSelected && "bg-primary/20 text-foreground shadow-[inset_3px_0_0_var(--primary)] hover:bg-primary/20",
                   )}
                   data-bytecode-offset={instruction.offset}
                   key={`${instruction.offset}:${instruction.detail}`}
@@ -2631,6 +2685,14 @@ function formatSourceBytes(instruction: MoveBytecodeInstructionView) {
   return instruction.source
     ? `${instruction.source.startByte}...${instruction.source.endByte}`
     : "-";
+}
+
+function preferredScrollBehavior(): ScrollBehavior {
+  if (typeof window === "undefined") {
+    return "auto";
+  }
+
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 }
 
 function buildBytecodeSourceInstructionIndex(

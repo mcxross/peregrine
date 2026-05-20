@@ -8,7 +8,7 @@ import { rust } from "@codemirror/lang-rust";
 import { yaml } from "@codemirror/lang-yaml";
 import {
   bracketMatching,
-  defaultHighlightStyle,
+  HighlightStyle,
   indentOnInput,
   StreamLanguage,
   syntaxHighlighting,
@@ -33,6 +33,7 @@ import {
   lineNumbers,
   WidgetType,
 } from "@codemirror/view";
+import { tags } from "@lezer/highlight";
 import React from "react";
 
 type CodeEditorProps = {
@@ -62,6 +63,7 @@ export type CodeEditorSourceSpanHighlight = {
   endByte: number;
   id: string;
   isActive?: boolean;
+  isExiting?: boolean;
   startByte: number;
   title?: string;
 };
@@ -82,6 +84,40 @@ const EMPTY_SOURCE_SPAN_HIGHLIGHTS: CodeEditorSourceSpanHighlight[] = [];
 const setComplexityHighlights = StateEffect.define<ComplexityHighlight[]>();
 const setSourceSpanHighlights = StateEffect.define<CodeEditorSourceSpanHighlight[]>();
 const LONG_MOVE_ADDRESS_PATTERN = /(?:0x)?[0-9a-fA-F]{33,64}(?=::)/g;
+
+// Code editors need stable token contrast independent of app accent/theme swaps.
+const editorHighlightStyle = HighlightStyle.define([
+  { tag: tags.keyword, color: "#f472b6", fontWeight: "600" },
+  { tag: tags.controlKeyword, color: "#fb7185", fontWeight: "600" },
+  { tag: tags.operatorKeyword, color: "#f472b6", fontWeight: "600" },
+  { tag: tags.moduleKeyword, color: "#22d3ee", fontWeight: "600" },
+  { tag: tags.bool, color: "#fbbf24", fontWeight: "600" },
+  { tag: tags.null, color: "#fbbf24" },
+  { tag: tags.number, color: "#fbbf24" },
+  { tag: tags.string, color: "#a7f3d0" },
+  { tag: tags.character, color: "#a7f3d0" },
+  { tag: tags.escape, color: "#fde68a" },
+  { tag: tags.comment, color: "#f59e0b", fontStyle: "italic" },
+  { tag: tags.lineComment, color: "#f59e0b", fontStyle: "italic" },
+  { tag: tags.blockComment, color: "#f59e0b", fontStyle: "italic" },
+  { tag: tags.name, color: "#f8fafc" },
+  { tag: tags.variableName, color: "#f8fafc" },
+  { tag: tags.definition(tags.variableName), color: "#93c5fd", fontWeight: "600" },
+  { tag: tags.function(tags.variableName), color: "#7dd3fc", fontWeight: "600" },
+  { tag: tags.function(tags.definition(tags.variableName)), color: "#7dd3fc", fontWeight: "700" },
+  { tag: tags.typeName, color: "#5eead4", fontWeight: "600" },
+  { tag: tags.className, color: "#5eead4", fontWeight: "600" },
+  { tag: tags.propertyName, color: "#c4b5fd" },
+  { tag: tags.attributeName, color: "#c4b5fd" },
+  { tag: tags.labelName, color: "#fca5a5" },
+  { tag: tags.operator, color: "#e2e8f0" },
+  { tag: tags.punctuation, color: "#cbd5e1" },
+  { tag: tags.brace, color: "#f8fafc" },
+  { tag: tags.squareBracket, color: "#f8fafc" },
+  { tag: tags.paren, color: "#f8fafc" },
+  { tag: tags.angleBracket, color: "#f8fafc" },
+  { tag: tags.invalid, color: "#fecaca", textDecoration: "underline wavy #ef4444" },
+]);
 
 const complexityHighlightField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
@@ -275,8 +311,8 @@ export function CodeEditor({
 
     editor.dispatch({
       selection: { anchor: line.from },
-      effects: EditorView.scrollIntoView(line.from, { y: "center" }),
     });
+    smoothScrollEditorToPosition(editor, line.from);
     editor.focus();
   }, [jumpRequest]);
 
@@ -295,8 +331,8 @@ export function CodeEditor({
 
     editor.dispatch({
       selection: { anchor: from, head },
-      effects: EditorView.scrollIntoView(from, { y: "center" }),
     });
+    smoothScrollEditorToPosition(editor, from);
 
     if (sourceSelectionRequest.focus) {
       editor.focus();
@@ -319,7 +355,7 @@ function editorExtensions(
     bracketMatching(),
     highlightActiveLine(),
     highlightActiveLineGutter(),
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    syntaxHighlighting(editorHighlightStyle, { fallback: true }),
     keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
     complexityHighlightField,
     sourceSpanHighlightField,
@@ -386,6 +422,11 @@ function buildSourceSpanDecorations(
   for (const highlight of [...highlights].sort((left, right) => left.startByte - right.startByte)) {
     const from = byteOffsetToPosition(source, highlight.startByte);
     const to = Math.max(from, byteOffsetToPosition(source, highlight.endByte));
+    const classes = [
+      "cm-bytecodeSourceSpan",
+      highlight.isActive ? "cm-bytecodeSourceSpanActive" : "",
+      highlight.isExiting ? "cm-bytecodeSourceSpanExit" : "",
+    ].filter(Boolean).join(" ");
 
     if (from >= state.doc.length && to >= state.doc.length) {
       continue;
@@ -396,9 +437,7 @@ function buildSourceSpanDecorations(
       to > from ? to : Math.min(state.doc.length, from + 1),
       Decoration.mark({
         attributes: highlight.title ? { title: highlight.title } : undefined,
-        class: highlight.isActive
-          ? "cm-bytecodeSourceSpan cm-bytecodeSourceSpanActive"
-          : "cm-bytecodeSourceSpan",
+        class: classes,
       }),
     );
   }
@@ -588,62 +627,113 @@ function highestSeverity(
   return nextRank > currentRank ? next : current;
 }
 
+function preferredScrollBehavior(): ScrollBehavior {
+  if (typeof window === "undefined") {
+    return "auto";
+  }
+
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+}
+
+function smoothScrollEditorToPosition(editor: EditorView, position: number) {
+  const behavior = preferredScrollBehavior();
+
+  if (behavior === "auto") {
+    editor.dispatch({
+      effects: EditorView.scrollIntoView(position, { y: "center" }),
+    });
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    const scrollDOM = editor.scrollDOM;
+    const block = editor.lineBlockAt(Math.min(editor.state.doc.length, Math.max(0, position)));
+    const maxTop = Math.max(0, scrollDOM.scrollHeight - scrollDOM.clientHeight);
+    const targetTop = Math.min(
+      maxTop,
+      Math.max(0, block.top + block.height / 2 - scrollDOM.clientHeight * 0.42),
+    );
+
+    scrollDOM.scrollTo({
+      behavior,
+      top: targetTop,
+    });
+  });
+}
+
 const editorTheme = EditorView.theme(
   {
     "&": {
-      backgroundColor: "var(--background)",
-      color: "var(--foreground)",
+      backgroundColor: "#070a0f",
+      color: "#f4f7fb",
       height: "100%",
     },
     "&.cm-focused": {
       outline: "none",
     },
     ".cm-content": {
-      caretColor: "var(--foreground)",
+      caretColor: "#f8fafc",
       minHeight: "100%",
       padding: "20px 0",
     },
+    ".cm-line": {
+      color: "#f4f7fb",
+      padding: "0 20px",
+    },
+    ".cm-line span": {
+      textDecorationThickness: "1px",
+      textUnderlineOffset: "3px",
+    },
     ".cm-cursor": {
-      borderLeftColor: "var(--foreground)",
+      borderLeftColor: "#f8fafc",
+      borderLeftWidth: "2px",
     },
     ".cm-gutters": {
-      backgroundColor: "var(--background)",
-      borderRight: "1px solid var(--border)",
-      color: "var(--muted-foreground)",
+      backgroundColor: "#0b1018",
+      borderRight: "1px solid #202938",
+      color: "#9ca8ba",
     },
-    ".cm-line": {
-      padding: "0 20px",
+    ".cm-gutterElement": {
+      paddingLeft: "10px",
+      paddingRight: "10px",
     },
     ".cm-scroller": {
       fontFamily:
         'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
       fontSize: "13px",
       lineHeight: "1.55",
+      scrollBehavior: "smooth",
     },
     ".cm-activeLine": {
-      backgroundColor: "var(--muted)",
+      backgroundColor: "#121927",
     },
     ".cm-activeLineGutter": {
-      backgroundColor: "var(--muted)",
-      color: "var(--foreground)",
+      backgroundColor: "#121927",
+      color: "#f8fafc",
     },
     ".cm-compact-move-address": {
       color: "inherit",
-      textDecoration: "underline dotted color-mix(in oklch, var(--muted-foreground) 70%, transparent)",
+      textDecoration: "underline dotted #94a3b8",
       textUnderlineOffset: "3px",
     },
     ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
-      backgroundColor: "color-mix(in oklch, var(--primary) 30%, transparent)",
+      backgroundColor: "#24496f",
+    },
+    ".cm-content ::selection": {
+      backgroundColor: "#24496f",
+      color: "#f8fafc",
+    },
+    ".cm-selectionMatch": {
+      backgroundColor: "#78350f",
+      outline: "1px solid #f59e0b",
     },
     ".cm-line.cm-complexityLine": {
-      backgroundColor: "color-mix(in oklch, var(--chart-5) 13%, transparent)",
-      boxShadow:
-        "inset 3px 0 0 color-mix(in oklch, var(--chart-5) 82%, transparent)",
+      backgroundColor: "#2b210f",
+      boxShadow: "inset 3px 0 0 #f59e0b",
     },
     ".cm-line.cm-complexityLineError": {
-      backgroundColor: "color-mix(in oklch, var(--destructive) 14%, transparent)",
-      boxShadow:
-        "inset 3px 0 0 color-mix(in oklch, var(--destructive) 80%, transparent)",
+      backgroundColor: "#2f1215",
+      boxShadow: "inset 3px 0 0 #fb7185",
     },
     ".cm-line.cm-complexityLineStart": {
       borderTopLeftRadius: "4px",
@@ -654,18 +744,59 @@ const editorTheme = EditorView.theme(
       borderBottomRightRadius: "4px",
     },
     ".cm-activeLine.cm-complexityLine": {
-      backgroundColor: "color-mix(in oklch, var(--chart-5) 20%, var(--muted))",
+      backgroundColor: "#3a2b12",
     },
     ".cm-activeLine.cm-complexityLineError": {
-      backgroundColor: "color-mix(in oklch, var(--destructive) 20%, var(--muted))",
+      backgroundColor: "#42181d",
     },
     ".cm-bytecodeSourceSpan": {
-      backgroundColor: "color-mix(in oklch, var(--primary) 16%, transparent)",
-      borderBottom: "1px solid color-mix(in oklch, var(--primary) 55%, transparent)",
+      backgroundColor: "#102a43",
+      borderBottom: "1px solid #38bdf8",
+      borderRadius: "2px",
+      transition: "background-color 220ms ease, box-shadow 220ms ease, border-color 220ms ease",
+      animation: "cmBytecodeSourceSpanEnter 180ms ease-out both",
     },
     ".cm-bytecodeSourceSpanActive": {
-      backgroundColor: "color-mix(in oklch, var(--primary) 30%, transparent)",
-      boxShadow: "inset 0 -1px 0 color-mix(in oklch, var(--primary) 75%, transparent)",
+      backgroundColor: "#173f63",
+      boxShadow: "inset 3px 0 0 #38bdf8, inset 0 -1px 0 #7dd3fc",
+    },
+    ".cm-bytecodeSourceSpanExit": {
+      animation: "cmBytecodeSourceSpanExit 260ms ease-in forwards",
+      backgroundColor: "#111827",
+      borderBottomColor: "transparent",
+      boxShadow: "inset 0 0 0 transparent",
+    },
+    "@keyframes cmBytecodeSourceSpanEnter": {
+      from: {
+        backgroundColor: "transparent",
+        boxShadow: "inset 0 0 0 transparent",
+      },
+      to: {
+        backgroundColor: "#173f63",
+        boxShadow: "inset 3px 0 0 #38bdf8, inset 0 -1px 0 #7dd3fc",
+      },
+    },
+    "@keyframes cmBytecodeSourceSpanExit": {
+      from: {
+        backgroundColor: "#173f63",
+        boxShadow: "inset 3px 0 0 #38bdf8, inset 0 -1px 0 #7dd3fc",
+      },
+      to: {
+        backgroundColor: "transparent",
+        boxShadow: "inset 0 0 0 transparent",
+      },
+    },
+    "@media (prefers-reduced-motion: reduce)": {
+      ".cm-scroller": {
+        scrollBehavior: "auto",
+      },
+      ".cm-bytecodeSourceSpan": {
+        animation: "none",
+        transition: "none",
+      },
+      ".cm-bytecodeSourceSpanExit": {
+        animation: "none",
+      },
     },
   },
   { dark: true },
