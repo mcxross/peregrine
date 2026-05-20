@@ -1,17 +1,28 @@
-use peregrine_types::analysis::{AnalysisContext, Rule, RuleConfig, RuleOutcome, Severity};
+use peregrine_types::analysis::{
+    AnalysisContext, Rule, RuleConfig, RuleMetadata, RuleOutcome, Severity,
+};
 
 use super::common::{
     all_functions, finding, function_local_types, function_target, primitive_type_after_cast,
-    sanitize_source, token_is_identifier, token_line_span, tokenize, Token,
+    rule_metadata, sanitize_source, token_is_identifier, token_line_span, tokenize, Token,
 };
 
-pub const RULE_ID: &str = "TypeConversion";
+pub const RULE_ID: &str = "type_conversion";
 
 pub struct TypeConversionRule;
 
 impl Rule for TypeConversionRule {
     fn id(&self) -> &'static str {
         RULE_ID
+    }
+
+    fn metadata(&self) -> RuleMetadata {
+        rule_metadata(
+            RULE_ID,
+            "Type conversion",
+            "Reports no-op primitive casts.",
+            Severity::Info,
+        )
     }
 
     fn analyze(&self, context: &AnalysisContext, _config: &RuleConfig) -> RuleOutcome {
@@ -38,6 +49,7 @@ impl Rule for TypeConversionRule {
 
                 let target = function_target(module, function);
                 outcome.findings.push(finding(
+                    RULE_ID,
                     RULE_ID,
                     Severity::Info,
                     format!("{target} casts `{source_name}` to `{target_type}` even though it is already `{target_type}`."),

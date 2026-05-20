@@ -6,7 +6,8 @@ use crate::{
     sui::{args::AnalyzeArgs, project::CliContext},
 };
 use peregrine_static_analysis::{
-    AnalysisConfig, AnalysisDiagnostic, Analyzer, Finding, RuleMetric, Severity,
+    AnalysisConfig, AnalysisDiagnostic, AnalysisEngine, AnalysisEngineOptions, Finding, RuleMetric,
+    Severity,
 };
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, time::Instant};
@@ -23,7 +24,53 @@ pub fn run_analyze(context: &CliContext, args: &AnalyzeArgs) -> CliStep {
             );
         }
     };
-    let report = Analyzer::new().analyze_package(&context.package_root, config);
+    let engine = AnalysisEngine::new();
+    let options = AnalysisEngineOptions {
+        use_global_plugins: !args.no_global_plugins,
+        extra_plugin_paths: args.plugins.clone(),
+        only_rulesets: args.rulesets.clone(),
+        ..AnalysisEngineOptions::default()
+    };
+
+    if args.list_analyzers {
+        let catalog = engine.catalog_with_options(&context.package_root, config, options);
+        let diagnostics = catalog
+            .diagnostics
+            .iter()
+            .map(map_analysis_diagnostic)
+            .collect::<Vec<_>>();
+        let should_fail = diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == CliDiagnosticSeverity::Error);
+        let stdout = render_catalog_stdout(&catalog);
+
+        return CliStep {
+            name: "analyze".to_string(),
+            status: if should_fail {
+                CliStatus::Failed
+            } else {
+                CliStatus::Passed
+            },
+            duration_ms: elapsed_ms(started_at),
+            exit_code: if should_fail {
+                EXIT_WORKFLOW_FAILED
+            } else {
+                EXIT_SUCCESS
+            },
+            command: Some("peregrine analyze --list-analyzers".to_string()),
+            diagnostics,
+            metadata: BTreeMap::from([
+                ("rulesetCount".to_string(), json!(catalog.rulesets.len())),
+                ("selectedRulesets".to_string(), json!(&args.rulesets)),
+                ("loadedPlugins".to_string(), json!(catalog.loaded_plugins)),
+            ]),
+            stdout,
+            stderr: String::new(),
+            details: json!({ "catalog": catalog }),
+        };
+    }
+
+    let report = engine.analyze_package_with_options(&context.package_root, config, options);
     let mut diagnostics = report
         .diagnostics
         .iter()
@@ -55,6 +102,7 @@ pub fn run_analyze(context: &CliContext, args: &AnalyzeArgs) -> CliStep {
         metadata: BTreeMap::from([
             ("findingCount".to_string(), json!(report.findings.len())),
             ("metricCount".to_string(), json!(report.metrics.len())),
+            ("selectedRulesets".to_string(), json!(&args.rulesets)),
             ("loadedRulesets".to_string(), json!(report.loaded_rulesets)),
             ("loadedPlugins".to_string(), json!(report.loaded_plugins)),
         ]),
@@ -113,6 +161,33 @@ fn map_metric(metric: &RuleMetric) -> Value {
     })
 }
 
+fn render_catalog_stdout(catalog: &peregrine_static_analysis::AnalysisRuleCatalog) -> String {
+    let mut lines = Vec::new();
+
+    for ruleset in &catalog.rulesets {
+        let source = ruleset
+            .plugin_id
+            .as_ref()
+            .map(|plugin_id| format!("plugin:{plugin_id}"))
+            .unwrap_or_else(|| "bundled".to_string());
+        lines.push(format!("{} ({source})", ruleset.id));
+
+        for rule in &ruleset.rules {
+            lines.push(format!(
+                "  {} [{}]",
+                rule.id,
+                match rule.default_severity {
+                    Severity::Info => "info",
+                    Severity::Warning => "warning",
+                    Severity::Error => "error",
+                }
+            ));
+        }
+    }
+
+    lines.join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,6 +229,10 @@ public fun caller() {
             &context,
             &AnalyzeArgs {
                 fail_on_findings: false,
+                no_global_plugins: true,
+                plugins: Vec::new(),
+                list_analyzers: false,
+                rulesets: Vec::new(),
             },
         );
 
@@ -162,8 +241,88 @@ public fun caller() {
             .iter()
             .filter_map(|diagnostic| diagnostic.code.as_deref())
             .collect::<Vec<_>>();
-        assert!(codes.contains(&"InfiniteLoop"));
-        assert!(codes.contains(&"UncheckedReturn"));
+        assert!(codes.contains(&"infinite_loop"));
+        assert!(codes.contains(&"unchecked_return"));
         assert_eq!(step.status, CliStatus::Passed);
+    }
+
+    #[test]
+    fn list_analyzers_reports_bundled_rulesets() {
+        let temp = tempdir().expect("tempdir");
+        fs::create_dir_all(temp.path().join("sources")).expect("sources");
+        fs::write(
+            temp.path().join("Move.toml"),
+            "[package]\nname = \"demo\"\n",
+        )
+        .expect("manifest");
+        fs::write(temp.path().join("sources/m.move"), "module demo::m;").expect("source");
+        let context = resolve_context(temp.path(), ".").expect("context");
+
+        let step = run_analyze(
+            &context,
+            &AnalyzeArgs {
+                fail_on_findings: false,
+                no_global_plugins: true,
+                plugins: Vec::new(),
+                list_analyzers: true,
+                rulesets: Vec::new(),
+            },
+        );
+
+        assert_eq!(step.status, CliStatus::Passed);
+        assert!(step.stdout.contains("complexity"));
+        assert!(step.stdout.contains("bool_judgement"));
+        assert!(step.stdout.contains("unchecked_return"));
+    }
+
+    #[test]
+    fn analyze_can_run_single_ruleset() {
+        let temp = tempdir().expect("tempdir");
+        fs::create_dir_all(temp.path().join("sources")).expect("sources");
+        fs::write(
+            temp.path().join("Move.toml"),
+            "[package]\nname = \"demo\"\n",
+        )
+        .expect("manifest");
+        fs::write(
+            temp.path().join("sources/m.move"),
+            r#"
+module demo::m;
+
+fun value(): u64 { 1 }
+
+public fun caller() {
+    value();
+    loop {
+        let x = 1;
+    }
+}
+"#,
+        )
+        .expect("source");
+        let context = resolve_context(temp.path(), ".").expect("context");
+
+        let step = run_analyze(
+            &context,
+            &AnalyzeArgs {
+                fail_on_findings: false,
+                no_global_plugins: true,
+                plugins: Vec::new(),
+                list_analyzers: false,
+                rulesets: vec!["unchecked_return".to_string()],
+            },
+        );
+
+        let codes = step
+            .diagnostics
+            .iter()
+            .filter_map(|diagnostic| diagnostic.code.as_deref())
+            .collect::<Vec<_>>();
+        assert!(codes.contains(&"unchecked_return"));
+        assert!(!codes.contains(&"infinite_loop"));
+        assert_eq!(
+            step.metadata.get("loadedRulesets"),
+            Some(&json!(["unchecked_return"]))
+        );
     }
 }

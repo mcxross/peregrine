@@ -1,22 +1,32 @@
 use std::collections::BTreeSet;
 
 use peregrine_types::analysis::{
-    AnalysisContext, ParsedFunction, ParsedModule, Rule, RuleConfig, RuleOutcome, Severity,
+    AnalysisContext, ParsedFunction, ParsedModule, Rule, RuleConfig, RuleMetadata, RuleOutcome,
+    Severity,
 };
 
 use super::common::{
     all_functions, call_name_at, find_matching_token, finding, function_has_return_value,
-    function_target, is_function_declaration, qualified_call_module, sanitize_source,
-    token_line_span, tokenize, Token,
+    function_target, is_function_declaration, qualified_call_module, rule_metadata,
+    sanitize_source, token_line_span, tokenize, Token,
 };
 
-pub const RULE_ID: &str = "UncheckedReturn";
+pub const RULE_ID: &str = "unchecked_return";
 
 pub struct UncheckedReturnRule;
 
 impl Rule for UncheckedReturnRule {
     fn id(&self) -> &'static str {
         RULE_ID
+    }
+
+    fn metadata(&self) -> RuleMetadata {
+        rule_metadata(
+            RULE_ID,
+            "Unchecked return",
+            "Reports calls whose return values are discarded.",
+            Severity::Info,
+        )
     }
 
     fn analyze(&self, context: &AnalysisContext, _config: &RuleConfig) -> RuleOutcome {
@@ -46,6 +56,7 @@ impl Rule for UncheckedReturnRule {
 
                 let target = function_target(module, function);
                 outcome.findings.push(finding(
+                    RULE_ID,
                     RULE_ID,
                     Severity::Info,
                     format!(

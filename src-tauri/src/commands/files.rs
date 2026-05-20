@@ -7,14 +7,15 @@ use peregrine_static_analysis::sui::bytecode_view::{
 use peregrine_static_analysis::{
     discover_move_project_fast, discover_move_project_shallow, discover_project_graphs,
     discover_project_graphs_for_package, discover_state_access_graph_for_function, AnalysisConfig,
-    AnalysisReport, Analyzer, MoveCallGraph, MovePackage, MoveProjectGraphs, MoveStateAccessGraph,
-    MoveTypeGraph, PackageDependencyGraph,
+    AnalysisEngine, AnalysisEngineOptions, AnalysisReport, MoveCallGraph, MovePackage,
+    MoveProjectGraphs, MoveStateAccessGraph, MoveTypeGraph, PackageDependencyGraph,
 };
 use serde::Serialize;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
+use tauri::Manager;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -150,6 +151,7 @@ pub(crate) async fn save_graph_png(path: String, png_data_url: String) -> Result
 
 #[tauri::command]
 pub(crate) async fn analyze_move_package(
+    app: tauri::AppHandle,
     root_path: String,
     package_path: String,
 ) -> Result<AnalysisReport, String> {
@@ -165,8 +167,19 @@ pub(crate) async fn analyze_move_package(
         }
 
         let config = AnalysisConfig::load_from_package(&package_root)?;
+        let registry_root = app
+            .path()
+            .app_config_dir()
+            .map_err(|error| format!("Could not resolve app config directory: {error}"))?;
 
-        Ok(Analyzer::new().analyze_package(package_root, config))
+        Ok(AnalysisEngine::new().analyze_package_with_options(
+            package_root,
+            config,
+            AnalysisEngineOptions {
+                global_plugin_root: Some(registry_root),
+                ..AnalysisEngineOptions::default()
+            },
+        ))
     })
     .await
     .map_err(|error| format!("Could not join Move analysis task: {error}"))?

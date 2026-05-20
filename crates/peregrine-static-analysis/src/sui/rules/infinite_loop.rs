@@ -1,17 +1,28 @@
-use peregrine_types::analysis::{AnalysisContext, Rule, RuleConfig, RuleOutcome, Severity};
-
-use super::common::{
-    all_functions, find_matching_token, finding, function_target, sanitize_source, token_line_span,
-    tokenize,
+use peregrine_types::analysis::{
+    AnalysisContext, Rule, RuleConfig, RuleMetadata, RuleOutcome, Severity,
 };
 
-pub const RULE_ID: &str = "InfiniteLoop";
+use super::common::{
+    all_functions, find_matching_token, finding, function_target, rule_metadata, sanitize_source,
+    token_line_span, tokenize,
+};
+
+pub const RULE_ID: &str = "infinite_loop";
 
 pub struct InfiniteLoopRule;
 
 impl Rule for InfiniteLoopRule {
     fn id(&self) -> &'static str {
         RULE_ID
+    }
+
+    fn metadata(&self) -> RuleMetadata {
+        rule_metadata(
+            RULE_ID,
+            "Infinite loop",
+            "Reports loops with no obvious break, return, or abort path.",
+            Severity::Warning,
+        )
     }
 
     fn analyze(&self, context: &AnalysisContext, _config: &RuleConfig) -> RuleOutcome {
@@ -42,6 +53,7 @@ impl Rule for InfiniteLoopRule {
 
                 let target = function_target(module, function);
                 outcome.findings.push(finding(
+                    RULE_ID,
                     RULE_ID,
                     Severity::Warning,
                     format!(

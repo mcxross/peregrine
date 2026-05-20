@@ -100,6 +100,10 @@ fn run_check_all(
         context,
         &AnalyzeArgs {
             fail_on_findings: args.fail_on_findings,
+            no_global_plugins: args.no_global_plugins,
+            plugins: args.plugins.clone(),
+            list_analyzers: false,
+            rulesets: args.rulesets.clone(),
         },
     ));
 

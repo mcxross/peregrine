@@ -1,17 +1,28 @@
-use peregrine_types::analysis::{AnalysisContext, Rule, RuleConfig, RuleOutcome, Severity};
+use peregrine_types::analysis::{
+    AnalysisContext, Rule, RuleConfig, RuleMetadata, RuleOutcome, Severity,
+};
 
 use super::common::{
-    all_functions, finding, function_target, sanitize_source, token_line_span,
+    all_functions, finding, function_target, rule_metadata, sanitize_source, token_line_span,
     token_range_contains, token_range_contains_call, tokenize, Token,
 };
 
-pub const RULE_ID: &str = "PrecisionLoss";
+pub const RULE_ID: &str = "precision_loss";
 
 pub struct PrecisionLossRule;
 
 impl Rule for PrecisionLossRule {
     fn id(&self) -> &'static str {
         RULE_ID
+    }
+
+    fn metadata(&self) -> RuleMetadata {
+        rule_metadata(
+            RULE_ID,
+            "Precision loss",
+            "Reports multiplication of values already reduced by division or square root.",
+            Severity::Warning,
+        )
     }
 
     fn analyze(&self, context: &AnalysisContext, _config: &RuleConfig) -> RuleOutcome {
@@ -40,6 +51,7 @@ impl Rule for PrecisionLossRule {
 
                 let target = function_target(module, function);
                 outcome.findings.push(finding(
+                    RULE_ID,
                     RULE_ID,
                     Severity::Warning,
                     format!("{target} multiplies a value derived from division or `sqrt`; multiply before reducing precision."),

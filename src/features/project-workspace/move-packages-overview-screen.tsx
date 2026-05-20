@@ -42,7 +42,7 @@ const TREE_PANE_MIN_WIDTH = 320;
 const TREE_PANE_MAX_WIDTH = 760;
 const DETAIL_PANE_MIN_WIDTH = 420;
 const COMPLEXITY_RULESET_ID = "complexity";
-const FUNCTION_COMPLEXITY_RULE_ID = "FunctionComplexity";
+const FUNCTION_COMPLEXITY_RULE_ID = "function_complexity";
 const CodeEditor = React.lazy(() =>
   import("@/features/project-workspace/editor/code-editor").then((module) => ({
     default: module.CodeEditor,

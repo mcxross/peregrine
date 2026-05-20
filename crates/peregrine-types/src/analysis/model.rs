@@ -89,7 +89,7 @@ pub struct RuleMetric {
     pub metric: Metric,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalysisDiagnostic {
     pub level: String,

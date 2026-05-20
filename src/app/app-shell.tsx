@@ -932,7 +932,11 @@ export function AppShell({
       <section className="flex min-h-0">
         <div className="min-w-0 flex-1">
           {isSettings ? (
-            <SettingsScreen onBack={onCloseSettings} />
+            <SettingsScreen
+              activeMovePackage={activeMovePackage}
+              onBack={onCloseSettings}
+              packageTree={packageTree}
+            />
           ) : (
             <Workspace
               activeWorkspaceTab={activeWorkspaceTab}

@@ -104,6 +104,18 @@ pub struct CfgArgs {
 pub struct AnalyzeArgs {
     #[arg(long)]
     pub fail_on_findings: bool,
+
+    #[arg(long)]
+    pub no_global_plugins: bool,
+
+    #[arg(long = "plugin", value_name = "PATH")]
+    pub plugins: Vec<PathBuf>,
+
+    #[arg(long)]
+    pub list_analyzers: bool,
+
+    #[arg(long = "ruleset", value_name = "ID")]
+    pub rulesets: Vec<String>,
 }
 
 #[derive(Clone, Debug, Args)]
@@ -116,6 +128,15 @@ pub struct CheckAllArgs {
 
     #[arg(long)]
     pub fail_on_findings: bool,
+
+    #[arg(long)]
+    pub no_global_plugins: bool,
+
+    #[arg(long = "plugin", value_name = "PATH")]
+    pub plugins: Vec<PathBuf>,
+
+    #[arg(long = "ruleset", value_name = "ID")]
+    pub rulesets: Vec<String>,
 
     #[arg(long, default_value_t = 30)]
     pub fuzz_time_limit_seconds: u64,

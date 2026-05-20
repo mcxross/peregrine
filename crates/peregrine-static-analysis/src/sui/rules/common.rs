@@ -1,10 +1,9 @@
 use std::collections::BTreeMap;
 
 use peregrine_types::analysis::{
-    AnalysisContext, Finding, ParsedFunction, ParsedModule, Severity, SourceFile, Span,
+    AnalysisContext, Finding, ParsedFunction, ParsedModule, RuleConfigProperty,
+    RuleConfigValueKind, RuleMetadata, Severity, SourceFile, Span,
 };
-
-pub const RULESET_ID: &str = "sui";
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Token {
@@ -32,6 +31,7 @@ pub enum DeclaredItemKind {
 }
 
 pub fn finding(
+    ruleset_id: &str,
     rule_id: &str,
     severity: Severity,
     message: impl Into<String>,
@@ -40,12 +40,34 @@ pub fn finding(
 ) -> Finding {
     Finding {
         rule_id: rule_id.to_string(),
-        ruleset_id: RULESET_ID.to_string(),
+        ruleset_id: ruleset_id.to_string(),
         severity,
         message: message.into(),
         file: file.into(),
         span,
         metric: None,
+    }
+}
+
+pub fn rule_metadata(
+    id: &str,
+    name: &str,
+    description: &str,
+    default_severity: Severity,
+) -> RuleMetadata {
+    RuleMetadata {
+        id: id.to_string(),
+        name: name.to_string(),
+        description: description.to_string(),
+        active: true,
+        default_severity,
+        configured_severity: None,
+        config_schema: vec![RuleConfigProperty {
+            key: "severity".to_string(),
+            value_kind: RuleConfigValueKind::Severity,
+            description: "Finding severity override.".to_string(),
+            default_value: None,
+        }],
     }
 }
 

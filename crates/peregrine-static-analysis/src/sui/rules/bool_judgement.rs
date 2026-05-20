@@ -1,16 +1,28 @@
-use peregrine_types::analysis::{AnalysisContext, Rule, RuleConfig, RuleOutcome, Severity};
-
-use super::common::{
-    all_functions, finding, function_target, sanitize_source, token_line_span, tokenize,
+use peregrine_types::analysis::{
+    AnalysisContext, Rule, RuleConfig, RuleMetadata, RuleOutcome, Severity,
 };
 
-pub const RULE_ID: &str = "BoolJudgement";
+use super::common::{
+    all_functions, finding, function_target, rule_metadata, sanitize_source, token_line_span,
+    tokenize,
+};
+
+pub const RULE_ID: &str = "bool_judgement";
 
 pub struct BoolJudgementRule;
 
 impl Rule for BoolJudgementRule {
     fn id(&self) -> &'static str {
         RULE_ID
+    }
+
+    fn metadata(&self) -> RuleMetadata {
+        rule_metadata(
+            RULE_ID,
+            "Boolean judgement",
+            "Reports boolean literals compared with boolean expressions.",
+            Severity::Info,
+        )
     }
 
     fn analyze(&self, context: &AnalysisContext, _config: &RuleConfig) -> RuleOutcome {
@@ -40,6 +52,7 @@ impl Rule for BoolJudgementRule {
                 let target = function_target(module, function);
                 outcome.findings.push(finding(
                     RULE_ID,
+                    RULE_ID,
                     Severity::Info,
                     format!(
                         "{target} compares a boolean expression with `{}`; use the boolean expression directly.",
@@ -58,7 +71,6 @@ impl Rule for BoolJudgementRule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sui::rules::RULESET_ID;
     use peregrine_types::analysis::{
         AnalysisConfig, AnalysisContext, ParsedFunction, ParsedModule, SourceFile, Span,
     };
@@ -72,7 +84,7 @@ mod tests {
         );
 
         assert_eq!(outcome.findings.len(), 1);
-        assert_eq!(outcome.findings[0].ruleset_id, RULESET_ID);
+        assert_eq!(outcome.findings[0].ruleset_id, RULE_ID);
         assert_eq!(outcome.findings[0].rule_id, RULE_ID);
     }
 

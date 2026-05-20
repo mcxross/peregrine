@@ -5,7 +5,11 @@ import {
   ChevronDown,
   FolderOpen,
   Palette,
+  Puzzle,
+  RefreshCw,
   TerminalSquare,
+  Trash2,
+  Upload,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,7 +25,19 @@ import { Input } from "@/components/ui/input";
 import {
   checkSuiAdapter,
   getSuiAdapterSettings,
+  installAnalyzerPlugin,
+  listAnalyzerPlugins,
+  listAnalyzerRuleCatalog,
+  removeAnalyzerPlugin,
+  saveAnalysisRuleConfig,
   saveSuiAdapterSettings,
+  setAnalyzerPluginEnabled,
+  type AnalysisRuleCatalog,
+  type AnalysisRuleMetadata,
+  type AnalysisSeverity,
+  type InstalledAnalyzerPlugin,
+  type MovePackage,
+  type PackageTree,
   type SuiAdapterSettings,
   type SuiAdapterSource,
   type SuiAdapterStatus,
@@ -31,10 +47,12 @@ import { useTheme } from "@/theme/theme-provider";
 import type { ThemeId, ThemeMode } from "@/theme/themes";
 
 type SettingsScreenProps = {
+  activeMovePackage?: MovePackage | null;
   onBack: () => void;
+  packageTree?: PackageTree | null;
 };
 
-type SettingsGroupId = "appearance" | "toolchain";
+type SettingsGroupId = "appearance" | "toolchain" | "analyzers";
 
 const settingsGroups: {
   id: SettingsGroupId;
@@ -54,6 +72,12 @@ const settingsGroups: {
     description: "Move toolchain",
     icon: TerminalSquare,
   },
+  {
+    id: "analyzers",
+    label: "Analyzers",
+    description: "Rules and plugins",
+    icon: Puzzle,
+  },
 ];
 
 const modeOptions: { value: ThemeMode; label: string }[] = [
@@ -67,7 +91,7 @@ const suiSourceOptions: { value: SuiAdapterSource; label: string }[] = [
   { value: "system", label: "User installed" },
 ];
 
-export function SettingsScreen({ onBack }: SettingsScreenProps) {
+export function SettingsScreen({ activeMovePackage = null, onBack, packageTree = null }: SettingsScreenProps) {
   const { themes, themeId, mode, resolvedMode, setMode, setThemeId } = useTheme();
   const [activeGroup, setActiveGroup] = React.useState<SettingsGroupId>("appearance");
   const [suiSettings, setSuiSettings] = React.useState<SuiAdapterSettings>({
@@ -78,7 +102,12 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [suiStatus, setSuiStatus] = React.useState<SuiAdapterStatus | null>(null);
   const [suiSettingsError, setSuiSettingsError] = React.useState<string | null>(null);
   const [isSavingSuiSettings, setIsSavingSuiSettings] = React.useState(false);
+  const [analyzerPlugins, setAnalyzerPlugins] = React.useState<InstalledAnalyzerPlugin[]>([]);
+  const [analyzerCatalog, setAnalyzerCatalog] = React.useState<AnalysisRuleCatalog | null>(null);
+  const [analyzerError, setAnalyzerError] = React.useState<string | null>(null);
+  const [isLoadingAnalyzers, setIsLoadingAnalyzers] = React.useState(false);
   const effectiveSuiSource = suiSettings.cliPath?.trim() ? "system" : suiSettings.source;
+  const activePackagePath = activeMovePackage?.path ?? null;
 
   React.useEffect(() => {
     let isMounted = true;
@@ -104,6 +133,33 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
       isMounted = false;
     };
   }, []);
+
+  const refreshAnalyzers = React.useCallback(async () => {
+    setIsLoadingAnalyzers(true);
+    setAnalyzerError(null);
+
+    try {
+      const [plugins, catalog] = await Promise.all([
+        listAnalyzerPlugins(),
+        listAnalyzerRuleCatalog(packageTree, activePackagePath),
+      ]);
+
+      setAnalyzerPlugins(plugins);
+      setAnalyzerCatalog(catalog);
+    } catch (error) {
+      setAnalyzerError(getSettingsErrorMessage(error));
+    } finally {
+      setIsLoadingAnalyzers(false);
+    }
+  }, [activePackagePath, packageTree]);
+
+  React.useEffect(() => {
+    if (activeGroup !== "analyzers") {
+      return;
+    }
+
+    void refreshAnalyzers();
+  }, [activeGroup, refreshAnalyzers]);
 
   const updateSuiSource = React.useCallback(
     async (source: SuiAdapterSource) => {
@@ -177,6 +233,91 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
     setSuiCliPathInput(selectedPath);
     await saveSuiCliPath(selectedPath);
   }, [saveSuiCliPath]);
+  const chooseAnalyzerPlugin = React.useCallback(async () => {
+    const selectedPath = await openAnalyzerPluginPath();
+
+    if (!selectedPath) {
+      return;
+    }
+
+    setIsLoadingAnalyzers(true);
+    setAnalyzerError(null);
+
+    try {
+      await installAnalyzerPlugin(selectedPath);
+      await refreshAnalyzers();
+    } catch (error) {
+      setAnalyzerError(getSettingsErrorMessage(error));
+    } finally {
+      setIsLoadingAnalyzers(false);
+    }
+  }, [refreshAnalyzers]);
+  const toggleAnalyzerPlugin = React.useCallback(
+    async (pluginId: string, enabled: boolean) => {
+      setIsLoadingAnalyzers(true);
+      setAnalyzerError(null);
+
+      try {
+        await setAnalyzerPluginEnabled(pluginId, enabled);
+        await refreshAnalyzers();
+      } catch (error) {
+        setAnalyzerError(getSettingsErrorMessage(error));
+      } finally {
+        setIsLoadingAnalyzers(false);
+      }
+    },
+    [refreshAnalyzers],
+  );
+  const removeAnalyzer = React.useCallback(
+    async (pluginId: string) => {
+      setIsLoadingAnalyzers(true);
+      setAnalyzerError(null);
+
+      try {
+        await removeAnalyzerPlugin(pluginId);
+        await refreshAnalyzers();
+      } catch (error) {
+        setAnalyzerError(getSettingsErrorMessage(error));
+      } finally {
+        setIsLoadingAnalyzers(false);
+      }
+    },
+    [refreshAnalyzers],
+  );
+  const saveAnalyzerRulePatch = React.useCallback(
+    async (
+      rulesetId: string,
+      ruleId: string | null,
+      patch: {
+        active?: boolean | null;
+        severity?: AnalysisSeverity | null;
+        threshold?: number | null;
+        entryThreshold?: number | null;
+      },
+    ) => {
+      if (!packageTree || !activePackagePath) {
+        setAnalyzerError("Open a Move package before editing rule configuration.");
+        return;
+      }
+
+      setIsLoadingAnalyzers(true);
+      setAnalyzerError(null);
+
+      try {
+        await saveAnalysisRuleConfig(packageTree, activePackagePath, {
+          ...patch,
+          ruleId,
+          rulesetId,
+        });
+        await refreshAnalyzers();
+      } catch (error) {
+        setAnalyzerError(getSettingsErrorMessage(error));
+      } finally {
+        setIsLoadingAnalyzers(false);
+      }
+    },
+    [activePackagePath, packageTree, refreshAnalyzers],
+  );
   const activeSettingsGroup = settingsGroups.find((group) => group.id === activeGroup) ?? settingsGroups[0];
   const ActiveGroupIcon = activeSettingsGroup.icon;
 
@@ -239,6 +380,21 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
               suiStatus={suiStatus}
               updateSuiSource={updateSuiSource}
               setSuiCliPathInput={setSuiCliPathInput}
+            />
+          ) : null}
+
+          {activeGroup === "analyzers" ? (
+            <AnalyzerSettings
+              activePackageName={activeMovePackage?.name ?? null}
+              analyzerCatalog={analyzerCatalog}
+              analyzerError={analyzerError}
+              analyzerPlugins={analyzerPlugins}
+              chooseAnalyzerPlugin={chooseAnalyzerPlugin}
+              isLoadingAnalyzers={isLoadingAnalyzers}
+              refreshAnalyzers={refreshAnalyzers}
+              removeAnalyzer={removeAnalyzer}
+              saveAnalyzerRulePatch={saveAnalyzerRulePatch}
+              toggleAnalyzerPlugin={toggleAnalyzerPlugin}
             />
           ) : null}
         </div>
@@ -549,6 +705,374 @@ function ToolchainSettings({
   );
 }
 
+function AnalyzerSettings({
+  activePackageName,
+  analyzerCatalog,
+  analyzerError,
+  analyzerPlugins,
+  chooseAnalyzerPlugin,
+  isLoadingAnalyzers,
+  refreshAnalyzers,
+  removeAnalyzer,
+  saveAnalyzerRulePatch,
+  toggleAnalyzerPlugin,
+}: {
+  activePackageName: string | null;
+  analyzerCatalog: AnalysisRuleCatalog | null;
+  analyzerError: string | null;
+  analyzerPlugins: InstalledAnalyzerPlugin[];
+  chooseAnalyzerPlugin: () => Promise<void>;
+  isLoadingAnalyzers: boolean;
+  refreshAnalyzers: () => Promise<void>;
+  removeAnalyzer: (pluginId: string) => Promise<void>;
+  saveAnalyzerRulePatch: (
+    rulesetId: string,
+    ruleId: string | null,
+    patch: {
+      active?: boolean | null;
+      severity?: AnalysisSeverity | null;
+      threshold?: number | null;
+      entryThreshold?: number | null;
+    },
+  ) => Promise<void>;
+  toggleAnalyzerPlugin: (pluginId: string, enabled: boolean) => Promise<void>;
+}) {
+  return (
+    <>
+      <SettingsSection title="Plugins">
+        <SettingsRow
+          label="Installed plugins"
+          description={`${analyzerPlugins.length} user-global plugin${analyzerPlugins.length === 1 ? "" : "s"}`}
+        >
+          <div className="flex min-w-0 gap-2">
+            <Button
+              disabled={isLoadingAnalyzers}
+              onClick={() => void refreshAnalyzers()}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <RefreshCw aria-hidden="true" />
+              Refresh
+            </Button>
+            <Button
+              disabled={isLoadingAnalyzers}
+              onClick={() => void chooseAnalyzerPlugin()}
+              size="sm"
+              type="button"
+            >
+              <Upload aria-hidden="true" />
+              Install
+            </Button>
+          </div>
+        </SettingsRow>
+
+        <div className="border-t border-border/70">
+          {analyzerPlugins.length ? (
+            analyzerPlugins.map((plugin) => (
+              <PluginRow
+                disabled={isLoadingAnalyzers}
+                key={`${plugin.pluginId}:${plugin.version}`}
+                plugin={plugin}
+                removeAnalyzer={removeAnalyzer}
+                toggleAnalyzerPlugin={toggleAnalyzerPlugin}
+              />
+            ))
+          ) : (
+            <div className="px-4 py-3.5 text-[13px] text-muted-foreground">
+              No unbundled analyzer plugins installed.
+            </div>
+          )}
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Rules">
+        <SettingsRow
+          label="Package"
+          description={activePackageName ? `Editing ${activePackageName}` : "Open a package to persist rule configuration."}
+        >
+          <Badge variant="secondary">{activePackageName ?? "No package"}</Badge>
+        </SettingsRow>
+
+        <div className="border-t border-border/70">
+          {analyzerCatalog?.rulesets.length ? (
+            analyzerCatalog.rulesets.map((ruleset) => (
+              <RuleSetRow
+                disabled={isLoadingAnalyzers || !activePackageName}
+                key={`${ruleset.pluginId ?? "bundled"}:${ruleset.id}`}
+                ruleset={ruleset}
+                saveAnalyzerRulePatch={saveAnalyzerRulePatch}
+              />
+            ))
+          ) : (
+            <div className="px-4 py-3.5 text-[13px] text-muted-foreground">
+              No analyzer catalog loaded.
+            </div>
+          )}
+        </div>
+
+        {analyzerCatalog?.diagnostics.length ? (
+          <div className="border-t border-border/70 px-4 py-3.5">
+            <div className="grid gap-2">
+              {analyzerCatalog.diagnostics.map((diagnostic) => (
+                <p
+                  className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300"
+                  key={`${diagnostic.source}:${diagnostic.message}`}
+                >
+                  {diagnostic.source}: {diagnostic.message}
+                </p>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {analyzerError ? (
+          <div className="border-t border-border/70 px-4 py-3.5">
+            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {analyzerError}
+            </p>
+          </div>
+        ) : null}
+      </SettingsSection>
+    </>
+  );
+}
+
+function PluginRow({
+  disabled,
+  plugin,
+  removeAnalyzer,
+  toggleAnalyzerPlugin,
+}: {
+  disabled: boolean;
+  plugin: InstalledAnalyzerPlugin;
+  removeAnalyzer: (pluginId: string) => Promise<void>;
+  toggleAnalyzerPlugin: (pluginId: string, enabled: boolean) => Promise<void>;
+}) {
+  const name = plugin.manifest.name ?? plugin.pluginId;
+
+  return (
+    <div className="grid gap-3 border-t border-border/70 px-4 py-3.5 first:border-t-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-[13px] font-medium text-foreground">{name}</span>
+          <Badge className="rounded px-1.5 py-0 text-[10px]" variant="secondary">
+            v{plugin.version}
+          </Badge>
+        </div>
+        <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{plugin.path}</p>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button
+          disabled={disabled}
+          onClick={() => void toggleAnalyzerPlugin(plugin.pluginId, !plugin.enabled)}
+          size="sm"
+          type="button"
+          variant={plugin.enabled ? "default" : "outline"}
+        >
+          {plugin.enabled ? "Enabled" : "Disabled"}
+        </Button>
+        <Button
+          disabled={disabled}
+          onClick={() => void removeAnalyzer(plugin.pluginId)}
+          size="sm"
+          title="Remove plugin"
+          type="button"
+          variant="outline"
+        >
+          <Trash2 aria-hidden="true" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function RuleSetRow({
+  disabled,
+  ruleset,
+  saveAnalyzerRulePatch,
+}: {
+  disabled: boolean;
+  ruleset: AnalysisRuleCatalog["rulesets"][number];
+  saveAnalyzerRulePatch: (
+    rulesetId: string,
+    ruleId: string | null,
+    patch: {
+      active?: boolean | null;
+      severity?: AnalysisSeverity | null;
+      threshold?: number | null;
+      entryThreshold?: number | null;
+    },
+  ) => Promise<void>;
+}) {
+  return (
+    <div className="border-t border-border/70 first:border-t-0">
+      <div className="grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-[13px] font-medium text-foreground">{ruleset.name}</span>
+            <Badge className="rounded px-1.5 py-0 text-[10px]" variant="secondary">
+              {ruleset.bundled ? "Bundled" : ruleset.pluginId}
+            </Badge>
+          </div>
+          <p className="mt-1 text-[12px] text-muted-foreground">{ruleset.description || ruleset.id}</p>
+        </div>
+        <Button
+          disabled={disabled}
+          onClick={() => void saveAnalyzerRulePatch(ruleset.id, null, { active: !ruleset.active })}
+          size="sm"
+          type="button"
+          variant={ruleset.active ? "default" : "outline"}
+        >
+          {ruleset.active ? "Enabled" : "Disabled"}
+        </Button>
+      </div>
+      <div className="grid border-t border-border/70">
+        {ruleset.rules.map((rule) => (
+          <RuleRow
+            disabled={disabled || !ruleset.active}
+            key={rule.id}
+            rule={rule}
+            rulesetId={ruleset.id}
+            saveAnalyzerRulePatch={saveAnalyzerRulePatch}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RuleRow({
+  disabled,
+  rule,
+  rulesetId,
+  saveAnalyzerRulePatch,
+}: {
+  disabled: boolean;
+  rule: AnalysisRuleMetadata;
+  rulesetId: string;
+  saveAnalyzerRulePatch: (
+    rulesetId: string,
+    ruleId: string | null,
+    patch: {
+      active?: boolean | null;
+      severity?: AnalysisSeverity | null;
+      threshold?: number | null;
+      entryThreshold?: number | null;
+    },
+  ) => Promise<void>;
+}) {
+  const effectiveSeverity = rule.configuredSeverity ?? rule.defaultSeverity;
+
+  return (
+    <div className="grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-[13px] font-medium text-foreground">{rule.name}</span>
+          <Badge className="rounded px-1.5 py-0 text-[10px]" variant="secondary">
+            {effectiveSeverity}
+          </Badge>
+        </div>
+        <p className="mt-1 text-[12px] text-muted-foreground">{rule.description || rule.id}</p>
+      </div>
+      <div className="flex flex-wrap justify-end gap-2">
+        <SeverityDropdown
+          disabled={disabled}
+          onChange={(severity) => void saveAnalyzerRulePatch(rulesetId, rule.id, { severity })}
+          value={effectiveSeverity}
+        />
+        <RuleNumericControls
+          disabled={disabled}
+          onSave={(patch) => void saveAnalyzerRulePatch(rulesetId, rule.id, patch)}
+          rule={rule}
+        />
+        <Button
+          disabled={disabled}
+          onClick={() => void saveAnalyzerRulePatch(rulesetId, rule.id, { active: !rule.active })}
+          size="sm"
+          type="button"
+          variant={rule.active ? "default" : "outline"}
+        >
+          {rule.active ? "Enabled" : "Disabled"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SeverityDropdown({
+  disabled,
+  onChange,
+  value,
+}: {
+  disabled: boolean;
+  onChange: (severity: AnalysisSeverity) => void;
+  value: AnalysisSeverity;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button disabled={disabled} size="sm" type="button" variant="outline">
+          {value}
+          <ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {(["info", "warning", "error"] as AnalysisSeverity[]).map((severity) => (
+          <DropdownMenuItem key={severity} onSelect={() => onChange(severity)}>
+            {severity}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function RuleNumericControls({
+  disabled,
+  onSave,
+  rule,
+}: {
+  disabled: boolean;
+  onSave: (patch: { threshold?: number | null; entryThreshold?: number | null }) => void;
+  rule: AnalysisRuleMetadata;
+}) {
+  const numericProperties = rule.configSchema.filter((property) => property.valueKind === "integer");
+
+  if (!numericProperties.length) {
+    return null;
+  }
+
+  return (
+    <>
+      {numericProperties.map((property) => (
+        <Input
+          className="h-8 w-24"
+          disabled={disabled}
+          inputMode="numeric"
+          key={property.key}
+          min={0}
+          onBlur={(event) => {
+            const value = event.currentTarget.value.trim();
+            if (!value) {
+              return;
+            }
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed < 0) {
+              return;
+            }
+            onSave(property.key === "entry_threshold"
+              ? { entryThreshold: Math.floor(parsed) }
+              : { threshold: Math.floor(parsed) });
+          }}
+          placeholder={property.defaultValue ?? property.key}
+          type="number"
+        />
+      ))}
+    </>
+  );
+}
+
 function SettingsNavButton({
   active,
   group,
@@ -693,6 +1217,19 @@ async function openSuiCliPath(): Promise<string | null> {
     directory: false,
     multiple: false,
     title: "Select Sui CLI",
+  });
+
+  return typeof selectedPath === "string" ? selectedPath : null;
+}
+
+async function openAnalyzerPluginPath(): Promise<string | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+
+  const selectedPath = await open({
+    directory: false,
+    filters: [{ extensions: ["wasm"], name: "WASM analyzer plugin" }],
+    multiple: false,
+    title: "Install analyzer plugin",
   });
 
   return typeof selectedPath === "string" ? selectedPath : null;

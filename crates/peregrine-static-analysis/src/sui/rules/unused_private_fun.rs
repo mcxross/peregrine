@@ -1,18 +1,28 @@
 use peregrine_types::analysis::{
-    AnalysisContext, ParsedFunction, ParsedModule, Rule, RuleConfig, RuleOutcome, Severity,
+    AnalysisContext, ParsedFunction, ParsedModule, Rule, RuleConfig, RuleMetadata, RuleOutcome,
+    Severity,
 };
 
 use super::common::{
-    all_functions, called_by_function, finding, function_target, test_like_function,
+    all_functions, called_by_function, finding, function_target, rule_metadata, test_like_function,
 };
 
-pub const RULE_ID: &str = "UnusedPrivateFunction";
+pub const RULE_ID: &str = "unused_private_function";
 
 pub struct UnusedPrivateFunctionRule;
 
 impl Rule for UnusedPrivateFunctionRule {
     fn id(&self) -> &'static str {
         RULE_ID
+    }
+
+    fn metadata(&self) -> RuleMetadata {
+        rule_metadata(
+            RULE_ID,
+            "Unused private function",
+            "Reports private package functions that are not invoked.",
+            Severity::Info,
+        )
     }
 
     fn analyze(&self, context: &AnalysisContext, _config: &RuleConfig) -> RuleOutcome {
@@ -36,6 +46,7 @@ impl Rule for UnusedPrivateFunctionRule {
             }
 
             outcome.findings.push(finding(
+                RULE_ID,
                 RULE_ID,
                 Severity::Info,
                 format!(

@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 
 use peregrine_types::analysis::{
-    AnalysisContext, Finding, Metric, ParsedFunction, ParsedModule, Rule, RuleConfig, RuleMetric,
-    RuleOutcome, RuleSet, RuleSetProvider, Severity,
+    AnalysisContext, Finding, Metric, ParsedFunction, ParsedModule, Rule, RuleConfig,
+    RuleConfigProperty, RuleConfigValueKind, RuleMetadata, RuleMetric, RuleOutcome, RuleSet,
+    RuleSetMetadata, RuleSetProvider, Severity,
 };
 
 const RULESET_ID: &str = "complexity";
-const FUNCTION_RULE_ID: &str = "FunctionComplexity";
-const MODULE_RULE_ID: &str = "ModuleComplexity";
+const FUNCTION_RULE_ID: &str = "function_complexity";
+const MODULE_RULE_ID: &str = "module_complexity";
 const DEFAULT_FUNCTION_THRESHOLD: u32 = 15;
 const DEFAULT_ENTRY_FUNCTION_THRESHOLD: u32 = 12;
 const DEFAULT_MODULE_THRESHOLD: u32 = 80;
@@ -27,6 +28,22 @@ impl RuleSet for ComplexityRuleSet {
         RULESET_ID
     }
 
+    fn metadata(&self) -> RuleSetMetadata {
+        RuleSetMetadata {
+            id: RULESET_ID.to_string(),
+            name: "Complexity".to_string(),
+            description: "Heuristic complexity checks for Move modules and functions.".to_string(),
+            bundled: true,
+            plugin_id: None,
+            active: true,
+            rules: self
+                .rules()
+                .into_iter()
+                .map(|rule| rule.metadata())
+                .collect(),
+        }
+    }
+
     fn rules(&self) -> Vec<Box<dyn Rule>> {
         vec![
             Box::new(FunctionComplexityRule),
@@ -40,6 +57,37 @@ pub struct FunctionComplexityRule;
 impl Rule for FunctionComplexityRule {
     fn id(&self) -> &'static str {
         FUNCTION_RULE_ID
+    }
+
+    fn metadata(&self) -> RuleMetadata {
+        RuleMetadata {
+            id: FUNCTION_RULE_ID.to_string(),
+            name: "Function complexity".to_string(),
+            description: "Reports Move functions whose heuristic complexity score exceeds the configured threshold.".to_string(),
+            active: true,
+            default_severity: Severity::Warning,
+            configured_severity: None,
+            config_schema: vec![
+                RuleConfigProperty {
+                    key: "threshold".to_string(),
+                    value_kind: RuleConfigValueKind::Integer,
+                    description: "Maximum complexity score for regular functions.".to_string(),
+                    default_value: Some(DEFAULT_FUNCTION_THRESHOLD.to_string()),
+                },
+                RuleConfigProperty {
+                    key: "entry_threshold".to_string(),
+                    value_kind: RuleConfigValueKind::Integer,
+                    description: "Maximum complexity score for entry or transaction-callable functions.".to_string(),
+                    default_value: Some(DEFAULT_ENTRY_FUNCTION_THRESHOLD.to_string()),
+                },
+                RuleConfigProperty {
+                    key: "severity".to_string(),
+                    value_kind: RuleConfigValueKind::Severity,
+                    description: "Finding severity override.".to_string(),
+                    default_value: Some("warning".to_string()),
+                },
+            ],
+        }
     }
 
     fn analyze(&self, context: &AnalysisContext, config: &RuleConfig) -> RuleOutcome {
@@ -98,6 +146,31 @@ pub struct ModuleComplexityRule;
 impl Rule for ModuleComplexityRule {
     fn id(&self) -> &'static str {
         MODULE_RULE_ID
+    }
+
+    fn metadata(&self) -> RuleMetadata {
+        RuleMetadata {
+            id: MODULE_RULE_ID.to_string(),
+            name: "Module complexity".to_string(),
+            description: "Reports Move modules whose aggregate function complexity exceeds the configured threshold.".to_string(),
+            active: true,
+            default_severity: Severity::Warning,
+            configured_severity: None,
+            config_schema: vec![
+                RuleConfigProperty {
+                    key: "threshold".to_string(),
+                    value_kind: RuleConfigValueKind::Integer,
+                    description: "Maximum aggregate complexity score for a module.".to_string(),
+                    default_value: Some(DEFAULT_MODULE_THRESHOLD.to_string()),
+                },
+                RuleConfigProperty {
+                    key: "severity".to_string(),
+                    value_kind: RuleConfigValueKind::Severity,
+                    description: "Finding severity override.".to_string(),
+                    default_value: Some("warning".to_string()),
+                },
+            ],
+        }
     }
 
     fn analyze(&self, context: &AnalysisContext, config: &RuleConfig) -> RuleOutcome {
@@ -424,7 +497,7 @@ fun complicated() {
 [analysis.rulesets.complexity]
 active = true
 
-[analysis.rulesets.complexity.FunctionComplexity]
+[analysis.rulesets.complexity.function_complexity]
 active = true
 threshold = 100
 entry_threshold = 2

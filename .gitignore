@@ -30,3 +30,5 @@ AGENT.md
 .superstack
 docs
 ARCHITECTURE.md
+.tmp
+**/README.md

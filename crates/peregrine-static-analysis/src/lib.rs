@@ -1,4 +1,5 @@
 mod analyzer;
+mod engine;
 mod parser;
 mod plugins;
 mod project;
@@ -12,14 +13,15 @@ pub mod config {
 
 pub mod model {
     pub use peregrine_types::analysis::{
-        AnalysisContext, AnalysisDiagnostic, AnalysisReport, Finding, Metric, ParsedFunction,
-        ParsedModule, RuleMetric, Severity, SourceFile, Span,
+        AnalysisContext, AnalysisDiagnostic, AnalysisReport, AnalysisRuleCatalog, Finding, Metric,
+        ParsedFunction, ParsedModule, RuleConfigProperty, RuleConfigValueKind, RuleMetadata,
+        RuleMetric, RuleSetMetadata, Severity, SourceFile, Span,
     };
 }
 
 pub mod rules {
     pub mod complexity {
-        pub use crate::sui::complexity::*;
+        pub use crate::sui::rules::complexity::*;
     }
 
     pub mod sui {
@@ -28,17 +30,19 @@ pub mod rules {
 }
 
 pub use analyzer::Analyzer;
+pub use engine::{AnalysisEngine, AnalysisEngineOptions};
 pub use peregrine_types::analysis::{
     AnalysisConfig, AnalysisSection, PluginConfig, RuleConfig, RuleSetConfig,
 };
 pub use peregrine_types::analysis::{
-    AnalysisContext, AnalysisDiagnostic, AnalysisReport, Finding, Metric, ParsedFunction,
-    ParsedModule, Rule, RuleMetric, RuleOutcome, RuleSet, RuleSetProvider, Severity, SourceFile,
-    Span,
+    AnalysisContext, AnalysisDiagnostic, AnalysisReport, AnalysisRuleCatalog, Finding, Metric,
+    ParsedFunction, ParsedModule, Rule, RuleConfigProperty, RuleConfigValueKind, RuleMetadata,
+    RuleMetric, RuleOutcome, RuleSet, RuleSetMetadata, RuleSetProvider, Severity, SourceFile, Span,
 };
 pub use plugins::{
-    PluginAnalyzeInput, PluginAnalyzeOutput, PluginManifest, PluginManifestInput,
-    PluginRuleManifest, PluginRuleSetManifest, WasmPluginHost,
+    AnalyzerPluginRegistry, AnalyzerPluginRegistryFile, InstalledAnalyzerPlugin,
+    PluginActiveRuleConfig, PluginAnalyzeInput, PluginAnalyzeOutput, PluginManifest,
+    PluginManifestInput, PluginRuleManifest, PluginRuleSetManifest, WasmPluginHost,
 };
 pub use project::{
     discover_move_project, discover_move_project_fast, discover_move_project_shallow,

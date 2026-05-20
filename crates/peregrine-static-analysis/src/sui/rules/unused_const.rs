@@ -1,16 +1,28 @@
-use peregrine_types::analysis::{AnalysisContext, Rule, RuleConfig, RuleOutcome, Severity};
-
-use super::common::{
-    collect_declarations, finding, name_referenced_outside_declaration, DeclaredItemKind,
+use peregrine_types::analysis::{
+    AnalysisContext, Rule, RuleConfig, RuleMetadata, RuleOutcome, Severity,
 };
 
-pub const RULE_ID: &str = "UnusedConst";
+use super::common::{
+    collect_declarations, finding, name_referenced_outside_declaration, rule_metadata,
+    DeclaredItemKind,
+};
+
+pub const RULE_ID: &str = "unused_const";
 
 pub struct UnusedConstRule;
 
 impl Rule for UnusedConstRule {
     fn id(&self) -> &'static str {
         RULE_ID
+    }
+
+    fn metadata(&self) -> RuleMetadata {
+        rule_metadata(
+            RULE_ID,
+            "Unused constant",
+            "Reports constants that are never referenced outside their declaration.",
+            Severity::Info,
+        )
     }
 
     fn analyze(&self, context: &AnalysisContext, _config: &RuleConfig) -> RuleOutcome {
@@ -25,6 +37,7 @@ impl Rule for UnusedConstRule {
             }
 
             outcome.findings.push(finding(
+                RULE_ID,
                 RULE_ID,
                 Severity::Info,
                 format!(

@@ -528,6 +528,80 @@ export type AnalysisReport = {
   diagnostics: AnalysisDiagnostic[];
 };
 
+export type AnalysisRuleConfigValueKind = "boolean" | "integer" | "string" | "severity";
+
+export type AnalysisRuleConfigProperty = {
+  key: string;
+  valueKind: AnalysisRuleConfigValueKind;
+  description: string;
+  defaultValue: string | null;
+};
+
+export type AnalysisRuleMetadata = {
+  id: string;
+  name: string;
+  description: string;
+  active: boolean;
+  defaultSeverity: AnalysisSeverity;
+  configuredSeverity: AnalysisSeverity | null;
+  configSchema: AnalysisRuleConfigProperty[];
+};
+
+export type AnalysisRuleSetMetadata = {
+  id: string;
+  name: string;
+  description: string;
+  bundled: boolean;
+  pluginId: string | null;
+  active: boolean;
+  rules: AnalysisRuleMetadata[];
+};
+
+export type AnalysisRuleCatalog = {
+  rulesets: AnalysisRuleSetMetadata[];
+  loadedPlugins: string[];
+  diagnostics: AnalysisDiagnostic[];
+};
+
+export type AnalyzerPluginManifest = {
+  schemaVersion: number;
+  pluginId: string;
+  version: string;
+  name?: string | null;
+  description?: string | null;
+  rulesets: {
+    id: string;
+    name?: string | null;
+    description?: string | null;
+    rules: {
+      id: string;
+      name?: string | null;
+      description?: string | null;
+      defaultSeverity?: AnalysisSeverity | null;
+      configKeys: string[];
+    }[];
+  }[];
+};
+
+export type InstalledAnalyzerPlugin = {
+  pluginId: string;
+  version: string;
+  path: string;
+  checksum: string;
+  enabled: boolean;
+  installedAtUnixMs: number;
+  manifest: AnalyzerPluginManifest;
+};
+
+export type AnalysisRuleConfigPatch = {
+  rulesetId: string;
+  ruleId?: string | null;
+  active?: boolean | null;
+  severity?: AnalysisSeverity | null;
+  threshold?: number | null;
+  entryThreshold?: number | null;
+};
+
 export type CommandOutput = {
   status: number | null;
   stdout: string;
@@ -811,6 +885,47 @@ export async function analyzeMovePackage(
   return invoke<AnalysisReport>("analyze_move_package", {
     rootPath: packageTree.rootPath,
     packagePath,
+  });
+}
+
+export async function listAnalyzerPlugins() {
+  return invoke<InstalledAnalyzerPlugin[]>("list_analyzer_plugins");
+}
+
+export async function installAnalyzerPlugin(pluginPath: string) {
+  return invoke<InstalledAnalyzerPlugin>("install_analyzer_plugin", { pluginPath });
+}
+
+export async function removeAnalyzerPlugin(pluginId: string) {
+  return invoke<InstalledAnalyzerPlugin[]>("remove_analyzer_plugin", { pluginId });
+}
+
+export async function setAnalyzerPluginEnabled(pluginId: string, enabled: boolean) {
+  return invoke<InstalledAnalyzerPlugin[]>("set_analyzer_plugin_enabled", {
+    enabled,
+    pluginId,
+  });
+}
+
+export async function listAnalyzerRuleCatalog(
+  packageTree?: PackageTree | null,
+  packagePath?: string | null,
+) {
+  return invoke<AnalysisRuleCatalog>("list_analyzer_rule_catalog", {
+    packagePath: packagePath ?? null,
+    rootPath: packageTree?.rootPath ?? null,
+  });
+}
+
+export async function saveAnalysisRuleConfig(
+  packageTree: PackageTree,
+  packagePath: string,
+  patch: AnalysisRuleConfigPatch,
+) {
+  return invoke("save_analysis_rule_config", {
+    packagePath,
+    patch,
+    rootPath: packageTree.rootPath,
   });
 }
 

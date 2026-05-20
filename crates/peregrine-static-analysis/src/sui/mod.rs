@@ -1,6 +1,5 @@
 pub mod attack_surface;
 pub mod bytecode_view;
-pub mod complexity;
 pub mod object_lifecycle;
 pub mod rules;
 
@@ -16,9 +15,8 @@ pub use bytecode_view::{
     MoveBytecodeModuleView, MoveBytecodePackageView, MoveBytecodeSourceSpan,
     MoveModuleBytecodeInput,
 };
-pub use complexity::ComplexityRuleSetProvider;
 pub use object_lifecycle::{
     object_lifecycle_maps, object_lifecycle_risks, ObjectLifecycleFunctionRef, ObjectLifecycleMap,
     ObjectLifecycleRisk, ObjectLifecycleStage,
 };
-pub use rules::{SuiRuleSet, SuiRuleSetProvider, RULESET_ID};
+pub use rules::SuiRuleSetProvider;
