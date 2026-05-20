@@ -6,7 +6,7 @@ use crate::{
         project::{resolve_context, resolve_workspace_root},
         runners::{
             run_analyze, run_build, run_bytecode, run_coverage, run_fuzz, run_import_package,
-            run_new_package, run_test, run_verify,
+            run_new_package, run_signatures, run_test, run_verify,
         },
     },
 };
@@ -64,6 +64,7 @@ pub fn execute(cli: &Cli) -> CliReport {
                 CliCommand::Test => vec![run_test(&context)],
                 CliCommand::Coverage => run_coverage(&context),
                 CliCommand::Bytecode(args) => vec![run_bytecode(&context, args)],
+                CliCommand::Signatures(args) => vec![run_signatures(&context, args)],
                 CliCommand::Fuzz(args) => vec![run_fuzz(&context, args)],
                 CliCommand::Verify(args) => run_verify(&context, args),
                 CliCommand::Analyze(args) => vec![run_analyze(&context, args)],

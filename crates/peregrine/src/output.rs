@@ -188,6 +188,10 @@ pub fn write_report(report: &CliReport, json_output: bool) -> Result<(), String>
 }
 
 pub fn human_report(report: &CliReport) -> String {
+    if let Some(rendered) = direct_human_stdout(report) {
+        return rendered;
+    }
+
     let mut lines = Vec::new();
 
     lines.push(format!(
@@ -248,6 +252,21 @@ pub fn human_report(report: &CliReport) -> String {
     }
 
     lines.join("\n")
+}
+
+fn direct_human_stdout(report: &CliReport) -> Option<String> {
+    let [step] = report.steps.as_slice() else {
+        return None;
+    };
+
+    if report.command == "signatures"
+        && report.status == CliStatus::Passed
+        && !step.stdout.trim().is_empty()
+    {
+        return Some(step.stdout.trim_end().to_string());
+    }
+
+    None
 }
 
 pub fn command_details(status: Option<i32>) -> Value {
@@ -394,5 +413,32 @@ mod tests {
         assert!(rendered.contains("peregrine analyze: SKIP"));
         assert!(rendered.contains("Project: /workspace"));
         assert!(rendered.contains("SKIP fuzz"));
+    }
+
+    #[test]
+    fn signatures_human_report_prints_only_signature_tree() {
+        let started_at = Instant::now();
+        let report = CliReport::from_steps(
+            "signatures",
+            started_at,
+            "/workspace",
+            ".",
+            vec![CliStep {
+                name: "signatures".to_string(),
+                status: CliStatus::Passed,
+                duration_ms: 1,
+                exit_code: EXIT_SUCCESS,
+                command: None,
+                diagnostics: Vec::new(),
+                metadata: BTreeMap::new(),
+                stdout: "package Demo\n|-- module main\n".to_string(),
+                stderr: String::new(),
+                details: Value::Null,
+            }],
+        );
+
+        let rendered = human_report(&report);
+
+        assert_eq!(rendered, "package Demo\n|-- module main");
     }
 }

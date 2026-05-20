@@ -1,6 +1,6 @@
 use crate::sui::args::{
     AnalyzeArgs, BytecodeArgs, CheckAllArgs, FuzzArgs, ImportPackageArgs, NewPackageArgs,
-    VerifyArgs,
+    SignaturesArgs, VerifyArgs,
 };
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -32,6 +32,8 @@ pub enum CliCommand {
     Coverage,
     #[command(name = "bytecode", visible_alias = "bytecode-viewer")]
     Bytecode(BytecodeArgs),
+    #[command(name = "signatures", visible_alias = "function-signatures")]
+    Signatures(SignaturesArgs),
     Fuzz(FuzzArgs),
     Verify(VerifyArgs),
     Analyze(AnalyzeArgs),
@@ -50,6 +52,7 @@ impl CliCommand {
             Self::Test => "test",
             Self::Coverage => "coverage",
             Self::Bytecode(_) => "bytecode",
+            Self::Signatures(_) => "signatures",
             Self::Fuzz(_) => "fuzz",
             Self::Verify(_) => "verify",
             Self::Analyze(_) => "analyze",
@@ -151,6 +154,27 @@ mod tests {
         };
         assert_eq!(args.module.as_deref(), Some("vault"));
         assert!(args.interactive);
+    }
+
+    #[test]
+    fn parses_signature_filters() {
+        let cli = Cli::try_parse_from([
+            "peregrine",
+            "signatures",
+            "--module",
+            "orders",
+            "--module",
+            "policy",
+            "--file",
+            "sources/orders.move",
+        ])
+        .expect("cli args");
+
+        let CliCommand::Signatures(args) = cli.command else {
+            panic!("expected signatures command");
+        };
+        assert_eq!(args.modules, ["orders", "policy"]);
+        assert_eq!(args.file.as_deref(), Some("sources/orders.move"));
     }
 
     #[test]

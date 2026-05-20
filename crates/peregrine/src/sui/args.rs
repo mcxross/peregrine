@@ -47,6 +47,15 @@ pub struct BytecodeArgs {
 }
 
 #[derive(Clone, Debug, Args)]
+pub struct SignaturesArgs {
+    #[arg(long = "module", value_name = "NAME")]
+    pub modules: Vec<String>,
+
+    #[arg(long, value_name = "PATH")]
+    pub file: Option<String>,
+}
+
+#[derive(Clone, Debug, Args)]
 pub struct AnalyzeArgs {
     #[arg(long)]
     pub fail_on_findings: bool,
