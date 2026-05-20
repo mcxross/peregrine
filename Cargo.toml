@@ -20,16 +20,19 @@ edition = "2021"
 [workspace.dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
 base64 = "0.22"
+crossterm = "0.25.0"
 globset = "0.4"
 hex = "0.4"
 move-command-line-common = { path = "../oss/sui/external-crates/move/crates/move-command-line-common" }
 move-binary-format = { path = "../oss/sui/external-crates/move/crates/move-binary-format" }
 move-bytecode-source-map = { path = "../oss/sui/external-crates/move/crates/move-bytecode-source-map" }
 move-compiler = { path = "../oss/sui/external-crates/move/crates/move-compiler" }
+move-cli = { path = "../oss/sui/external-crates/move/crates/move-cli" }
 move-decompiler = { path = "../oss/sui/external-crates/move/crates/move-decompiler" }
 move-disassembler = { path = "../oss/sui/external-crates/move/crates/move-disassembler" }
 move-ir-types = { path = "../oss/sui/external-crates/move/crates/move-ir-types" }
 move-model-2 = { path = "../oss/sui/external-crates/move/crates/move-model-2" }
+move-package-alt-compilation = { path = "../oss/sui/external-crates/move/crates/move-package-alt-compilation" }
 move-prover-boogie-backend = { path = "../oss/sui-prover/crates/move-prover-boogie-backend" }
 move-stackless-bytecode = { path = "../oss/sui-prover/crates/move-stackless-bytecode" }
 movy = { path = "../oss/movy/crates/movy", default-features = false, features = ["sui-fuzz"] }
@@ -49,6 +52,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 sui = { path = "../oss/sui/crates/sui", package = "sui", features = ["tracing"] }
+sui-package-alt = { path = "../oss/sui/crates/sui-package-alt" }
 sui-prover = { path = "../oss/sui-prover/crates/sui-prover" }
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 tauri = { version = "=2.11.2", features = [] }

@@ -1,5 +1,6 @@
 use crate::sui::args::{
-    AnalyzeArgs, CheckAllArgs, FuzzArgs, ImportPackageArgs, NewPackageArgs, VerifyArgs,
+    AnalyzeArgs, BytecodeArgs, CheckAllArgs, FuzzArgs, ImportPackageArgs, NewPackageArgs,
+    VerifyArgs,
 };
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -29,6 +30,8 @@ pub enum CliCommand {
     Build,
     Test,
     Coverage,
+    #[command(name = "bytecode", visible_alias = "bytecode-viewer")]
+    Bytecode(BytecodeArgs),
     Fuzz(FuzzArgs),
     Verify(VerifyArgs),
     Analyze(AnalyzeArgs),
@@ -46,6 +49,7 @@ impl CliCommand {
             Self::Build => "build",
             Self::Test => "test",
             Self::Coverage => "coverage",
+            Self::Bytecode(_) => "bytecode",
             Self::Fuzz(_) => "fuzz",
             Self::Verify(_) => "verify",
             Self::Analyze(_) => "analyze",
@@ -129,6 +133,24 @@ mod tests {
             panic!("expected new-package command");
         };
         assert_eq!(args.package_name, "vault");
+    }
+
+    #[test]
+    fn parses_bytecode_viewer_target() {
+        let cli = Cli::try_parse_from([
+            "peregrine",
+            "bytecode",
+            "--module",
+            "vault",
+            "--interactive",
+        ])
+        .expect("cli args");
+
+        let CliCommand::Bytecode(args) = cli.command else {
+            panic!("expected bytecode command");
+        };
+        assert_eq!(args.module.as_deref(), Some("vault"));
+        assert!(args.interactive);
     }
 
     #[test]

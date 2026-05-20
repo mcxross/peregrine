@@ -1,4 +1,5 @@
 mod analysis;
+mod bytecode;
 mod fuzz;
 mod import_package;
 mod new_package;
@@ -7,6 +8,7 @@ mod process;
 mod verify;
 
 pub use analysis::run_analyze;
+pub use bytecode::run_bytecode;
 pub use fuzz::run_fuzz;
 pub use import_package::run_import_package;
 pub use new_package::run_new_package;

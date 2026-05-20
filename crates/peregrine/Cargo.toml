@@ -9,13 +9,17 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { workspace = true }
+crossterm = { workspace = true }
+move-cli = { workspace = true }
+move-package-alt-compilation = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 peregrine-adapters = { workspace = true }
 peregrine-dynamic-analysis = { workspace = true }
 peregrine-import-engine = { workspace = true }
 peregrine-static-analysis = { workspace = true }
+sui-package-alt = { workspace = true }
+tempfile = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }

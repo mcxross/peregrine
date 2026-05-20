@@ -1,5 +1,6 @@
 use peregrine_cli::helper_args::{
-    BUNDLED_SUI_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG, MOVY_FUZZ_HELPER_ARG,
+    BUNDLED_SUI_HELPER_ARG, BYTECODE_VIEWER_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG,
+    MOVY_FUZZ_HELPER_ARG,
 };
 
 fn main() {
@@ -9,6 +10,9 @@ fn main() {
     match args.next() {
         Some(arg) if arg.as_os_str() == std::ffi::OsStr::new(BUNDLED_SUI_HELPER_ARG) => {
             run_bundled_sui_helper(args);
+        }
+        Some(arg) if arg.as_os_str() == std::ffi::OsStr::new(BYTECODE_VIEWER_HELPER_ARG) => {
+            run_bytecode_viewer_helper(args);
         }
         Some(arg) if arg.as_os_str() == std::ffi::OsStr::new(MOVY_FUZZ_HELPER_ARG) => {
             run_movy_fuzz_helper(args);
@@ -39,6 +43,74 @@ fn run_bundled_sui_helper(args: impl IntoIterator<Item = std::ffi::OsString>) {
             std::process::exit(1);
         }
     }
+}
+
+fn run_bytecode_viewer_helper(mut args: impl Iterator<Item = std::ffi::OsString>) {
+    let Some(package_root) = args.next() else {
+        eprintln!("missing package root");
+        std::process::exit(1);
+    };
+    let Some(module_name) = args.next() else {
+        eprintln!("missing module name");
+        std::process::exit(1);
+    };
+    let mut interactive = false;
+    let mut bytecode_map = false;
+    let mut debug = false;
+
+    for arg in args {
+        match arg.to_string_lossy().as_ref() {
+            "--interactive" => interactive = true,
+            "--bytecode-map" => bytecode_map = true,
+            "--debug" => debug = true,
+            unknown => {
+                eprintln!("unknown bytecode viewer option: {unknown}");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    let package_root = std::path::PathBuf::from(package_root);
+    let module_name = module_name.to_string_lossy().into_owned();
+    let install_dir = tempfile::tempdir().expect("bytecode viewer install dir");
+    let mut build_config = move_package_alt_compilation::build_config::BuildConfig::default();
+    build_config.install_dir = Some(install_dir.path().to_path_buf());
+    let disassemble = move_cli::base::disassemble::Disassemble {
+        interactive,
+        package_name: None,
+        module_or_script_name: module_name,
+        debug,
+        bytecode_map,
+    };
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("bytecode viewer runtime");
+    let result = runtime.block_on(
+        disassemble
+            .execute::<sui_package_alt::SuiFlavor>(Some(package_root.as_path()), build_config),
+    );
+    if interactive {
+        restore_bytecode_viewer_terminal();
+    }
+
+    match result {
+        Ok(()) => std::process::exit(0),
+        Err(error) => {
+            eprintln!("{error:#}");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn restore_bytecode_viewer_terminal() {
+    let mut stdout = std::io::stdout();
+    let _ = crossterm::execute!(
+        stdout,
+        crossterm::event::DisableMouseCapture,
+        crossterm::terminal::LeaveAlternateScreen
+    );
+    let _ = crossterm::terminal::disable_raw_mode();
 }
 
 fn run_movy_fuzz_helper(mut args: impl Iterator<Item = std::ffi::OsString>) {

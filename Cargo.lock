@@ -12491,12 +12491,16 @@ name = "peregrine-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "crossterm 0.25.0",
+ "move-cli",
+ "move-package-alt-compilation",
  "peregrine-adapters",
  "peregrine-dynamic-analysis",
  "peregrine-import-engine",
  "peregrine-static-analysis",
  "serde",
  "serde_json",
+ "sui-package-alt",
  "tempfile",
  "tokio",
 ]

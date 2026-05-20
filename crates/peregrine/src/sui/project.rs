@@ -1,6 +1,6 @@
 use crate::{
     output::{CliDiagnostic, CliDiagnosticSeverity},
-    sui::args::VerifyArgs,
+    sui::args::{BytecodeArgs, VerifyArgs},
 };
 use peregrine_static_analysis::{discover_move_project_fast, MoveModule};
 use std::{
@@ -19,6 +19,13 @@ pub struct CliContext {
 pub struct FormalTarget {
     pub file_path: String,
     pub module_name: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BytecodeTarget {
+    pub file_path: String,
+    pub module_name: String,
+    pub source_path: PathBuf,
 }
 
 pub fn resolve_workspace_root(project_root: impl AsRef<Path>) -> Result<PathBuf, CliDiagnostic> {
@@ -125,6 +132,76 @@ pub fn formal_targets(
     }
 
     Ok(targets)
+}
+
+pub fn bytecode_target(
+    context: &CliContext,
+    args: &BytecodeArgs,
+) -> Result<BytecodeTarget, CliDiagnostic> {
+    let project = discover_move_project_fast(&context.project_root);
+    let Some(package) = project
+        .packages
+        .iter()
+        .find(|package| normalize_path_label(Path::new(&package.path)) == context.package_path)
+    else {
+        return Err(CliDiagnostic::error(
+            "bytecode",
+            format!(
+                "Could not discover package `{}` under {}.",
+                context.package_path,
+                context.project_root.display()
+            ),
+        ));
+    };
+    let requested_module = args
+        .module
+        .as_deref()
+        .map(str::trim)
+        .filter(|module| !module.is_empty());
+    let requested_file = args
+        .file
+        .as_deref()
+        .map(normalize_requested_file)
+        .filter(|file| !file.is_empty());
+
+    let targets = package
+        .modules
+        .iter()
+        .filter(|module| {
+            requested_file.as_deref().map_or(true, |file| {
+                normalize_path_label(Path::new(&module.file_path)) == file
+            })
+        })
+        .filter(|module| {
+            requested_module.map_or(true, |requested| module_matches(requested, module))
+        })
+        .map(|module| BytecodeTarget {
+            file_path: module.file_path.clone(),
+            module_name: module.name.clone(),
+            source_path: context.project_root.join(&module.file_path),
+        })
+        .collect::<Vec<_>>();
+
+    match targets.as_slice() {
+        [] => Err(CliDiagnostic {
+            severity: CliDiagnosticSeverity::Error,
+            source: "bytecode".to_string(),
+            code: Some("NoBytecodeTarget".to_string()),
+            message: "No Move module matched the requested bytecode target.".to_string(),
+            file: requested_file,
+            span: None,
+        }),
+        [target] => Ok(target.clone()),
+        _ => Err(CliDiagnostic {
+            severity: CliDiagnosticSeverity::Error,
+            source: "bytecode".to_string(),
+            code: Some("AmbiguousBytecodeTarget".to_string()),
+            message: "More than one Move module matched. Pass --module or --file to choose one."
+                .to_string(),
+            file: requested_file,
+            span: None,
+        }),
+    }
 }
 
 pub fn resolve_output_path(workspace_root: &Path, output: Option<&Path>) -> PathBuf {
@@ -295,6 +372,35 @@ mod tests {
                 module_name: "m".to_string(),
             }]
         );
+    }
+
+    #[test]
+    fn discovers_bytecode_target_by_module_name_without_using_file_stem() {
+        let temp = tempdir().expect("tempdir");
+        fs::create_dir_all(temp.path().join("sources")).expect("sources");
+        fs::write(
+            temp.path().join("Move.toml"),
+            "[package]\nname = \"demo\"\n",
+        )
+        .expect("manifest");
+        fs::write(
+            temp.path().join("sources/not_the_module_name.move"),
+            "module demo::actual { public fun ping() {} }",
+        )
+        .expect("source");
+        let context = resolve_context(temp.path(), ".").expect("context");
+        let args = BytecodeArgs {
+            module: Some("actual".to_string()),
+            file: None,
+            interactive: false,
+            bytecode_map: false,
+            debug: false,
+        };
+
+        let target = bytecode_target(&context, &args).expect("target");
+
+        assert_eq!(target.module_name, "actual");
+        assert_eq!(target.file_path, "sources/not_the_module_name.move");
     }
 
     #[test]

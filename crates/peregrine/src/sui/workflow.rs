@@ -5,8 +5,8 @@ use crate::{
         args::AnalyzeArgs,
         project::{resolve_context, resolve_workspace_root},
         runners::{
-            run_analyze, run_build, run_coverage, run_fuzz, run_import_package, run_new_package,
-            run_test, run_verify,
+            run_analyze, run_build, run_bytecode, run_coverage, run_fuzz, run_import_package,
+            run_new_package, run_test, run_verify,
         },
     },
 };
@@ -15,6 +15,17 @@ use std::time::Instant;
 pub fn execute(cli: &Cli) -> CliReport {
     let started_at = Instant::now();
     let command_name = cli.command.name();
+
+    if matches!(&cli.command, CliCommand::Bytecode(args) if args.interactive && cli.json) {
+        return CliReport::usage_error(
+            command_name,
+            started_at,
+            CliDiagnostic::error(
+                "bytecode",
+                "Interactive bytecode viewer cannot be combined with --json.",
+            ),
+        );
+    }
 
     match &cli.command {
         CliCommand::ImportPackage(args) => {
@@ -52,6 +63,7 @@ pub fn execute(cli: &Cli) -> CliReport {
                 CliCommand::Build => vec![run_build(&context)],
                 CliCommand::Test => vec![run_test(&context)],
                 CliCommand::Coverage => run_coverage(&context),
+                CliCommand::Bytecode(args) => vec![run_bytecode(&context, args)],
                 CliCommand::Fuzz(args) => vec![run_fuzz(&context, args)],
                 CliCommand::Verify(args) => run_verify(&context, args),
                 CliCommand::Analyze(args) => vec![run_analyze(&context, args)],

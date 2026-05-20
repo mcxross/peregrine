@@ -25,6 +25,24 @@ where
     run_peregrine_child_in(args, None)
 }
 
+pub(super) fn run_peregrine_child_interactive<I>(args: I) -> Result<ChildOutput, String>
+where
+    I: IntoIterator<Item = OsString>,
+{
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let status = Command::new(executable)
+        .args(args)
+        .status()
+        .map_err(|error| format!("Could not run Peregrine helper process: {error}"))?;
+
+    Ok(ChildOutput {
+        status: status.code(),
+        stdout: String::new(),
+        stderr: String::new(),
+    })
+}
+
 pub(super) fn run_peregrine_child_in<I>(
     args: I,
     current_dir: Option<&Path>,

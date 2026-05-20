@@ -29,6 +29,24 @@ pub struct VerifyArgs {
 }
 
 #[derive(Clone, Debug, Args)]
+pub struct BytecodeArgs {
+    #[arg(long = "module", value_name = "NAME")]
+    pub module: Option<String>,
+
+    #[arg(long, value_name = "PATH")]
+    pub file: Option<String>,
+
+    #[arg(long)]
+    pub interactive: bool,
+
+    #[arg(long = "bytecode-map")]
+    pub bytecode_map: bool,
+
+    #[arg(long = "Xdebug")]
+    pub debug: bool,
+}
+
+#[derive(Clone, Debug, Args)]
 pub struct AnalyzeArgs {
     #[arg(long)]
     pub fail_on_findings: bool,
