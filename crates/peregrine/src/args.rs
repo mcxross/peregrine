@@ -1,6 +1,6 @@
 use crate::sui::args::{
-    AnalyzeArgs, BytecodeArgs, CheckAllArgs, FuzzArgs, ImportPackageArgs, NewPackageArgs,
-    SignaturesArgs, VerifyArgs,
+    AnalyzeArgs, BytecodeArgs, CallGraphArgs, CfgArgs, CheckAllArgs, FuzzArgs, ImportPackageArgs,
+    NewPackageArgs, ObjectGraphArgs, SignaturesArgs, VerifyArgs,
 };
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -34,6 +34,12 @@ pub enum CliCommand {
     Bytecode(BytecodeArgs),
     #[command(name = "signatures", visible_alias = "function-signatures")]
     Signatures(SignaturesArgs),
+    #[command(name = "call-graph", visible_alias = "callgraph")]
+    CallGraph(CallGraphArgs),
+    #[command(name = "object-graph", visible_alias = "objectgraph")]
+    ObjectGraph(ObjectGraphArgs),
+    #[command(name = "cfg", visible_alias = "control-flow-graph")]
+    Cfg(CfgArgs),
     Fuzz(FuzzArgs),
     Verify(VerifyArgs),
     Analyze(AnalyzeArgs),
@@ -53,6 +59,9 @@ impl CliCommand {
             Self::Coverage => "coverage",
             Self::Bytecode(_) => "bytecode",
             Self::Signatures(_) => "signatures",
+            Self::CallGraph(_) => "call-graph",
+            Self::ObjectGraph(_) => "object-graph",
+            Self::Cfg(_) => "cfg",
             Self::Fuzz(_) => "fuzz",
             Self::Verify(_) => "verify",
             Self::Analyze(_) => "analyze",
@@ -175,6 +184,53 @@ mod tests {
         };
         assert_eq!(args.modules, ["orders", "policy"]);
         assert_eq!(args.file.as_deref(), Some("sources/orders.move"));
+    }
+
+    #[test]
+    fn parses_graph_output_options() {
+        let cli = Cli::try_parse_from([
+            "peregrine",
+            "call-graph",
+            "--module",
+            "orders",
+            "--include-external",
+            "--dot",
+            "--output",
+            "graphs/calls.dot",
+        ])
+        .expect("cli args");
+
+        let CliCommand::CallGraph(args) = cli.command else {
+            panic!("expected call-graph command");
+        };
+        assert_eq!(args.modules, ["orders"]);
+        assert!(args.include_external);
+        assert!(args.output.dot);
+        assert_eq!(
+            args.output.output.as_deref(),
+            Some(std::path::Path::new("graphs/calls.dot"))
+        );
+    }
+
+    #[test]
+    fn parses_cfg_target() {
+        let cli = Cli::try_parse_from([
+            "peregrine",
+            "cfg",
+            "--module",
+            "vault",
+            "--function",
+            "deposit",
+            "--dot",
+        ])
+        .expect("cli args");
+
+        let CliCommand::Cfg(args) = cli.command else {
+            panic!("expected cfg command");
+        };
+        assert_eq!(args.module.as_deref(), Some("vault"));
+        assert_eq!(args.function.as_deref(), Some("deposit"));
+        assert!(args.output.dot);
     }
 
     #[test]

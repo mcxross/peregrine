@@ -259,8 +259,10 @@ fn direct_human_stdout(report: &CliReport) -> Option<String> {
         return None;
     };
 
-    if report.command == "signatures"
-        && report.status == CliStatus::Passed
+    if matches!(
+        report.command.as_str(),
+        "signatures" | "call-graph" | "object-graph" | "cfg"
+    ) && report.status == CliStatus::Passed
         && !step.stdout.trim().is_empty()
     {
         return Some(step.stdout.trim_end().to_string());

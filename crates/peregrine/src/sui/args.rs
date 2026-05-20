@@ -56,6 +56,51 @@ pub struct SignaturesArgs {
 }
 
 #[derive(Clone, Debug, Args)]
+pub struct GraphOutputArgs {
+    #[arg(long)]
+    pub dot: bool,
+
+    #[arg(long, value_name = "PATH")]
+    pub output: Option<PathBuf>,
+}
+
+#[derive(Clone, Debug, Args)]
+pub struct CallGraphArgs {
+    #[arg(long = "module", value_name = "NAME")]
+    pub modules: Vec<String>,
+
+    #[arg(long)]
+    pub include_external: bool,
+
+    #[command(flatten)]
+    pub output: GraphOutputArgs,
+}
+
+#[derive(Clone, Debug, Args)]
+pub struct ObjectGraphArgs {
+    #[arg(long = "module", value_name = "NAME")]
+    pub modules: Vec<String>,
+
+    #[arg(long)]
+    pub include_external: bool,
+
+    #[command(flatten)]
+    pub output: GraphOutputArgs,
+}
+
+#[derive(Clone, Debug, Args)]
+pub struct CfgArgs {
+    #[arg(long = "module", value_name = "NAME")]
+    pub module: Option<String>,
+
+    #[arg(long = "function", value_name = "NAME")]
+    pub function: Option<String>,
+
+    #[command(flatten)]
+    pub output: GraphOutputArgs,
+}
+
+#[derive(Clone, Debug, Args)]
 pub struct AnalyzeArgs {
     #[arg(long)]
     pub fail_on_findings: bool,

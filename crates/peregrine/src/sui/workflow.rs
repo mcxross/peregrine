@@ -5,8 +5,9 @@ use crate::{
         args::AnalyzeArgs,
         project::{resolve_context, resolve_workspace_root},
         runners::{
-            run_analyze, run_build, run_bytecode, run_coverage, run_fuzz, run_import_package,
-            run_new_package, run_signatures, run_test, run_verify,
+            run_analyze, run_build, run_bytecode, run_call_graph, run_cfg, run_coverage, run_fuzz,
+            run_import_package, run_new_package, run_object_graph, run_signatures, run_test,
+            run_verify,
         },
     },
 };
@@ -65,6 +66,9 @@ pub fn execute(cli: &Cli) -> CliReport {
                 CliCommand::Coverage => run_coverage(&context),
                 CliCommand::Bytecode(args) => vec![run_bytecode(&context, args)],
                 CliCommand::Signatures(args) => vec![run_signatures(&context, args)],
+                CliCommand::CallGraph(args) => vec![run_call_graph(&context, args)],
+                CliCommand::ObjectGraph(args) => vec![run_object_graph(&context, args)],
+                CliCommand::Cfg(args) => vec![run_cfg(&context, args)],
                 CliCommand::Fuzz(args) => vec![run_fuzz(&context, args)],
                 CliCommand::Verify(args) => run_verify(&context, args),
                 CliCommand::Analyze(args) => vec![run_analyze(&context, args)],
