@@ -44,9 +44,10 @@ pub use peregrine_types::analysis::{
     RuleMetric, RuleOutcome, RuleSet, RuleSetMetadata, RuleSetProvider, Severity, SourceFile, Span,
 };
 pub use plugins::{
-    AnalyzerPluginRegistry, AnalyzerPluginRegistryFile, InstalledAnalyzerPlugin,
-    PluginActiveRuleConfig, PluginAnalyzeInput, PluginAnalyzeOutput, PluginManifest,
-    PluginManifestInput, PluginRuleManifest, PluginRuleSetManifest, WasmPluginHost,
+    AnalysisPluginHost, AnalyzerPluginRegistry, AnalyzerPluginRegistryFile,
+    InstalledAnalyzerPlugin, PluginActiveRuleConfig, PluginAnalysisReport, PluginAnalyzeInput,
+    PluginAnalyzeOutput, PluginManifest, PluginManifestInput, PluginRuleManifest,
+    PluginRuleSetManifest,
 };
 pub use project::{
     discover_move_project, discover_move_project_fast, discover_move_project_shallow,

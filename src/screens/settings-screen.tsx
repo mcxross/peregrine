@@ -859,6 +859,9 @@ function PluginRow({
           <Badge className="rounded px-1.5 py-0 text-[10px]" variant="secondary">
             v{plugin.version}
           </Badge>
+          <Badge className="rounded px-1.5 py-0 text-[10px]" variant="outline">
+            {plugin.runtime === "wasm" ? "WASM" : "Native"}
+          </Badge>
         </div>
         <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground">{plugin.path}</p>
       </div>
@@ -1227,7 +1230,7 @@ async function openAnalyzerPluginPath(): Promise<string | null> {
 
   const selectedPath = await open({
     directory: false,
-    filters: [{ extensions: ["wasm"], name: "WASM analyzer plugin" }],
+    filters: [{ extensions: ["wasm", "dylib", "so", "dll"], name: "Analyzer plugin" }],
     multiple: false,
     title: "Install analyzer plugin",
   });

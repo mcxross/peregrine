@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use peregrine_static_analysis::{
-    AnalysisConfig, AnalysisEngine, AnalysisEngineOptions, AnalysisRuleCatalog,
-    AnalyzerPluginRegistry, InstalledAnalyzerPlugin, RuleConfig, Severity, WasmPluginHost,
+    AnalysisConfig, AnalysisEngine, AnalysisEngineOptions, AnalysisPluginHost, AnalysisRuleCatalog,
+    AnalyzerPluginRegistry, InstalledAnalyzerPlugin, RuleConfig, Severity,
 };
 use serde::Deserialize;
 use tauri::Manager;
@@ -36,7 +36,7 @@ pub(crate) async fn install_analyzer_plugin(
 ) -> Result<InstalledAnalyzerPlugin, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let registry = analyzer_registry(&app)?;
-        registry.install_plugin(PathBuf::from(plugin_path), &WasmPluginHost)
+        registry.install_plugin(PathBuf::from(plugin_path), &AnalysisPluginHost)
     })
     .await
     .map_err(|error| format!("Could not join analyzer plugin install task: {error}"))?

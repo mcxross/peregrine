@@ -7,7 +7,7 @@ use crate::{
     parser::parse_package,
     plugins::{
         plugin_manifest_rulesets, plugin_rule_config_value, resolve_plugin_path,
-        AnalyzerPluginRegistry, PluginActiveRuleConfig, PluginManifest, WasmPluginHost,
+        AnalysisPluginHost, AnalyzerPluginRegistry, PluginActiveRuleConfig, PluginManifest,
     },
     sui::{rules::complexity::ComplexityRuleSetProvider, SuiRuleSetProvider},
 };
@@ -18,7 +18,7 @@ use peregrine_types::analysis::{
 
 pub struct AnalysisEngine {
     providers: Vec<Box<dyn RuleSetProvider>>,
-    plugin_host: WasmPluginHost,
+    plugin_host: AnalysisPluginHost,
 }
 
 impl Default for AnalysisEngine {
@@ -34,7 +34,7 @@ impl AnalysisEngine {
                 Box::new(ComplexityRuleSetProvider),
                 Box::new(SuiRuleSetProvider),
             ],
-            plugin_host: WasmPluginHost,
+            plugin_host: AnalysisPluginHost,
         }
     }
 

@@ -587,7 +587,7 @@ export type InstalledAnalyzerPlugin = {
   pluginId: string;
   version: string;
   kind: string;
-  runtime: "wasm";
+  runtime: "wasm" | "native";
   path: string;
   checksum: string;
   enabled: boolean;
