@@ -1,5 +1,4 @@
 import type { LanguageModel } from "ai";
-import { createOllama } from "ai-sdk-ollama/browser";
 
 import type {
   AgentProviderConfig,
@@ -7,7 +6,7 @@ import type {
 } from "@/features/agents/types";
 
 export type ModelProviderAdapter = ModelProviderDescriptor & {
-  resolveLanguageModel: (config: AgentProviderConfig) => LanguageModel;
+  resolveLanguageModel: (config: AgentProviderConfig) => LanguageModel | Promise<LanguageModel>;
 };
 
 const OLLAMA_DEFAULT_ENDPOINT = "http://127.0.0.1:11434";
@@ -70,7 +69,8 @@ export const modelProviderAdapters: ModelProviderAdapter[] = [
     modelIds: ["llama3.2", "qwen2.5-coder", "mistral", "deepseek-r1"],
     supportsTools: true,
     supportsLocalModels: true,
-    resolveLanguageModel: (config) => {
+    resolveLanguageModel: async (config) => {
+      const { createOllama } = await import("ai-sdk-ollama/browser");
       const provider = createOllama({
         baseURL: config.endpoint || OLLAMA_DEFAULT_ENDPOINT,
       });
@@ -95,4 +95,3 @@ export function providerModelOptions(config: AgentProviderConfig) {
 
   return [...dynamicModel, ...provider.modelIds];
 }
-

@@ -1,3 +1,4 @@
-pub const BUNDLED_SUI_HELPER_ARG: &str = "--peregrine-bundled-sui";
-pub const FORMAL_VERIFICATION_HELPER_ARG: &str = "--peregrine-formal-verification";
-pub const MOVY_FUZZ_HELPER_ARG: &str = "--peregrine-movy-fuzz";
+pub use peregrine_helper_protocol::{
+    resolve_external_helper_executable, resolve_helper_executable, BUNDLED_SUI_HELPER_ARG,
+    FORMAL_VERIFICATION_HELPER_ARG, MOVY_FUZZ_HELPER_ARG,
+};

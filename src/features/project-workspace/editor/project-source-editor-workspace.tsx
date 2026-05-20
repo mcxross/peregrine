@@ -54,7 +54,7 @@ export function ProjectSourceEditorWorkspace({
         return [...current, createOpenFileTab(path)];
       });
 
-      void loadFilePreview(packageTree, path)
+      void loadFilePreview(packageTree, path, { includeHighlightedHtml: false })
         .then((preview) => {
           if (rootPathRef.current !== rootPathAtRequest) {
             return;

@@ -4,6 +4,8 @@ members = [
   "crates/peregrine",
   "crates/peregrine-adapters",
   "crates/peregrine-dynamic-analysis",
+  "crates/peregrine-helper",
+  "crates/peregrine-helper-protocol",
   "crates/peregrine-indexer",
   "crates/peregrine-import-engine",
   "crates/peregrine-package-resolution",
@@ -40,6 +42,7 @@ move-stackless-bytecode = { path = "../oss/sui-prover/crates/move-stackless-byte
 movy = { path = "../oss/movy/crates/movy", default-features = false, features = ["sui-fuzz"] }
 peregrine-adapters = { path = "crates/peregrine-adapters" }
 peregrine-dynamic-analysis = { path = "crates/peregrine-dynamic-analysis" }
+peregrine-helper-protocol = { path = "crates/peregrine-helper-protocol" }
 peregrine-indexer = { path = "crates/peregrine-indexer" }
 peregrine-import-engine = { path = "crates/peregrine-import-engine" }
 peregrine-package-resolution = { path = "crates/peregrine-package-resolution" }

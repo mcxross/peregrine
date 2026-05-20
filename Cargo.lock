@@ -12425,6 +12425,7 @@ dependencies = [
  "base64 0.22.1",
  "peregrine-adapters",
  "peregrine-dynamic-analysis",
+ "peregrine-helper-protocol",
  "peregrine-import-engine",
  "peregrine-indexer",
  "peregrine-plugins",
@@ -12438,6 +12439,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
+ "tempfile",
  "tokio",
 ]
 
@@ -12497,6 +12499,7 @@ dependencies = [
  "move-package-alt-compilation",
  "peregrine-adapters",
  "peregrine-dynamic-analysis",
+ "peregrine-helper-protocol",
  "peregrine-import-engine",
  "peregrine-static-analysis",
  "serde",
@@ -12518,6 +12521,31 @@ dependencies = [
  "tempfile",
  "tokio",
  "walkdir",
+]
+
+[[package]]
+name = "peregrine-helper"
+version = "0.1.0"
+dependencies = [
+ "crossterm 0.25.0",
+ "move-cli",
+ "move-package-alt-compilation",
+ "peregrine-adapters",
+ "peregrine-dynamic-analysis",
+ "peregrine-helper-protocol",
+ "serde_json",
+ "sui-package-alt",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "peregrine-helper-protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

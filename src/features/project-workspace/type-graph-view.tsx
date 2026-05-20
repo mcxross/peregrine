@@ -202,12 +202,14 @@ export function TypeGraphView({
         return;
       }
 
-      console.info("[TypeGraph] source open requested", {
-        filePath: span.filePath,
-        line: span.startLine || 1,
-        selectedEdgeId,
-        selectedTypeId,
-      });
+      if (import.meta.env.DEV) {
+        console.info("[TypeGraph] source open requested", {
+          filePath: span.filePath,
+          line: span.startLine || 1,
+          selectedEdgeId,
+          selectedTypeId,
+        });
+      }
       onOpenSourceLocation({ filePath: span.filePath, line: span.startLine || 1 });
     },
     [onOpenSourceLocation, selectedEdgeId, selectedTypeId],
@@ -396,10 +398,12 @@ export function TypeGraphView({
             nodesDraggable={false}
             nodesFocusable={false}
             onEdgeClick={(_, edge) => {
-              console.info("[TypeGraph] edge clicked", {
-                edgeId: edge.id,
-                selectedTypeId,
-              });
+              if (import.meta.env.DEV) {
+                console.info("[TypeGraph] edge clicked", {
+                  edgeId: edge.id,
+                  selectedTypeId,
+                });
+              }
               setSelectedEdgeId(edge.id);
               setIsInspectorOpen(true);
             }}

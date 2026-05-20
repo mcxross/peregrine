@@ -108,10 +108,15 @@ pub(crate) async fn move_project_path_exists(
 pub(crate) async fn load_file_preview(
     root_path: String,
     relative_path: String,
+    include_highlighted_html: Option<bool>,
 ) -> Result<FilePreview, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let file_path = resolve_package_child_path(&root_path, &relative_path)?;
-        build_file_preview(&file_path, relative_path)
+        build_file_preview(
+            &file_path,
+            relative_path,
+            include_highlighted_html.unwrap_or(true),
+        )
     })
     .await
     .map_err(|error| format!("Could not join file preview task: {error}"))?
@@ -122,12 +127,17 @@ pub(crate) async fn save_text_file(
     root_path: String,
     relative_path: String,
     contents: String,
+    include_highlighted_html: Option<bool>,
 ) -> Result<FilePreview, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let file_path = resolve_package_child_path(&root_path, &relative_path)?;
         fs::write(&file_path, contents)
             .map_err(|error| format!("Could not write {}: {error}", file_path.display()))?;
-        build_file_preview(&file_path, relative_path)
+        build_file_preview(
+            &file_path,
+            relative_path,
+            include_highlighted_html.unwrap_or(true),
+        )
     })
     .await
     .map_err(|error| format!("Could not join file save task: {error}"))?
@@ -419,4 +429,63 @@ pub(crate) fn resolve_package_child_path(
     }
 
     Ok(canonical_file_path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn load_file_preview_defaults_to_highlighted_html() {
+        let directory = tempdir().expect("tempdir");
+        let file_path = directory.path().join("module.move");
+        fs::write(&file_path, "module 0x1::example { fun demo() {} }\n").expect("write source");
+
+        let preview = tauri::async_runtime::block_on(load_file_preview(
+            directory.path().to_string_lossy().into_owned(),
+            "module.move".to_string(),
+            None,
+        ))
+        .expect("preview");
+
+        let FilePreview::Text {
+            highlighted_html,
+            source,
+            ..
+        } = preview
+        else {
+            panic!("expected text preview");
+        };
+
+        assert_eq!(source, "module 0x1::example { fun demo() {} }\n");
+        assert!(highlighted_html.contains("<span"));
+    }
+
+    #[test]
+    fn load_file_preview_can_skip_highlighted_html() {
+        let directory = tempdir().expect("tempdir");
+        let file_path = directory.path().join("module.move");
+        fs::write(&file_path, "module 0x1::example { fun demo() {} }\n").expect("write source");
+
+        let preview = tauri::async_runtime::block_on(load_file_preview(
+            directory.path().to_string_lossy().into_owned(),
+            "module.move".to_string(),
+            Some(false),
+        ))
+        .expect("preview");
+
+        let FilePreview::Text {
+            highlighted_html,
+            source,
+            ..
+        } = preview
+        else {
+            panic!("expected text preview");
+        };
+
+        assert_eq!(source, "module 0x1::example { fun demo() {} }\n");
+        assert_eq!(highlighted_html, "");
+    }
 }

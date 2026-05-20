@@ -1,6 +1,9 @@
-use crate::output::{
-    command_details, elapsed_ms, CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep,
-    EXIT_WORKFLOW_FAILED,
+use crate::{
+    helper_args::resolve_helper_executable,
+    output::{
+        command_details, elapsed_ms, CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep,
+        EXIT_WORKFLOW_FAILED,
+    },
 };
 use serde_json::Value;
 use std::{
@@ -29,8 +32,7 @@ pub(super) fn run_peregrine_child_interactive<I>(args: I) -> Result<ChildOutput,
 where
     I: IntoIterator<Item = OsString>,
 {
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let executable = resolve_helper_executable()?;
     let status = Command::new(executable)
         .args(args)
         .status()
@@ -50,8 +52,7 @@ pub(super) fn run_peregrine_child_in<I>(
 where
     I: IntoIterator<Item = OsString>,
 {
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let executable = resolve_helper_executable()?;
     let mut command = Command::new(executable);
 
     command

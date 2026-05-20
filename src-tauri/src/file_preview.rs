@@ -56,7 +56,11 @@ pub enum FilePreview {
     },
 }
 
-pub fn build_file_preview(file_path: &Path, relative_path: String) -> Result<FilePreview, String> {
+pub fn build_file_preview(
+    file_path: &Path,
+    relative_path: String,
+    include_highlighted_html: bool,
+) -> Result<FilePreview, String> {
     let metadata = fs::metadata(file_path)
         .map_err(|error| format!("Could not inspect {}: {error}", file_path.display()))?;
 
@@ -85,7 +89,11 @@ pub fn build_file_preview(file_path: &Path, relative_path: String) -> Result<Fil
         }
         FileClass::Text(syntax) => {
             let source = decode_text(&bytes);
-            let highlighted_html = render_source(file_path, &source, syntax);
+            let highlighted_html = if include_highlighted_html {
+                render_source(file_path, &source, syntax)
+            } else {
+                String::new()
+            };
 
             Ok(FilePreview::Text {
                 path: relative_path,
@@ -385,5 +393,61 @@ fn escape_html_char(character: char) -> String {
         '"' => "&quot;".to_string(),
         '\'' => "&#39;".to_string(),
         _ => character.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn text_preview_can_include_highlighted_html() {
+        let directory = tempdir().expect("tempdir");
+        let file_path = directory.path().join("module.move");
+        fs::write(&file_path, "module 0x1::example { fun demo() {} }\n").expect("write source");
+
+        let preview =
+            build_file_preview(&file_path, "module.move".to_string(), true).expect("preview");
+
+        let FilePreview::Text {
+            highlighted_html,
+            language,
+            source,
+            ..
+        } = preview
+        else {
+            panic!("expected text preview");
+        };
+
+        assert_eq!(language, "Move");
+        assert_eq!(source, "module 0x1::example { fun demo() {} }\n");
+        assert!(highlighted_html.contains("<span"));
+        assert!(highlighted_html.contains("module"));
+    }
+
+    #[test]
+    fn text_preview_can_skip_highlighted_html() {
+        let directory = tempdir().expect("tempdir");
+        let file_path = directory.path().join("module.move");
+        fs::write(&file_path, "module 0x1::example { fun demo() {} }\n").expect("write source");
+
+        let preview =
+            build_file_preview(&file_path, "module.move".to_string(), false).expect("preview");
+
+        let FilePreview::Text {
+            highlighted_html,
+            language,
+            source,
+            ..
+        } = preview
+        else {
+            panic!("expected text preview");
+        };
+
+        assert_eq!(language, "Move");
+        assert_eq!(source, "module 0x1::example { fun demo() {} }\n");
+        assert_eq!(highlighted_html, "");
     }
 }

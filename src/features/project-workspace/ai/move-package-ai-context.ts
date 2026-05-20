@@ -183,7 +183,7 @@ function moduleSignatureContext(modules: MoveModule[]) {
 async function sourceContext(packageTree: PackageTree, modules: MoveModule[]) {
   const previews = await Promise.all(
     modules.map((moveModule) =>
-      loadFilePreview(packageTree, moveModule.filePath)
+      loadFilePreview(packageTree, moveModule.filePath, { includeHighlightedHtml: false })
         .then((preview) => ({
           moduleName: moveModule.name,
           preview,

@@ -216,18 +216,22 @@ export function MovePackagesOverviewScreen({
     const jumpKey = sourceJumpRequestKey(sourceJumpRequest);
 
     if (processedSourceJumpKeyRef.current === jumpKey) {
-      console.debug("[MovePackagesOverview] source jump already processed", {
-        key: jumpKey,
-        request: sourceJumpRequest,
-      });
+      if (import.meta.env.DEV) {
+        console.debug("[MovePackagesOverview] source jump already processed", {
+          key: jumpKey,
+          request: sourceJumpRequest,
+        });
+      }
       return;
     }
 
-    console.info("[MovePackagesOverview] source jump received", {
-      activePackage: movePackage.name,
-      activePackagePath: movePackage.path,
-      request: sourceJumpRequest,
-    });
+    if (import.meta.env.DEV) {
+      console.info("[MovePackagesOverview] source jump received", {
+        activePackage: movePackage.name,
+        activePackagePath: movePackage.path,
+        request: sourceJumpRequest,
+      });
+    }
     const matchingModule = movePackage.modules.find((moveModule) =>
       sameSourcePath(moveModule.filePath, sourceJumpRequest.filePath, movePackage.path),
     );
@@ -242,12 +246,14 @@ export function MovePackagesOverviewScreen({
     }
 
     processedSourceJumpKeyRef.current = jumpKey;
-    console.info("[MovePackagesOverview] opening editor for source jump", {
-      line: sourceJumpRequest.line,
-      module: matchingModule.name,
-      path: matchingModule.filePath,
-      token: sourceJumpRequest.token,
-    });
+    if (import.meta.env.DEV) {
+      console.info("[MovePackagesOverview] opening editor for source jump", {
+        line: sourceJumpRequest.line,
+        module: matchingModule.name,
+        path: matchingModule.filePath,
+        token: sourceJumpRequest.token,
+      });
+    }
     const nextSelectedModule = { moveModule: matchingModule, movePackage };
     setIsEditorMode(true);
     setActiveEditorPath(matchingModule.filePath);
@@ -652,14 +658,16 @@ function ModuleSourceEditorWorkspace({
       status: "loading",
     }));
 
-    loadFilePreview(packageTree, filePath)
+    loadFilePreview(packageTree, filePath, { includeHighlightedHtml: false })
       .then((nextPreview) => {
-        console.info("[ModuleSourceEditorWorkspace] file preview loaded", {
-          filePath,
-          kind: nextPreview.kind,
-          language: nextPreview.kind === "text" ? nextPreview.language : null,
-          sourceLength: nextPreview.kind === "text" ? nextPreview.source.length : null,
-        });
+        if (import.meta.env.DEV) {
+          console.info("[ModuleSourceEditorWorkspace] file preview loaded", {
+            filePath,
+            kind: nextPreview.kind,
+            language: nextPreview.kind === "text" ? nextPreview.language : null,
+            sourceLength: nextPreview.kind === "text" ? nextPreview.source.length : null,
+          });
+        }
         if (nextPreview.kind !== "text") {
           updateTab(filePath, (tab) => ({
             ...tab,
@@ -746,19 +754,23 @@ function ModuleSourceEditorWorkspace({
     const jumpKey = sourceJumpRequestKey(sourceJumpRequest);
 
     if (processedEditorJumpKeyRef.current === jumpKey) {
-      console.debug("[ModuleSourceEditorWorkspace] editor jump already dispatched", {
-        activePath: activeTab.selectedModule.moveModule.filePath,
-        key: jumpKey,
-      });
+      if (import.meta.env.DEV) {
+        console.debug("[ModuleSourceEditorWorkspace] editor jump already dispatched", {
+          activePath: activeTab.selectedModule.moveModule.filePath,
+          key: jumpKey,
+        });
+      }
       return;
     }
 
-    console.info("[ModuleSourceEditorWorkspace] applying source jump", {
-      activePath: activeTab.selectedModule.moveModule.filePath,
-      activePackagePath: activeTab.selectedModule.movePackage.path,
-      request: sourceJumpRequest,
-      status: activeTab.status,
-    });
+    if (import.meta.env.DEV) {
+      console.info("[ModuleSourceEditorWorkspace] applying source jump", {
+        activePath: activeTab.selectedModule.moveModule.filePath,
+        activePackagePath: activeTab.selectedModule.movePackage.path,
+        request: sourceJumpRequest,
+        status: activeTab.status,
+      });
+    }
     if (!sameSourcePath(
       activeTab.selectedModule.moveModule.filePath,
       sourceJumpRequest.filePath,
@@ -772,11 +784,13 @@ function ModuleSourceEditorWorkspace({
     }
 
     processedEditorJumpKeyRef.current = jumpKey;
-    console.info("[ModuleSourceEditorWorkspace] dispatching editor jump", {
-      line: sourceJumpRequest.line,
-      path: activeTab.selectedModule.moveModule.filePath,
-      token: sourceJumpRequest.token,
-    });
+    if (import.meta.env.DEV) {
+      console.info("[ModuleSourceEditorWorkspace] dispatching editor jump", {
+        line: sourceJumpRequest.line,
+        path: activeTab.selectedModule.moveModule.filePath,
+        token: sourceJumpRequest.token,
+      });
+    }
     setJumpRequest({
       line: sourceJumpRequest.line,
       token: sourceJumpRequest.token,

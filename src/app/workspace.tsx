@@ -1,3 +1,4 @@
+import React from "react";
 import { EmptyProjectScreen } from "@/features/empty-project/empty-project-screen";
 import type { SuiNetworkSelection } from "@/app/sui-network";
 import type {
@@ -12,7 +13,12 @@ import type {
   BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
 import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
-import { ProjectWorkspace } from "@/features/project-workspace/project-workspace";
+
+const ProjectWorkspace = React.lazy(() =>
+  import("@/features/project-workspace/project-workspace").then((module) => ({
+    default: module.ProjectWorkspace,
+  })),
+);
 
 type WorkspaceProps = {
   activeWorkspaceTab: WorkspaceTab;
@@ -53,22 +59,24 @@ export function Workspace({
 }: WorkspaceProps) {
   if (packageTree) {
     return (
-      <ProjectWorkspace
-        activeWorkspaceTab={activeWorkspaceTab}
-        activePackageManifestPath={activePackageManifestPath}
-        buildLogSheet={buildLogSheet}
-        isDependencyGraphLoading={isDependencyGraphLoading}
-        isLeftPanelOpen={isLeftPanelOpen}
-        lastScannedAt={lastScannedAt}
-        loadAssessment={loadAssessment}
-        mode={mode}
-        onActivePackageManifestPathChange={onActivePackageManifestPathChange}
-        onCommandLog={onCommandLog}
-        onFormalVerificationTargetChange={onFormalVerificationTargetChange}
-        onProjectSelected={onProjectSelected}
-        onWorkspaceTabChange={onWorkspaceTabChange}
-        packageTree={packageTree}
-      />
+      <React.Suspense fallback={<WorkspaceLoadingState />}>
+        <ProjectWorkspace
+          activeWorkspaceTab={activeWorkspaceTab}
+          activePackageManifestPath={activePackageManifestPath}
+          buildLogSheet={buildLogSheet}
+          isDependencyGraphLoading={isDependencyGraphLoading}
+          isLeftPanelOpen={isLeftPanelOpen}
+          lastScannedAt={lastScannedAt}
+          loadAssessment={loadAssessment}
+          mode={mode}
+          onActivePackageManifestPathChange={onActivePackageManifestPathChange}
+          onCommandLog={onCommandLog}
+          onFormalVerificationTargetChange={onFormalVerificationTargetChange}
+          onProjectSelected={onProjectSelected}
+          onWorkspaceTabChange={onWorkspaceTabChange}
+          packageTree={packageTree}
+        />
+      </React.Suspense>
     );
   }
 
@@ -78,5 +86,13 @@ export function Workspace({
       onNetworkChange={onNetworkChange}
       onProjectSelected={onProjectSelected}
     />
+  );
+}
+
+function WorkspaceLoadingState() {
+  return (
+    <div className="grid h-full min-h-0 place-items-center bg-[var(--app-window)] px-6 text-sm text-muted-foreground">
+      Loading workspace...
+    </div>
   );
 }

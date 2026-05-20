@@ -1934,7 +1934,7 @@ async function analyzeFormalVerification(
 ): Promise<Pick<StepExecutionOutcome, "detail" | "state" | "summary">> {
   const previews = await Promise.all(
     movePackage.modules.map((moveModule) =>
-      loadFilePreview(packageTree, moveModule.filePath).catch(() => null),
+      loadFilePreview(packageTree, moveModule.filePath, { includeHighlightedHtml: false }).catch(() => null),
     ),
   );
   const sourceFiles = previews.filter(isTextPreview);

@@ -25,7 +25,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { runAgentWorkflowWithModel } from "@/features/agents/agent-runner";
 import { AgentWorkflowCanvas } from "@/features/agents/agent-workflow-canvas";
 import {
   agentStudioStateToProjectMetadata,
@@ -344,6 +343,7 @@ export function AgentsScreen({
     });
 
     try {
+      const { runAgentWorkflowWithModel } = await import("@/features/agents/agent-runner");
       const result = await runAgentWorkflowWithModel({
         agent: runAgent,
         onTrace: (event) => {

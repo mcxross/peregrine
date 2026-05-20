@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Titlebar } from "@/app/titlebar";
 import { defaultSuiNetworkSelection, type SuiNetworkSelection } from "@/app/sui-network";
@@ -30,14 +30,23 @@ import {
   type PackageLoadAssessment,
   type PackageLoadAssessmentState,
 } from "@/features/project-workspace/package-load-assessment";
-import { ProjectConfigDialog } from "@/features/project-workspace/project-config-dialog";
 import {
   type LaunchIndexState,
   useLaunchIndexer,
 } from "@/features/project-workspace/indexer/use-launch-indexer";
 import { defaultLayoutSettings } from "@/layout/layout-store";
 import { titlebarHeight } from "@/layout/window-chrome";
-import { SettingsScreen } from "@/screens/settings-screen";
+
+const ProjectConfigDialog = React.lazy(() =>
+  import("@/features/project-workspace/project-config-dialog").then((module) => ({
+    default: module.ProjectConfigDialog,
+  })),
+);
+const SettingsScreen = React.lazy(() =>
+  import("@/screens/settings-screen").then((module) => ({
+    default: module.SettingsScreen,
+  })),
+);
 
 const BUILD_FRESHNESS_WINDOW_MS = 3 * 60 * 1000;
 const LAUNCH_BUILD_STATUS_MESSAGES = [
@@ -932,11 +941,13 @@ export function AppShell({
       <section className="flex min-h-0">
         <div className="min-w-0 flex-1">
           {isSettings ? (
-            <SettingsScreen
-              activeMovePackage={activeMovePackage}
-              onBack={onCloseSettings}
-              packageTree={packageTree}
-            />
+            <React.Suspense fallback={<PanelLoadingState label="Loading settings..." />}>
+              <SettingsScreen
+                activeMovePackage={activeMovePackage}
+                onBack={onCloseSettings}
+                packageTree={packageTree}
+              />
+            </React.Suspense>
           ) : (
             <Workspace
               activeWorkspaceTab={activeWorkspaceTab}
@@ -961,12 +972,14 @@ export function AppShell({
       </section>
 
       {!isSettings && packageTree ? (
-        <ProjectConfigDialog
-          activeMovePackage={activeMovePackage}
-          open={isProjectConfigOpen}
-          onOpenChange={setIsProjectConfigOpen}
-          packageTree={packageTree}
-        />
+        <React.Suspense fallback={null}>
+          <ProjectConfigDialog
+            activeMovePackage={activeMovePackage}
+            open={isProjectConfigOpen}
+            onOpenChange={setIsProjectConfigOpen}
+            packageTree={packageTree}
+          />
+        </React.Suspense>
       ) : null}
 
       <LaunchStatusToasts
@@ -980,6 +993,14 @@ export function AppShell({
         }}
       />
     </main>
+  );
+}
+
+function PanelLoadingState({ label }: { label: string }) {
+  return (
+    <div className="grid h-full min-h-0 place-items-center bg-[var(--app-window)] px-6 text-sm text-muted-foreground">
+      {label}
+    </div>
   );
 }
 

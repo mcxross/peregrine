@@ -33,33 +33,64 @@ import {
   type MovePackage,
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
-import { AiFloatingWindow } from "@/features/project-workspace/ai/ai-floating-window";
-import { AgentsScreen } from "@/features/agents/agents-screen";
 import {
   BuildLogSheet,
   type BuildLogRun,
   type BuildLogSheetController,
   type BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
-import { BytecodeViewScreen } from "@/features/project-workspace/bytecode-view-screen";
-import { DependencyGraphScreen } from "@/features/project-workspace/dependency-graph-screen";
-import { ExecutionBuilderScreen } from "@/features/project-workspace/execution-builder-screen";
-import { ProjectSourceEditorWorkspace } from "@/features/project-workspace/editor/project-source-editor-workspace";
-import { MovePackagesOverviewScreen } from "@/features/project-workspace/move-packages-overview-screen";
 import { assessmentSidebarItems } from "@/features/project-workspace/package-load-assessment-cards";
 import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
 import type { SelectedMoveModule } from "@/features/project-workspace/module-signature-screen";
 import { findSourceModule } from "@/features/project-workspace/source-paths";
 import type { TypeGraphSourceLocation } from "@/features/project-workspace/type-graph-view";
-import {
-  SurfaceDetailScreen,
-  type SurfaceDetailKind,
-} from "@/features/project-workspace/surface-detail-screen";
+import type { SurfaceDetailKind } from "@/features/project-workspace/surface-detail-screen";
 import {
   workspaceSidebarWidth,
   workspaceStatusBarHeight,
 } from "@/layout/window-chrome";
 import { cn } from "@/lib/utils";
+
+const AiFloatingWindow = React.lazy(() =>
+  import("@/features/project-workspace/ai/ai-floating-window").then((module) => ({
+    default: module.AiFloatingWindow,
+  })),
+);
+const AgentsScreen = React.lazy(() =>
+  import("@/features/agents/agents-screen").then((module) => ({
+    default: module.AgentsScreen,
+  })),
+);
+const BytecodeViewScreen = React.lazy(() =>
+  import("@/features/project-workspace/bytecode-view-screen").then((module) => ({
+    default: module.BytecodeViewScreen,
+  })),
+);
+const DependencyGraphScreen = React.lazy(() =>
+  import("@/features/project-workspace/dependency-graph-screen").then((module) => ({
+    default: module.DependencyGraphScreen,
+  })),
+);
+const ExecutionBuilderScreen = React.lazy(() =>
+  import("@/features/project-workspace/execution-builder-screen").then((module) => ({
+    default: module.ExecutionBuilderScreen,
+  })),
+);
+const MovePackagesOverviewScreen = React.lazy(() =>
+  import("@/features/project-workspace/move-packages-overview-screen").then((module) => ({
+    default: module.MovePackagesOverviewScreen,
+  })),
+);
+const ProjectSourceEditorWorkspace = React.lazy(() =>
+  import("@/features/project-workspace/editor/project-source-editor-workspace").then((module) => ({
+    default: module.ProjectSourceEditorWorkspace,
+  })),
+);
+const SurfaceDetailScreen = React.lazy(() =>
+  import("@/features/project-workspace/surface-detail-screen").then((module) => ({
+    default: module.SurfaceDetailScreen,
+  })),
+);
 
 type ProjectWorkspaceProps = {
   activeWorkspaceTab: WorkspaceTab;
@@ -248,16 +279,18 @@ export function ProjectWorkspace({
 
   const openSourceLocation = React.useCallback(
     (location: TypeGraphSourceLocation) => {
-      console.info("[ProjectWorkspace] source jump requested", {
-        activePackageManifestPath,
-        location,
-        packages: packageTree.movePackages.map((movePackage) => ({
-          manifestPath: movePackage.manifestPath,
-          moduleCount: movePackage.modules.length,
-          name: movePackage.name,
-          path: movePackage.path,
-        })),
-      });
+      if (import.meta.env.DEV) {
+        console.info("[ProjectWorkspace] source jump requested", {
+          activePackageManifestPath,
+          location,
+          packages: packageTree.movePackages.map((movePackage) => ({
+            manifestPath: movePackage.manifestPath,
+            moduleCount: movePackage.modules.length,
+            name: movePackage.name,
+            path: movePackage.path,
+          })),
+        });
+      }
       const match = findSourceModule(packageTree.movePackages, location);
 
       if (!match) {
@@ -274,12 +307,14 @@ export function ProjectWorkspace({
         return;
       }
 
-      console.info("[ProjectWorkspace] source jump matched module", {
-        filePath: match.moveModule.filePath,
-        line: location.line,
-        module: match.moveModule.name,
-        package: match.movePackage.name,
-      });
+      if (import.meta.env.DEV) {
+        console.info("[ProjectWorkspace] source jump matched module", {
+          filePath: match.moveModule.filePath,
+          line: location.line,
+          module: match.moveModule.name,
+          package: match.movePackage.name,
+        });
+      }
       setActiveSurfaceDetail(null);
       setSelectedModule({ moveModule: match.moveModule, movePackage: match.movePackage });
       onActivePackageManifestPathChange(match.movePackage.manifestPath);
@@ -331,25 +366,27 @@ export function ProjectWorkspace({
         <WorkspaceErrorBoundary
           resetKey={`${mode}:${packageTree.rootPath}:${activeWorkspaceTab}:${activePackageManifestPath ?? ""}:${sourceJumpRequest?.token ?? "no-source-jump"}`}
         >
-          <WorkspaceMainPanel
-            activeWorkspaceTab={activeWorkspaceTab}
-            activeSurfaceDetail={activeSurfaceDetail}
-            activeMovePackage={activeMovePackage}
-            isDependencyGraphLoading={isDependencyGraphLoading}
-            mode={mode}
-            packageTree={packageTree}
-            packageName={packageName}
-            selectedModule={selectedModule}
-            onCommandLog={onCommandLog}
-            onProjectSelected={onProjectSelected}
-            onClearSelectedModule={() => setSelectedModule(null)}
-            onOpenSourceLocation={openSourceLocation}
-            onSelectModule={(movePackage, moveModule) => {
-              setActiveSurfaceDetail(null);
-              setSelectedModule({ moveModule, movePackage });
-            }}
-            sourceJumpRequest={sourceJumpRequest}
-          />
+          <React.Suspense fallback={<WorkspacePanelLoadingState />}>
+            <WorkspaceMainPanel
+              activeWorkspaceTab={activeWorkspaceTab}
+              activeSurfaceDetail={activeSurfaceDetail}
+              activeMovePackage={activeMovePackage}
+              isDependencyGraphLoading={isDependencyGraphLoading}
+              mode={mode}
+              packageTree={packageTree}
+              packageName={packageName}
+              selectedModule={selectedModule}
+              onCommandLog={onCommandLog}
+              onProjectSelected={onProjectSelected}
+              onClearSelectedModule={() => setSelectedModule(null)}
+              onOpenSourceLocation={openSourceLocation}
+              onSelectModule={(movePackage, moveModule) => {
+                setActiveSurfaceDetail(null);
+                setSelectedModule({ moveModule, movePackage });
+              }}
+              sourceJumpRequest={sourceJumpRequest}
+            />
+          </React.Suspense>
         </WorkspaceErrorBoundary>
         <BuildLogSheet
           bottomInset={workspaceStatusBarHeight}
@@ -380,13 +417,23 @@ export function ProjectWorkspace({
       ) : null}
 
       {!isEditorMode && activeMovePackage ? (
-        <AiFloatingWindow
-          activeMovePackage={activeMovePackage}
-          isOpen={isAiOpen}
-          onOpenChange={setIsAiOpen}
-          packageTree={packageTree}
-        />
+        <React.Suspense fallback={null}>
+          <AiFloatingWindow
+            activeMovePackage={activeMovePackage}
+            isOpen={isAiOpen}
+            onOpenChange={setIsAiOpen}
+            packageTree={packageTree}
+          />
+        </React.Suspense>
       ) : null}
+    </div>
+  );
+}
+
+function WorkspacePanelLoadingState() {
+  return (
+    <div className="grid h-full min-h-0 place-items-center bg-[var(--app-window)] px-6 text-sm text-muted-foreground">
+      Loading view...
     </div>
   );
 }

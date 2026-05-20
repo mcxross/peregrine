@@ -1,5 +1,6 @@
 use crate::helper_args::{
-    BUNDLED_SUI_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG, MOVY_FUZZ_HELPER_ARG,
+    resolve_helper_executable, BUNDLED_SUI_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG,
+    MOVY_FUZZ_HELPER_ARG,
 };
 use crate::{commands::files, validated_move_project_name};
 use peregrine_adapters::sui::{
@@ -237,8 +238,7 @@ fn run_movy_fuzz_worker(
     let header = "Deploying package into Movy's local Sui executor and starting Movy fuzzing...\n";
     emit_command_output_chunk(stream.as_ref(), "stdout", header);
 
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let executable = resolve_helper_executable()?;
     let mut process = Command::new(executable);
     process
         .arg(MOVY_FUZZ_HELPER_ARG)
@@ -276,8 +276,7 @@ fn run_formal_verification_worker(
     );
     emit_command_output_chunk(stream.as_ref(), "stdout", &header);
 
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let executable = resolve_helper_executable()?;
     let mut process = Command::new(executable);
     process
         .arg(FORMAL_VERIFICATION_HELPER_ARG)
@@ -467,8 +466,7 @@ fn run_bundled_package_command(
 
     emit_command_output_chunk(stream.as_ref(), "stdout", &header);
 
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let executable = resolve_helper_executable()?;
     let mut process = Command::new(executable);
     process
         .arg(BUNDLED_SUI_HELPER_ARG)
@@ -492,8 +490,7 @@ fn run_bundled_move_new_command(
 
     emit_command_output_chunk(stream.as_ref(), "stdout", &header);
 
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let executable = resolve_helper_executable()?;
     let mut process = Command::new(executable);
     process
         .arg(BUNDLED_SUI_HELPER_ARG)
@@ -733,8 +730,7 @@ fn run_package_script(
 }
 
 fn create_bundled_sui_shim_dir() -> Result<PathBuf, String> {
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    let executable = resolve_helper_executable()?;
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_nanos())

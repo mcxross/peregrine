@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "measure:perf": "bun scripts/measure-performance.ts",
+    "prepare:sidecars": "bun scripts/prepare-sidecars.ts",
     "test": "bun test packages/*/test",
     "preview": "vite preview",
     "tauri": "tauri"

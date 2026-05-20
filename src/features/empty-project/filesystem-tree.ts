@@ -802,8 +802,10 @@ export function resolvePackagePath(packageTree: PackageTree, relativePath: strin
 export async function loadFilePreview(
   packageTree: PackageTree,
   relativePath: string,
+  options?: { includeHighlightedHtml?: boolean },
 ) {
   return invoke<FilePreview>("load_file_preview", {
+    includeHighlightedHtml: options?.includeHighlightedHtml ?? true,
     rootPath: packageTree.rootPath,
     relativePath,
   });
@@ -813,11 +815,13 @@ export async function saveTextFile(
   packageTree: PackageTree,
   relativePath: string,
   contents: string,
+  options?: { includeHighlightedHtml?: boolean },
 ) {
   return invoke<FilePreview>("save_text_file", {
     rootPath: packageTree.rootPath,
     relativePath,
     contents,
+    includeHighlightedHtml: options?.includeHighlightedHtml ?? true,
   });
 }
 
@@ -989,6 +993,38 @@ async function invokeCommandOutput(
   const streamId = options?.streamId == null ? null : String(options.streamId);
   const output: CommandOutput = { status: null, stderr: "", stdout: "" };
   const onOutput = options?.onOutput;
+  let scheduledOutputFlush: ReturnType<typeof globalThis.setTimeout> | number | null = null;
+  let scheduledOutputFlushKind: "animation-frame" | "timeout" | null = null;
+  let hasPendingOutput = false;
+  const flushOutput = () => {
+    scheduledOutputFlush = null;
+    scheduledOutputFlushKind = null;
+
+    if (!hasPendingOutput) {
+      return;
+    }
+
+    hasPendingOutput = false;
+    onOutput?.({ ...output });
+  };
+  const scheduleOutputFlush = () => {
+    if (!onOutput) {
+      return;
+    }
+
+    hasPendingOutput = true;
+
+    if (scheduledOutputFlush != null) {
+      return;
+    }
+
+    scheduledOutputFlush = typeof window !== "undefined" && "requestAnimationFrame" in window
+      ? window.requestAnimationFrame(flushOutput)
+      : globalThis.setTimeout(flushOutput, 16);
+    scheduledOutputFlushKind = typeof window !== "undefined" && "requestAnimationFrame" in window
+      ? "animation-frame"
+      : "timeout";
+  };
   const unlisten = streamId && onOutput
     ? await listen<CommandOutputChunk>(COMMAND_OUTPUT_EVENT, (event) => {
         if (event.payload.streamId !== streamId) {
@@ -1001,7 +1037,7 @@ async function invokeCommandOutput(
           output.stderr += event.payload.chunk;
         }
 
-        onOutput({ ...output });
+        scheduleOutputFlush();
       })
     : null;
 
@@ -1011,6 +1047,16 @@ async function invokeCommandOutput(
       streamId,
     });
   } finally {
+    if (scheduledOutputFlush != null) {
+      if (scheduledOutputFlushKind === "animation-frame" && typeof window !== "undefined") {
+        window.cancelAnimationFrame(Number(scheduledOutputFlush));
+      } else {
+        globalThis.clearTimeout(scheduledOutputFlush);
+      }
+      scheduledOutputFlush = null;
+      scheduledOutputFlushKind = null;
+    }
+    flushOutput();
     unlisten?.();
   }
 }

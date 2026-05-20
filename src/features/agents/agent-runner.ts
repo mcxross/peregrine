@@ -33,7 +33,7 @@ export async function runAgentWorkflowWithModel({
   workflow: AgentWorkflow;
 }): Promise<AgentRunResult> {
   const provider = providerById(agent.provider.providerId);
-  const model = provider.resolveLanguageModel(agent.provider);
+  const model = await provider.resolveLanguageModel(agent.provider);
   const instructions = buildAgentInstructions(agent, workflow);
   const prompt = buildAgentPrompt(agent, workflow);
   const onStepFinish: ToolLoopAgentOnStepFinishCallback = (step) => {

@@ -83,7 +83,9 @@ export async function streamChatWithOllama({
       if (event.payload.kind === "error") {
         console.error(message);
       } else if (event.payload.kind === "debug") {
-        console.debug(message);
+        if (import.meta.env.DEV) {
+          console.debug(message);
+        }
       }
 
       onDebug?.(event.payload.content);

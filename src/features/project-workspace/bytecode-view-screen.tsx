@@ -1072,7 +1072,7 @@ function BytecodeSourceEditorPanel({
     setJumpRequest(null);
     setSourceSelectionRequest(null);
 
-    loadFilePreview(packageTree, target.sourcePath)
+    loadFilePreview(packageTree, target.sourcePath, { includeHighlightedHtml: false })
       .then((nextPreview) => {
         if (isCancelled) {
           return;
