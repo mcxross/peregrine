@@ -39,13 +39,31 @@ type CodeEditorProps = {
   complexityHighlights?: ComplexityHighlight[];
   jumpRequest?: CodeEditorJumpRequest | null;
   language: string;
+  sourceSelectionRequest?: CodeEditorSourceSelectionRequest | null;
+  sourceSpanHighlights?: CodeEditorSourceSpanHighlight[];
   value: string;
+  onCursorByteOffsetChange?: (byteOffset: number) => void;
   onChange: (value: string) => void;
 };
 
 export type CodeEditorJumpRequest = {
   line: number;
   token: number;
+};
+
+export type CodeEditorSourceSelectionRequest = {
+  endByte: number;
+  focus?: boolean;
+  startByte: number;
+  token: number;
+};
+
+export type CodeEditorSourceSpanHighlight = {
+  endByte: number;
+  id: string;
+  isActive?: boolean;
+  startByte: number;
+  title?: string;
 };
 
 export type ComplexityHighlight = {
@@ -59,8 +77,10 @@ export type ComplexityHighlight = {
 };
 
 const EMPTY_COMPLEXITY_HIGHLIGHTS: ComplexityHighlight[] = [];
+const EMPTY_SOURCE_SPAN_HIGHLIGHTS: CodeEditorSourceSpanHighlight[] = [];
 
 const setComplexityHighlights = StateEffect.define<ComplexityHighlight[]>();
+const setSourceSpanHighlights = StateEffect.define<CodeEditorSourceSpanHighlight[]>();
 const LONG_MOVE_ADDRESS_PATTERN = /(?:0x)?[0-9a-fA-F]{33,64}(?=::)/g;
 
 const complexityHighlightField = StateField.define<DecorationSet>({
@@ -93,6 +113,22 @@ const compactMoveAddressField = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 });
 
+const sourceSpanHighlightField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(decorations, transaction) {
+    let nextDecorations = decorations.map(transaction.changes);
+
+    for (const effect of transaction.effects) {
+      if (effect.is(setSourceSpanHighlights)) {
+        nextDecorations = buildSourceSpanDecorations(transaction.state, effect.value);
+      }
+    }
+
+    return nextDecorations;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
 class CompactMoveAddressWidget extends WidgetType {
   constructor(
     private readonly fullAddress: string,
@@ -121,16 +157,24 @@ export function CodeEditor({
   complexityHighlights = EMPTY_COMPLEXITY_HIGHLIGHTS,
   jumpRequest = null,
   language,
+  sourceSelectionRequest = null,
+  sourceSpanHighlights = EMPTY_SOURCE_SPAN_HIGHLIGHTS,
   value,
+  onCursorByteOffsetChange,
   onChange,
 }: CodeEditorProps) {
   const hostRef = React.useRef<HTMLDivElement | null>(null);
   const editorRef = React.useRef<EditorView | null>(null);
   const onChangeRef = React.useRef(onChange);
+  const onCursorByteOffsetChangeRef = React.useRef(onCursorByteOffsetChange);
 
   React.useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
+
+  React.useEffect(() => {
+    onCursorByteOffsetChangeRef.current = onCursorByteOffsetChange;
+  }, [onCursorByteOffsetChange]);
 
   React.useEffect(() => {
     if (!hostRef.current) {
@@ -147,6 +191,8 @@ export function CodeEditor({
         doc: value,
         extensions: editorExtensions(language, (nextValue) => {
           onChangeRef.current(nextValue);
+        }, (byteOffset) => {
+          onCursorByteOffsetChangeRef.current?.(byteOffset);
         }),
       }),
     });
@@ -154,6 +200,9 @@ export function CodeEditor({
     editorRef.current = editor;
     editor.dispatch({
       effects: setComplexityHighlights.of(complexityHighlights),
+    });
+    editor.dispatch({
+      effects: setSourceSpanHighlights.of(sourceSpanHighlights),
     });
 
     return () => {
@@ -196,6 +245,18 @@ export function CodeEditor({
   React.useEffect(() => {
     const editor = editorRef.current;
 
+    if (!editor) {
+      return;
+    }
+
+    editor.dispatch({
+      effects: setSourceSpanHighlights.of(sourceSpanHighlights),
+    });
+  }, [sourceSpanHighlights]);
+
+  React.useEffect(() => {
+    const editor = editorRef.current;
+
     if (!editor || !jumpRequest) {
       if (jumpRequest && !editor) {
         console.warn("[CodeEditor] jump requested before editor was ready", jumpRequest);
@@ -219,10 +280,37 @@ export function CodeEditor({
     editor.focus();
   }, [jumpRequest]);
 
+  React.useEffect(() => {
+    const editor = editorRef.current;
+
+    if (!editor || !sourceSelectionRequest) {
+      return;
+    }
+
+    const source = editor.state.doc.toString();
+    const from = byteOffsetToPosition(source, sourceSelectionRequest.startByte);
+    const rawTo = byteOffsetToPosition(source, sourceSelectionRequest.endByte);
+    const to = Math.max(from, rawTo);
+    const head = to > from ? to : Math.min(editor.state.doc.length, from + 1);
+
+    editor.dispatch({
+      selection: { anchor: from, head },
+      effects: EditorView.scrollIntoView(from, { y: "center" }),
+    });
+
+    if (sourceSelectionRequest.focus) {
+      editor.focus();
+    }
+  }, [sourceSelectionRequest]);
+
   return <div ref={hostRef} className="min-h-0 flex-1 overflow-hidden" />;
 }
 
-function editorExtensions(language: string, onChange: (value: string) => void) {
+function editorExtensions(
+  language: string,
+  onChange: (value: string) => void,
+  onCursorByteOffsetChange: (byteOffset: number) => void,
+) {
   return [
     lineNumbers(),
     history(),
@@ -234,11 +322,20 @@ function editorExtensions(language: string, onChange: (value: string) => void) {
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
     keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
     complexityHighlightField,
+    sourceSpanHighlightField,
     language.toLowerCase() === "move" ? compactMoveAddressField : [],
     editorTheme,
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         onChange(update.state.doc.toString());
+      }
+      if (update.selectionSet) {
+        onCursorByteOffsetChange(
+          positionToByteOffset(
+            update.state.doc.toString(),
+            update.state.selection.main.from,
+          ),
+        );
       }
     }),
     languageExtension(language),
@@ -273,6 +370,89 @@ function buildCompactMoveAddressDecorations(state: EditorState) {
   }
 
   return builder.finish();
+}
+
+function buildSourceSpanDecorations(
+  state: EditorState,
+  highlights: CodeEditorSourceSpanHighlight[],
+) {
+  if (!highlights.length) {
+    return Decoration.none;
+  }
+
+  const builder = new RangeSetBuilder<Decoration>();
+  const source = state.doc.toString();
+
+  for (const highlight of [...highlights].sort((left, right) => left.startByte - right.startByte)) {
+    const from = byteOffsetToPosition(source, highlight.startByte);
+    const to = Math.max(from, byteOffsetToPosition(source, highlight.endByte));
+
+    if (from >= state.doc.length && to >= state.doc.length) {
+      continue;
+    }
+
+    builder.add(
+      from,
+      to > from ? to : Math.min(state.doc.length, from + 1),
+      Decoration.mark({
+        attributes: highlight.title ? { title: highlight.title } : undefined,
+        class: highlight.isActive
+          ? "cm-bytecodeSourceSpan cm-bytecodeSourceSpanActive"
+          : "cm-bytecodeSourceSpan",
+      }),
+    );
+  }
+
+  return builder.finish();
+}
+
+function byteOffsetToPosition(source: string, byteOffset: number) {
+  const target = Math.max(0, Math.floor(byteOffset));
+  let consumedBytes = 0;
+  let position = 0;
+
+  while (position < source.length && consumedBytes < target) {
+    const codePoint = source.codePointAt(position) ?? 0;
+    const codeUnits = codePoint > 0xffff ? 2 : 1;
+    const bytes = utf8ByteLength(codePoint);
+
+    if (consumedBytes + bytes > target) {
+      break;
+    }
+
+    consumedBytes += bytes;
+    position += codeUnits;
+  }
+
+  return position;
+}
+
+function positionToByteOffset(source: string, position: number) {
+  const target = Math.min(source.length, Math.max(0, Math.floor(position)));
+  let byteOffset = 0;
+  let cursor = 0;
+
+  while (cursor < target) {
+    const codePoint = source.codePointAt(cursor) ?? 0;
+    cursor += codePoint > 0xffff ? 2 : 1;
+    byteOffset += utf8ByteLength(codePoint);
+  }
+
+  return byteOffset;
+}
+
+function utf8ByteLength(codePoint: number) {
+  if (codePoint <= 0x7f) {
+    return 1;
+  }
+  if (codePoint <= 0x7ff) {
+    return 2;
+  }
+  if (codePoint <= 0xffff) {
+    return 3;
+  }
+
+  return 4;
 }
 
 function compactMoveAddress(address: string) {
@@ -478,6 +658,14 @@ const editorTheme = EditorView.theme(
     },
     ".cm-activeLine.cm-complexityLineError": {
       backgroundColor: "color-mix(in oklch, var(--destructive) 20%, var(--muted))",
+    },
+    ".cm-bytecodeSourceSpan": {
+      backgroundColor: "color-mix(in oklch, var(--primary) 16%, transparent)",
+      borderBottom: "1px solid color-mix(in oklch, var(--primary) 55%, transparent)",
+    },
+    ".cm-bytecodeSourceSpanActive": {
+      backgroundColor: "color-mix(in oklch, var(--primary) 30%, transparent)",
+      boxShadow: "inset 0 -1px 0 color-mix(in oklch, var(--primary) 75%, transparent)",
     },
   },
   { dark: true },

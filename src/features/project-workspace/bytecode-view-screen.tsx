@@ -38,7 +38,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { CodeEditorJumpRequest } from "@/features/project-workspace/editor/code-editor";
+import type {
+  CodeEditorJumpRequest,
+  CodeEditorSourceSelectionRequest,
+  CodeEditorSourceSpanHighlight,
+} from "@/features/project-workspace/editor/code-editor";
 import {
   displayMovePackageName,
   loadFilePreview,
@@ -51,6 +55,7 @@ import {
   type MoveBytecodeInstructionView,
   type MoveBytecodeModuleView,
   type MoveBytecodePackageView,
+  type MoveBytecodeSourceSpan,
   type MovePackage,
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
@@ -75,6 +80,8 @@ type BytecodeEditorTarget = {
 
 const BYTECODE_COLUMN_WIDTHS = [236, 470, 260, 292];
 const BYTECODE_COLUMN_MIN_WIDTHS = [184, 340, 210, 236];
+const BYTECODE_EDITOR_MIN_WIDTH = 420;
+const BYTECODE_INSTRUCTION_COLUMN_MAX_WIDTH = 820;
 const BYTECODE_RESIZE_HANDLE_WIDTH = 8;
 const BYTECODE_TREE_ANIMATION_MS = 160;
 
@@ -101,6 +108,14 @@ type BytecodeFunctionCategory = {
   id: BytecodeFunctionCategoryId;
   label: string;
   tone: "entry" | "friend" | "package" | "private" | "public" | "publicEntry" | "view";
+};
+
+type BytecodeSourceInstructionEntry = {
+  functionName: string;
+  instruction: MoveBytecodeInstructionView;
+  lineEndByte: number;
+  lineStartByte: number;
+  source: MoveBytecodeSourceSpan;
 };
 
 export function BytecodeViewScreen({
@@ -214,10 +229,37 @@ export function BytecodeViewScreen({
     setSelectedOffset(target.fn.instructions[0]?.offset ?? null);
   }, [view]);
   const isEditorOpen = Boolean(editorTarget);
+
+  React.useEffect(() => {
+    setEditorTarget((current) => {
+      if (!current || !selectedModule?.sourcePath) {
+        return current;
+      }
+
+      const nextTarget = {
+        functionName: selectedFunction?.name ?? null,
+        moduleName: selectedModule.name,
+        sourcePath: selectedModule.sourcePath,
+      };
+
+      return current.functionName === nextTarget.functionName
+        && current.moduleName === nextTarget.moduleName
+        && current.sourcePath === nextTarget.sourcePath
+        ? current
+        : nextTarget;
+    });
+  }, [selectedFunction?.name, selectedModule?.name, selectedModule?.sourcePath]);
+
   const gridTemplateColumns = React.useMemo(
     () =>
       isEditorOpen
-        ? `${columnWidths[0]}px ${BYTECODE_RESIZE_HANDLE_WIDTH}px minmax(0,1fr)`
+        ? [
+            `${columnWidths[0]}px`,
+            `${BYTECODE_RESIZE_HANDLE_WIDTH}px`,
+            `${columnWidths[1]}px`,
+            `${BYTECODE_RESIZE_HANDLE_WIDTH}px`,
+            `minmax(${BYTECODE_EDITOR_MIN_WIDTH}px,1fr)`,
+          ].join(" ")
         : [
             `${columnWidths[0]}px`,
             `${BYTECODE_RESIZE_HANDLE_WIDTH}px`,
@@ -232,7 +274,7 @@ export function BytecodeViewScreen({
   const gridMinWidth = React.useMemo(
     () =>
       isEditorOpen
-        ? columnWidths[0] + BYTECODE_RESIZE_HANDLE_WIDTH + 420
+        ? columnWidths[0] + columnWidths[1] + BYTECODE_RESIZE_HANDLE_WIDTH * 2 + BYTECODE_EDITOR_MIN_WIDTH
         : columnWidths.reduce((sum, width) => sum + width, 0) + BYTECODE_RESIZE_HANDLE_WIDTH * 3,
     [columnWidths, isEditorOpen],
   );
@@ -245,6 +287,7 @@ export function BytecodeViewScreen({
 
     const startX = event.clientX;
     const startWidths = [...columnWidths];
+    const isFlexibleEditorResize = isEditorOpen && handleIndex === 1;
     const pairTotal = startWidths[handleIndex] + startWidths[handleIndex + 1];
     const previousCursor = document.body.style.cursor;
     const previousUserSelect = document.body.style.userSelect;
@@ -254,6 +297,19 @@ export function BytecodeViewScreen({
 
     const handleMove = (moveEvent: PointerEvent) => {
       const delta = moveEvent.clientX - startX;
+
+      if (isFlexibleEditorResize) {
+        const nextWidth = Math.min(
+          BYTECODE_INSTRUCTION_COLUMN_MAX_WIDTH,
+          Math.max(BYTECODE_COLUMN_MIN_WIDTHS[1], startWidths[1] + delta),
+        );
+
+        setColumnWidths((current) =>
+          current.map((width, index) => index === 1 ? nextWidth : width),
+        );
+        return;
+      }
+
       let left = startWidths[handleIndex] + delta;
       let right = startWidths[handleIndex + 1] - delta;
       const leftMin = BYTECODE_COLUMN_MIN_WIDTHS[handleIndex];
@@ -294,7 +350,7 @@ export function BytecodeViewScreen({
 
     window.addEventListener("pointermove", handleMove);
     window.addEventListener("pointerup", handleEnd, { once: true });
-  }, [columnWidths]);
+  }, [columnWidths, isEditorOpen]);
 
   if (!activeMovePackage) {
     return (
@@ -372,11 +428,33 @@ export function BytecodeViewScreen({
             />
 
             {editorTarget ? (
-              <BytecodeSourceEditorPanel
-                packageTree={packageTree}
-                target={editorTarget}
-                onClose={() => setEditorTarget(null)}
-              />
+              <>
+                <InstructionPanel
+                  onOpenCallTarget={openCallTarget}
+                  selectedInstruction={selectedInstruction}
+                  selectedModule={selectedModule}
+                  selectedFunction={selectedFunction}
+                  view={view}
+                  onSelectInstruction={(instruction) => setSelectedOffset(instruction.offset)}
+                />
+                <ColumnResizeHandle
+                  active={resizingHandleIndex === 1}
+                  index={1}
+                  onPointerDown={handleColumnResizeStart}
+                />
+                <BytecodeSourceEditorPanel
+                  module={selectedModule}
+                  packageTree={packageTree}
+                  selectedFunction={selectedFunction}
+                  selectedInstruction={selectedInstruction}
+                  target={editorTarget}
+                  onClose={() => setEditorTarget(null)}
+                  onSelectInstructionFromSource={(functionName, offset) => {
+                    setSelectedFunctionName(functionName);
+                    setSelectedOffset(offset);
+                  }}
+                />
+              </>
             ) : (
               <>
                 <InstructionPanel
@@ -886,12 +964,20 @@ function BytecodeExplorerContextMenu({
 }
 
 function BytecodeSourceEditorPanel({
+  module,
   onClose,
+  onSelectInstructionFromSource,
   packageTree,
+  selectedFunction,
+  selectedInstruction,
   target,
 }: {
+  module: MoveBytecodeModuleView | null;
   onClose: () => void;
+  onSelectInstructionFromSource: (functionName: string, offset: number) => void;
   packageTree: PackageTree;
+  selectedFunction: MoveBytecodeFunctionView | null;
+  selectedInstruction: MoveBytecodeInstructionView | null;
   target: BytecodeEditorTarget;
 }) {
   const [preview, setPreview] = React.useState<FilePreview | null>(null);
@@ -899,6 +985,32 @@ function BytecodeSourceEditorPanel({
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [jumpRequest, setJumpRequest] = React.useState<CodeEditorJumpRequest | null>(null);
+  const [sourceSelectionRequest, setSourceSelectionRequest] =
+    React.useState<CodeEditorSourceSelectionRequest | null>(null);
+  const sourceInstructionIndex = React.useMemo(
+    () => module && source ? buildBytecodeSourceInstructionIndex(module, source) : [],
+    [module, source],
+  );
+  const sourceSpanHighlights = React.useMemo<CodeEditorSourceSpanHighlight[]>(() => {
+    if (!selectedInstruction?.source) {
+      return [];
+    }
+
+    return [{
+      endByte: selectedInstruction.source.endByte,
+      id: `instruction:${selectedFunction?.name ?? target.functionName ?? "unknown"}:${selectedInstruction.offset}`,
+      isActive: true,
+      startByte: selectedInstruction.source.startByte,
+      title: `${formatOpcode(selectedInstruction.opcode)} ${operandText(selectedInstruction)}`.trim(),
+    }];
+  }, [
+    selectedFunction?.name,
+    selectedInstruction?.offset,
+    selectedInstruction?.opcode,
+    selectedInstruction?.detail,
+    selectedInstruction?.source,
+    target.functionName,
+  ]);
 
   React.useEffect(() => {
     let isCancelled = false;
@@ -907,6 +1019,7 @@ function BytecodeSourceEditorPanel({
     setError(null);
     setIsLoading(true);
     setJumpRequest(null);
+    setSourceSelectionRequest(null);
 
     loadFilePreview(packageTree, target.sourcePath)
       .then((nextPreview) => {
@@ -922,10 +1035,6 @@ function BytecodeSourceEditorPanel({
         }
 
         setSource(nextPreview.source);
-        setJumpRequest({
-          line: target.functionName ? findMoveFunctionLine(nextPreview.source, target.functionName) : 1,
-          token: Date.now(),
-        });
       })
       .catch((reason: unknown) => {
         if (!isCancelled) {
@@ -941,7 +1050,62 @@ function BytecodeSourceEditorPanel({
     return () => {
       isCancelled = true;
     };
-  }, [packageTree, target.functionName, target.sourcePath]);
+  }, [packageTree, target.sourcePath]);
+
+  React.useEffect(() => {
+    if (preview?.kind !== "text") {
+      return;
+    }
+
+    if (selectedInstruction?.source) {
+      setSourceSelectionRequest({
+        endByte: selectedInstruction.source.endByte,
+        focus: false,
+        startByte: selectedInstruction.source.startByte,
+        token: Date.now(),
+      });
+      return;
+    }
+
+    setSourceSelectionRequest(null);
+    setJumpRequest({
+      line: target.functionName ? findMoveFunctionLine(source, target.functionName) : 1,
+      token: Date.now(),
+    });
+  }, [
+    preview?.kind,
+    selectedInstruction?.offset,
+    selectedInstruction?.source,
+    source,
+    target.functionName,
+  ]);
+
+  const handleCursorByteOffsetChange = React.useCallback((byteOffset: number) => {
+    const match = findInstructionForSourceByteOffset(
+      sourceInstructionIndex,
+      byteOffset,
+      selectedFunction?.name ?? target.functionName,
+    );
+
+    if (!match) {
+      return;
+    }
+
+    if (
+      match.functionName === selectedFunction?.name
+      && match.instruction.offset === selectedInstruction?.offset
+    ) {
+      return;
+    }
+
+    onSelectInstructionFromSource(match.functionName, match.instruction.offset);
+  }, [
+    onSelectInstructionFromSource,
+    selectedFunction?.name,
+    selectedInstruction?.offset,
+    sourceInstructionIndex,
+    target.functionName,
+  ]);
 
   return (
     <section className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
@@ -950,7 +1114,7 @@ function BytecodeSourceEditorPanel({
           <FileCode2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">
-              {target.functionName ? `${target.moduleName}::${target.functionName}` : target.moduleName}
+              {selectedFunction ? `${target.moduleName}::${selectedFunction.name}` : target.moduleName}
             </div>
             <div className="truncate text-[11px] text-muted-foreground">{target.sourcePath}</div>
           </div>
@@ -988,7 +1152,10 @@ function BytecodeSourceEditorPanel({
             jumpRequest={jumpRequest}
             key={target.sourcePath}
             language={preview.language || "move"}
+            sourceSelectionRequest={sourceSelectionRequest}
+            sourceSpanHighlights={sourceSpanHighlights}
             value={source}
+            onCursorByteOffsetChange={handleCursorByteOffsetChange}
             onChange={setSource}
           />
         </React.Suspense>
@@ -1174,8 +1341,77 @@ function InstructionPanel({
   selectedModule: MoveBytecodeModuleView | null;
   view: MoveBytecodePackageView | null;
 }) {
+  const sectionRef = React.useRef<HTMLElement | null>(null);
+  const tableBodyRef = React.useRef<HTMLTableSectionElement | null>(null);
+  const selectedInstructionIndex = React.useMemo(
+    () => selectedFunction?.instructions.findIndex((instruction) =>
+      instruction.offset === selectedInstruction?.offset,
+    ) ?? -1,
+    [selectedFunction, selectedInstruction?.offset],
+  );
+
+  React.useEffect(() => {
+    if (selectedInstruction?.offset == null) {
+      return;
+    }
+
+    const row = tableBodyRef.current?.querySelector<HTMLTableRowElement>(
+      `[data-bytecode-offset="${selectedInstruction.offset}"]`,
+    );
+
+    row?.scrollIntoView({ block: "nearest" });
+  }, [selectedInstruction?.offset]);
+
+  const selectInstructionAt = React.useCallback((index: number) => {
+    const instructions = selectedFunction?.instructions ?? [];
+    const nextInstruction = instructions[Math.min(instructions.length - 1, Math.max(0, index))];
+
+    if (nextInstruction) {
+      onSelectInstruction(nextInstruction);
+    }
+  }, [onSelectInstruction, selectedFunction?.instructions]);
+
+  const handleKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLElement>) => {
+    if (!selectedFunction?.instructions.length) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      selectInstructionAt((selectedInstructionIndex < 0 ? 0 : selectedInstructionIndex) + 1);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      selectInstructionAt((selectedInstructionIndex < 0 ? 0 : selectedInstructionIndex) - 1);
+      return;
+    }
+
+    if (event.key === "Home") {
+      event.preventDefault();
+      selectInstructionAt(0);
+      return;
+    }
+
+    if (event.key === "End") {
+      event.preventDefault();
+      selectInstructionAt(selectedFunction.instructions.length - 1);
+    }
+  }, [
+    selectInstructionAt,
+    selectedFunction?.instructions,
+    selectedInstructionIndex,
+  ]);
+
   return (
-    <section className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
+    <section
+      ref={sectionRef}
+      aria-label="Bytecode instructions"
+      className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+    >
       <PanelHeader
         icon={Cpu}
         title="Instructions"
@@ -1198,7 +1434,7 @@ function InstructionPanel({
               <th className="w-28 px-3 py-2 text-right font-semibold">Source</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody ref={tableBodyRef}>
             {selectedFunction?.instructions.map((instruction, index) => {
               const isSelected = selectedInstruction?.offset === instruction.offset;
               const callTarget = instruction.call ? findBytecodeCallTarget(view, instruction.call) : null;
@@ -1209,8 +1445,12 @@ function InstructionPanel({
                     "cursor-default border-b border-transparent text-muted-foreground hover:bg-[var(--app-subtle)]",
                     isSelected && "bg-primary/20 text-foreground hover:bg-primary/20",
                   )}
+                  data-bytecode-offset={instruction.offset}
                   key={`${instruction.offset}:${instruction.detail}`}
-                  onClick={() => onSelectInstruction(instruction)}
+                  onClick={() => {
+                    sectionRef.current?.focus({ preventScroll: true });
+                    onSelectInstruction(instruction);
+                  }}
                 >
                   <td className="px-3 py-1.5 text-[11px] text-muted-foreground">{index.toString().padStart(4, "0")}</td>
                   <td className="px-2 py-1.5">{formatOffset(instruction.offset)}</td>
@@ -2391,6 +2631,142 @@ function formatSourceBytes(instruction: MoveBytecodeInstructionView) {
   return instruction.source
     ? `${instruction.source.startByte}...${instruction.source.endByte}`
     : "-";
+}
+
+function buildBytecodeSourceInstructionIndex(
+  module: MoveBytecodeModuleView,
+  source: string,
+): BytecodeSourceInstructionEntry[] {
+  const entries: BytecodeSourceInstructionEntry[] = [];
+
+  for (const fn of module.functions) {
+    for (const instruction of fn.instructions) {
+      if (!instruction.source) {
+        continue;
+      }
+
+      const lineRange = sourceLineByteRange(source, instruction.source.startByte);
+
+      entries.push({
+        functionName: fn.name,
+        instruction,
+        lineEndByte: lineRange.endByte,
+        lineStartByte: lineRange.startByte,
+        source: instruction.source,
+      });
+    }
+  }
+
+  return entries.sort((left, right) =>
+    left.source.startByte - right.source.startByte
+    || left.source.endByte - right.source.endByte
+    || left.instruction.offset - right.instruction.offset,
+  );
+}
+
+function findInstructionForSourceByteOffset(
+  entries: BytecodeSourceInstructionEntry[],
+  byteOffset: number,
+  preferredFunctionName: string | null | undefined,
+) {
+  if (!entries.length) {
+    return null;
+  }
+
+  const containing = entries.filter((entry) =>
+    byteOffset >= entry.source.startByte
+    && byteOffset < Math.max(entry.source.startByte + 1, entry.source.endByte),
+  );
+
+  if (containing.length) {
+    return containing.sort((left, right) =>
+      sourceInstructionRank(left, byteOffset, preferredFunctionName)
+      - sourceInstructionRank(right, byteOffset, preferredFunctionName),
+    )[0] ?? null;
+  }
+
+  const sameLine = entries.filter((entry) =>
+    byteOffset >= entry.lineStartByte && byteOffset <= entry.lineEndByte,
+  );
+
+  if (!sameLine.length) {
+    return null;
+  }
+
+  return sameLine.sort((left, right) =>
+    sourceInstructionRank(left, byteOffset, preferredFunctionName)
+    - sourceInstructionRank(right, byteOffset, preferredFunctionName),
+  )[0] ?? null;
+}
+
+function sourceInstructionRank(
+  entry: BytecodeSourceInstructionEntry,
+  byteOffset: number,
+  preferredFunctionName: string | null | undefined,
+) {
+  const functionPenalty = preferredFunctionName && entry.functionName !== preferredFunctionName
+    ? 1_000_000
+    : 0;
+  const spanWidth = Math.max(1, entry.source.endByte - entry.source.startByte);
+  const distance = byteOffset < entry.source.startByte
+    ? entry.source.startByte - byteOffset
+    : byteOffset >= entry.source.endByte
+      ? byteOffset - entry.source.endByte
+      : 0;
+
+  return functionPenalty + distance * 1_000 + spanWidth + entry.instruction.offset / 10_000;
+}
+
+function sourceLineByteRange(source: string, byteOffset: number) {
+  const target = Math.max(0, Math.floor(byteOffset));
+  let lineStartByte = 0;
+  let currentByte = 0;
+  let position = 0;
+
+  while (position < source.length && currentByte < target) {
+    const codePoint = source.codePointAt(position) ?? 0;
+    const codeUnits = codePoint > 0xffff ? 2 : 1;
+    const bytes = sourceUtf8ByteLength(codePoint);
+
+    if (source[position] === "\n") {
+      lineStartByte = currentByte + bytes;
+    }
+
+    currentByte += bytes;
+    position += codeUnits;
+  }
+
+  while (position < source.length) {
+    const codePoint = source.codePointAt(position) ?? 0;
+    const codeUnits = codePoint > 0xffff ? 2 : 1;
+    const bytes = sourceUtf8ByteLength(codePoint);
+
+    if (source[position] === "\n") {
+      break;
+    }
+
+    currentByte += bytes;
+    position += codeUnits;
+  }
+
+  return {
+    endByte: currentByte,
+    startByte: lineStartByte,
+  };
+}
+
+function sourceUtf8ByteLength(codePoint: number) {
+  if (codePoint <= 0x7f) {
+    return 1;
+  }
+  if (codePoint <= 0x7ff) {
+    return 2;
+  }
+  if (codePoint <= 0xffff) {
+    return 3;
+  }
+
+  return 4;
 }
 
 type BytecodeCallTarget = {

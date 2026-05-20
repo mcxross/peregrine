@@ -1,6 +1,8 @@
 export { CodeEditor } from "@/features/project-workspace/editor/code-editor";
 export type {
   CodeEditorJumpRequest,
+  CodeEditorSourceSelectionRequest,
+  CodeEditorSourceSpanHighlight,
   ComplexityHighlight,
 } from "@/features/project-workspace/editor/code-editor";
 export { EditorTabs } from "@/features/project-workspace/editor/editor-tabs";
