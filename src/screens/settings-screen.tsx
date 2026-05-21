@@ -3,8 +3,15 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  Copy,
+  Download,
+  Eye,
   FolderOpen,
+  KeyRound,
+  MoreHorizontal,
   Palette,
+  Pencil,
+  Plus,
   Puzzle,
   RefreshCw,
   TerminalSquare,
@@ -19,19 +26,38 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   checkSuiAdapter,
+  exportSuiPrivateKey,
+  generateSuiKey,
   getSuiAdapterSettings,
+  importSuiKey,
   installAnalyzerPlugin,
   listAnalyzerPlugins,
   listAnalyzerRuleCatalog,
+  loadSuiKeyState,
   removeAnalyzerPlugin,
+  removeSuiKey,
+  renameSuiKeyAlias,
   saveAnalysisRuleConfig,
   saveSuiAdapterSettings,
   setAnalyzerPluginEnabled,
+  setActiveSuiAddress,
   type AnalysisRuleCatalog,
   type AnalysisRuleMetadata,
   type AnalysisSeverity,
@@ -41,6 +67,9 @@ import {
   type SuiAdapterSettings,
   type SuiAdapterSource,
   type SuiAdapterStatus,
+  type SuiGenerateKeyResponse,
+  type SuiKeyAccount,
+  type SuiKeyState,
 } from "@/features/empty-project/filesystem-tree";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/theme/theme-provider";
@@ -102,6 +131,9 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
   const [suiStatus, setSuiStatus] = React.useState<SuiAdapterStatus | null>(null);
   const [suiSettingsError, setSuiSettingsError] = React.useState<string | null>(null);
   const [isSavingSuiSettings, setIsSavingSuiSettings] = React.useState(false);
+  const [suiKeyState, setSuiKeyState] = React.useState<SuiKeyState | null>(null);
+  const [suiKeyError, setSuiKeyError] = React.useState<string | null>(null);
+  const [isLoadingSuiKeys, setIsLoadingSuiKeys] = React.useState(false);
   const [analyzerPlugins, setAnalyzerPlugins] = React.useState<InstalledAnalyzerPlugin[]>([]);
   const [analyzerCatalog, setAnalyzerCatalog] = React.useState<AnalysisRuleCatalog | null>(null);
   const [analyzerError, setAnalyzerError] = React.useState<string | null>(null);
@@ -133,6 +165,27 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
       isMounted = false;
     };
   }, []);
+
+  const refreshSuiKeys = React.useCallback(async () => {
+    setIsLoadingSuiKeys(true);
+    setSuiKeyError(null);
+
+    try {
+      setSuiKeyState(await loadSuiKeyState());
+    } catch (error) {
+      setSuiKeyError(getSettingsErrorMessage(error));
+    } finally {
+      setIsLoadingSuiKeys(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (activeGroup !== "toolchain") {
+      return;
+    }
+
+    void refreshSuiKeys();
+  }, [activeGroup, refreshSuiKeys]);
 
   const refreshAnalyzers = React.useCallback(async () => {
     setIsLoadingAnalyzers(true);
@@ -375,6 +428,12 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
               isSavingSuiSettings={isSavingSuiSettings}
               saveSuiCliPath={saveSuiCliPath}
               suiCliPathInput={suiCliPathInput}
+              isLoadingSuiKeys={isLoadingSuiKeys}
+              refreshSuiKeys={refreshSuiKeys}
+              setSuiKeyError={setSuiKeyError}
+              setSuiKeyState={setSuiKeyState}
+              suiKeyError={suiKeyError}
+              suiKeyState={suiKeyState}
               suiSettings={suiSettings}
               suiSettingsError={suiSettingsError}
               suiStatus={suiStatus}
@@ -589,10 +648,16 @@ function ThemePreviewPill({
 function ToolchainSettings({
   chooseSuiCliPath,
   effectiveSuiSource,
+  isLoadingSuiKeys,
   isSavingSuiSettings,
+  refreshSuiKeys,
   saveSuiCliPath,
   setSuiCliPathInput,
+  setSuiKeyError,
+  setSuiKeyState,
   suiCliPathInput,
+  suiKeyError,
+  suiKeyState,
   suiSettings,
   suiSettingsError,
   suiStatus,
@@ -600,108 +665,1096 @@ function ToolchainSettings({
 }: {
   chooseSuiCliPath: () => Promise<void>;
   effectiveSuiSource: SuiAdapterSource;
+  isLoadingSuiKeys: boolean;
   isSavingSuiSettings: boolean;
+  refreshSuiKeys: () => Promise<void>;
   saveSuiCliPath: (path: string) => Promise<void>;
   setSuiCliPathInput: (path: string) => void;
+  setSuiKeyError: (error: string | null) => void;
+  setSuiKeyState: (state: SuiKeyState | null) => void;
   suiCliPathInput: string;
+  suiKeyError: string | null;
+  suiKeyState: SuiKeyState | null;
   suiSettings: SuiAdapterSettings;
   suiSettingsError: string | null;
   suiStatus: SuiAdapterStatus | null;
   updateSuiSource: (source: SuiAdapterSource) => Promise<void>;
 }) {
   return (
-    <SettingsSection title="Sui CLI">
-      <SettingsRow
-        label="Source"
-        description={suiSourceLabel(effectiveSuiSource)}
-      >
-        <SegmentedControl>
-          {suiSourceOptions.map((option) => {
-            const unavailableSystem =
-              option.value === "system" && suiStatus ? !suiStatus.system.available : false;
-
-            return (
-              <Button
-                disabled={isSavingSuiSettings || unavailableSystem}
-                key={option.value}
-                onClick={() => void updateSuiSource(option.value)}
-                size="sm"
-                title={unavailableSystem ? suiStatus?.system.error ?? "Sui CLI not found on PATH." : undefined}
-                variant={effectiveSuiSource === option.value ? "default" : "ghost"}
-              >
-                {option.label}
-              </Button>
-            );
-          })}
-        </SegmentedControl>
-      </SettingsRow>
-
-      <div className="border-t border-border/70">
-        <div className="grid gap-2 px-4 py-3.5 text-xs text-muted-foreground">
-          <SuiSourceStatusRow
-            active={effectiveSuiSource === "bundled"}
-            label="Bundled crate"
-            path={suiStatus?.bundled.path ?? null}
-            version={suiStatus?.bundled.version ?? null}
-            available={suiStatus?.bundled.available ?? false}
-          />
-          <SuiSourceStatusRow
-            active={effectiveSuiSource === "system"}
-            label="User installed"
-            path={suiStatus?.system.path ?? null}
-            version={suiStatus?.system.version ?? null}
-            available={suiStatus?.system.available ?? false}
-          />
-        </div>
-      </div>
-
-      <div className="border-t border-border/70">
+    <>
+      <SettingsSection title="Sui CLI">
         <SettingsRow
-          label="CLI path"
-          description="Set a binary path instead of the embedded toolchain."
-          align="start"
+          label="Source"
+          description={suiSourceLabel(effectiveSuiSource)}
         >
-          <div className="grid w-full min-w-0 gap-2 sm:w-[22rem]">
-            <Input
-              autoComplete="off"
-              id="sui-cli-path"
-              onChange={(event) => setSuiCliPathInput(event.target.value)}
-              placeholder="Use bundled crate or PATH"
-              type="text"
-              value={suiCliPathInput}
+          <SegmentedControl>
+            {suiSourceOptions.map((option) => {
+              const unavailableSystem =
+                option.value === "system" && suiStatus ? !suiStatus.system.available : false;
+
+              return (
+                <Button
+                  disabled={isSavingSuiSettings || unavailableSystem}
+                  key={option.value}
+                  onClick={() => void updateSuiSource(option.value)}
+                  size="sm"
+                  title={unavailableSystem ? suiStatus?.system.error ?? "Sui CLI not found on PATH." : undefined}
+                  variant={effectiveSuiSource === option.value ? "default" : "ghost"}
+                >
+                  {option.label}
+                </Button>
+              );
+            })}
+          </SegmentedControl>
+        </SettingsRow>
+
+        <div className="border-t border-border/70">
+          <div className="grid gap-2 px-4 py-3.5 text-xs text-muted-foreground">
+            <SuiSourceStatusRow
+              active={effectiveSuiSource === "bundled"}
+              label="Bundled crate"
+              path={suiStatus?.bundled.path ?? null}
+              version={suiStatus?.bundled.version ?? null}
+              available={suiStatus?.bundled.available ?? false}
             />
-            <div className="flex justify-end gap-2">
-              <Button
-                disabled={isSavingSuiSettings}
-                onClick={() => void chooseSuiCliPath()}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                <FolderOpen aria-hidden="true" />
-                Browse
-              </Button>
-              <Button
-                disabled={isSavingSuiSettings || suiCliPathInput === (suiSettings.cliPath ?? "")}
-                onClick={() => void saveSuiCliPath(suiCliPathInput)}
-                size="sm"
-                type="button"
-              >
-                Save
-              </Button>
+            <SuiSourceStatusRow
+              active={effectiveSuiSource === "system"}
+              label="User installed"
+              path={suiStatus?.system.path ?? null}
+              version={suiStatus?.system.version ?? null}
+              available={suiStatus?.system.available ?? false}
+            />
+          </div>
+        </div>
+
+        <div className="border-t border-border/70">
+          <SettingsRow
+            label="CLI path"
+            description="Set a binary path instead of the embedded toolchain."
+            align="start"
+          >
+            <div className="grid w-full min-w-0 gap-2 sm:w-[22rem]">
+              <Input
+                autoComplete="off"
+                id="sui-cli-path"
+                onChange={(event) => setSuiCliPathInput(event.target.value)}
+                placeholder="Use bundled crate or PATH"
+                type="text"
+                value={suiCliPathInput}
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  disabled={isSavingSuiSettings}
+                  onClick={() => void chooseSuiCliPath()}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <FolderOpen aria-hidden="true" />
+                  Browse
+                </Button>
+                <Button
+                  disabled={isSavingSuiSettings || suiCliPathInput === (suiSettings.cliPath ?? "")}
+                  onClick={() => void saveSuiCliPath(suiCliPathInput)}
+                  size="sm"
+                  type="button"
+                >
+                  Save
+                </Button>
+              </div>
             </div>
+          </SettingsRow>
+        </div>
+
+        {suiSettingsError ? (
+          <div className="border-t border-border/70 px-4 py-3.5">
+            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {suiSettingsError}
+            </p>
+          </div>
+        ) : null}
+      </SettingsSection>
+
+      <SuiKeyManagementSettings
+        isLoading={isLoadingSuiKeys}
+        refreshSuiKeys={refreshSuiKeys}
+        setSuiKeyError={setSuiKeyError}
+        setSuiKeyState={setSuiKeyState}
+        suiKeyError={suiKeyError}
+        suiKeyState={suiKeyState}
+      />
+    </>
+  );
+}
+
+function SuiKeyManagementSettings({
+  isLoading,
+  refreshSuiKeys,
+  setSuiKeyError,
+  setSuiKeyState,
+  suiKeyError,
+  suiKeyState,
+}: {
+  isLoading: boolean;
+  refreshSuiKeys: () => Promise<void>;
+  setSuiKeyError: (error: string | null) => void;
+  setSuiKeyState: (state: SuiKeyState | null) => void;
+  suiKeyError: string | null;
+  suiKeyState: SuiKeyState | null;
+}) {
+  const [isMutating, setIsMutating] = React.useState(false);
+  const [openDialog, setOpenDialog] = React.useState<"generate" | "import" | null>(null);
+  const [accountAction, setAccountAction] = React.useState<{
+    account: SuiKeyAccount;
+    kind: "export" | "remove" | "rename";
+  } | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = React.useState<string | null>(null);
+  const [revealedSecret, setRevealedSecret] = React.useState<{
+    label: string;
+    secret: string;
+  } | null>(null);
+  const accounts = suiKeyState?.accounts ?? [];
+  const disabled = isLoading || isMutating;
+  const selectedAccount = React.useMemo(() => {
+    if (!accounts.length) {
+      return null;
+    }
+
+    return accounts.find((account) => suiAccountId(account) === selectedAccountId)
+      ?? accounts.find((account) => account.isActive)
+      ?? accounts[0];
+  }, [accounts, selectedAccountId]);
+  const exportAction = accountAction?.kind === "export"
+    ? { account: accountAction.account, kind: "export" as const }
+    : null;
+  const removeAction = accountAction?.kind === "remove"
+    ? { account: accountAction.account, kind: "remove" as const }
+    : null;
+  const renameAction = accountAction?.kind === "rename"
+    ? { account: accountAction.account, kind: "rename" as const }
+    : null;
+  const statusLabel = suiKeyState
+    ? suiKeyState.configStatus === "missing"
+      ? "No client config"
+      : suiKeyState.configStatus === "invalid"
+        ? "Config error"
+        : `${accounts.length} account${accounts.length === 1 ? "" : "s"}`
+    : "Not loaded";
+
+  React.useEffect(() => {
+    if (!selectedAccount) {
+      setSelectedAccountId(null);
+      return;
+    }
+
+    const nextSelectedAccountId = suiAccountId(selectedAccount);
+    if (selectedAccountId !== nextSelectedAccountId) {
+      setSelectedAccountId(nextSelectedAccountId);
+    }
+  }, [selectedAccount, selectedAccountId]);
+
+  const runMutation = React.useCallback(
+    async (mutation: () => Promise<SuiKeyState | SuiGenerateKeyResponse>) => {
+      setIsMutating(true);
+      setSuiKeyError(null);
+
+      try {
+        const result = await mutation();
+
+        if ("state" in result) {
+          setSuiKeyState(result.state);
+
+          if ("recoveryPhrase" in result && result.recoveryPhrase) {
+            setRevealedSecret({
+              label: `Recovery phrase for ${displaySuiAccountName(result.generated)}`,
+              secret: result.recoveryPhrase,
+            });
+          }
+        } else {
+          setSuiKeyState(result);
+        }
+      } catch (error) {
+        setSuiKeyError(getSettingsErrorMessage(error));
+      } finally {
+        setIsMutating(false);
+      }
+    },
+    [setSuiKeyError, setSuiKeyState],
+  );
+
+  return (
+    <>
+      <SettingsSection title="Sui Keys">
+        <SettingsRow
+          label="Accounts"
+          description={suiKeyState?.configDir ?? "~/.sui/sui_config"}
+        >
+          <div className="flex min-w-0 flex-wrap justify-end gap-2">
+            <Badge variant={suiKeyState?.configStatus === "invalid" ? "destructive" : "secondary"}>
+              {statusLabel}
+            </Badge>
+            <Button
+              disabled={disabled}
+              onClick={() => void refreshSuiKeys()}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <RefreshCw aria-hidden="true" />
+              Refresh
+            </Button>
+            <Button
+              disabled={disabled || suiKeyState?.configStatus === "invalid"}
+              onClick={() => setOpenDialog("import")}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <Upload aria-hidden="true" />
+              Import
+            </Button>
+            <Button
+              disabled={disabled || suiKeyState?.configStatus === "invalid"}
+              onClick={() => setOpenDialog("generate")}
+              size="sm"
+              type="button"
+            >
+              <Plus aria-hidden="true" />
+              Generate
+            </Button>
           </div>
         </SettingsRow>
-      </div>
 
-      {suiSettingsError ? (
-        <div className="border-t border-border/70 px-4 py-3.5">
-          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {suiSettingsError}
-          </p>
+        {suiKeyState?.diagnostics.length ? (
+          <div className="border-t border-border/70 px-4 py-3.5">
+            <div className="grid gap-2">
+              {suiKeyState.diagnostics.map((diagnostic) => (
+                <p
+                  className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                  key={`${diagnostic.path ?? "sui"}:${diagnostic.message}`}
+                >
+                  {diagnostic.message}
+                </p>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="border-t border-border/70">
+          {selectedAccount ? (
+            <SuiKeyAccountPanel
+              account={selectedAccount}
+              accounts={accounts}
+              disabled={disabled}
+              onCopy={(value) => void copyToClipboard(value)}
+              onExport={() => setAccountAction({ account: selectedAccount, kind: "export" })}
+              onMakeActive={() => {
+                void runMutation(() => setActiveSuiAddress(selectedAccount.alias ?? selectedAccount.address));
+              }}
+              onRemove={() => setAccountAction({ account: selectedAccount, kind: "remove" })}
+              onRename={() => setAccountAction({ account: selectedAccount, kind: "rename" })}
+              onSelectAccount={setSelectedAccountId}
+              selectedAccountId={suiAccountId(selectedAccount)}
+            />
+          ) : (
+            <div className="px-4 py-6 text-[13px] text-muted-foreground">
+              {suiKeyState?.configStatus === "invalid"
+                ? "Fix the Sui client configuration before managing keys."
+                : "No Sui accounts are available in the CLI keystore."}
+            </div>
+          )}
         </div>
+
+        {suiKeyError ? (
+          <div className="border-t border-border/70 px-4 py-3.5">
+            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {suiKeyError}
+            </p>
+          </div>
+        ) : null}
+      </SettingsSection>
+
+      <GenerateSuiKeyDialog
+        disabled={disabled}
+        onGenerate={(request) => runMutation(() => generateSuiKey(request))}
+        onOpenChange={(open) => setOpenDialog(open ? "generate" : null)}
+        open={openDialog === "generate"}
+        state={suiKeyState}
+      />
+      <ImportSuiKeyDialog
+        disabled={disabled}
+        onImport={(request) => runMutation(async () => (await importSuiKey(request)).state)}
+        onOpenChange={(open) => setOpenDialog(open ? "import" : null)}
+        open={openDialog === "import"}
+        state={suiKeyState}
+      />
+      <RenameSuiKeyDialog
+        action={renameAction}
+        disabled={disabled}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAccountAction(null);
+          }
+        }}
+        onRename={(account, newAlias) => runMutation(() => renameSuiKeyAlias(account.alias ?? account.address, newAlias))}
+      />
+      <RemoveSuiKeyDialog
+        action={removeAction}
+        disabled={disabled}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAccountAction(null);
+          }
+        }}
+        onRemove={(account, confirmation) => runMutation(() => removeSuiKey(account.alias ?? account.address, confirmation))}
+      />
+      <ExportSuiPrivateKeyDialog
+        action={exportAction}
+        disabled={disabled}
+        onExport={async (account, confirmation) => {
+          setIsMutating(true);
+          setSuiKeyError(null);
+
+          try {
+            const exported = await exportSuiPrivateKey(account.alias ?? account.address, confirmation);
+            setRevealedSecret({
+              label: `Bech32 private key for ${displaySuiAccountName(exported.account)}`,
+              secret: exported.exportedPrivateKey,
+            });
+            setAccountAction(null);
+          } catch (error) {
+            setSuiKeyError(getSettingsErrorMessage(error));
+          } finally {
+            setIsMutating(false);
+          }
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAccountAction(null);
+          }
+        }}
+      />
+      <SecretRevealDialog
+        onOpenChange={(open) => {
+          if (!open) {
+            setRevealedSecret(null);
+          }
+        }}
+        revealedSecret={revealedSecret}
+      />
+    </>
+  );
+}
+
+function SuiKeyAccountPanel({
+  account,
+  accounts,
+  disabled,
+  onCopy,
+  onExport,
+  onMakeActive,
+  onRemove,
+  onRename,
+  onSelectAccount,
+  selectedAccountId,
+}: {
+  account: SuiKeyAccount;
+  accounts: SuiKeyAccount[];
+  disabled: boolean;
+  onCopy: (value: string) => void;
+  onExport: () => void;
+  onMakeActive: () => void;
+  onRemove: () => void;
+  onRename: () => void;
+  onSelectAccount: (accountId: string) => void;
+  selectedAccountId: string;
+}) {
+  return (
+    <div className="grid gap-3 px-4 py-3.5">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <SuiKeyAccountSelector
+              accounts={accounts}
+              disabled={disabled}
+              onSelectAccount={onSelectAccount}
+              selectedAccountId={selectedAccountId}
+            />
+            <SuiAccountBadges account={account} />
+          </div>
+          <div className="mt-3 grid gap-x-4 gap-y-2 text-[11px] sm:grid-cols-2 xl:grid-cols-4">
+            <SuiKeyCompactDetail label="Address" title={account.address} value={truncateMiddle(account.address, 14, 10)} />
+            <SuiKeyCompactDetail label="Public key" title={account.publicBase64Key} value={truncateMiddle(account.publicBase64Key, 18, 10)} />
+            <SuiKeyCompactDetail label="Flag" value={String(account.flag)} />
+            <SuiKeyCompactDetail
+              label="Peer ID"
+              title={account.peerId ?? "Unavailable"}
+              value={account.peerId ? truncateMiddle(account.peerId, 12, 8) : "Unavailable"}
+            />
+          </div>
+        </div>
+        <div className="flex min-w-0 flex-wrap gap-2 lg:justify-end">
+        <Button
+          disabled={disabled}
+          onClick={() => onCopy(account.address)}
+          size="sm"
+          title="Copy address"
+          type="button"
+          variant="outline"
+        >
+          <Copy aria-hidden="true" />
+          Address
+        </Button>
+        <Button
+          disabled={disabled}
+          onClick={() => onCopy(publicSuiAccountJson(account))}
+          size="sm"
+          title="Copy public account JSON"
+          type="button"
+          variant="outline"
+        >
+          <Download aria-hidden="true" />
+          Public
+        </Button>
+        <Button
+          disabled={disabled || account.isActive}
+          onClick={onMakeActive}
+          size="sm"
+          type="button"
+          variant={account.isActive ? "default" : "outline"}
+        >
+          <KeyRound aria-hidden="true" />
+          Active
+        </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button disabled={disabled} size="icon-sm" title="More key actions" type="button" variant="outline">
+                <MoreHorizontal aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Key actions
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled={account.isExternal} onSelect={onRename}>
+                <Pencil aria-hidden="true" />
+                Rename alias
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={!account.canExportPrivateKey} onSelect={onExport}>
+                <Eye aria-hidden="true" />
+                Reveal private key
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled={!account.canRemove} onSelect={onRemove} variant="destructive">
+                <Trash2 aria-hidden="true" />
+                Remove key
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SuiKeyAccountSelector({
+  accounts,
+  disabled,
+  onSelectAccount,
+  selectedAccountId,
+}: {
+  accounts: SuiKeyAccount[];
+  disabled: boolean;
+  onSelectAccount: (accountId: string) => void;
+  selectedAccountId: string;
+}) {
+  const selectedAccount = accounts.find((account) => suiAccountId(account) === selectedAccountId) ?? accounts[0];
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          className="h-auto min-h-10 w-full justify-between gap-3 px-3 py-2 text-left sm:w-[22rem]"
+          disabled={disabled}
+          type="button"
+          variant="outline"
+        >
+          <span className="min-w-0">
+            <span className="block truncate text-[13px] font-medium">
+              {displaySuiAccountName(selectedAccount)}
+            </span>
+            <span className="block truncate font-mono text-[11px] text-muted-foreground">
+              {truncateMiddle(selectedAccount.address, 16, 10)}
+            </span>
+          </span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-80 w-[32rem] max-w-[calc(100vw-2rem)]">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">
+          Choose account
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup value={selectedAccountId} onValueChange={onSelectAccount}>
+          {accounts.map((account) => {
+            const accountId = suiAccountId(account);
+
+            return (
+              <DropdownMenuRadioItem
+                className="items-start py-2"
+                key={accountId}
+                value={accountId}
+              >
+                <span className="grid min-w-0 flex-1 gap-1">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate font-medium">{displaySuiAccountName(account)}</span>
+                    {account.isActive ? (
+                      <Badge className="rounded px-1.5 py-0 text-[10px]" variant="secondary">
+                        Active
+                      </Badge>
+                    ) : null}
+                    {account.isExternal ? (
+                      <Badge className="rounded px-1.5 py-0 text-[10px]" variant="outline">
+                        External
+                      </Badge>
+                    ) : null}
+                  </span>
+                  <span className="truncate font-mono text-[11px] text-muted-foreground">
+                    {truncateMiddle(account.address, 18, 12)}
+                  </span>
+                </span>
+                <span className="ml-auto rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  {account.keyScheme}
+                </span>
+              </DropdownMenuRadioItem>
+            );
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function SuiAccountBadges({ account }: { account: SuiKeyAccount }) {
+  return (
+    <>
+      {account.isActive ? (
+        <Badge className="rounded px-1.5 py-0 text-[10px]" variant="secondary">
+          Active
+        </Badge>
       ) : null}
-    </SettingsSection>
+      {account.isExternal ? (
+        <Badge className="rounded px-1.5 py-0 text-[10px]" variant="outline">
+          External
+        </Badge>
+      ) : null}
+      <Badge className="rounded px-1.5 py-0 text-[10px]" variant="outline">
+        {account.keyScheme}
+      </Badge>
+    </>
+  );
+}
+
+function SuiKeyCompactDetail({
+  label,
+  title,
+  value,
+}: {
+  label: string;
+  title?: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[10px] font-medium uppercase text-muted-foreground">{label}</div>
+      <div className="mt-0.5 truncate font-mono text-[11px] text-foreground" title={title ?? value}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function GenerateSuiKeyDialog({
+  disabled,
+  onGenerate,
+  onOpenChange,
+  open,
+  state,
+}: {
+  disabled: boolean;
+  onGenerate: (request: {
+    alias: string | null;
+    derivationPath: string | null;
+    keyScheme: string;
+    revealRecoveryPhrase: boolean;
+    wordLength: string | null;
+  }) => Promise<void>;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  state: SuiKeyState | null;
+}) {
+  const [alias, setAlias] = React.useState("");
+  const [derivationPath, setDerivationPath] = React.useState("");
+  const [keyScheme, setKeyScheme] = React.useState("ed25519");
+  const [revealRecoveryPhrase, setRevealRecoveryPhrase] = React.useState(false);
+  const [wordLength, setWordLength] = React.useState("word12");
+
+  React.useEffect(() => {
+    if (!open) {
+      setAlias("");
+      setDerivationPath("");
+      setKeyScheme("ed25519");
+      setRevealRecoveryPhrase(false);
+      setWordLength("word12");
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Generate Sui Key</DialogTitle>
+          <DialogDescription>
+            Creates a key in the standard Sui CLI keystore.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <LabeledField label="Alias">
+            <Input
+              autoComplete="off"
+              onChange={(event) => setAlias(event.target.value)}
+              placeholder="Optional"
+              value={alias}
+            />
+          </LabeledField>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <LabeledField label="Scheme">
+              <SuiOptionDropdown
+                options={state?.supportedSchemes ?? ["ed25519", "secp256k1", "secp256r1"]}
+                value={keyScheme}
+                onChange={setKeyScheme}
+              />
+            </LabeledField>
+            <LabeledField label="Words">
+              <SuiOptionDropdown
+                options={state?.supportedWordLengths ?? ["word12", "word15", "word18", "word21", "word24"]}
+                value={wordLength}
+                onChange={setWordLength}
+              />
+            </LabeledField>
+          </div>
+          <LabeledField label="Derivation path">
+            <Input
+              autoComplete="off"
+              onChange={(event) => setDerivationPath(event.target.value)}
+              placeholder="Use Sui default"
+              value={derivationPath}
+            />
+          </LabeledField>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              checked={revealRecoveryPhrase}
+              className="size-4 accent-primary"
+              onChange={(event) => setRevealRecoveryPhrase(event.target.checked)}
+              type="checkbox"
+            />
+            Reveal recovery phrase after generation
+          </label>
+        </div>
+        <DialogFooter>
+          <Button disabled={disabled} onClick={() => onOpenChange(false)} type="button" variant="outline">
+            Cancel
+          </Button>
+          <Button
+            disabled={disabled}
+            onClick={() => {
+              void onGenerate({
+                alias: alias.trim() || null,
+                derivationPath: derivationPath.trim() || null,
+                keyScheme,
+                revealRecoveryPhrase,
+                wordLength,
+              }).then(() => onOpenChange(false));
+            }}
+            type="button"
+          >
+            Generate
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ImportSuiKeyDialog({
+  disabled,
+  onImport,
+  onOpenChange,
+  open,
+  state,
+}: {
+  disabled: boolean;
+  onImport: (request: {
+    alias: string | null;
+    derivationPath: string | null;
+    inputString: string;
+    keyScheme: string;
+  }) => Promise<void>;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  state: SuiKeyState | null;
+}) {
+  const [alias, setAlias] = React.useState("");
+  const [derivationPath, setDerivationPath] = React.useState("");
+  const [inputString, setInputString] = React.useState("");
+  const [keyScheme, setKeyScheme] = React.useState("ed25519");
+
+  React.useEffect(() => {
+    if (!open) {
+      setAlias("");
+      setDerivationPath("");
+      setInputString("");
+      setKeyScheme("ed25519");
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Import Sui Key</DialogTitle>
+          <DialogDescription>
+            Accepts a `suiprivkey` Bech32 private key or mnemonic phrase.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <LabeledField label="Secret input">
+            <textarea
+              autoComplete="off"
+              className="min-h-28 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              onChange={(event) => setInputString(event.target.value)}
+              value={inputString}
+            />
+          </LabeledField>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <LabeledField label="Alias">
+              <Input
+                autoComplete="off"
+                onChange={(event) => setAlias(event.target.value)}
+                placeholder="Optional"
+                value={alias}
+              />
+            </LabeledField>
+            <LabeledField label="Mnemonic scheme">
+              <SuiOptionDropdown
+                options={state?.supportedSchemes ?? ["ed25519", "secp256k1", "secp256r1"]}
+                value={keyScheme}
+                onChange={setKeyScheme}
+              />
+            </LabeledField>
+          </div>
+          <LabeledField label="Derivation path">
+            <Input
+              autoComplete="off"
+              onChange={(event) => setDerivationPath(event.target.value)}
+              placeholder="Use Sui default for mnemonic import"
+              value={derivationPath}
+            />
+          </LabeledField>
+        </div>
+        <DialogFooter>
+          <Button disabled={disabled} onClick={() => onOpenChange(false)} type="button" variant="outline">
+            Cancel
+          </Button>
+          <Button
+            disabled={disabled || !inputString.trim()}
+            onClick={() => {
+              void onImport({
+                alias: alias.trim() || null,
+                derivationPath: derivationPath.trim() || null,
+                inputString,
+                keyScheme,
+              }).then(() => onOpenChange(false));
+            }}
+            type="button"
+          >
+            Import
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RenameSuiKeyDialog({
+  action,
+  disabled,
+  onOpenChange,
+  onRename,
+}: {
+  action: { account: SuiKeyAccount; kind: "rename" } | null;
+  disabled: boolean;
+  onOpenChange: (open: boolean) => void;
+  onRename: (account: SuiKeyAccount, newAlias: string) => Promise<void>;
+}) {
+  const [newAlias, setNewAlias] = React.useState("");
+  const account = action?.account ?? null;
+
+  React.useEffect(() => {
+    setNewAlias(account?.alias ?? "");
+  }, [account]);
+
+  return (
+    <Dialog open={Boolean(account)} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rename Alias</DialogTitle>
+          <DialogDescription>
+            Updates the alias stored in Sui’s aliases file.
+          </DialogDescription>
+        </DialogHeader>
+        <LabeledField label="Alias">
+          <Input
+            autoComplete="off"
+            onChange={(event) => setNewAlias(event.target.value)}
+            value={newAlias}
+          />
+        </LabeledField>
+        <DialogFooter>
+          <Button disabled={disabled} onClick={() => onOpenChange(false)} type="button" variant="outline">
+            Cancel
+          </Button>
+          <Button
+            disabled={disabled || !account || !newAlias.trim()}
+            onClick={() => {
+              if (!account) {
+                return;
+              }
+              void onRename(account, newAlias).then(() => onOpenChange(false));
+            }}
+            type="button"
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RemoveSuiKeyDialog({
+  action,
+  disabled,
+  onOpenChange,
+  onRemove,
+}: {
+  action: { account: SuiKeyAccount; kind: "remove" } | null;
+  disabled: boolean;
+  onOpenChange: (open: boolean) => void;
+  onRemove: (account: SuiKeyAccount, confirmation: string) => Promise<void>;
+}) {
+  const [confirmation, setConfirmation] = React.useState("");
+  const account = action?.account ?? null;
+  const expected = account ? account.alias ?? account.address : "";
+
+  React.useEffect(() => {
+    if (!account) {
+      setConfirmation("");
+    }
+  }, [account]);
+
+  return (
+    <Dialog open={Boolean(account)} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Remove Sui Key</DialogTitle>
+          <DialogDescription>
+            This removes the keypair from the Sui CLI keystore and cannot be undone from Peregrine.
+          </DialogDescription>
+        </DialogHeader>
+        {account ? (
+          <div className="grid gap-4">
+            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              Type `{expected}` to confirm removal.
+            </p>
+            <Input
+              autoComplete="off"
+              onChange={(event) => setConfirmation(event.target.value)}
+              value={confirmation}
+            />
+          </div>
+        ) : null}
+        <DialogFooter>
+          <Button disabled={disabled} onClick={() => onOpenChange(false)} type="button" variant="outline">
+            Cancel
+          </Button>
+          <Button
+            disabled={disabled || !account || confirmation.trim() !== expected}
+            onClick={() => {
+              if (!account) {
+                return;
+              }
+              void onRemove(account, confirmation).then(() => onOpenChange(false));
+            }}
+            type="button"
+            variant="destructive"
+          >
+            Remove
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ExportSuiPrivateKeyDialog({
+  action,
+  disabled,
+  onExport,
+  onOpenChange,
+}: {
+  action: { account: SuiKeyAccount; kind: "export" } | null;
+  disabled: boolean;
+  onExport: (account: SuiKeyAccount, confirmation: string) => Promise<void>;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [confirmation, setConfirmation] = React.useState("");
+  const account = action?.account ?? null;
+  const expected = account ? account.alias ?? account.address : "";
+
+  React.useEffect(() => {
+    if (!account) {
+      setConfirmation("");
+    }
+  }, [account]);
+
+  return (
+    <Dialog open={Boolean(account)} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Reveal Private Key</DialogTitle>
+          <DialogDescription>
+            Exports the Bech32 `suiprivkey` for this local Sui key.
+          </DialogDescription>
+        </DialogHeader>
+        {account ? (
+          <div className="grid gap-4">
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+              Anyone with this value can control the account. Type `{expected}` to reveal it.
+            </p>
+            <Input
+              autoComplete="off"
+              onChange={(event) => setConfirmation(event.target.value)}
+              value={confirmation}
+            />
+          </div>
+        ) : null}
+        <DialogFooter>
+          <Button disabled={disabled} onClick={() => onOpenChange(false)} type="button" variant="outline">
+            Cancel
+          </Button>
+          <Button
+            disabled={disabled || !account || confirmation.trim() !== expected}
+            onClick={() => {
+              if (!account) {
+                return;
+              }
+              void onExport(account, confirmation);
+            }}
+            type="button"
+            variant="destructive"
+          >
+            Reveal
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SecretRevealDialog({
+  onOpenChange,
+  revealedSecret,
+}: {
+  onOpenChange: (open: boolean) => void;
+  revealedSecret: { label: string; secret: string } | null;
+}) {
+  return (
+    <Dialog open={Boolean(revealedSecret)} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{revealedSecret?.label ?? "Secret"}</DialogTitle>
+          <DialogDescription>
+            This value is not stored by Peregrine. Closing this dialog clears it from the app state.
+          </DialogDescription>
+        </DialogHeader>
+        <textarea
+          className="min-h-28 w-full rounded-md border border-input bg-muted px-3 py-2 font-mono text-sm shadow-xs outline-none"
+          readOnly
+          value={revealedSecret?.secret ?? ""}
+        />
+        <DialogFooter>
+          <Button
+            disabled={!revealedSecret}
+            onClick={() => revealedSecret ? void copyToClipboard(revealedSecret.secret) : undefined}
+            type="button"
+            variant="outline"
+          >
+            <Copy aria-hidden="true" />
+            Copy
+          </Button>
+          <Button onClick={() => onOpenChange(false)} type="button">
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SuiOptionDropdown({
+  onChange,
+  options,
+  value,
+}: {
+  onChange: (value: string) => void;
+  options: string[];
+  value: string;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button className="w-full justify-between" type="button" variant="outline">
+          {value}
+          <ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-[var(--radix-dropdown-menu-trigger-width)]">
+        <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
+          {options.map((option) => (
+            <DropdownMenuRadioItem key={option} value={option}>
+              {option}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function LabeledField({
+  children,
+  label,
+}: {
+  children: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <label className="grid gap-1.5 text-sm">
+      <span className="font-medium text-foreground">{label}</span>
+      {children}
+    </label>
   );
 }
 
@@ -1074,6 +2127,41 @@ function RuleNumericControls({
       ))}
     </>
   );
+}
+
+function displaySuiAccountName(account: SuiKeyAccount) {
+  return account.alias?.trim() || truncateMiddle(account.address, 12, 8);
+}
+
+function suiAccountId(account: SuiKeyAccount) {
+  return `${account.isExternal ? "external" : "local"}:${account.address}`;
+}
+
+function publicSuiAccountJson(account: SuiKeyAccount) {
+  return JSON.stringify(
+    {
+      address: account.address,
+      alias: account.alias ?? null,
+      flag: account.flag,
+      keyScheme: account.keyScheme,
+      peerId: account.peerId ?? null,
+      publicBase64Key: account.publicBase64Key,
+    },
+    null,
+    2,
+  );
+}
+
+async function copyToClipboard(value: string) {
+  await navigator.clipboard.writeText(value);
+}
+
+function truncateMiddle(value: string, prefixLength: number, suffixLength: number) {
+  if (value.length <= prefixLength + suffixLength + 1) {
+    return value;
+  }
+
+  return `${value.slice(0, prefixLength)}...${value.slice(-suffixLength)}`;
 }
 
 function SettingsNavButton({

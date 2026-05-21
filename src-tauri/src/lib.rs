@@ -95,6 +95,13 @@ pub fn run() {
             commands::sui::check_sui_adapter,
             commands::sui::get_sui_adapter_settings,
             commands::sui::save_sui_adapter_settings,
+            commands::sui::load_sui_key_state,
+            commands::sui::generate_sui_key,
+            commands::sui::import_sui_key,
+            commands::sui::rename_sui_key_alias,
+            commands::sui::set_active_sui_address,
+            commands::sui::remove_sui_key,
+            commands::sui::export_sui_private_key,
             commands::metadata::load_project_metadata,
             commands::metadata::save_project_metadata
         ])

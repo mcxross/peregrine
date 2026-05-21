@@ -787,6 +787,76 @@ export type SuiAdapterSourceStatus = {
   error: string | null;
 };
 
+export type SuiKeyConfigStatus = "missing" | "loaded" | "invalid";
+
+export type SuiKeyDiagnosticLevel = "error" | "warning" | "info";
+
+export type SuiKeyDiagnostic = {
+  level: SuiKeyDiagnosticLevel;
+  message: string;
+  path?: string | null;
+};
+
+export type SuiKeyAccount = {
+  address: string;
+  alias?: string | null;
+  canExportPrivateKey: boolean;
+  canRemove: boolean;
+  flag: number;
+  isActive: boolean;
+  isExternal: boolean;
+  keyScheme: string;
+  peerId?: string | null;
+  publicBase64Key: string;
+};
+
+export type SuiKeyState = {
+  accounts: SuiKeyAccount[];
+  activeAddress?: string | null;
+  activeEnv?: string | null;
+  aliasesPath: string;
+  clientConfigPath: string;
+  configDir: string;
+  configStatus: SuiKeyConfigStatus;
+  diagnostics: SuiKeyDiagnostic[];
+  externalKeystorePath: string;
+  keystorePath: string;
+  supportedSchemes: string[];
+  supportedWordLengths: string[];
+};
+
+export type SuiGenerateKeyRequest = {
+  alias?: string | null;
+  derivationPath?: string | null;
+  keyScheme: string;
+  revealRecoveryPhrase: boolean;
+  wordLength?: string | null;
+};
+
+export type SuiGenerateKeyResponse = {
+  generated: SuiKeyAccount;
+  keyScheme: string;
+  recoveryPhrase?: string | null;
+  state: SuiKeyState;
+};
+
+export type SuiImportKeyRequest = {
+  alias?: string | null;
+  derivationPath?: string | null;
+  inputString: string;
+  keyScheme: string;
+};
+
+export type SuiImportKeyResponse = {
+  imported: SuiKeyAccount;
+  state: SuiKeyState;
+};
+
+export type SuiExportPrivateKeyResponse = {
+  account: SuiKeyAccount;
+  exportedPrivateKey: string;
+};
+
 export type FilePreview =
   | {
       kind: "text";
@@ -1080,6 +1150,53 @@ export async function getSuiAdapterSettings() {
 
 export async function saveSuiAdapterSettings(settings: SuiAdapterSettings) {
   return invoke<SuiAdapterSettings>("save_sui_adapter_settings", { settings });
+}
+
+export async function loadSuiKeyState() {
+  return invoke<SuiKeyState>("load_sui_key_state");
+}
+
+export async function generateSuiKey(request: SuiGenerateKeyRequest) {
+  return invoke<SuiGenerateKeyResponse>("generate_sui_key", { request });
+}
+
+export async function importSuiKey(request: SuiImportKeyRequest) {
+  return invoke<SuiImportKeyResponse>("import_sui_key", { request });
+}
+
+export async function renameSuiKeyAlias(aliasOrAddress: string, newAlias: string) {
+  return invoke<SuiKeyState>("rename_sui_key_alias", {
+    request: {
+      aliasOrAddress,
+      newAlias,
+    },
+  });
+}
+
+export async function setActiveSuiAddress(aliasOrAddress: string) {
+  return invoke<SuiKeyState>("set_active_sui_address", {
+    request: {
+      aliasOrAddress,
+    },
+  });
+}
+
+export async function removeSuiKey(aliasOrAddress: string, confirmation: string) {
+  return invoke<SuiKeyState>("remove_sui_key", {
+    request: {
+      aliasOrAddress,
+      confirmation,
+    },
+  });
+}
+
+export async function exportSuiPrivateKey(aliasOrAddress: string, confirmation: string) {
+  return invoke<SuiExportPrivateKeyResponse>("export_sui_private_key", {
+    request: {
+      aliasOrAddress,
+      confirmation,
+    },
+  });
 }
 
 export async function loadProjectMetadata(rootPath: string) {

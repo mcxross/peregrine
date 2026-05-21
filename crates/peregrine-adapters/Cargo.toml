@@ -40,10 +40,21 @@ alloy-transport-http = { version = "=1.4.3", default-features = false }
 alloy-transport-ws = { version = "=1.4.3", default-features = false }
 alloy-trie = { version = "=0.9.3", default-features = false }
 alloy-tx-macros = { version = "=1.4.3", default-features = false }
+anemo = { workspace = true }
+anyhow = { workspace = true }
+bip32 = { workspace = true }
 clap = { workspace = true }
+dirs = { workspace = true }
+fastcrypto = { workspace = true }
 serde = { workspace = true }
 sui = { workspace = true }
+sui-config = { workspace = true }
+sui-keys = { workspace = true }
+sui-sdk = { workspace = true }
+sui-types = { workspace = true }
+tiny-bip39 = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+tempfile = { workspace = true }

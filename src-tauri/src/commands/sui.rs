@@ -5,8 +5,10 @@ use crate::helper_args::{
 use crate::{commands::files, validated_move_project_name};
 use peregrine_adapters::sui::{
     SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus, SuiExecutionTarget,
-    SuiFormalVerificationCommand, SuiFormalVerificationOptions, SuiMoveNewCommand,
-    SuiPackageCommand,
+    SuiExportPrivateKeyRequest, SuiExportPrivateKeyResponse, SuiFormalVerificationCommand,
+    SuiFormalVerificationOptions, SuiGenerateKeyRequest, SuiGenerateKeyResponse,
+    SuiImportKeyRequest, SuiImportKeyResponse, SuiKeyManager, SuiKeyState, SuiMoveNewCommand,
+    SuiPackageCommand, SuiRemoveKeyRequest, SuiRenameKeyAliasRequest, SuiSetActiveAddressRequest,
 };
 use peregrine_dynamic_analysis::sui::formal_verification::{
     formal_verification_manifest, FormalVerificationOptions,
@@ -822,6 +824,90 @@ pub(crate) async fn check_sui_adapter(app: tauri::AppHandle) -> Result<SuiAdapte
 }
 
 #[tauri::command]
+pub(crate) async fn load_sui_key_state() -> Result<SuiKeyState, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let manager = sui_key_manager()?;
+        manager.load_state().map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| format!("Could not join Sui key state load task: {error}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn generate_sui_key(
+    request: SuiGenerateKeyRequest,
+) -> Result<SuiGenerateKeyResponse, String> {
+    let manager = sui_key_manager()?;
+
+    manager
+        .generate_key(request)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub(crate) async fn import_sui_key(
+    request: SuiImportKeyRequest,
+) -> Result<SuiImportKeyResponse, String> {
+    let manager = sui_key_manager()?;
+
+    manager
+        .import_key(request)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub(crate) async fn rename_sui_key_alias(
+    request: SuiRenameKeyAliasRequest,
+) -> Result<SuiKeyState, String> {
+    let manager = sui_key_manager()?;
+
+    manager
+        .rename_alias(request)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub(crate) async fn set_active_sui_address(
+    request: SuiSetActiveAddressRequest,
+) -> Result<SuiKeyState, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let manager = sui_key_manager()?;
+        manager
+            .set_active_address(request)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| format!("Could not join Sui active address update task: {error}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn remove_sui_key(request: SuiRemoveKeyRequest) -> Result<SuiKeyState, String> {
+    let manager = sui_key_manager()?;
+
+    manager
+        .remove_key(request)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub(crate) async fn export_sui_private_key(
+    request: SuiExportPrivateKeyRequest,
+) -> Result<SuiExportPrivateKeyResponse, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let manager = sui_key_manager()?;
+        manager
+            .export_private_key(request)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| format!("Could not join Sui private key export task: {error}"))?
+}
+
+#[tauri::command]
 pub(crate) async fn get_sui_adapter_settings(
     app: tauri::AppHandle,
 ) -> Result<SuiAdapterSettings, String> {
@@ -850,6 +936,10 @@ pub(crate) fn sui_adapter(app: &tauri::AppHandle) -> Result<SuiAdapter, String> 
         load_sui_adapter_settings(app)?,
         SuiAdapterEnvironment::new(),
     ))
+}
+
+fn sui_key_manager() -> Result<SuiKeyManager, String> {
+    SuiKeyManager::new_default().map_err(|error| error.to_string())
 }
 
 fn load_sui_adapter_settings(app: &tauri::AppHandle) -> Result<SuiAdapterSettings, String> {

@@ -27,8 +27,13 @@ edition = "2021"
 
 [workspace.dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
+anemo = { git = "https://github.com/mystenlabs/anemo.git", rev = "9248f8d3951df750360308df22618e5978ad6dc0" }
+anyhow = "1.0.71"
 base64 = "0.22"
+bip32 = "0.4.0"
 crossterm = "0.25.0"
+dirs = "4.0.0"
+fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "5f87e04bb21d295ef6b39375a06615d45cbb906c" }
 globset = "0.4"
 hex = "0.4"
 libloading = "0.8"
@@ -68,14 +73,19 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 sui = { path = "../oss/sui/crates/sui", package = "sui", features = ["tracing"] }
+sui-config = { path = "../oss/sui/crates/sui-config" }
+sui-keys = { path = "../oss/sui/crates/sui-keys" }
 sui-package-alt = { path = "../oss/sui/crates/sui-package-alt" }
 sui-prover = { path = "../oss/sui-prover/crates/sui-prover" }
+sui-sdk = { path = "../oss/sui/crates/sui-sdk" }
+sui-types = { path = "../oss/sui/crates/sui-types" }
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 tauri = { version = "=2.11.2", features = [] }
 tauri-build = { version = "=2.6.2", features = [] }
 tauri-plugin-dialog = "=2.7.1"
 tauri-plugin-opener = "=2.5.4"
 tempfile = "3"
+tiny-bip39 = "1.0.0"
 tokio = { version = "=1.49.0", features = ["rt-multi-thread"] }
 toml = "0.8"
 walkdir = "2"

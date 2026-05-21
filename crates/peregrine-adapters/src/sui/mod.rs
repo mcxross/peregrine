@@ -10,6 +10,7 @@ mod command;
 mod environment;
 mod error;
 mod formal;
+mod keys;
 mod settings;
 mod status;
 mod system;
@@ -24,6 +25,12 @@ pub use error::SuiAdapterError;
 pub use formal::{
     SuiFormalVerificationCommand, SuiFormalVerificationOptions,
     DEFAULT_FORMAL_VERIFICATION_TIMEOUT_SECONDS,
+};
+pub use keys::{
+    SuiExportPrivateKeyRequest, SuiExportPrivateKeyResponse, SuiGenerateKeyRequest,
+    SuiGenerateKeyResponse, SuiImportKeyRequest, SuiImportKeyResponse, SuiKeyAccount,
+    SuiKeyConfigStatus, SuiKeyDiagnostic, SuiKeyDiagnosticLevel, SuiKeyManager, SuiKeyState,
+    SuiRemoveKeyRequest, SuiRenameKeyAliasRequest, SuiSetActiveAddressRequest,
 };
 pub use settings::{SuiAdapterSettings, SuiAdapterSource};
 pub use status::{SuiAdapterSourceStatus, SuiAdapterStatus};
