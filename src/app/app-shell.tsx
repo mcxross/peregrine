@@ -7,10 +7,14 @@ import { Workspace } from "@/app/workspace";
 import { Button } from "@/components/ui/button";
 import {
   buildMovePackage,
+  defaultProjectMetadata,
   displayMovePackageName,
   loadPackageTree,
   loadPackageTreeDetails,
   loadProjectMetadata,
+  projectMoveCoverageScriptPath,
+  projectMoveTestScriptPath,
+  projectPackageConfigKey,
   runFormalVerification,
   runMovyFuzz,
   runSecurityScript,
@@ -18,7 +22,6 @@ import {
   saveProjectMetadata,
   type MovePackage,
   type PackageTree,
-  type ProjectMetadata,
 } from "@/features/empty-project/filesystem-tree";
 import type {
   BuildLogRun,
@@ -223,7 +226,7 @@ export function AppShell({
 
     let isCancelled = false;
     const launchBuildKey = projectBuildRuntimeKey(packageTree, activeMovePackage);
-    const packageMetadataKey = projectPackageMetadataKey(activeMovePackage);
+    const packageMetadataKey = projectPackageConfigKey(activeMovePackage);
 
     if (launchBuildKeysRef.current.has(launchBuildKey)) {
       return;
@@ -460,7 +463,7 @@ export function AppShell({
       if (state === "success") {
         await rememberSuccessfulLaunchBuild(
           packageTree.rootPath,
-          projectPackageMetadataKey(activeMovePackage),
+          projectPackageConfigKey(activeMovePackage),
           Date.now(),
         );
       }
@@ -1108,11 +1111,7 @@ function packagePathLabel(movePackage: MovePackage, packageTree: PackageTree) {
 }
 
 function projectBuildRuntimeKey(packageTree: PackageTree, movePackage: MovePackage) {
-  return `${packageTree.rootPath}::${movePackage.manifestPath || movePackage.path || "."}`;
-}
-
-function projectPackageMetadataKey(movePackage: MovePackage) {
-  return movePackage.manifestPath || movePackage.path || ".";
+  return `${packageTree.rootPath}::${projectPackageConfigKey(movePackage)}`;
 }
 
 async function rememberSuccessfulLaunchBuild(
@@ -1135,29 +1134,6 @@ async function rememberSuccessfulLaunchBuild(
   } catch (error) {
     console.warn("Could not store project build metadata.", error);
   }
-}
-
-function defaultProjectMetadata(): ProjectMetadata {
-  return {
-    agents: undefined,
-    builds: {},
-    packageConfigs: {},
-    version: 1,
-  };
-}
-
-function projectMoveTestScriptPath(metadata: ProjectMetadata, movePackage: MovePackage) {
-  return (
-    metadata.packageConfigs?.[projectPackageMetadataKey(movePackage)]?.commands?.moveTestScriptPath?.trim()
-    || null
-  );
-}
-
-function projectMoveCoverageScriptPath(metadata: ProjectMetadata, movePackage: MovePackage) {
-  return (
-    metadata.packageConfigs?.[projectPackageMetadataKey(movePackage)]?.commands?.moveCoverageScriptPath?.trim()
-    || null
-  );
 }
 
 function createVisibleLoadAssessment(

@@ -78,6 +78,55 @@ export type ProjectCommandConfig = {
   moveTestScriptPath?: string | null;
 };
 
+export function defaultProjectMetadata(): ProjectMetadata {
+  return {
+    agents: undefined,
+    builds: {},
+    packageConfigs: {},
+    version: 1,
+  };
+}
+
+export function projectPackageConfigKey(movePackage: Pick<MovePackage, "manifestPath" | "path">) {
+  return movePackage.manifestPath || movePackage.path || ".";
+}
+
+export function projectPackageConfig(
+  metadata: ProjectMetadata,
+  movePackage: Pick<MovePackage, "manifestPath" | "path">,
+) {
+  const candidateKeys = [
+    projectPackageConfigKey(movePackage),
+    movePackage.manifestPath,
+    movePackage.path,
+    ".",
+  ].filter((key): key is string => Boolean(key));
+
+  for (const key of candidateKeys) {
+    const config = metadata.packageConfigs?.[key];
+
+    if (config) {
+      return config;
+    }
+  }
+
+  return null;
+}
+
+export function projectMoveTestScriptPath(
+  metadata: ProjectMetadata,
+  movePackage: Pick<MovePackage, "manifestPath" | "path">,
+) {
+  return projectPackageConfig(metadata, movePackage)?.commands?.moveTestScriptPath?.trim() || null;
+}
+
+export function projectMoveCoverageScriptPath(
+  metadata: ProjectMetadata,
+  movePackage: Pick<MovePackage, "manifestPath" | "path">,
+) {
+  return projectPackageConfig(metadata, movePackage)?.commands?.moveCoverageScriptPath?.trim() || null;
+}
+
 export type MoveProjectGraphs = {
   callGraph: MoveCallGraph;
   typeGraph: MoveTypeGraph;
@@ -695,6 +744,7 @@ type CommandOutputChunk = {
 };
 
 const COMMAND_OUTPUT_EVENT = "command-output";
+const PROJECT_METADATA_CHANGED_EVENT = "project-metadata-changed";
 const SUI_ADAPTER_SETTINGS_CHANGED_EVENT = "sui-adapter-settings-changed";
 
 export type SecurityCommandKind =
@@ -1037,7 +1087,36 @@ export async function loadProjectMetadata(rootPath: string) {
 }
 
 export async function saveProjectMetadata(rootPath: string, metadata: ProjectMetadata) {
-  return invoke<ProjectMetadata>("save_project_metadata", { rootPath, metadata });
+  const savedMetadata = await invoke<ProjectMetadata>("save_project_metadata", { rootPath, metadata });
+
+  window.dispatchEvent(new CustomEvent<ProjectMetadataChangedDetail>(
+    PROJECT_METADATA_CHANGED_EVENT,
+    {
+      detail: {
+        metadata: savedMetadata,
+        rootPath,
+      },
+    },
+  ));
+
+  return savedMetadata;
+}
+
+export type ProjectMetadataChangedDetail = {
+  metadata: ProjectMetadata;
+  rootPath: string;
+};
+
+export function listenProjectMetadataChanged(
+  onProjectMetadataChanged: (detail: ProjectMetadataChangedDetail) => void,
+) {
+  const listener = (event: Event) => {
+    onProjectMetadataChanged((event as CustomEvent<ProjectMetadataChangedDetail>).detail);
+  };
+
+  window.addEventListener(PROJECT_METADATA_CHANGED_EVENT, listener);
+
+  return () => window.removeEventListener(PROJECT_METADATA_CHANGED_EVENT, listener);
 }
 
 export async function listenSuiAdapterSettingsChanged(

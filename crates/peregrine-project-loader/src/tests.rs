@@ -147,6 +147,43 @@ public fun ping() {}
     );
 }
 
+#[test]
+fn shallow_load_reports_existing_package_summaries() {
+    let temp = tempdir().expect("tempdir");
+
+    fs::write(
+        temp.path().join("Move.toml"),
+        r#"
+[package]
+name = "with_summaries"
+"#,
+    )
+    .expect("manifest");
+    fs::create_dir_all(temp.path().join("sources")).expect("sources");
+    fs::write(
+        temp.path().join("sources/main.move"),
+        r#"
+module with_summaries::main;
+
+public fun ping() {}
+"#,
+    )
+    .expect("source");
+    fs::create_dir_all(temp.path().join("package_summaries/with_summaries")).expect("summaries");
+
+    let project = load_project(temp.path(), ProjectLoadOptions::default()).expect("project");
+
+    assert_eq!(
+        project.dependency_graph.summary_path.as_deref(),
+        Some("package_summaries"),
+    );
+    assert_stage_status(
+        &project.load_report,
+        "packageSummaries",
+        ProjectLoadStageStatus::Passed,
+    );
+}
+
 fn assert_stage_status(
     report: &ProjectLoadReport,
     stage_id: &str,

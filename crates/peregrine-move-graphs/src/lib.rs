@@ -4,7 +4,7 @@ mod graph_builder;
 mod state_access_graph;
 mod type_graph;
 
-use dependency_graph::build_package_dependency_graph;
+use dependency_graph::{build_package_dependency_graph, resolve_summary_relative_path};
 use graph_builder::{build_move_graphs, build_move_state_access_graph, MoveStateAccessGraphTarget};
 use peregrine_move_model::{
     build_move_package, discover_move_packages, root_package_name, MovePackageModel,
@@ -80,7 +80,7 @@ pub fn discover_move_project_model_fast(root: &Path) -> MoveProjectModel {
 
 pub fn discover_move_project_model_shallow(root: &Path) -> MoveProjectModel {
     let packages = discover_move_packages(root, false);
-    let dependency_graph = shallow_dependency_graph(&packages);
+    let dependency_graph = shallow_dependency_graph(root, &packages);
 
     MoveProjectModel {
         packages,
@@ -91,8 +91,12 @@ pub fn discover_move_project_model_shallow(root: &Path) -> MoveProjectModel {
     }
 }
 
-fn shallow_dependency_graph(packages: &[MovePackageModel]) -> PackageDependencyGraph {
+fn shallow_dependency_graph(
+    root_path: &Path,
+    packages: &[MovePackageModel],
+) -> PackageDependencyGraph {
     let root = root_package_name(packages);
+    let summary_path = resolve_summary_relative_path(root_path, packages);
 
     PackageDependencyGraph {
         root: root.clone(),
@@ -109,7 +113,7 @@ fn shallow_dependency_graph(packages: &[MovePackageModel]) -> PackageDependencyG
             })
             .unwrap_or_default(),
         edges: Vec::new(),
-        summary_path: None,
+        summary_path,
     }
 }
 
@@ -164,6 +168,58 @@ pub fn discover_move_state_access_graph_for_function(
             max_call_depth: 4,
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn shallow_project_model_reports_root_package_summaries() {
+        let temp = tempdir().expect("tempdir");
+
+        fs::write(
+            temp.path().join("Move.toml"),
+            r#"
+[package]
+name = "root_pkg"
+"#,
+        )
+        .expect("manifest");
+        fs::create_dir_all(temp.path().join("package_summaries/root_pkg")).expect("summary dir");
+
+        let project = discover_move_project_model_shallow(temp.path());
+
+        assert_eq!(
+            project.dependency_graph.summary_path.as_deref(),
+            Some("package_summaries"),
+        );
+    }
+
+    #[test]
+    fn shallow_project_model_reports_nested_package_summaries() {
+        let temp = tempdir().expect("tempdir");
+        let package_root = temp.path().join("packages/app");
+
+        fs::create_dir_all(package_root.join("package_summaries/app")).expect("summary dir");
+        fs::write(
+            package_root.join("Move.toml"),
+            r#"
+[package]
+name = "app"
+"#,
+        )
+        .expect("manifest");
+
+        let project = discover_move_project_model_shallow(temp.path());
+
+        assert_eq!(
+            project.dependency_graph.summary_path.as_deref(),
+            Some("packages/app/package_summaries"),
+        );
+    }
 }
 
 fn discover_move_project_model_with_graphs(root: &Path, include_graphs: bool) -> MoveProjectModel {

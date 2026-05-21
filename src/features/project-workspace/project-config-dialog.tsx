@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import {
   displayMovePackageName,
   loadProjectMetadata,
+  projectPackageConfig,
+  projectPackageConfigKey,
   saveProjectMetadata,
   type MovePackage,
   type PackageTree,
@@ -85,12 +87,10 @@ export function ProjectConfigDialog({
           return;
         }
 
-        setDraftMoveTestScriptPath(
-          metadata.packageConfigs?.[packageKey]?.commands?.moveTestScriptPath ?? "",
-        );
-        setDraftMoveCoverageScriptPath(
-          metadata.packageConfigs?.[packageKey]?.commands?.moveCoverageScriptPath ?? "",
-        );
+        const packageConfig = projectPackageConfig(metadata, activeMovePackage);
+
+        setDraftMoveTestScriptPath(packageConfig?.commands?.moveTestScriptPath ?? "");
+        setDraftMoveCoverageScriptPath(packageConfig?.commands?.moveCoverageScriptPath ?? "");
       })
       .catch((loadError) => {
         if (!isCancelled) {
@@ -494,10 +494,6 @@ function ReadOnlyValue({ value }: { value: string }) {
 
 function normalizeScriptPath(scriptPath: string) {
   return scriptPath.trim().replace(/^\/+/, "") || null;
-}
-
-function projectPackageConfigKey(movePackage: MovePackage) {
-  return movePackage.manifestPath || movePackage.path || ".";
 }
 
 function absolutePackagePath(packageTree: PackageTree, packagePath: string) {

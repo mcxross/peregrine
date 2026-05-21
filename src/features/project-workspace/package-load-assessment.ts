@@ -265,10 +265,8 @@ async function runBuildAssessment({
         if (refreshedPackageTree.dependencyGraph.summaryPath) {
           caption = "Summaries refreshed";
         } else {
-          finalState = "attention";
-          value = "Review";
-          caption = "Summaries missing";
-          summary = "Build passed, but package_summaries were not found after rescanning.";
+          caption = "Build passed";
+          summary = "Build passed. Package summaries were not found after rescanning, so dependency graph detail may be limited.";
         }
 
         if (isCurrent()) {

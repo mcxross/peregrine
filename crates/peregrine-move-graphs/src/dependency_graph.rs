@@ -77,6 +77,13 @@ pub(crate) fn build_package_dependency_graph(
     }
 }
 
+pub(crate) fn resolve_summary_relative_path(
+    root: &Path,
+    packages: &[MovePackageModel],
+) -> Option<String> {
+    resolve_summary_location(root, packages).map(|location| location.relative_path)
+}
+
 struct SummaryLocation {
     path: PathBuf,
     relative_path: String,

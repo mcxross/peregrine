@@ -3,7 +3,6 @@ import {
   BaseEdge,
   Controls,
   Handle,
-  MarkerType,
   Position,
   ReactFlow,
   ReactFlowProvider,
@@ -25,14 +24,18 @@ import {
   ArrowRight,
   ArrowUp,
   Bug,
+  ChevronDown,
+  ChevronRight,
   CheckCircle2,
   Circle,
+  Clock3,
   FileCheck2,
+  FileText,
   FolderOpen,
   Gauge,
-  GripVertical,
   Hammer,
   Loader2,
+  MoreVertical,
   Play,
   Plus,
   Rocket,
@@ -45,18 +48,30 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   buildMovePackage,
+  defaultProjectMetadata,
   displayMovePackageName,
   loadFilePreview,
   loadPackageTree,
+  loadProjectMetadata,
+  listenProjectMetadataChanged,
+  projectMoveCoverageScriptPath,
+  projectMoveTestScriptPath,
   runSecurityScript,
   runSecurityCommand,
   type CommandOutput,
   type FilePreview,
   type MovePackage,
   type PackageTree,
+  type ProjectMetadata,
   type SecurityCommandKind,
 } from "@/features/empty-project/filesystem-tree";
 import type {
@@ -135,6 +150,12 @@ type StepExecutionOutcome = StepExecutionResult & {
   packageTree?: PackageTree;
 };
 
+type ProjectConfiguredScript = {
+  args: string[];
+  modeLabel: string;
+  scriptPath: string;
+};
+
 type ExecutionRun = {
   finishedAt: Date | null;
   id: number;
@@ -154,6 +175,7 @@ type ExecutionWorkflowNodeData = {
   onUpdateStep: (stepId: string, nextStep: ExecutionStepUpdate) => void;
   result: StepExecutionResult | undefined;
   packageTree: PackageTree;
+  projectMetadata: ProjectMetadata | null;
   selected: boolean;
   sequenceLength: number;
   step: ExecutionStep;
@@ -178,12 +200,16 @@ type DragPayload =
 const DRAG_MIME = "application/x-peregrine-execution-step";
 const DRAG_TEXT_PREFIX = "peregrine-execution-step:";
 let currentExecutionDragPayload: DragPayload | null = null;
-const EXECUTION_NODE_WIDTH = 360;
-const EXECUTION_NODE_HEIGHT = 88;
-const EXECUTION_HORIZONTAL_GAP = 92;
-const EXECUTION_VERTICAL_GAP = 74;
-const EXECUTION_FLOW_START_X = 120;
-const EXECUTION_FLOW_START_Y = 160;
+const EXECUTION_NODE_WIDTH = 760;
+const EXECUTION_HORIZONTAL_NODE_WIDTH = 520;
+const EXECUTION_NODE_HEIGHT = 96;
+const EXECUTION_FAILED_NODE_HEIGHT = 214;
+const EXECUTION_PUBLISH_NODE_HEIGHT = 156;
+const EXECUTION_HORIZONTAL_GAP = 88;
+const EXECUTION_VERTICAL_GAP = 54;
+const EXECUTION_FLOW_START_X = 184;
+const EXECUTION_FLOW_START_Y = 92;
+const EXECUTION_TIMELINE_OFFSET = 48;
 const EXECUTION_DROP_TARGET_ID = "execution-drop-target";
 const EXECUTION_NODE_TYPES = {
   dropTarget: ExecutionDropTargetNode,
@@ -305,8 +331,38 @@ export function ExecutionBuilderScreen({
   const [stepResults, setStepResults] = React.useState<Record<string, StepExecutionResult>>({});
   const [run, setRun] = React.useState<ExecutionRun | null>(null);
   const [sequenceDirection, setSequenceDirection] = React.useState<SequenceDirection>("horizontal");
+  const [projectMetadata, setProjectMetadata] = React.useState<ProjectMetadata | null>(null);
   const activeDragPayloadRef = React.useRef<DragPayload | null>(null);
   const isRunning = run?.state === "running";
+
+  React.useEffect(() => {
+    let isCancelled = false;
+
+    void loadProjectMetadata(packageTree.rootPath)
+      .then((metadata) => {
+        if (!isCancelled) {
+          setProjectMetadata(metadata);
+        }
+      })
+      .catch((error) => {
+        console.warn("Could not load project configuration for execution workflow.", error);
+        if (!isCancelled) {
+          setProjectMetadata(null);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [packageTree.rootPath]);
+
+  React.useEffect(() =>
+    listenProjectMetadataChanged(({ metadata, rootPath }) => {
+      if (rootPath === packageTree.rootPath) {
+        setProjectMetadata(metadata);
+      }
+    }),
+  [packageTree.rootPath]);
 
   React.useEffect(() => {
     if (!selectedStepId || sequence.some((step) => step.id === selectedStepId)) {
@@ -468,7 +524,13 @@ export function ExecutionBuilderScreen({
     const startedAt = new Date();
     let currentTree = packageTree;
     let currentPackage = resolveActiveMovePackage(currentTree, activeMovePackage);
+    const runProjectMetadata = await loadProjectMetadata(packageTree.rootPath).catch((error) => {
+      console.warn("Could not load project configuration for execution run.", error);
+      return projectMetadata ?? defaultProjectMetadata();
+    });
     let hasAttention = false;
+
+    setProjectMetadata(runProjectMetadata);
 
     setRun({
       finishedAt: null,
@@ -504,6 +566,7 @@ export function ExecutionBuilderScreen({
       const runningLog = executionLogRun({
         movePackage: currentPackage,
         packageTree: currentTree,
+        projectMetadata: runProjectMetadata,
         startedAt: stepStartedAt,
         state: "running",
         step,
@@ -521,6 +584,7 @@ export function ExecutionBuilderScreen({
           movePackage: currentPackage,
           onProjectSelected,
           packageTree: currentTree,
+          projectMetadata: runProjectMetadata,
           onCommandOutput: (output) => {
             onCommandLog({
               ...runningLog,
@@ -544,6 +608,7 @@ export function ExecutionBuilderScreen({
             movePackage: currentPackage ?? packageForLog,
             output: outcome.output,
             packageTree: currentTree,
+            projectMetadata: runProjectMetadata,
             startedAt: outcome.startedAt ?? stepStartedAt,
             state: outcome.state === "error" ? "error" : "success",
             step,
@@ -574,6 +639,7 @@ export function ExecutionBuilderScreen({
             finishedAt,
             movePackage: currentPackage,
             packageTree: currentTree,
+            projectMetadata: runProjectMetadata,
             startedAt: stepStartedAt,
             state: "error",
             step,
@@ -603,6 +669,7 @@ export function ExecutionBuilderScreen({
     onCommandLog,
     onProjectSelected,
     packageTree,
+    projectMetadata,
     sequence,
     updateStepResult,
   ]);
@@ -650,7 +717,7 @@ export function ExecutionBuilderScreen({
         </Button>
       </div>
 
-      <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid h-full min-h-0 grid-cols-[176px_minmax(0,1fr)]">
         <StepPalette
           onDragEnd={scheduleClearDrag}
           onDragStart={beginDrag}
@@ -672,6 +739,7 @@ export function ExecutionBuilderScreen({
           onSelectStep={setSelectedStepId}
           onUpdateStep={updateStep}
           packageTree={packageTree}
+          projectMetadata={projectMetadata}
           selectedStepId={selectedStepId}
           sequence={sequence}
           stepResults={stepResults}
@@ -696,11 +764,32 @@ function StepPalette({
 }) {
   const activeKinds = new Set(sequence.map((step) => step.kind));
   const paletteSteps = stepDefinitions.filter((definition) => !definition.locked);
+  const paletteRef = React.useRef<HTMLElement | null>(null);
+  const [hoveredStep, setHoveredStep] = React.useState<{
+    definition: ExecutionStepDefinition;
+    top: number;
+  } | null>(null);
+
+  const showStepDescription = React.useCallback(
+    (event: React.FocusEvent<HTMLElement> | React.MouseEvent<HTMLElement>, definition: ExecutionStepDefinition) => {
+      const paletteRect = paletteRef.current?.getBoundingClientRect();
+      const rowRect = event.currentTarget.getBoundingClientRect();
+
+      setHoveredStep({
+        definition,
+        top: paletteRect ? rowRect.top - paletteRect.top : 8,
+      });
+    },
+    [],
+  );
 
   return (
-    <aside className="grid min-h-0 border-r border-[color:var(--app-border)] bg-[var(--app-panel)]">
+    <aside
+      className="relative z-30 grid min-h-0 border-r border-[color:var(--app-border)] bg-[var(--app-panel)]"
+      ref={paletteRef}
+    >
       <ScrollArea className="min-h-0">
-        <div className="grid gap-2 p-3">
+        <div className="grid gap-1.5 p-2">
           {paletteSteps.map((definition) => {
             const isAdded = activeKinds.has(definition.kind);
             const canAdd = !isRunning && !isAdded;
@@ -708,9 +797,10 @@ function StepPalette({
 
             return (
               <Card
+                aria-label={canAdd ? `Add ${definition.label}` : definition.label}
                 aria-disabled={!canAdd}
                 className={cn(
-                  "group gap-0 rounded-md p-3 shadow-none transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                  "group gap-0 rounded-md px-2.5 py-2 shadow-none transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                   !canAdd
                     ? "border-[color:var(--app-border)] opacity-60"
                     : "cursor-pointer hover:border-primary/45 hover:bg-[var(--app-subtle)] active:cursor-grabbing",
@@ -722,6 +812,7 @@ function StepPalette({
                     onAddStep(definition.kind);
                   }
                 }}
+                onBlur={() => setHoveredStep(null)}
                 onDragEnd={onDragEnd}
                 onDragStart={(event) => {
                   onDragStart(event, {
@@ -729,6 +820,7 @@ function StepPalette({
                     source: "palette",
                   });
                 }}
+                onFocus={(event) => showStepDescription(event, definition)}
                 onKeyDown={(event) => {
                   if (!canAdd || (event.key !== "Enter" && event.key !== " ")) {
                     return;
@@ -737,32 +829,29 @@ function StepPalette({
                   event.preventDefault();
                   onAddStep(definition.kind);
                 }}
+                onMouseEnter={(event) => showStepDescription(event, definition)}
+                onMouseLeave={() => setHoveredStep(null)}
                 role="button"
                 tabIndex={canAdd ? 0 : -1}
                 title={
                   canAdd
-                    ? "Click or drag to add"
+                    ? `${definition.label}: ${definition.description}`
                     : isRunning
                       ? "Wait for the current run to finish"
                       : "Already on canvas"
                 }
               >
-                <div className="flex min-w-0 items-start gap-3">
-                  <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-[var(--app-elevated)] text-muted-foreground group-hover:text-primary">
-                    <Icon className="size-4" aria-hidden="true" />
+                <div className="grid min-w-0 grid-cols-[30px_minmax(0,1fr)] items-center gap-2">
+                  <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-[var(--app-elevated)] text-muted-foreground group-hover:text-primary">
+                    <Icon className="size-3.5" aria-hidden="true" />
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-center justify-between gap-2">
-                      <h3 className="truncate text-sm font-semibold">
-                        {definition.shortLabel}
-                      </h3>
-                      <Badge className="rounded px-1.5 py-0 text-[10px]" variant="secondary">
-                        {definition.category}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                      {definition.description}
-                    </p>
+                  <div className="grid min-w-0 gap-0.5">
+                    <h3 className="truncate text-xs font-semibold leading-4">
+                      {definition.shortLabel}
+                    </h3>
+                    <span className="truncate text-[10px] font-medium leading-3 text-muted-foreground">
+                      {definition.category}
+                    </span>
                   </div>
                 </div>
               </Card>
@@ -770,6 +859,23 @@ function StepPalette({
           })}
         </div>
       </ScrollArea>
+      {hoveredStep ? (
+        <div
+          className="pointer-events-none absolute left-[calc(100%+8px)] z-50 w-72 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-3 text-xs shadow-xl shadow-black/35"
+          style={{ top: hoveredStep.top }}
+        >
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="truncate text-sm font-semibold">{hoveredStep.definition.label}</div>
+            <Badge className="rounded px-1.5 py-0 text-[10px]" variant="secondary">
+              {hoveredStep.definition.category}
+            </Badge>
+          </div>
+          <p className="mt-2 leading-5 text-muted-foreground">{hoveredStep.definition.description}</p>
+          <p className="mt-2 rounded bg-[var(--app-subtle)] px-2 py-1.5 font-mono text-[11px] leading-4 text-muted-foreground">
+            {hoveredStep.definition.command}
+          </p>
+        </div>
+      ) : null}
     </aside>
   );
 }
@@ -787,6 +893,7 @@ type SequenceCanvasProps = {
   onSelectStep: (stepId: string) => void;
   onUpdateStep: (stepId: string, nextStep: ExecutionStepUpdate) => void;
   packageTree: PackageTree;
+  projectMetadata: ProjectMetadata | null;
   selectedStepId: string;
   sequence: ExecutionStep[];
   stepResults: Record<string, StepExecutionResult>;
@@ -813,6 +920,7 @@ function ExecutionFlowCanvas({
   onSelectStep,
   onUpdateStep,
   packageTree,
+  projectMetadata,
   selectedStepId,
   sequence,
   stepResults,
@@ -829,6 +937,7 @@ function ExecutionFlowCanvas({
         onSelectStep,
         onUpdateStep,
         packageTree,
+        projectMetadata,
         selectedStepId,
         sequence,
         stepResults,
@@ -842,6 +951,7 @@ function ExecutionFlowCanvas({
       onSelectStep,
       onUpdateStep,
       packageTree,
+      projectMetadata,
       selectedStepId,
       sequence,
       stepResults,
@@ -859,7 +969,7 @@ function ExecutionFlowCanvas({
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [direction, fitView, sequence.length]);
+  }, [direction, fitView, sequence.length, stepResults]);
 
   const displayedNodes = React.useMemo<ExecutionCanvasNode[]>(() => {
     if (dropIndex === null) {
@@ -868,9 +978,14 @@ function ExecutionFlowCanvas({
 
     return [
       ...flowNodes,
-      createDropTargetNode(clampInsertionIndex(dropIndex, sequence.length), direction),
+      createDropTargetNode(
+        clampInsertionIndex(dropIndex, sequence.length),
+        direction,
+        sequence,
+        stepResults,
+      ),
     ];
-  }, [direction, dropIndex, flowNodes, sequence.length]);
+  }, [direction, dropIndex, flowNodes, sequence, stepResults]);
 
   const flowEdges = React.useMemo(() => createExecutionFlowEdges(sequence, direction), [
     direction,
@@ -901,10 +1016,11 @@ function ExecutionFlowCanvas({
           screenToFlowPosition({ x: event.clientX, y: event.clientY }),
           sequence,
           direction,
+          stepResults,
         ),
       );
     },
-    [direction, isRunning, onDropPreview, screenToFlowPosition, sequence],
+    [direction, isRunning, onDropPreview, screenToFlowPosition, sequence, stepResults],
   );
 
   const handlePaneDrop = React.useCallback(
@@ -917,11 +1033,11 @@ function ExecutionFlowCanvas({
 
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       const targetIndex =
-        dropIndex ?? insertionIndexForFlowPosition(position, sequence, direction);
+        dropIndex ?? insertionIndexForFlowPosition(position, sequence, direction, stepResults);
 
       onDropIndex(event, targetIndex);
     },
-    [direction, dropIndex, isRunning, onDropIndex, screenToFlowPosition, sequence],
+    [direction, dropIndex, isRunning, onDropIndex, screenToFlowPosition, sequence, stepResults],
   );
 
   const handleNodeDrag = React.useCallback(
@@ -930,9 +1046,9 @@ function ExecutionFlowCanvas({
         return;
       }
 
-      onDropPreview(insertionIndexForFlowPosition(node.position, sequence, direction));
+      onDropPreview(insertionIndexForFlowPosition(node.position, sequence, direction, stepResults));
     },
-    [direction, isRunning, onDropPreview, sequence],
+    [direction, isRunning, onDropPreview, sequence, stepResults],
   );
 
   const handleNodeDragStop = React.useCallback(
@@ -944,11 +1060,11 @@ function ExecutionFlowCanvas({
       onSelectStep(node.id);
       onReorderStep(
         node.id,
-        dropIndex ?? insertionIndexForFlowPosition(node.position, sequence, direction),
+        dropIndex ?? insertionIndexForFlowPosition(node.position, sequence, direction, stepResults),
       );
       onDropPreview(null);
     },
-    [direction, dropIndex, isRunning, onDropPreview, onReorderStep, sequence],
+    [direction, dropIndex, isRunning, onDropPreview, onReorderStep, sequence, stepResults],
   );
 
   const handleDragLeave = React.useCallback(
@@ -1021,27 +1137,43 @@ function ExecutionWorkflowNode({ data }: NodeProps<Node<ExecutionWorkflowNodeDat
   const isHorizontal = data.direction === "horizontal";
   const PreviousIcon = isHorizontal ? ArrowLeft : ArrowUp;
   const NextIcon = isHorizontal ? ArrowRight : ArrowDown;
-  const sourcePosition = isHorizontal ? Position.Right : Position.Bottom;
-  const targetPosition = isHorizontal ? Position.Left : Position.Top;
+  const sourcePosition = isHorizontal ? Position.Right : Position.Left;
+  const targetPosition = Position.Left;
   const usesScript = data.step.config.useScript === true;
-  const commandLabel = commandPreview(data.definition, data.step);
+  const commandLabel = commandPreview(
+    data.definition,
+    data.step,
+    data.projectMetadata,
+    data.activeMovePackage,
+  );
+  const durationLabel = executionDurationLabel(data.result);
+  const isError = state === "error";
+  const handleStyle = !isHorizontal
+    ? {
+        left: -EXECUTION_TIMELINE_OFFSET,
+        top: "50%",
+        transform: "translateY(-50%)",
+      }
+    : undefined;
 
   return (
     <article
       className={cn(
-        "group relative grid min-h-[72px] w-[360px] min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2.5 py-2 shadow-[0_14px_30px_rgba(0,0,0,0.22)] transition",
-        data.step.kind === "publish" && !usesScript && "min-h-[100px] w-[420px] items-start",
+        "group relative min-w-0 overflow-visible rounded-lg border border-[color:var(--app-border)] bg-[var(--app-surface)] text-foreground shadow-[0_14px_30px_rgba(0,0,0,0.22)] transition",
+        isHorizontal ? "w-[520px]" : "w-[760px]",
         state === "running" && "execution-step-active border-primary/45",
         data.selected && "border-primary/55 bg-[var(--app-elevated)] shadow-lg",
         !data.step.locked && !data.isRunning && "cursor-grab active:cursor-grabbing",
       )}
       title={data.step.locked ? undefined : "Drag to reorder"}
     >
+      <StepTimelineMarker direction={data.direction} state={state} />
       <Handle
         className="!size-1 !border-0 !bg-transparent !opacity-0"
         id="target"
         isConnectable={false}
         position={targetPosition}
+        style={handleStyle}
         type="target"
       />
       <Handle
@@ -1049,125 +1181,260 @@ function ExecutionWorkflowNode({ data }: NodeProps<Node<ExecutionWorkflowNodeDat
         id="source"
         isConnectable={false}
         position={sourcePosition}
+        style={handleStyle}
         type="source"
       />
 
-      <div className="flex items-center gap-1.5">
-        <span className="grid size-8 shrink-0 place-items-center rounded-md bg-[var(--app-subtle)] text-xs font-semibold text-muted-foreground">
+      <div
+        className={cn(
+          "grid min-h-[96px] min-w-0 grid-cols-[52px_46px_minmax(0,1fr)_auto_auto] items-center gap-5 px-6 py-4",
+          isHorizontal && "grid-cols-[48px_40px_minmax(0,1fr)] gap-x-4 gap-y-3",
+        )}
+      >
+        <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-[var(--app-subtle)] text-base font-semibold text-muted-foreground">
           {data.index + 1}
         </span>
         <span
           className={cn(
-            "grid size-8 shrink-0 place-items-center rounded-md bg-[var(--app-elevated)] text-muted-foreground shadow-sm",
-            state === "running" && "text-primary",
-            state === "success" && "text-emerald-400",
-            state === "attention" && "text-amber-400",
-            state === "error" && "text-red-400",
+            "grid size-10 shrink-0 place-items-center rounded-md bg-[var(--app-elevated)] shadow-sm",
+            stepIconToneClass(state),
           )}
         >
-          <Icon className="size-4" aria-hidden="true" />
+          <Icon className="size-6" aria-hidden="true" />
         </span>
-      </div>
 
-      <div className="grid min-w-0 gap-1 self-center">
-        <div className="flex min-w-0 items-center gap-2 leading-none">
-          <h3 className="min-w-0 truncate text-sm font-semibold leading-4">
-            {data.definition.label}
-          </h3>
-          {shouldShowState ? <StepStateBadge state={state} compact /> : null}
+        <div className="grid min-w-0 gap-2">
+          <div className="flex min-w-0 items-center gap-3 leading-none">
+            <h3 className="min-w-0 truncate text-xl font-semibold leading-6 tracking-normal">
+              {data.definition.label}
+            </h3>
+            {shouldShowState ? <StepStateBadge state={state} compact /> : null}
+          </div>
+          {usesScript ? (
+            <ScriptPathPicker
+              activeMovePackage={data.activeMovePackage}
+              disabled={data.isRunning}
+              onUpdateStep={data.onUpdateStep}
+              packageTree={data.packageTree}
+              step={data.step}
+            />
+          ) : (
+            <p className="truncate font-mono text-sm leading-5 text-muted-foreground">
+              {isError ? commandLabel : data.result?.summary ?? commandLabel}
+            </p>
+          )}
         </div>
-        {usesScript ? (
-          <ScriptPathPicker
-            activeMovePackage={data.activeMovePackage}
-            disabled={data.isRunning}
-            onUpdateStep={data.onUpdateStep}
-            packageTree={data.packageTree}
-            step={data.step}
-          />
-        ) : (
-          <p className="truncate font-mono text-[10.5px] leading-4 text-muted-foreground">
-            {data.result?.summary ?? commandLabel}
-          </p>
-        )}
-      </div>
 
-      <div className="flex shrink-0 items-center gap-0.5 self-center">
-        <Button
-          aria-label={isHorizontal ? "Move step left" : "Move step up"}
-          className="nodrag nopan size-5.5 rounded text-muted-foreground hover:text-foreground"
-          disabled={data.isRunning || data.step.locked || data.index <= 0}
-          onClick={() => data.onMoveStep(data.step.id, -1)}
-          size="icon-xs"
-          type="button"
-          variant="ghost"
-        >
-          <PreviousIcon className="size-3.5" aria-hidden="true" />
-        </Button>
-        <Button
-          aria-label={isHorizontal ? "Move step right" : "Move step down"}
-          className="nodrag nopan size-5.5 rounded text-muted-foreground hover:text-foreground"
-          disabled={data.isRunning || data.step.locked || data.index >= data.sequenceLength - 1}
-          onClick={() => data.onMoveStep(data.step.id, 1)}
-          size="icon-xs"
-          type="button"
-          variant="ghost"
-        >
-          <NextIcon className="size-3.5" aria-hidden="true" />
-        </Button>
-        <Button
-          aria-label={usesScript ? "Use default command" : "Use bash script"}
-          aria-pressed={usesScript}
+        <div
           className={cn(
-            "nodrag nopan size-5.5 rounded text-muted-foreground hover:text-foreground",
-            usesScript && "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary",
+            "flex min-w-[76px] items-center justify-end gap-1.5 text-sm text-muted-foreground",
+            isHorizontal && "col-start-2 col-span-2 justify-start",
           )}
-          disabled={data.isRunning}
-          onClick={() =>
-            data.onUpdateStep(data.step.id, {
-              config: {
-                scriptPath: data.step.config.scriptPath,
-                useScript: !usesScript,
-              },
-            })
-          }
-          size="icon-xs"
-          title={usesScript ? "Use default command" : "Use bash script"}
-          type="button"
-          variant="ghost"
         >
-          <Terminal className="size-3.5" aria-hidden="true" />
-        </Button>
-        <Button
-          aria-label="Remove step"
-          className="nodrag nopan size-5.5 rounded text-muted-foreground hover:text-destructive"
-          disabled={data.isRunning || data.step.locked}
-          onClick={() => data.onRemoveStep(data.step.id)}
-          size="icon-xs"
-          type="button"
-          variant="ghost"
-        >
-          <Trash2 className="size-3.5" aria-hidden="true" />
-        </Button>
-        <span
+          {durationLabel ? (
+            <>
+              <Clock3 className="size-4 shrink-0" aria-hidden="true" />
+              <span className="tabular-nums">{durationLabel}</span>
+            </>
+          ) : null}
+        </div>
+
+        <div
           className={cn(
-            "grid size-5.5 place-items-center rounded text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground",
-            data.step.locked || data.isRunning ? "opacity-30" : "cursor-grab active:cursor-grabbing",
+            "nodrag nopan grid h-12 shrink-0 grid-cols-3 overflow-hidden rounded-lg border border-[color:var(--app-border)] bg-[var(--app-elevated)]",
+            isHorizontal && "col-span-3 w-full grid-cols-3",
           )}
-          title={data.step.locked ? "This step cannot be reordered" : "Drag to reorder"}
         >
-          <GripVertical className="size-3.5" aria-hidden="true" />
-        </span>
+          <Button
+            aria-label="Select step"
+            className="h-12 rounded-none border-r border-[color:var(--app-border)] text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground"
+            onClick={() => data.onSelectStep(data.step.id)}
+            type="button"
+            variant="ghost"
+          >
+            <ChevronRight className="size-5" aria-hidden="true" />
+          </Button>
+          <Button
+            aria-label={usesScript ? "Use default command" : "Use bash script"}
+            aria-pressed={usesScript}
+            className={cn(
+              "h-12 rounded-none border-r border-[color:var(--app-border)] text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground",
+              usesScript && "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary",
+            )}
+            disabled={data.isRunning}
+            onClick={() =>
+              data.onUpdateStep(data.step.id, {
+                config: {
+                  scriptPath: data.step.config.scriptPath,
+                  useScript: !usesScript,
+                },
+              })
+            }
+            title={usesScript ? "Use default command" : "Use bash script"}
+            type="button"
+            variant="ghost"
+          >
+            <FileText className="size-5" aria-hidden="true" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                aria-label="Step actions"
+                className="h-12 rounded-none text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground"
+                disabled={data.isRunning}
+                type="button"
+                variant="ghost"
+              >
+                <MoreVertical className="size-5" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                disabled={data.step.locked || data.index <= 0}
+                onClick={() => data.onMoveStep(data.step.id, -1)}
+              >
+                <PreviousIcon className="mr-2 size-3.5" aria-hidden="true" />
+                Move {isHorizontal ? "left" : "up"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={data.step.locked || data.index >= data.sequenceLength - 1}
+                onClick={() => data.onMoveStep(data.step.id, 1)}
+              >
+                <NextIcon className="mr-2 size-3.5" aria-hidden="true" />
+                Move {isHorizontal ? "right" : "down"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  data.onUpdateStep(data.step.id, {
+                    config: {
+                      scriptPath: data.step.config.scriptPath,
+                      useScript: !usesScript,
+                    },
+                  })
+                }
+              >
+                <Terminal className="mr-2 size-3.5" aria-hidden="true" />
+                {usesScript ? "Use default" : "Use script"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                disabled={data.step.locked}
+                onClick={() => data.onRemoveStep(data.step.id)}
+              >
+                <Trash2 className="mr-2 size-3.5" aria-hidden="true" />
+                Remove
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {data.step.kind === "publish" && !usesScript ? (
-        <PublishConfig
-          disabled={data.isRunning}
-          step={data.step}
-          onUpdateStep={data.onUpdateStep}
-        />
+        <div className="px-6 pb-4">
+          <PublishConfig
+            disabled={data.isRunning}
+            step={data.step}
+            onUpdateStep={data.onUpdateStep}
+          />
+        </div>
+      ) : null}
+
+      {isError ? (
+        <div className="border-t border-[color:var(--app-border)] px-5 pb-5 pt-4">
+          <div className="grid min-h-[76px] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-5">
+            <div className="min-w-0">
+              <div className="text-base font-semibold text-destructive">Step failed</div>
+              <p className="mt-1 truncate font-mono text-sm leading-5 text-muted-foreground">
+                {commandLabel}
+              </p>
+            </div>
+            <Button
+              className="h-10 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-5 text-sm text-foreground hover:bg-[var(--app-elevated)]"
+              onClick={() => data.onSelectStep(data.step.id)}
+              type="button"
+              variant="ghost"
+            >
+              View logs
+            </Button>
+            <Button
+              aria-label="Collapse failure details"
+              className="size-10 rounded-md text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground"
+              type="button"
+              variant="ghost"
+            >
+              <ChevronDown className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
       ) : null}
     </article>
   );
+}
+
+function StepTimelineMarker({
+  direction,
+  state,
+}: {
+  direction: SequenceDirection;
+  state: ExecutionStepState;
+}) {
+  const isHorizontal = direction === "horizontal";
+
+  return (
+    <span
+      className={cn(
+        "pointer-events-none absolute z-10 grid size-7 place-items-center rounded-full border border-[color:var(--app-border)] bg-[var(--app-surface)] text-[13px] text-muted-foreground shadow-[0_0_0_4px_var(--app-window)]",
+        isHorizontal
+          ? "left-[-38px] top-1/2 -translate-y-1/2"
+          : "left-[-62px] top-1/2 -translate-y-1/2",
+        state === "success" && "text-emerald-400",
+        state === "error" && "text-red-400",
+        state === "attention" && "text-amber-400",
+        state === "running" && "text-primary",
+      )}
+    >
+      {state === "success" ? <CheckCircle2 className="size-4" aria-hidden="true" /> : null}
+      {state === "error" ? <XCircle className="size-4" aria-hidden="true" /> : null}
+      {state === "attention" ? <AlertTriangle className="size-4" aria-hidden="true" /> : null}
+      {state === "running" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+      {state === "idle" || state === "skipped" ? <Circle className="size-3.5" aria-hidden="true" /> : null}
+    </span>
+  );
+}
+
+function stepIconToneClass(state: ExecutionStepState) {
+  switch (state) {
+    case "success":
+      return "text-emerald-400";
+    case "attention":
+      return "text-amber-400";
+    case "error":
+      return "text-red-400";
+    case "running":
+      return "text-primary";
+    case "idle":
+    case "skipped":
+      return "text-muted-foreground";
+  }
+}
+
+function executionDurationLabel(result: StepExecutionResult | undefined) {
+  if (!result?.startedAt) {
+    return null;
+  }
+
+  const finishedAt = result.finishedAt ?? (result.state === "running" ? new Date() : null);
+
+  if (!finishedAt) {
+    return null;
+  }
+
+  const elapsedSeconds = Math.max(
+    1,
+    Math.round((finishedAt.getTime() - result.startedAt.getTime()) / 1000),
+  );
+
+  return `${elapsedSeconds}s`;
 }
 
 function ExecutionDropTargetNode({ data }: NodeProps<Node<ExecutionDropNodeData>>) {
@@ -1176,8 +1443,8 @@ function ExecutionDropTargetNode({ data }: NodeProps<Node<ExecutionDropNodeData>
   return (
     <div
       className={cn(
-        "pointer-events-none grid place-items-center rounded-md border border-dashed border-primary/70 bg-primary/10 text-xs font-medium text-primary shadow-sm",
-        isHorizontal ? "h-[76px] w-14" : "h-12 w-[320px]",
+        "pointer-events-none grid place-items-center rounded-lg border border-dashed border-primary/70 bg-primary/10 text-xs font-medium text-primary shadow-sm",
+        isHorizontal ? "h-[92px] w-16" : "h-12 w-[760px]",
       )}
     >
       <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
@@ -1190,10 +1457,8 @@ function ExecutionDropTargetNode({ data }: NodeProps<Node<ExecutionDropNodeData>
 
 function ExecutionSequenceEdge({
   data,
-  markerEnd,
   sourceX,
   sourceY,
-  style,
   targetX,
   targetY,
 }: EdgeProps<Edge<ExecutionSequenceEdgeData>>) {
@@ -1202,7 +1467,15 @@ function ExecutionSequenceEdge({
       ? `M ${sourceX},${sourceY} L ${sourceX},${targetY}`
       : `M ${sourceX},${sourceY} L ${targetX},${sourceY}`;
 
-  return <BaseEdge markerEnd={markerEnd} path={path} style={style} />;
+  return (
+    <BaseEdge
+      path={path}
+      style={{
+        stroke: "var(--app-border)",
+        strokeWidth: 1.7,
+      }}
+    />
+  );
 }
 
 function createExecutionFlowNodes({
@@ -1214,6 +1487,7 @@ function createExecutionFlowNodes({
   onSelectStep,
   onUpdateStep,
   packageTree,
+  projectMetadata,
   selectedStepId,
   sequence,
   stepResults,
@@ -1226,6 +1500,7 @@ function createExecutionFlowNodes({
   onSelectStep: (stepId: string) => void;
   onUpdateStep: (stepId: string, nextStep: ExecutionStepUpdate) => void;
   packageTree: PackageTree;
+  projectMetadata: ProjectMetadata | null;
   selectedStepId: string;
   sequence: ExecutionStep[];
   stepResults: Record<string, StepExecutionResult>;
@@ -1244,6 +1519,7 @@ function createExecutionFlowNodes({
       onSelectStep,
       onUpdateStep,
       packageTree,
+      projectMetadata,
       result: stepResults[step.id],
       selected: selectedStepId === step.id,
       sequenceLength: sequence.length,
@@ -1251,7 +1527,7 @@ function createExecutionFlowNodes({
     },
     draggable: !step.locked && !isRunning,
     focusable: false,
-    position: executionNodePosition(index, direction),
+    position: executionNodePosition(index, direction, sequence, stepResults),
     selectable: true,
     zIndex: selectedStepId === step.id ? 20 : 10,
   }));
@@ -1272,10 +1548,6 @@ function createExecutionFlowEdges(
       sourceHandle: "source",
       target: step.id,
       targetHandle: "target",
-      markerEnd: {
-        color,
-        type: MarkerType.ArrowClosed,
-      },
       style: {
         stroke: color,
         strokeWidth: 1.7,
@@ -1289,6 +1561,8 @@ function createExecutionFlowEdges(
 function createDropTargetNode(
   dropIndex: number,
   direction: SequenceDirection,
+  sequence: ExecutionStep[],
+  stepResults: Record<string, StepExecutionResult>,
 ): ExecutionDropNode {
   return {
     id: EXECUTION_DROP_TARGET_ID,
@@ -1296,7 +1570,7 @@ function createDropTargetNode(
     data: { direction },
     draggable: false,
     focusable: false,
-    position: dropTargetPosition(dropIndex, direction),
+    position: dropTargetPosition(dropIndex, direction, sequence, stepResults),
     selectable: false,
     zIndex: 100,
   };
@@ -1306,15 +1580,17 @@ function insertionIndexForFlowPosition(
   position: { x: number; y: number },
   sequence: ExecutionStep[],
   direction: SequenceDirection,
+  stepResults: Record<string, StepExecutionResult>,
 ) {
   const coordinate = direction === "horizontal" ? position.x : position.y;
 
   for (let index = 0; index < sequence.length; index += 1) {
-    const nodePosition = executionNodePosition(index, direction);
+    const nodePosition = executionNodePosition(index, direction, sequence, stepResults);
+    const nodeSize = executionNodeSize(sequence[index], stepResults[sequence[index].id], direction);
     const midpoint =
       direction === "horizontal"
-        ? nodePosition.x + EXECUTION_NODE_WIDTH / 2
-        : nodePosition.y + EXECUTION_NODE_HEIGHT / 2;
+        ? nodePosition.x + nodeSize.width / 2
+        : nodePosition.y + nodeSize.height / 2;
 
     if (coordinate < midpoint) {
       return index;
@@ -1324,41 +1600,73 @@ function insertionIndexForFlowPosition(
   return sequence.length;
 }
 
-function executionNodePosition(index: number, direction: SequenceDirection) {
+function executionNodePosition(
+  index: number,
+  direction: SequenceDirection,
+  sequence: ExecutionStep[],
+  stepResults: Record<string, StepExecutionResult>,
+) {
   if (direction === "horizontal") {
     return {
-      x: EXECUTION_FLOW_START_X + index * (EXECUTION_NODE_WIDTH + EXECUTION_HORIZONTAL_GAP),
+      x: EXECUTION_FLOW_START_X + index * (EXECUTION_HORIZONTAL_NODE_WIDTH + EXECUTION_HORIZONTAL_GAP),
       y: EXECUTION_FLOW_START_Y,
     };
   }
 
+  const yOffset = sequence.slice(0, index).reduce((total, step) => {
+    return total + executionNodeSize(step, stepResults[step.id], direction).height + EXECUTION_VERTICAL_GAP;
+  }, 0);
+
   return {
     x: EXECUTION_FLOW_START_X,
-    y: EXECUTION_FLOW_START_Y + index * (EXECUTION_NODE_HEIGHT + EXECUTION_VERTICAL_GAP),
+    y: EXECUTION_FLOW_START_Y + yOffset,
   };
 }
 
-function dropTargetPosition(index: number, direction: SequenceDirection) {
+function dropTargetPosition(
+  index: number,
+  direction: SequenceDirection,
+  sequence: ExecutionStep[],
+  stepResults: Record<string, StepExecutionResult>,
+) {
   const insertionIndex = Math.max(0, index);
 
   if (direction === "horizontal") {
     return {
       x:
         EXECUTION_FLOW_START_X +
-        insertionIndex * (EXECUTION_NODE_WIDTH + EXECUTION_HORIZONTAL_GAP) -
+        insertionIndex * (EXECUTION_HORIZONTAL_NODE_WIDTH + EXECUTION_HORIZONTAL_GAP) -
         EXECUTION_HORIZONTAL_GAP / 2 -
         32,
-      y: EXECUTION_FLOW_START_Y - 9,
+      y: EXECUTION_FLOW_START_Y + 2,
     };
   }
 
+  const yOffset = sequence.slice(0, insertionIndex).reduce((total, step) => {
+    return total + executionNodeSize(step, stepResults[step.id], direction).height + EXECUTION_VERTICAL_GAP;
+  }, 0);
+
   return {
     x: EXECUTION_FLOW_START_X,
-    y:
-      EXECUTION_FLOW_START_Y +
-      insertionIndex * (EXECUTION_NODE_HEIGHT + EXECUTION_VERTICAL_GAP) -
-      EXECUTION_VERTICAL_GAP / 2 -
-      28,
+    y: EXECUTION_FLOW_START_Y + yOffset - EXECUTION_VERTICAL_GAP / 2 - 24,
+  };
+}
+
+function executionNodeSize(
+  step: ExecutionStep,
+  result: StepExecutionResult | undefined,
+  direction: SequenceDirection,
+) {
+  const hasInlinePublishConfig = step.kind === "publish" && step.config.useScript !== true;
+  const isFailed = result?.state === "error";
+
+  return {
+    height: isFailed
+      ? EXECUTION_FAILED_NODE_HEIGHT
+      : hasInlinePublishConfig
+        ? EXECUTION_PUBLISH_NODE_HEIGHT
+        : EXECUTION_NODE_HEIGHT,
+    width: direction === "horizontal" ? EXECUTION_HORIZONTAL_NODE_WIDTH : EXECUTION_NODE_WIDTH,
   };
 }
 
@@ -1500,9 +1808,22 @@ function PublishConfig({
   );
 }
 
-function commandPreview(definition: ExecutionStepDefinition, step: ExecutionStep) {
-  if (step.config.useScript) {
+function commandPreview(
+  definition: ExecutionStepDefinition,
+  step: ExecutionStep,
+  projectMetadata: ProjectMetadata | null = null,
+  movePackage: MovePackage | null = null,
+) {
+  if (isLocalScriptEnabled(step)) {
     return normalizedScriptPath(step) || "Bash script";
+  }
+
+  const configuredScript = projectMetadata && movePackage
+    ? configuredProjectScriptForStep(step, projectMetadata, movePackage)
+    : null;
+
+  if (configuredScript) {
+    return configuredScriptCommand(configuredScript);
   }
 
   if (step.kind === "publish") {
@@ -1514,6 +1835,56 @@ function commandPreview(definition: ExecutionStepDefinition, step: ExecutionStep
   }
 
   return definition.command;
+}
+
+function configuredProjectScriptForStep(
+  step: ExecutionStep,
+  metadata: ProjectMetadata,
+  movePackage: MovePackage,
+): ProjectConfiguredScript | null {
+  if (isLocalScriptEnabled(step)) {
+    return null;
+  }
+
+  if (step.kind === "test") {
+    const scriptPath = projectMoveTestScriptPath(metadata, movePackage);
+
+    return scriptPath
+      ? {
+          args: [],
+          modeLabel: "Project test script",
+          scriptPath,
+        }
+      : null;
+  }
+
+  if (step.kind === "coverage") {
+    const coverageScriptPath = projectMoveCoverageScriptPath(metadata, movePackage);
+
+    if (coverageScriptPath) {
+      return {
+        args: [],
+        modeLabel: "Project coverage script",
+        scriptPath: coverageScriptPath,
+      };
+    }
+
+    const testScriptPath = projectMoveTestScriptPath(metadata, movePackage);
+
+    return testScriptPath
+      ? {
+          args: ["--coverage"],
+          modeLabel: "Project test script",
+          scriptPath: testScriptPath,
+        }
+      : null;
+  }
+
+  return null;
+}
+
+function configuredScriptCommand(configuredScript: ProjectConfiguredScript) {
+  return `bash ${configuredScript.scriptPath}${configuredScript.args.length ? ` ${configuredScript.args.join(" ")}` : ""}`;
 }
 
 function scriptPathPlaceholder(kind: ExecutionStepKind) {
@@ -1537,6 +1908,10 @@ function normalizedScriptPath(step: ExecutionStep) {
   return step.config.scriptPath?.trim() ?? "";
 }
 
+function isLocalScriptEnabled(step: ExecutionStep) {
+  return step.config.useScript === true;
+}
+
 function executionLogRun({
   detail,
   error = null,
@@ -1544,6 +1919,7 @@ function executionLogRun({
   movePackage,
   output = null,
   packageTree,
+  projectMetadata,
   startedAt,
   state,
   step,
@@ -1555,14 +1931,16 @@ function executionLogRun({
   movePackage: MovePackage;
   output?: CommandOutput | null;
   packageTree: PackageTree;
+  projectMetadata: ProjectMetadata;
   startedAt: Date;
   state: BuildLogRun["state"];
   step: ExecutionStep;
   summary?: string | null;
 }): BuildLogRun {
   const definition = definitionByKind[step.kind];
-  const scriptPath = normalizedScriptPath(step);
-  const command = executionLogCommand(definition, step);
+  const localScriptPath = isLocalScriptEnabled(step) ? normalizedScriptPath(step) : "";
+  const configuredScript = configuredProjectScriptForStep(step, projectMetadata, movePackage);
+  const command = executionLogCommand(definition, step, configuredScript);
 
   return {
     canRerun: false,
@@ -1575,7 +1953,13 @@ function executionLogRun({
     }, 7),
     metadata: [
       { label: "Step", value: definition.label },
-      { label: "Mode", value: scriptPath ? "Bash script" : "Default" },
+      {
+        label: "Mode",
+        value: localScriptPath ? "Bash script" : configuredScript?.modeLabel ?? "Default",
+      },
+      ...(configuredScript && configuredScript.args.length
+        ? [{ label: "Args", value: configuredScript.args.join(" ") }]
+        : []),
       ...(summary ? [{ label: "Summary", value: summary }] : []),
     ],
     note: detail ?? null,
@@ -1590,8 +1974,12 @@ function executionLogRun({
   };
 }
 
-function executionLogCommand(definition: ExecutionStepDefinition, step: ExecutionStep) {
-  const scriptPath = normalizedScriptPath(step);
+function executionLogCommand(
+  definition: ExecutionStepDefinition,
+  step: ExecutionStep,
+  configuredScript: ProjectConfiguredScript | null,
+) {
+  const scriptPath = isLocalScriptEnabled(step) ? normalizedScriptPath(step) : "";
 
   if (step.kind === "build" && scriptPath) {
     return `sui move build && bash ${scriptPath}`;
@@ -1599,6 +1987,10 @@ function executionLogCommand(definition: ExecutionStepDefinition, step: Executio
 
   if (scriptPath) {
     return `bash ${scriptPath}`;
+  }
+
+  if (configuredScript) {
+    return configuredScriptCommand(configuredScript);
   }
 
   return commandPreview(definition, step);
@@ -1660,8 +2052,8 @@ function StepStateBadge({
   return (
     <Badge
       className={cn(
-        "shrink-0 gap-1 rounded px-1.5 py-0 text-[10px]",
-        compact && "max-w-[5rem]",
+        "shrink-0 gap-1 rounded-md px-2 py-1 text-sm leading-none",
+        compact && "max-w-[7rem]",
         state === "idle" && "bg-muted text-muted-foreground",
         state === "running" && "bg-muted text-muted-foreground",
         state === "success" && "bg-emerald-500/15 text-emerald-400",
@@ -1671,11 +2063,11 @@ function StepStateBadge({
       )}
       variant="secondary"
     >
-      {state === "idle" ? <Circle className="size-2.5" /> : null}
-      {state === "running" ? <Loader2 className="size-2.5 animate-spin" /> : null}
-      {state === "success" ? <CheckCircle2 className="size-2.5" /> : null}
-      {state === "attention" ? <AlertTriangle className="size-2.5" /> : null}
-      {state === "error" ? <XCircle className="size-2.5" /> : null}
+      {state === "idle" ? <Circle className="size-3" /> : null}
+      {state === "running" ? <Loader2 className="size-3 animate-spin" /> : null}
+      {state === "success" ? <CheckCircle2 className="size-3" /> : null}
+      {state === "attention" ? <AlertTriangle className="size-3" /> : null}
+      {state === "error" ? <XCircle className="size-3" /> : null}
       <span className="truncate">{stepStateLabel(state)}</span>
     </Badge>
   );
@@ -1686,6 +2078,7 @@ async function executeStep({
   onCommandOutput,
   onProjectSelected,
   packageTree,
+  projectMetadata,
   startedAt,
   streamId,
   step,
@@ -1694,6 +2087,7 @@ async function executeStep({
   onCommandOutput?: (output: CommandOutput) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
   packageTree: PackageTree;
+  projectMetadata: ProjectMetadata;
   startedAt: Date;
   streamId?: number | string;
   step: ExecutionStep;
@@ -1731,7 +2125,7 @@ async function executeStep({
 
     onProjectSelected(nextPackageTree);
 
-    if (step.config.useScript) {
+    if (isLocalScriptEnabled(step)) {
       const refreshedMovePackage =
         resolveActiveMovePackage(nextPackageTree, movePackage) ?? movePackage;
       const scriptOutcome = await executeScriptStep({
@@ -1743,49 +2137,53 @@ async function executeStep({
         step,
       });
 
-      const buildRefreshState: ExecutionStepState = nextPackageTree.dependencyGraph.summaryPath
-        ? "success"
-        : "attention";
-
       return {
         ...scriptOutcome,
         detail: [
           nextPackageTree.dependencyGraph.summaryPath
             ? `Summary directory: ${nextPackageTree.dependencyGraph.summaryPath}`
-            : "Build completed, but Peregrine did not find package_summaries after rescanning.",
+            : "Package summaries were not found after rescanning; dependency graph detail may be limited.",
           scriptOutcome.detail,
         ]
           .filter(Boolean)
           .join("\n"),
         packageTree: nextPackageTree,
-        state:
-          scriptOutcome.state === "success" && buildRefreshState === "attention"
-            ? "attention"
-            : scriptOutcome.state,
-        summary:
-          scriptOutcome.state === "success" && buildRefreshState === "attention"
-            ? "Bash script passed, but no package_summaries directory was found."
-            : scriptOutcome.summary,
+        state: scriptOutcome.state,
+        summary: scriptOutcome.summary,
       };
     }
 
     return {
       detail: nextPackageTree.dependencyGraph.summaryPath
         ? `Summary directory: ${nextPackageTree.dependencyGraph.summaryPath}`
-        : "Build completed, but Peregrine did not find package_summaries after rescanning.",
+        : "Package summaries were not found after rescanning; dependency graph detail may be limited.",
       finishedAt,
       output,
       packageTree: nextPackageTree,
       startedAt,
-      state: nextPackageTree.dependencyGraph.summaryPath ? "success" : "attention",
+      state: "success",
       summary: nextPackageTree.dependencyGraph.summaryPath
         ? "Build succeeded and package summaries were refreshed."
-        : "Build succeeded, but no package_summaries directory was found.",
+        : "Build succeeded.",
     };
   }
 
-  if (step.config.useScript) {
+  if (isLocalScriptEnabled(step)) {
     return executeScriptStep({
+      movePackage,
+      onCommandOutput,
+      packageTree,
+      startedAt,
+      streamId,
+      step,
+    });
+  }
+
+  const configuredScript = configuredProjectScriptForStep(step, projectMetadata, movePackage);
+
+  if (configuredScript) {
+    return executeConfiguredProjectScriptStep({
+      configuredScript,
       movePackage,
       onCommandOutput,
       packageTree,
@@ -1904,6 +2302,47 @@ async function executeScriptStep({
       output.status === 0
         ? `${definition.label} script passed.`
         : `${definition.label} script failed.`,
+  };
+}
+
+async function executeConfiguredProjectScriptStep({
+  configuredScript,
+  movePackage,
+  onCommandOutput,
+  packageTree,
+  startedAt,
+  streamId,
+  step,
+}: {
+  configuredScript: ProjectConfiguredScript;
+  movePackage: MovePackage;
+  onCommandOutput?: (output: CommandOutput) => void;
+  packageTree: PackageTree;
+  startedAt: Date;
+  streamId?: number | string;
+  step: ExecutionStep;
+}): Promise<StepExecutionOutcome> {
+  const definition = definitionByKind[step.kind];
+  const output = await runSecurityScript(packageTree, movePackage.path, configuredScript.scriptPath, {
+    args: configuredScript.args,
+    onOutput: onCommandOutput,
+    streamId,
+  });
+  const finishedAt = new Date();
+
+  return {
+    detail:
+      output.status === 0
+        ? `${configuredScript.modeLabel} completed in ${displayMovePackageName(movePackage.name)}.`
+        : `${configuredScript.modeLabel} exited with a non-zero status in ${displayMovePackageName(movePackage.name)}.`,
+    finishedAt,
+    output,
+    startedAt,
+    state: output.status === 0 ? "success" : "error",
+    summary:
+      output.status === 0
+        ? `${definition.label} project script passed.`
+        : `${definition.label} project script failed.`,
   };
 }
 
