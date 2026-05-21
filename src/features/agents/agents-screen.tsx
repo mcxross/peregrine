@@ -14,7 +14,6 @@ import {
   Pause,
   Play,
   Plus,
-  RefreshCcw,
   ShieldCheck,
   Square,
   Trash2,
@@ -52,7 +51,6 @@ import {
   loadProjectMetadata,
   saveProjectMetadata,
 } from "@/features/empty-project/filesystem-tree";
-import { listOllamaModels, type OllamaModel } from "@/features/project-workspace/ai/ollama-client";
 import { cn } from "@/lib/utils";
 
 export function AgentsScreen({
@@ -64,8 +62,6 @@ export function AgentsScreen({
   const [isLibraryPanelOpen, setIsLibraryPanelOpen] = React.useState(true);
   const [isConfigPanelOpen, setIsConfigPanelOpen] = React.useState(true);
   const [tracePanelHeight, setTracePanelHeight] = React.useState(260);
-  const [ollamaModels, setOllamaModels] = React.useState<OllamaModel[]>([]);
-  const [ollamaError, setOllamaError] = React.useState<string | null>(null);
   const activeRunControllerRef = React.useRef<AbortController | null>(null);
   const [isProjectStateLoaded, setIsProjectStateLoaded] = React.useState(false);
   const selectedAgent = state.agents.find((agent) => agent.id === state.selectedAgentId) ?? state.agents[0];
@@ -131,32 +127,6 @@ export function AgentsScreen({
 
     return () => window.clearTimeout(timeout);
   }, [isProjectStateLoaded, projectRootPath, state]);
-
-  React.useEffect(() => {
-    if (!selectedAgent || selectedAgent.provider.providerId !== "ollama") {
-      return;
-    }
-
-    let cancelled = false;
-
-    setOllamaError(null);
-    void listOllamaModels(selectedAgent.provider.endpoint)
-      .then((models) => {
-        if (!cancelled) {
-          setOllamaModels(models);
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setOllamaModels([]);
-          setOllamaError(error instanceof Error ? error.message : String(error));
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedAgent?.id, selectedAgent?.provider.endpoint, selectedAgent?.provider.providerId]);
 
   if (!selectedAgent || !selectedWorkflow) {
     return null;
@@ -266,17 +236,7 @@ export function AgentsScreen({
       <AgentConfigPanel
         agent={selectedAgent}
         isOpen={isConfigPanelOpen}
-        ollamaError={ollamaError}
-        ollamaModels={ollamaModels}
         onToggleOpen={() => setIsConfigPanelOpen((current) => !current)}
-        onRefreshOllama={() => {
-          void listOllamaModels(selectedAgent.provider.endpoint)
-            .then((models) => {
-              setOllamaModels(models);
-              setOllamaError(null);
-            })
-            .catch((error) => setOllamaError(error instanceof Error ? error.message : String(error)));
-        }}
         onUpdateAgent={(patch) => updateAgent(selectedAgent.id, patch)}
         workflow={selectedWorkflow}
       />
@@ -712,26 +672,18 @@ function WorkflowToolbar({
 function AgentConfigPanel({
   agent,
   isOpen,
-  ollamaError,
-  ollamaModels,
-  onRefreshOllama,
   onToggleOpen,
   onUpdateAgent,
   workflow,
 }: {
   agent: AgentDefinition;
   isOpen: boolean;
-  ollamaError: string | null;
-  ollamaModels: OllamaModel[];
-  onRefreshOllama: () => void;
   onToggleOpen: () => void;
   onUpdateAgent: (patch: Partial<AgentDefinition>) => void;
   workflow: AgentWorkflow;
 }) {
   const provider = providerById(agent.provider.providerId);
-  const modelOptions = agent.provider.providerId === "ollama" && ollamaModels.length
-    ? ollamaModels.map((model) => model.name)
-    : providerModelOptions(agent.provider);
+  const modelOptions = providerModelOptions(agent.provider);
   const canEditIdentity = agent.kind === "custom";
 
   return (
@@ -810,27 +762,17 @@ function AgentConfigPanel({
             </LabelledField>
             {provider.id === "ollama" ? (
               <LabelledField label="Ollama endpoint">
-                <div className="flex gap-2">
-                  <Input
-                    onChange={(event) =>
-                      onUpdateAgent({
-                        provider: {
-                          ...agent.provider,
-                          endpoint: event.target.value,
-                        },
-                      })
-                    }
-                    value={agent.provider.endpoint ?? provider.defaultEndpoint ?? ""}
-                  />
-                  <IconButton label="Refresh Ollama models" onClick={onRefreshOllama}>
-                    <RefreshCcw className="size-3.5" />
-                  </IconButton>
-                </div>
-                {ollamaError ? (
-                  <p className="mt-1 text-[11px] leading-4 text-red-300">
-                    {ollamaError}
-                  </p>
-                ) : null}
+                <Input
+                  onChange={(event) =>
+                    onUpdateAgent({
+                      provider: {
+                        ...agent.provider,
+                        endpoint: event.target.value,
+                      },
+                    })
+                  }
+                  value={agent.provider.endpoint ?? provider.defaultEndpoint ?? ""}
+                />
               </LabelledField>
             ) : null}
             <LabelledField label="Model">

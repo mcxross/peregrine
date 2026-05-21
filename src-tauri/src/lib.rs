@@ -96,11 +96,7 @@ pub fn run() {
             commands::sui::get_sui_adapter_settings,
             commands::sui::save_sui_adapter_settings,
             commands::metadata::load_project_metadata,
-            commands::metadata::save_project_metadata,
-            commands::ollama::list_ollama_models,
-            commands::ollama::chat_with_ollama,
-            commands::ollama::preload_ollama_model,
-            commands::ollama::stream_chat_with_ollama
+            commands::metadata::save_project_metadata
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

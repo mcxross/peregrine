@@ -1,9 +1,9 @@
 import {
-  ToolLoopAgent,
-  stepCountIs,
-  type ToolLoopAgentOnFinishCallback,
-  type ToolLoopAgentOnStepFinishCallback,
-} from "ai";
+  PeregrineAgentRuntime,
+  type AgentContextPacket,
+  type AgentRole,
+  type ToolGateway,
+} from "@peregrine/agent-runtime";
 
 import { providerById } from "@/features/agents/model-providers/provider-adapters";
 import type {
@@ -34,54 +34,13 @@ export async function runAgentWorkflowWithModel({
 }): Promise<AgentRunResult> {
   const provider = providerById(agent.provider.providerId);
   const model = await provider.resolveLanguageModel(agent.provider);
-  const instructions = buildAgentInstructions(agent, workflow);
+  const packet = buildWorkflowContextPacket(agent, workflow);
   const prompt = buildAgentPrompt(agent, workflow);
-  const onStepFinish: ToolLoopAgentOnStepFinishCallback = (step) => {
-    onTrace?.({
-      level: "trace",
-      message: [
-        `Model step ${step.stepNumber + 1} finished.`,
-        `finish=${step.finishReason}`,
-        `model=${step.model.provider}/${step.model.modelId}`,
-        formatUsage(step.usage),
-        step.toolCalls.length ? `toolCalls=${step.toolCalls.length}` : "toolCalls=0",
-      ].join(" "),
-    });
-
-    if (step.reasoningText) {
-      onTrace?.({
-        level: "trace",
-        message: `Visible model reasoning output: ${formatTraceText(step.reasoningText, 900)}`,
-      });
-    }
-
-    if (step.text.trim()) {
-      onTrace?.({
-        level: "trace",
-        message: `Visible model output chunk: ${formatTraceText(step.text, 900)}`,
-      });
-    }
-
-    for (const warning of step.warnings ?? []) {
-      onTrace?.({
-        level: "warning",
-        message: `Provider warning: ${JSON.stringify(warning)}`,
-      });
-    }
-  };
-  const onFinish: ToolLoopAgentOnFinishCallback = (event) => {
-    onTrace?.({
-      level: "info",
-      message: `Model finished after ${event.steps.length} step(s). ${formatUsage(event.totalUsage)}`,
-    });
-  };
-  const runner = new ToolLoopAgent({
+  const runner = new PeregrineAgentRuntime({
     model,
-    instructions,
-    onFinish,
-    onStepFinish,
-    stopWhen: stepCountIs(Math.max(1, agent.execution.maxSteps)),
-    toolChoice: "none",
+    tools: [],
+    toolGateway: noToolsGateway,
+    maxSteps: Math.max(1, agent.execution.maxSteps),
   });
 
   onTrace?.({
@@ -90,7 +49,7 @@ export async function runAgentWorkflowWithModel({
   });
   onTrace?.({
     level: "trace",
-    message: `System prompt sent: ${formatTraceText(instructions, 1_200)}`,
+    message: `Agent context packet sent: ${formatTraceText(JSON.stringify(packet), 1_200)}`,
   });
   onTrace?.({
     level: "trace",
@@ -98,33 +57,23 @@ export async function runAgentWorkflowWithModel({
   });
 
   const result = await runner.generate({
+    packet,
     abortSignal: signal,
     prompt,
     timeout: {
       totalMs: 120_000,
     },
+    toolChoice: "none",
+  });
+
+  onTrace?.({
+    level: "info",
+    message: "Agent runtime completed through @peregrine/agent-runtime.",
   });
 
   return {
     text: result.text.trim(),
   };
-}
-
-function buildAgentInstructions(agent: AgentDefinition, workflow: AgentWorkflow) {
-  return [
-    agent.systemPrompt,
-    "",
-    "You are running inside Peregrine's Agents workspace.",
-    "Use the workflow graph as the task boundary.",
-    "Do not claim that deterministic repository tools ran unless the execution trace explicitly includes their output.",
-    "Do not reveal hidden chain-of-thought. Provide concise rationale, observable decisions, evidence needs, and uncertainty.",
-    "Return a report with these sections: Run Summary, Reasoning Trace Summary, Findings or Output, Evidence Needed, Next Actions.",
-    "",
-    `Agent: ${agent.name}`,
-    `Agent description: ${agent.description}`,
-    `Workflow: ${workflow.name}`,
-    `Workflow description: ${workflow.description}`,
-  ].join("\n");
 }
 
 function buildAgentPrompt(agent: AgentDefinition, workflow: AgentWorkflow) {
@@ -151,6 +100,122 @@ function buildAgentPrompt(agent: AgentDefinition, workflow: AgentWorkflow) {
   ].join("\n");
 }
 
+function buildWorkflowContextPacket(
+  agent: AgentDefinition,
+  workflow: AgentWorkflow,
+): AgentContextPacket {
+  return {
+    task: {
+      id: workflow.id,
+      role: agentRoleForWorkflow(agent, workflow),
+      title: workflow.name,
+      objective: agent.description || workflow.description,
+    },
+    developerIntent: [
+      agent.systemPrompt,
+      "Run the configured Peregrine Agents workflow.",
+      "Use the workflow graph as the task boundary.",
+      "Do not claim that deterministic repository tools ran unless explicit tool evidence is available.",
+      "Return a report with these sections: Run Summary, Reasoning Trace Summary, Findings or Output, Evidence Needed, Next Actions.",
+    ].join("\n"),
+    projectSummary: {
+      id: "local-project",
+      name: workflow.name,
+      rootPath: "",
+      chain: "sui",
+      modules: workflow.nodes.map((node) => ({
+        id: node.id,
+        name: node.data.label,
+        summary: node.data.description || node.data.nodeType,
+      })),
+    },
+    securityProfile: "local-agent-workflow",
+    selectedCode: [],
+    riskSignals: [],
+    relevantGuides: [],
+    currentFindings: [],
+    recentToolResults: [],
+    allowedActions: [
+      {
+        actionClass: "readOnly",
+        description: "Read the provided workflow context.",
+        requiresApproval: false,
+      },
+      {
+        actionClass: "toolExecution",
+        description: "Use deterministic tools only when registered in the agent runtime.",
+        requiresApproval: agent.execution.requireToolApproval,
+      },
+    ],
+    approvalPolicy: {
+      mode: providerById(agent.provider.providerId).scope === "local" ? "localAi" : "cloudAiRedacted",
+      networkAccess: "approvalRequired",
+      sourceModification: "approvalRequired",
+      dependencyModification: "approvalRequired",
+      secretAccess: "forbidden",
+    },
+    outputContract: {
+      format: "markdown",
+      requiredEvidence: false,
+      description: "Concise workflow report with observable evidence needs and next actions.",
+    },
+  };
+}
+
+const noToolsGateway: ToolGateway = {
+  async runTool(request) {
+    return {
+      status: "failed",
+      toolId: request.tool.id,
+      toolCallId: request.toolCallId,
+      action: request.tool.action,
+      summary: "No deterministic tools are registered for this UI workflow run.",
+      evidenceRefs: [],
+      diagnostics: [
+        {
+          level: "error",
+          source: "agents",
+          message: "No deterministic tools are registered for this UI workflow run.",
+        },
+      ],
+    };
+  },
+};
+
+function agentRoleForWorkflow(agent: AgentDefinition, workflow: AgentWorkflow): AgentRole {
+  const text = `${agent.name} ${agent.description} ${workflow.name} ${workflow.description}`.toLowerCase();
+
+  if (text.includes("test")) {
+    return "testGeneration";
+  }
+
+  if (text.includes("fuzz")) {
+    return "fuzzCampaign";
+  }
+
+  if (text.includes("formal") || text.includes("spec")) {
+    return "formalSpec";
+  }
+
+  if (text.includes("patch")) {
+    return "patch";
+  }
+
+  if (text.includes("document") || text.includes("report")) {
+    return "report";
+  }
+
+  if (text.includes("triage")) {
+    return "triage";
+  }
+
+  if (text.includes("ci")) {
+    return "ci";
+  }
+
+  return "securityReview";
+}
+
 function formatNode(node: AgentWorkflowNode) {
   return [
     `- ${node.id}`,
@@ -164,18 +229,6 @@ function formatNode(node: AgentWorkflowNode) {
   ]
     .filter(Boolean)
     .join("\n");
-}
-
-function formatUsage(usage: {
-  inputTokens?: number;
-  outputTokens?: number;
-  totalTokens?: number;
-}) {
-  const input = usage.inputTokens ?? 0;
-  const output = usage.outputTokens ?? 0;
-  const total = usage.totalTokens ?? input + output;
-
-  return `tokens=input:${input} output:${output} total:${total}`;
 }
 
 function formatTraceText(text: string, maxLength: number) {

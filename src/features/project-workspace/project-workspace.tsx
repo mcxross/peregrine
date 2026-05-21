@@ -13,7 +13,6 @@ import {
   PanelRightClose,
   ScanEye,
   ShieldAlert,
-  Sparkles,
   Workflow,
 } from "lucide-react";
 
@@ -51,11 +50,6 @@ import {
 } from "@/layout/window-chrome";
 import { cn } from "@/lib/utils";
 
-const AiFloatingWindow = React.lazy(() =>
-  import("@/features/project-workspace/ai/ai-floating-window").then((module) => ({
-    default: module.AiFloatingWindow,
-  })),
-);
 const AgentsScreen = React.lazy(() =>
   import("@/features/agents/agents-screen").then((module) => ({
     default: module.AgentsScreen,
@@ -189,7 +183,6 @@ export function ProjectWorkspace({
   packageTree,
 }: ProjectWorkspaceProps) {
   const [isRightPanelOpen, setIsRightPanelOpen] = React.useState(true);
-  const [isAiOpen, setIsAiOpen] = React.useState(false);
   const [selectedModule, setSelectedModule] = React.useState<SelectedMoveModule | null>(null);
   const [activeSurfaceDetail, setActiveSurfaceDetail] = React.useState<SurfaceDetailKind | null>(null);
   const [sourceJumpRequest, setSourceJumpRequest] = React.useState<SourceJumpRequest | null>(null);
@@ -408,23 +401,10 @@ export function ProjectWorkspace({
         ) : (
           <CollapsedPanelRail
             label="Open inspector"
-            isAiOpen={isAiOpen}
-            onToggleAi={activeMovePackage ? () => setIsAiOpen((current) => !current) : undefined}
             side="right"
             onOpen={() => setIsRightPanelOpen(true)}
           />
         )
-      ) : null}
-
-      {!isEditorMode && activeMovePackage ? (
-        <React.Suspense fallback={null}>
-          <AiFloatingWindow
-            activeMovePackage={activeMovePackage}
-            isOpen={isAiOpen}
-            onOpenChange={setIsAiOpen}
-            packageTree={packageTree}
-          />
-        </React.Suspense>
       ) : null}
     </div>
   );
@@ -947,16 +927,12 @@ function InspectorPanel({
 }
 
 function CollapsedPanelRail({
-  isAiOpen = false,
   label,
   onOpen,
-  onToggleAi,
   side,
 }: {
-  isAiOpen?: boolean;
   label: string;
   onOpen: () => void;
-  onToggleAi?: () => void;
   side: "left" | "right";
 }) {
   const Icon = side === "left" ? PanelLeftOpen : ScanEye;
@@ -986,22 +962,6 @@ function CollapsedPanelRail({
         >
           <Icon className="size-4" aria-hidden="true" />
         </Button>
-        {side === "right" && onToggleAi ? (
-          <Button
-            aria-label={isAiOpen ? "Hide AI" : "Ask AI"}
-            aria-pressed={isAiOpen}
-            className={cn(
-              "size-8 text-muted-foreground hover:text-foreground",
-              isAiOpen && "bg-[var(--app-elevated)] text-primary",
-            )}
-            onClick={onToggleAi}
-            size="icon-sm"
-            type="button"
-            variant="ghost"
-          >
-            <Sparkles className="size-4 text-primary" aria-hidden="true" />
-          </Button>
-        ) : null}
       </div>
     </aside>
   );

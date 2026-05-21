@@ -12434,7 +12434,6 @@ dependencies = [
  "peregrine-plugins",
  "peregrine-static-analysis",
  "pulldown-cmark 0.12.2",
- "reqwest 0.13.2",
  "serde",
  "serde_json",
  "syntect",
