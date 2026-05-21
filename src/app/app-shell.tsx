@@ -1178,11 +1178,15 @@ function createVisibleLoadAssessment(
         && run.packageName === activeMovePackage.name
         && run.packagePath === packagePath,
     ) ?? null;
-  const assessment = createPackageLoadAssessment({
-    movePackage: activeMovePackage,
+  const assessment = applyProjectLoadReportAssessment(
+    createPackageLoadAssessment({
+      movePackage: activeMovePackage,
+      packageTree,
+      startedAt: latestBuildRun?.startedAt ?? new Date(),
+    }),
     packageTree,
-    startedAt: latestBuildRun?.startedAt ?? new Date(),
-  });
+    activeMovePackage,
+  );
 
   if (!latestBuildRun) {
     return assessment;
@@ -1208,6 +1212,107 @@ function createVisibleLoadAssessment(
         : step,
     ),
   };
+}
+
+function applyProjectLoadReportAssessment(
+  assessment: PackageLoadAssessment,
+  packageTree: PackageTree,
+  activeMovePackage: MovePackage,
+): PackageLoadAssessment {
+  const manifestPath = activeMovePackage.manifestPath;
+  const capability = packageTree.loadReport.capabilities[manifestPath] ?? null;
+  const report = packageTree.loadReport.analysisReports[manifestPath] ?? null;
+  const analyzerStage = packageTree.loadReport.stages.find((stage) => stage.id === "analyzer") ?? null;
+  const analyzerDiagnostic = analyzerStage?.diagnostics.find(
+    (diagnostic) =>
+      diagnostic.packageManifestPath === manifestPath && diagnostic.level === "error",
+  ) ?? analyzerStage?.diagnostics.find(
+    (diagnostic) =>
+      diagnostic.packageManifestPath === manifestPath || diagnostic.packageManifestPath === null,
+  ) ?? null;
+  let riskStep: Partial<PackageLoadAssessment["steps"][number]>;
+
+  if (report) {
+    riskStep = analyzerAssessmentDisplay(report);
+  } else if (capability && !capability.canRunStaticAnalysis) {
+    riskStep = {
+      caption: "Requires modules",
+      detail: "Static analysis requires parseable Move modules.",
+      enabled: false,
+      state: "muted",
+      value: "Skipped",
+    };
+  } else if (analyzerDiagnostic?.level === "error" || analyzerStage?.status === "failed") {
+    riskStep = {
+      caption: "Analyzer failed",
+      detail: analyzerDiagnostic?.message ?? "Static analysis could not complete.",
+      enabled: false,
+      state: "error",
+      value: "Fail",
+    };
+  } else {
+    riskStep = {
+      caption: packageTree.isDetailed ? "No analyzer report" : "Runs after launch",
+      detail: packageTree.isDetailed
+        ? "Static analysis did not return a package report."
+        : "Static analysis runs during detailed project hydration.",
+      enabled: false,
+      state: "muted",
+      value: "Pending",
+    };
+  }
+
+  return {
+    ...assessment,
+    steps: assessment.steps.map((step) =>
+      step.id === "risk"
+        ? {
+            ...step,
+            ...riskStep,
+            command: null,
+            output: null,
+          }
+        : step,
+    ),
+  };
+}
+
+function analyzerAssessmentDisplay(
+  report: PackageTree["loadReport"]["analysisReports"][string],
+): Partial<PackageLoadAssessment["steps"][number]> {
+  const findingCount = report.findings.length;
+  const errorCount = report.diagnostics.filter((diagnostic) => diagnostic.level === "error").length;
+  const warningCount = report.diagnostics.filter((diagnostic) => diagnostic.level === "warning").length;
+  const state: PackageLoadAssessmentState =
+    errorCount > 0
+      ? "error"
+      : findingCount > 0 || warningCount > 0
+        ? "attention"
+        : "success";
+  const detailParts = [
+    formatLoadReportCount(report.loadedRulesets.length, "ruleset"),
+    report.loadedPlugins.length
+      ? formatLoadReportCount(report.loadedPlugins.length, "plugin")
+      : null,
+    warningCount ? formatLoadReportCount(warningCount, "warning") : null,
+    errorCount ? formatLoadReportCount(errorCount, "error") : null,
+  ].filter(Boolean);
+
+  return {
+    caption: errorCount > 0
+      ? "Analyzer reported errors"
+      : findingCount > 0
+        ? "Findings detected"
+        : "Analyzer completed",
+    detail: detailParts.join(" / ") || "Analyzer completed",
+    enabled: true,
+    state,
+    value: findingCount === 0 ? "Clean" : formatLoadReportCount(findingCount, "finding"),
+  };
+}
+
+function formatLoadReportCount(count: number, label: string) {
+  return `${count} ${label}${count === 1 ? "" : "s"}`;
 }
 
 function buildAssessmentDisplay(run: BuildLogRun): {

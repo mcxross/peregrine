@@ -104,6 +104,9 @@ export function MovePackagesOverviewScreen({
   const [analysisError, setAnalysisError] = React.useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
   const processedSourceJumpKeyRef = React.useRef<string | null>(null);
+  const preloadedAnalysisReport = movePackage
+    ? packageTree.loadReport.analysisReports[movePackage.manifestPath] ?? null
+    : null;
 
   React.useEffect(() => {
     setEditorTabs([]);
@@ -118,6 +121,13 @@ export function MovePackagesOverviewScreen({
   React.useEffect(() => {
     if (!movePackage || !movePackage.hasSourceModules) {
       setAnalysisReport(null);
+      setAnalysisError(null);
+      setIsAnalyzing(false);
+      return;
+    }
+
+    if (preloadedAnalysisReport) {
+      setAnalysisReport(preloadedAnalysisReport);
       setAnalysisError(null);
       setIsAnalyzing(false);
       return;
@@ -149,7 +159,7 @@ export function MovePackagesOverviewScreen({
     return () => {
       isCurrent = false;
     };
-  }, [movePackage, packageTree]);
+  }, [movePackage, packageTree, preloadedAnalysisReport]);
 
   const complexFunctionCounts = React.useMemo(
     () => (movePackage ? complexFunctionCountsByModule(analysisReport, movePackage) : new Map<string, number>()),

@@ -12432,6 +12432,7 @@ dependencies = [
  "peregrine-move-graphs",
  "peregrine-move-model",
  "peregrine-plugins",
+ "peregrine-project-loader",
  "peregrine-static-analysis",
  "pulldown-cmark 0.12.2",
  "serde",
@@ -12655,6 +12656,16 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "wasmtime",
+]
+
+[[package]]
+name = "peregrine-project-loader"
+version = "0.1.0"
+dependencies = [
+ "peregrine-move-graphs",
+ "peregrine-static-analysis",
+ "serde",
+ "tempfile",
 ]
 
 [[package]]

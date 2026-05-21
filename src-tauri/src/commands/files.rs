@@ -4,48 +4,41 @@ use base64::{engine::general_purpose, Engine};
 use peregrine_bytecode::{load_package_bytecode, MoveBytecodePackageView};
 use peregrine_move_graphs::{
     discover_move_project_graphs, discover_move_project_graphs_for_package,
-    discover_move_state_access_graph_for_function, MoveCallGraph, MoveProjectGraphs,
-    MoveStateAccessGraph, MoveTypeGraph, PackageDependencyGraph,
+    discover_move_state_access_graph_for_function, MoveProjectGraphs, MoveStateAccessGraph,
 };
 use peregrine_move_model::{build_move_package, MovePackageModel};
+use peregrine_project_loader::{load_project, LoadedProject, ProjectLoadMode, ProjectLoadOptions};
 use peregrine_static_analysis::{
-    discover_move_project_fast, discover_move_project_shallow, AnalysisConfig, AnalysisEngine,
-    AnalysisEngineOptions, AnalysisReport, MovePackage,
+    AnalysisConfig, AnalysisEngine, AnalysisEngineOptions, AnalysisReport,
 };
-use serde::Serialize;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 use tauri::Manager;
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct PackageTree {
-    root_path: String,
-    root_name: String,
-    is_detailed: bool,
-    paths: Vec<String>,
-    move_packages: Vec<MovePackage>,
-    dependency_graph: PackageDependencyGraph,
-    call_graph: MoveCallGraph,
-    type_graph: MoveTypeGraph,
-    state_access_graph: MoveStateAccessGraph,
-}
+pub(crate) type PackageTree = LoadedProject;
 
 #[tauri::command]
 pub(crate) async fn load_package_tree(root_path: String) -> Result<PackageTree, String> {
+    let options = project_load_options(None, PackageTreeMode::Shallow);
+
     tauri::async_runtime::spawn_blocking(move || {
-        build_package_tree(root_path, PackageTreeMode::Shallow)
+        build_package_tree_with_options(root_path, options)
     })
     .await
     .map_err(|error| format!("Could not join package tree task: {error}"))?
 }
 
 #[tauri::command]
-pub(crate) async fn load_package_tree_details(root_path: String) -> Result<PackageTree, String> {
+pub(crate) async fn load_package_tree_details(
+    app: tauri::AppHandle,
+    root_path: String,
+) -> Result<PackageTree, String> {
+    let options = project_load_options(Some(&app), PackageTreeMode::Detailed);
+
     tauri::async_runtime::spawn_blocking(move || {
-        build_package_tree(root_path, PackageTreeMode::Detailed)
+        build_package_tree_with_options(root_path, options)
     })
     .await
     .map_err(|error| format!("Could not join package detail task: {error}"))?
@@ -226,36 +219,30 @@ pub(crate) fn build_package_tree(
     root_path: String,
     mode: PackageTreeMode,
 ) -> Result<PackageTree, String> {
-    let root = PathBuf::from(&root_path);
-    let root = root
-        .canonicalize()
-        .map_err(|error| format!("Could not read package directory {root_path}: {error}"))?;
-    let root_name = root
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or(root_path.as_str())
-        .to_string();
-    let mut paths = Vec::new();
+    build_package_tree_with_options(root_path, project_load_options(None, mode))
+}
 
-    collect_paths(&root, &root, &mut paths)?;
-    paths.sort_by(|left, right| compare_tree_paths(left, right));
+fn build_package_tree_with_options(
+    root_path: String,
+    options: ProjectLoadOptions,
+) -> Result<PackageTree, String> {
+    load_project(root_path, options)
+}
 
-    let move_project = match mode {
-        PackageTreeMode::Detailed => discover_move_project_fast(&root),
-        PackageTreeMode::Shallow => discover_move_project_shallow(&root),
-    };
+fn project_load_options(
+    app: Option<&tauri::AppHandle>,
+    mode: PackageTreeMode,
+) -> ProjectLoadOptions {
+    let analyzer_plugin_root = app.and_then(|app| app.path().app_config_dir().ok());
 
-    Ok(PackageTree {
-        root_path: root.to_string_lossy().into_owned(),
-        root_name,
-        is_detailed: matches!(mode, PackageTreeMode::Detailed),
-        paths,
-        move_packages: move_project.packages,
-        dependency_graph: move_project.dependency_graph,
-        call_graph: move_project.call_graph,
-        type_graph: move_project.type_graph,
-        state_access_graph: move_project.state_access_graph,
-    })
+    ProjectLoadOptions {
+        analyzer_plugin_root,
+        include_analyzer: matches!(mode, PackageTreeMode::Detailed),
+        mode: match mode {
+            PackageTreeMode::Detailed => ProjectLoadMode::Detailed,
+            PackageTreeMode::Shallow => ProjectLoadMode::Shallow,
+        },
+    }
 }
 
 fn build_move_state_access_graph(
@@ -357,103 +344,6 @@ fn move_source_unavailable_message(package: &MovePackageModel) -> String {
         package.name,
         package.source_file_count,
         if package.source_file_count == 1 { "file" } else { "files" }
-    )
-}
-
-fn collect_paths(root: &Path, directory: &Path, paths: &mut Vec<String>) -> Result<(), String> {
-    let entries = match fs::read_dir(directory) {
-        Ok(entries) => entries,
-        Err(error) if directory == root => {
-            return Err(format!(
-                "Could not read package directory {}: {error}",
-                directory.display()
-            ));
-        }
-        Err(_) => return Ok(()),
-    };
-
-    let mut entries = entries
-        .filter_map(Result::ok)
-        .collect::<Vec<fs::DirEntry>>();
-    entries.sort_by(compare_dir_entries);
-
-    for entry in entries {
-        let path = entry.path();
-        let Ok(relative_path) = path.strip_prefix(root) else {
-            continue;
-        };
-        let Some(relative_path) = normalize_tree_path(relative_path) else {
-            continue;
-        };
-        let Ok(file_type) = entry.file_type() else {
-            paths.push(relative_path);
-            continue;
-        };
-
-        if file_type.is_dir() {
-            if should_skip_tree_directory(&path) {
-                continue;
-            }
-
-            paths.push(format!("{relative_path}/"));
-            collect_paths(root, &path, paths)?;
-        } else {
-            paths.push(relative_path);
-        }
-    }
-
-    Ok(())
-}
-
-fn should_skip_tree_directory(path: &Path) -> bool {
-    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-        return false;
-    };
-
-    matches!(
-        name,
-        ".git"
-            | ".next"
-            | ".peregrine"
-            | ".sui"
-            | ".turbo"
-            | "build"
-            | "coverage"
-            | "dist"
-            | "node_modules"
-            | "package_summaries"
-            | "target"
-    )
-}
-
-fn compare_dir_entries(left: &fs::DirEntry, right: &fs::DirEntry) -> std::cmp::Ordering {
-    let left_is_dir = left
-        .file_type()
-        .map(|file_type| file_type.is_dir())
-        .unwrap_or(false);
-    let right_is_dir = right
-        .file_type()
-        .map(|file_type| file_type.is_dir())
-        .unwrap_or(false);
-
-    right_is_dir
-        .cmp(&left_is_dir)
-        .then_with(|| left.file_name().cmp(&right.file_name()))
-}
-
-fn compare_tree_paths(left: &str, right: &str) -> std::cmp::Ordering {
-    let left_is_dir = left.ends_with('/');
-    let right_is_dir = right.ends_with('/');
-
-    right_is_dir.cmp(&left_is_dir).then_with(|| left.cmp(right))
-}
-
-fn normalize_tree_path(path: &Path) -> Option<String> {
-    Some(
-        path.components()
-            .map(|component| component.as_os_str().to_str())
-            .collect::<Option<Vec<_>>>()?
-            .join("/"),
     )
 }
 

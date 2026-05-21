@@ -12,6 +12,50 @@ export type PackageTree = {
   callGraph: MoveCallGraph;
   typeGraph: MoveTypeGraph;
   stateAccessGraph: MoveStateAccessGraph;
+  loadReport: ProjectLoadReport;
+};
+
+export type ProjectLoadStageStatus =
+  | "failed"
+  | "passed"
+  | "running"
+  | "skipped"
+  | "warning";
+
+export type ProjectLoadDiagnostic = {
+  level: string;
+  source: string;
+  message: string;
+  packageManifestPath: string | null;
+};
+
+export type ProjectLoadStageReport = {
+  id: string;
+  label: string;
+  status: ProjectLoadStageStatus;
+  diagnostics: ProjectLoadDiagnostic[];
+  durationMs: number;
+};
+
+export type PackageLoadCapabilities = {
+  packageName: string;
+  packagePath: string;
+  manifestPath: string;
+  hasManifest: boolean;
+  hasSourceFiles: boolean;
+  hasParseableModules: boolean;
+  hasPackageSummaries: boolean;
+  canShowDependencyGraph: boolean;
+  canShowCallGraph: boolean;
+  canShowTypeGraph: boolean;
+  canShowBytecode: boolean;
+  canRunStaticAnalysis: boolean;
+};
+
+export type ProjectLoadReport = {
+  stages: ProjectLoadStageReport[];
+  capabilities: Record<string, PackageLoadCapabilities>;
+  analysisReports: Record<string, AnalysisReport>;
 };
 
 export type ProjectMetadata = {

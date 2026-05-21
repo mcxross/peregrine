@@ -30,6 +30,7 @@ peregrine-indexer = { workspace = true }
 peregrine-import-engine = { workspace = true }
 peregrine-move-graphs = { workspace = true }
 peregrine-move-model = { workspace = true }
+peregrine-project-loader = { workspace = true }
 peregrine-plugins = { workspace = true }
 peregrine-static-analysis = { workspace = true }
 
