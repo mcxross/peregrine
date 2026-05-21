@@ -26,6 +26,7 @@ import type {
   WorkspaceMode,
   WorkspaceTab,
 } from "@/app/workspace-types";
+import type { SuiNetworkSelection } from "@/app/sui-network";
 import {
   displayMovePackageName,
   type MoveModule,
@@ -95,6 +96,7 @@ type ProjectWorkspaceProps = {
   lastScannedAt: number | null;
   loadAssessment: PackageLoadAssessment | null;
   mode: WorkspaceMode;
+  network: SuiNetworkSelection;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onFormalVerificationTargetChange: (target: FormalVerificationTarget | null) => void;
@@ -175,6 +177,7 @@ export function ProjectWorkspace({
   lastScannedAt,
   loadAssessment,
   mode,
+  network,
   onActivePackageManifestPathChange,
   onCommandLog,
   onFormalVerificationTargetChange,
@@ -366,6 +369,7 @@ export function ProjectWorkspace({
               activeMovePackage={activeMovePackage}
               isDependencyGraphLoading={isDependencyGraphLoading}
               mode={mode}
+              network={network}
               packageTree={packageTree}
               packageName={packageName}
               selectedModule={selectedModule}
@@ -424,6 +428,7 @@ function WorkspaceMainPanel({
   activeMovePackage,
   isDependencyGraphLoading,
   mode,
+  network,
   onClearSelectedModule,
   onOpenSourceLocation,
   onSelectModule,
@@ -439,6 +444,7 @@ function WorkspaceMainPanel({
   activeMovePackage: MovePackage | null;
   isDependencyGraphLoading: boolean;
   mode: WorkspaceMode;
+  network: SuiNetworkSelection;
   onClearSelectedModule: () => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onOpenSourceLocation: (location: TypeGraphSourceLocation) => void;
@@ -481,6 +487,7 @@ function WorkspaceMainPanel({
     return (
       <ExecutionBuilderScreen
         activeMovePackage={activeMovePackage}
+        network={network}
         onCommandLog={onCommandLog}
         onProjectSelected={onProjectSelected}
         packageTree={packageTree}

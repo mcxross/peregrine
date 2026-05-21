@@ -85,10 +85,15 @@ import type {
   BuildLogRun,
   BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
+import {
+  suiNetworkLabel,
+  type SuiNetworkSelection,
+} from "@/app/sui-network";
 import { cn } from "@/lib/utils";
 
 type ExecutionBuilderScreenProps = {
   activeMovePackage: MovePackage | null;
+  network: SuiNetworkSelection;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   packageTree: PackageTree;
   onProjectSelected: (packageTree: PackageTree) => void;
@@ -102,7 +107,6 @@ type ExecutionStepKind =
   | "formal"
   | "publish";
 
-type PublishTarget = "localnet" | "devnet" | "testnet" | "mainnet";
 type SequenceDirection = "horizontal" | "vertical";
 
 type ExecutionStepDefinition = {
@@ -124,7 +128,7 @@ type ExecutionStep = {
   kind: ExecutionStepKind;
   config: {
     publishDryRun?: boolean;
-    publishTarget?: PublishTarget;
+    publishWithUnpublishedDependencies?: boolean;
     scriptPath?: string;
     stopOnFailure: boolean;
     useScript?: boolean;
@@ -176,6 +180,7 @@ type ExecutionWorkflowNodeData = {
   direction: SequenceDirection;
   index: number;
   isRunning: boolean;
+  network: SuiNetworkSelection;
   onMoveStep: (stepId: string, direction: -1 | 1) => void;
   onRemoveStep: (stepId: string) => void;
   onSelectStep: (stepId: string) => void;
@@ -225,12 +230,6 @@ const EXECUTION_NODE_TYPES = {
 const EXECUTION_EDGE_TYPES = {
   sequence: ExecutionSequenceEdge,
 };
-const publishTargets: { label: string; value: PublishTarget }[] = [
-  { label: "Local", value: "localnet" },
-  { label: "Devnet", value: "devnet" },
-  { label: "Testnet", value: "testnet" },
-  { label: "Mainnet", value: "mainnet" },
-];
 const FORMAL_VERIFICATION_TIMEOUT_SECONDS = 45;
 
 const stepDefinitions: ExecutionStepDefinition[] = [
@@ -307,11 +306,11 @@ const stepDefinitions: ExecutionStepDefinition[] = [
     label: "Publish",
     shortLabel: "Publish",
     description:
-      "Publishes the active Move package to local, devnet, testnet, or mainnet. Dry-run is on by default.",
+      "Publishes the active Move package with the active Sui client environment. Dry-run uses an ephemeral publication file.",
     whenToUse:
       "Use this as the final block after build, tests, fuzzing, coverage, and formal verification checks.",
     category: "Deploy",
-    command: "sui client publish --dry-run --client.env localnet .",
+    command: "sui client publish --dry-run .",
     defaultStopOnFailure: true,
     icon: Rocket,
   },
@@ -329,6 +328,7 @@ let stepIdCounter = 0;
 
 export function ExecutionBuilderScreen({
   activeMovePackage,
+  network,
   onCommandLog,
   onProjectSelected,
   packageTree,
@@ -586,6 +586,7 @@ export function ExecutionBuilderScreen({
       const stepStartedAt = new Date();
       const runningLog = executionLogRun({
         movePackage: currentPackage,
+        network,
         packageTree: currentTree,
         projectMetadata: runProjectMetadata,
         startedAt: stepStartedAt,
@@ -603,6 +604,7 @@ export function ExecutionBuilderScreen({
       try {
         const outcome = await executeStep({
           movePackage: currentPackage,
+          network,
           onProjectSelected,
           packageTree: currentTree,
           projectMetadata: runProjectMetadata,
@@ -628,6 +630,7 @@ export function ExecutionBuilderScreen({
             detail: outcome.detail,
             finishedAt: outcome.finishedAt ?? new Date(),
             movePackage: currentPackage ?? packageForLog,
+            network,
             output: outcome.output,
             packageTree: currentTree,
             projectMetadata: runProjectMetadata,
@@ -660,6 +663,7 @@ export function ExecutionBuilderScreen({
             error: errorMessage,
             finishedAt,
             movePackage: currentPackage,
+            network,
             packageTree: currentTree,
             projectMetadata: runProjectMetadata,
             startedAt: stepStartedAt,
@@ -761,6 +765,7 @@ export function ExecutionBuilderScreen({
           onClearCanvas={clearCanvas}
           onSelectStep={setSelectedStepId}
           onUpdateStep={updateStep}
+          network={network}
           packageTree={packageTree}
           projectMetadata={projectMetadata}
           selectedStepId={selectedStepId}
@@ -908,6 +913,7 @@ type SequenceCanvasProps = {
   direction: SequenceDirection;
   dropIndex: number | null;
   isRunning: boolean;
+  network: SuiNetworkSelection;
   onClearCanvas: () => void;
   onDropIndex: (event: React.DragEvent<HTMLElement>, index: number) => void;
   onDropPreview: (index: number | null) => void;
@@ -936,6 +942,7 @@ function ExecutionFlowCanvas({
   direction,
   dropIndex,
   isRunning,
+  network,
   onClearCanvas,
   onDropIndex,
   onDropPreview,
@@ -957,6 +964,7 @@ function ExecutionFlowCanvas({
         activeMovePackage,
         direction,
         isRunning,
+        network,
         onMoveStep,
         onRemoveStep,
         onSelectStep,
@@ -971,6 +979,7 @@ function ExecutionFlowCanvas({
       direction,
       activeMovePackage,
       isRunning,
+      network,
       onMoveStep,
       onRemoveStep,
       onSelectStep,
@@ -1182,6 +1191,7 @@ function ExecutionWorkflowNode({ data }: NodeProps<Node<ExecutionWorkflowNodeDat
   const commandLabel = commandPreview(
     data.definition,
     data.step,
+    data.network,
     data.projectMetadata,
     data.activeMovePackage,
   );
@@ -1385,6 +1395,7 @@ function ExecutionWorkflowNode({ data }: NodeProps<Node<ExecutionWorkflowNodeDat
         <div className="px-6 pb-4">
           <PublishConfig
             disabled={data.isRunning}
+            network={data.network}
             step={data.step}
             onUpdateStep={data.onUpdateStep}
           />
@@ -1534,6 +1545,7 @@ function createExecutionFlowNodes({
   activeMovePackage,
   direction,
   isRunning,
+  network,
   onMoveStep,
   onRemoveStep,
   onSelectStep,
@@ -1547,6 +1559,7 @@ function createExecutionFlowNodes({
   activeMovePackage: MovePackage | null;
   direction: SequenceDirection;
   isRunning: boolean;
+  network: SuiNetworkSelection;
   onMoveStep: (stepId: string, direction: -1 | 1) => void;
   onRemoveStep: (stepId: string) => void;
   onSelectStep: (stepId: string) => void;
@@ -1566,6 +1579,7 @@ function createExecutionFlowNodes({
       direction,
       index,
       isRunning,
+      network,
       onMoveStep,
       onRemoveStep,
       onSelectStep,
@@ -1808,38 +1822,50 @@ function ScriptPathPicker({
 
 function PublishConfig({
   disabled,
+  network,
   onUpdateStep,
   step,
 }: {
   disabled: boolean;
+  network: SuiNetworkSelection;
   onUpdateStep: (stepId: string, nextStep: ExecutionStepUpdate) => void;
   step: ExecutionStep;
 }) {
-  const target = step.config.publishTarget ?? "localnet";
   const dryRun = step.config.publishDryRun !== false;
+  const includeUnpublishedDeps = step.config.publishWithUnpublishedDependencies === true;
+  const networkLabel = suiNetworkLabel(network);
 
   return (
-    <div className="nodrag nopan col-span-3 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded border border-[color:var(--app-border)] bg-[var(--app-window)]/80 p-1.5">
-      <div className="grid min-w-0 grid-cols-4 gap-1">
-        {publishTargets.map((option) => (
-          <Button
-            className="h-6 min-w-0 justify-center rounded px-1 text-[10.5px]"
-            disabled={disabled}
-            key={option.value}
-            onClick={() =>
-              onUpdateStep(step.id, {
-                config: {
-                  publishTarget: option.value,
-                },
-              })
-            }
-            type="button"
-            variant={target === option.value ? "secondary" : "ghost"}
-          >
-            <span className="truncate">{option.label}</span>
-          </Button>
-        ))}
+    <div className="nodrag nopan col-span-3 grid min-w-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded border border-[color:var(--app-border)] bg-[var(--app-window)]/80 p-1.5">
+      <div className="min-w-0 truncate px-1.5 text-[10.5px] text-muted-foreground">
+        <div className="truncate">Active env: {networkLabel}</div>
+        {dryRun || includeUnpublishedDeps ? (
+          <div className="truncate text-[10px]">
+            {includeUnpublishedDeps
+              ? `${dryRun ? "Dry-run includes" : "Publish includes"} unpublished deps.`
+              : "Dry-run uses an ephemeral pubfile."}
+          </div>
+        ) : null}
       </div>
+      <label
+        className="flex h-6 shrink-0 items-center gap-1.5 rounded px-1.5 text-[10.5px] text-muted-foreground"
+        title="Include unpublished package dependencies in the publish transaction. Useful for dry-runs; publish dependencies one by one for production deploys when possible."
+      >
+        <input
+          checked={includeUnpublishedDeps}
+          className="size-3 shrink-0 accent-primary"
+          disabled={disabled}
+          onChange={(event) =>
+            onUpdateStep(step.id, {
+              config: {
+                publishWithUnpublishedDependencies: event.target.checked,
+              },
+            })
+          }
+          type="checkbox"
+        />
+        <span className="whitespace-nowrap">Include deps</span>
+      </label>
       <label className="flex h-6 shrink-0 items-center gap-1.5 rounded px-1.5 text-[10.5px] text-muted-foreground">
         <input
           checked={dryRun}
@@ -1863,6 +1889,7 @@ function PublishConfig({
 function commandPreview(
   definition: ExecutionStepDefinition,
   step: ExecutionStep,
+  network: SuiNetworkSelection,
   projectMetadata: ProjectMetadata | null = null,
   movePackage: MovePackage | null = null,
 ) {
@@ -1879,11 +1906,15 @@ function commandPreview(
   }
 
   if (step.kind === "publish") {
-    const target = step.config.publishTarget ?? "localnet";
-    const prefix = step.config.publishDryRun === false ? "sui client publish" : "sui client publish --dry-run";
-    const pubfile = step.config.publishDryRun === false ? "" : " --pubfile-path <temporary>";
+    const depsFlag = step.config.publishWithUnpublishedDependencies === true
+      ? " --with-unpublished-dependencies"
+      : "";
 
-    return `${prefix} --client.env ${target}${pubfile} .`;
+    if (step.config.publishDryRun === false) {
+      return `sui client publish${depsFlag} .`;
+    }
+
+    return `sui client test-publish --dry-run --pubfile-path <temporary> --build-env ${network.id}${depsFlag} .`;
   }
 
   return definition.command;
@@ -1952,7 +1983,7 @@ function scriptPathPlaceholder(kind: ExecutionStepKind) {
     case "formal":
       return "scripts/prove.sh";
     case "publish":
-      return "scripts/publish-testnet.sh";
+      return "scripts/publish.sh";
   }
 }
 
@@ -1969,6 +2000,7 @@ function executionLogRun({
   error = null,
   finishedAt = null,
   movePackage,
+  network,
   output = null,
   packageTree,
   projectMetadata,
@@ -1981,6 +2013,7 @@ function executionLogRun({
   error?: string | null;
   finishedAt?: Date | null;
   movePackage: MovePackage;
+  network: SuiNetworkSelection;
   output?: CommandOutput | null;
   packageTree: PackageTree;
   projectMetadata: ProjectMetadata;
@@ -1992,7 +2025,7 @@ function executionLogRun({
   const definition = definitionByKind[step.kind];
   const localScriptPath = isLocalScriptEnabled(step) ? normalizedScriptPath(step) : "";
   const configuredScript = configuredProjectScriptForStep(step, projectMetadata, movePackage);
-  const command = executionLogCommand(definition, step, configuredScript);
+  const command = executionLogCommand(definition, step, network, configuredScript);
 
   return {
     canRerun: false,
@@ -2012,6 +2045,7 @@ function executionLogRun({
       ...(configuredScript && configuredScript.args.length
         ? [{ label: "Args", value: configuredScript.args.join(" ") }]
         : []),
+      ...(step.kind === "publish" ? [{ label: "Active env", value: suiNetworkLabel(network) }] : []),
       ...(summary ? [{ label: "Summary", value: summary }] : []),
     ],
     note: detail ?? null,
@@ -2029,6 +2063,7 @@ function executionLogRun({
 function executionLogCommand(
   definition: ExecutionStepDefinition,
   step: ExecutionStep,
+  network: SuiNetworkSelection,
   configuredScript: ProjectConfiguredScript | null,
 ) {
   const scriptPath = isLocalScriptEnabled(step) ? normalizedScriptPath(step) : "";
@@ -2045,7 +2080,7 @@ function executionLogCommand(
     return configuredScriptCommand(configuredScript);
   }
 
-  return commandPreview(definition, step);
+  return commandPreview(definition, step, network);
 }
 
 function absolutePackagePath(packageTree: PackageTree, packagePath: string) {
@@ -2127,6 +2162,7 @@ function StepStateBadge({
 
 async function executeStep({
   movePackage,
+  network,
   onCommandOutput,
   onProjectSelected,
   packageTree,
@@ -2136,6 +2172,7 @@ async function executeStep({
   step,
 }: {
   movePackage: MovePackage;
+  network: SuiNetworkSelection;
   onCommandOutput?: (output: CommandOutput) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
   packageTree: PackageTree;
@@ -2247,18 +2284,28 @@ async function executeStep({
 
   if (step.kind === "publish") {
     const commandKind = publishCommandKind(step);
+    const withUnpublishedDependencies = step.config.publishWithUnpublishedDependencies === true;
     const output = await runSecurityCommand(packageTree, movePackage.path, commandKind, {
+      buildEnv: network.id,
       onOutput: onCommandOutput,
       streamId,
+      withUnpublishedDependencies,
     });
-    const targetLabel = publishTargetLabel(step.config.publishTarget ?? "localnet");
+    const targetLabel = suiNetworkLabel(network);
     const finishedAt = new Date();
+    const unpublishedDepsFailure = isUnpublishedDependenciesFailure(output);
+    const modeLabel = step.config.publishDryRun === false ? "Publish" : "Publish dry run";
+    const failureDetail = unpublishedDepsFailure
+      ? step.config.publishDryRun === false
+        ? "Publish found unpublished dependencies. Prefer publishing dependencies one by one; only enable Include deps when you intentionally want one publish transaction with unpublished dependencies."
+        : "Publish dry run found unpublished dependencies. Enable Include deps on this Publish step to include them in the dry-run transaction."
+      : `${modeLabel} failed for ${targetLabel}.`;
 
     return {
       detail:
         output.status === 0
-          ? `${step.config.publishDryRun === false ? "Publish" : "Publish dry run"} completed for ${targetLabel}.`
-          : `${step.config.publishDryRun === false ? "Publish" : "Publish dry run"} failed for ${targetLabel}.`,
+          ? `${modeLabel} completed for ${targetLabel}.`
+          : failureDetail,
       finishedAt,
       output,
       startedAt,
@@ -2266,7 +2313,9 @@ async function executeStep({
       summary:
         output.status === 0
           ? `${targetLabel} publish ${step.config.publishDryRun === false ? "completed" : "dry run passed"}.`
-          : `${targetLabel} publish ${step.config.publishDryRun === false ? "failed" : "dry run failed"}.`,
+          : unpublishedDepsFailure
+            ? "Unpublished dependencies need an explicit publish mode."
+            : `${targetLabel} publish ${step.config.publishDryRun === false ? "failed" : "dry run failed"}.`,
     };
   }
 
@@ -2489,26 +2538,15 @@ async function executeConfiguredProjectScriptStep({
 }
 
 function publishCommandKind(step: ExecutionStep): SecurityCommandKind {
-  const target = step.config.publishTarget ?? "localnet";
-
   if (step.config.publishDryRun === false) {
-    return `publish-${target}` as SecurityCommandKind;
+    return "publish";
   }
 
-  return `publish-dry-run-${target}` as SecurityCommandKind;
+  return "publish-dry-run";
 }
 
-function publishTargetLabel(target: PublishTarget) {
-  switch (target) {
-    case "localnet":
-      return "Local";
-    case "devnet":
-      return "Devnet";
-    case "testnet":
-      return "Testnet";
-    case "mainnet":
-      return "Mainnet";
-  }
+function isUnpublishedDependenciesFailure(output: CommandOutput) {
+  return /The package has unpublished dependencies/i.test(`${output.stderr}\n${output.stdout}`);
 }
 
 function markRemainingStepsSkipped(
@@ -2554,7 +2592,7 @@ function createStep(kind: ExecutionStepKind): ExecutionStep {
     kind,
     config: {
       publishDryRun: true,
-      publishTarget: "localnet",
+      publishWithUnpublishedDependencies: false,
       scriptPath: "",
       stopOnFailure: definition.defaultStopOnFailure,
       useScript: false,

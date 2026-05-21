@@ -69,6 +69,7 @@ export function Workspace({
           lastScannedAt={lastScannedAt}
           loadAssessment={loadAssessment}
           mode={mode}
+          network={network}
           onActivePackageManifestPathChange={onActivePackageManifestPathChange}
           onCommandLog={onCommandLog}
           onFormalVerificationTargetChange={onFormalVerificationTargetChange}

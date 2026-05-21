@@ -2,6 +2,7 @@ use super::{bundled, SuiAdapterError, SuiAdapterSource};
 use std::{
     ffi::OsString,
     path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -25,6 +26,8 @@ pub struct SuiPackageCommand {
     pub args: Vec<String>,
     pub display: String,
     pub temp_pubfile_path: Option<PathBuf>,
+    pub publish_build_env: Option<String>,
+    pub with_unpublished_dependencies: bool,
     pub kind: SuiCommandKind,
 }
 
@@ -101,16 +104,34 @@ fn validated_move_project_name(project_name: &str) -> Result<String, SuiAdapterE
 }
 
 impl SuiPackageCommand {
-    pub(crate) fn new(kind: SuiCommandKind, execution: SuiExecutionTarget) -> Self {
-        let (args, display, temp_pubfile_path) = command_parts(kind);
+    pub(crate) fn new(
+        kind: SuiCommandKind,
+        execution: SuiExecutionTarget,
+        publish_build_env: Option<&str>,
+        with_unpublished_dependencies: bool,
+    ) -> Result<Self, SuiAdapterError> {
+        let publish_build_env = normalized_publish_build_env(kind, publish_build_env)?;
+        let temp_pubfile_path = if matches!(kind, SuiCommandKind::PublishDryRun) {
+            Some(temp_pubfile_path())
+        } else {
+            None
+        };
+        let (args, display) = command_parts(
+            kind,
+            temp_pubfile_path.as_deref(),
+            publish_build_env.as_deref(),
+            with_unpublished_dependencies,
+        );
 
-        Self {
+        Ok(Self {
             execution,
             args,
             display,
             temp_pubfile_path,
+            publish_build_env,
+            with_unpublished_dependencies,
             kind,
-        }
+        })
     }
 
     pub fn source(&self) -> SuiAdapterSource {
@@ -125,7 +146,13 @@ impl SuiPackageCommand {
     }
 
     pub fn bundled_args_for_package(&self, package_root: &Path) -> Vec<OsString> {
-        bundled_args_for_package(self.kind, package_root)
+        bundled_args_for_package(
+            self.kind,
+            package_root,
+            self.temp_pubfile_path.as_deref(),
+            self.publish_build_env.as_deref(),
+            self.with_unpublished_dependencies,
+        )
     }
 
     pub fn run_bundled_blocking(
@@ -157,8 +184,8 @@ pub enum SuiCommandKind {
     MoveCoverage,
     MoveCoverageSummary,
     MoveFuzz,
-    PublishDryRun(SuiNetwork),
-    Publish(SuiNetwork),
+    PublishDryRun,
+    Publish,
 }
 
 impl SuiCommandKind {
@@ -169,14 +196,8 @@ impl SuiCommandKind {
             "move-coverage" => Ok(Self::MoveCoverage),
             "move-coverage-summary" => Ok(Self::MoveCoverageSummary),
             "move-fuzz" => Ok(Self::MoveFuzz),
-            "publish-dry-run-localnet" => Ok(Self::PublishDryRun(SuiNetwork::Localnet)),
-            "publish-dry-run-devnet" => Ok(Self::PublishDryRun(SuiNetwork::Devnet)),
-            "publish-dry-run-testnet" => Ok(Self::PublishDryRun(SuiNetwork::Testnet)),
-            "publish-dry-run-mainnet" => Ok(Self::PublishDryRun(SuiNetwork::Mainnet)),
-            "publish-localnet" => Ok(Self::Publish(SuiNetwork::Localnet)),
-            "publish-devnet" => Ok(Self::Publish(SuiNetwork::Devnet)),
-            "publish-testnet" => Ok(Self::Publish(SuiNetwork::Testnet)),
-            "publish-mainnet" => Ok(Self::Publish(SuiNetwork::Mainnet)),
+            "publish-dry-run" => Ok(Self::PublishDryRun),
+            "publish" => Ok(Self::Publish),
             _ => Err(SuiAdapterError::UnsupportedCommand(
                 command_kind.to_string(),
             )),
@@ -184,83 +205,93 @@ impl SuiCommandKind {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SuiNetwork {
-    Localnet,
-    Devnet,
-    Testnet,
-    Mainnet,
-}
-
-impl SuiNetwork {
-    fn as_cli_arg(self) -> &'static str {
-        match self {
-            Self::Localnet => "localnet",
-            Self::Devnet => "devnet",
-            Self::Testnet => "testnet",
-            Self::Mainnet => "mainnet",
-        }
-    }
-}
-
-fn command_parts(command_kind: SuiCommandKind) -> (Vec<String>, String, Option<PathBuf>) {
+fn command_parts(
+    command_kind: SuiCommandKind,
+    temp_pubfile_path: Option<&Path>,
+    publish_build_env: Option<&str>,
+    with_unpublished_dependencies: bool,
+) -> (Vec<String>, String) {
     match command_kind {
         SuiCommandKind::MoveBuild => (
             command_args(&["move", "build"]),
             "sui move build".to_string(),
-            None,
         ),
-        SuiCommandKind::MoveTest => (
-            command_args(&["move", "test"]),
-            "sui move test".to_string(),
-            None,
-        ),
+        SuiCommandKind::MoveTest => (command_args(&["move", "test"]), "sui move test".to_string()),
         SuiCommandKind::MoveCoverage => (
             command_args(&["move", "test", "--coverage"]),
             "sui move test --coverage".to_string(),
-            None,
         ),
         SuiCommandKind::MoveCoverageSummary => (
             command_args(&["move", "coverage", "summary"]),
             "sui move coverage summary".to_string(),
-            None,
         ),
         SuiCommandKind::MoveFuzz => (
             command_args(&["move", "test", "--rand-num-iters", "256"]),
             "sui move test --rand-num-iters 256".to_string(),
-            None,
         ),
-        SuiCommandKind::Publish(network) => {
-            let environment = network.as_cli_arg();
-            let args = command_args(&["client", "publish", "--client.env", environment, "."]);
-
-            (
-                args,
-                format!("sui client publish --client.env {environment} ."),
-                None,
-            )
-        }
-        SuiCommandKind::PublishDryRun(network) => {
-            let environment = network.as_cli_arg();
-            let args = command_args(&[
-                "client",
-                "publish",
-                "--dry-run",
-                "--client.env",
-                environment,
-                ".",
-            ]);
-
-            (
-                args,
-                format!("sui client publish --dry-run --client.env {environment} ."),
-                None,
-            )
-        }
+        SuiCommandKind::Publish => publish_command_parts(
+            false,
+            temp_pubfile_path,
+            publish_build_env,
+            with_unpublished_dependencies,
+        ),
+        SuiCommandKind::PublishDryRun => publish_command_parts(
+            true,
+            temp_pubfile_path,
+            publish_build_env,
+            with_unpublished_dependencies,
+        ),
     }
 }
 
-fn bundled_args_for_package(command_kind: SuiCommandKind, package_root: &Path) -> Vec<OsString> {
+fn publish_command_parts(
+    dry_run: bool,
+    temp_pubfile_path: Option<&Path>,
+    publish_build_env: Option<&str>,
+    with_unpublished_dependencies: bool,
+) -> (Vec<String>, String) {
+    let mut args = vec!["client".to_string()];
+    let mut display = "sui client".to_string();
+
+    if dry_run {
+        args.push("test-publish".to_string());
+        display.push_str(" test-publish");
+        args.push("--dry-run".to_string());
+        display.push_str(" --dry-run");
+
+        if let Some(pubfile_path) = temp_pubfile_path {
+            let pubfile_path = pubfile_path.display().to_string();
+            args.extend(["--pubfile-path".to_string(), pubfile_path.clone()]);
+            display.push_str(&format!(" --pubfile-path {pubfile_path}"));
+        }
+
+        if let Some(build_env) = publish_build_env {
+            args.extend(["--build-env".to_string(), build_env.to_string()]);
+            display.push_str(&format!(" --build-env {build_env}"));
+        }
+    } else {
+        args.push("publish".to_string());
+        display.push_str(" publish");
+    }
+
+    if with_unpublished_dependencies {
+        args.push("--with-unpublished-dependencies".to_string());
+        display.push_str(" --with-unpublished-dependencies");
+    }
+
+    args.push(".".to_string());
+    display.push_str(" .");
+
+    (args, display)
+}
+
+fn bundled_args_for_package(
+    command_kind: SuiCommandKind,
+    package_root: &Path,
+    temp_pubfile_path: Option<&Path>,
+    publish_build_env: Option<&str>,
+    with_unpublished_dependencies: bool,
+) -> Vec<OsString> {
     let package_root = package_root.as_os_str();
     let mut args = vec![OsString::from("sui")];
 
@@ -290,29 +321,100 @@ fn bundled_args_for_package(command_kind: SuiCommandKind, package_root: &Path) -
             args.push(package_root.to_os_string());
             push_os_args(&mut args, ["test", "--rand-num-iters", "256"]);
         }
-        SuiCommandKind::Publish(network) => {
-            push_os_args(
+        SuiCommandKind::Publish => {
+            push_publish_os_args(
                 &mut args,
-                ["client", "publish", "--client.env", network.as_cli_arg()],
+                false,
+                package_root,
+                temp_pubfile_path,
+                publish_build_env,
+                with_unpublished_dependencies,
             );
-            args.push(package_root.to_os_string());
         }
-        SuiCommandKind::PublishDryRun(network) => {
-            push_os_args(
+        SuiCommandKind::PublishDryRun => {
+            push_publish_os_args(
                 &mut args,
-                [
-                    "client",
-                    "publish",
-                    "--dry-run",
-                    "--client.env",
-                    network.as_cli_arg(),
-                ],
+                true,
+                package_root,
+                temp_pubfile_path,
+                publish_build_env,
+                with_unpublished_dependencies,
             );
-            args.push(package_root.to_os_string());
         }
     }
 
     args
+}
+
+fn push_publish_os_args(
+    args: &mut Vec<OsString>,
+    dry_run: bool,
+    package_root: &std::ffi::OsStr,
+    temp_pubfile_path: Option<&Path>,
+    publish_build_env: Option<&str>,
+    with_unpublished_dependencies: bool,
+) {
+    args.push(OsString::from("client"));
+
+    if dry_run {
+        args.push(OsString::from("test-publish"));
+        args.push(OsString::from("--dry-run"));
+
+        if let Some(pubfile_path) = temp_pubfile_path {
+            args.push(OsString::from("--pubfile-path"));
+            args.push(pubfile_path.as_os_str().to_os_string());
+        }
+
+        if let Some(build_env) = publish_build_env {
+            push_os_args(args, ["--build-env", build_env]);
+        }
+    } else {
+        args.push(OsString::from("publish"));
+    }
+
+    if with_unpublished_dependencies {
+        args.push(OsString::from("--with-unpublished-dependencies"));
+    }
+
+    args.push(package_root.to_os_string());
+}
+
+fn normalized_publish_build_env(
+    kind: SuiCommandKind,
+    publish_build_env: Option<&str>,
+) -> Result<Option<String>, SuiAdapterError> {
+    if !matches!(kind, SuiCommandKind::PublishDryRun) {
+        return Ok(None);
+    }
+
+    let Some(build_env) = publish_build_env
+        .map(str::trim)
+        .filter(|env| !env.is_empty())
+    else {
+        return Err(SuiAdapterError::CommandParse(
+            "Active Sui environment is required for publish dry-runs.".to_string(),
+        ));
+    };
+
+    if build_env.chars().any(char::is_whitespace) {
+        return Err(SuiAdapterError::CommandParse(
+            "Sui environment aliases cannot contain whitespace.".to_string(),
+        ));
+    }
+
+    Ok(Some(build_env.to_string()))
+}
+
+fn temp_pubfile_path() -> PathBuf {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+
+    std::env::temp_dir().join(format!(
+        "peregrine-sui-dry-run-{}-{timestamp}.toml",
+        std::process::id()
+    ))
 }
 
 fn command_args(args: &[&str]) -> Vec<String> {

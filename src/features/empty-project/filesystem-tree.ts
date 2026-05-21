@@ -733,6 +733,11 @@ export type CommandOutputStreamOptions = {
   onOutput?: (output: CommandOutput) => void;
 };
 
+export type SecurityCommandOutputOptions = CommandOutputStreamOptions & {
+  buildEnv?: string | null;
+  withUnpublishedDependencies?: boolean;
+};
+
 export type CommandScriptOutputStreamOptions = CommandOutputStreamOptions & {
   args?: string[];
 };
@@ -752,14 +757,8 @@ export type SecurityCommandKind =
   | "move-coverage-summary"
   | "move-fuzz"
   | "move-test"
-  | "publish-dry-run-localnet"
-  | "publish-dry-run-devnet"
-  | "publish-dry-run-testnet"
-  | "publish-dry-run-mainnet"
-  | "publish-localnet"
-  | "publish-devnet"
-  | "publish-testnet"
-  | "publish-mainnet";
+  | "publish-dry-run"
+  | "publish";
 
 export type SuiAdapterStatus = {
   installed: boolean;
@@ -823,6 +822,33 @@ export type SuiKeyState = {
   keystorePath: string;
   supportedSchemes: string[];
   supportedWordLengths: string[];
+};
+
+export type SuiNetworkState = {
+  activeEnv?: string | null;
+  clientConfigPath: string;
+  configDir: string;
+  configStatus: SuiKeyConfigStatus;
+  diagnostics: SuiKeyDiagnostic[];
+  envs: SuiNetworkEnv[];
+};
+
+export type SuiNetworkEnv = {
+  alias: string;
+  basicAuthConfigured: boolean;
+  canRemove: boolean;
+  chainId?: string | null;
+  isActive: boolean;
+  isBuiltin: boolean;
+  rpc: string;
+  ws?: string | null;
+};
+
+export type SuiAddNetworkEnvRequest = {
+  alias?: string | null;
+  basicAuth?: string | null;
+  rpc: string;
+  ws?: string | null;
 };
 
 export type SuiGenerateKeyRequest = {
@@ -1035,12 +1061,14 @@ export async function runSecurityCommand(
   packageTree: PackageTree,
   packagePath: string,
   commandKind: SecurityCommandKind,
-  options?: CommandOutputStreamOptions,
+  options?: SecurityCommandOutputOptions,
 ) {
   return invokeCommandOutput("run_security_command", {
     rootPath: packageTree.rootPath,
     packagePath,
     commandKind,
+    buildEnv: options?.buildEnv ?? null,
+    withUnpublishedDependencies: options?.withUnpublishedDependencies ?? false,
   }, options);
 }
 
@@ -1166,6 +1194,31 @@ export async function saveSuiAdapterSettings(settings: SuiAdapterSettings) {
 
 export async function loadSuiKeyState() {
   return invoke<SuiKeyState>("load_sui_key_state");
+}
+
+export async function loadSuiNetworkState() {
+  return invoke<SuiNetworkState>("load_sui_network_state");
+}
+
+export async function addSuiNetworkEnv(request: SuiAddNetworkEnvRequest) {
+  return invoke<SuiNetworkState>("add_sui_network_env", { request });
+}
+
+export async function setActiveSuiNetworkEnv(alias: string) {
+  return invoke<SuiNetworkState>("set_active_sui_network_env", {
+    request: {
+      alias,
+    },
+  });
+}
+
+export async function removeSuiNetworkEnv(alias: string, confirmation: string) {
+  return invoke<SuiNetworkState>("remove_sui_network_env", {
+    request: {
+      alias,
+      confirmation,
+    },
+  });
 }
 
 export async function loadSuiWalletSummary(graphQlUrl: string | null) {

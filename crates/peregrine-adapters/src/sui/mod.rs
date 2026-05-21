@@ -17,8 +17,7 @@ mod system;
 
 pub use adapter::SuiAdapter;
 pub use command::{
-    SuiCommandKind, SuiCommandOutput, SuiExecutionTarget, SuiMoveNewCommand, SuiNetwork,
-    SuiPackageCommand,
+    SuiCommandKind, SuiCommandOutput, SuiExecutionTarget, SuiMoveNewCommand, SuiPackageCommand,
 };
 pub use environment::SuiAdapterEnvironment;
 pub use error::SuiAdapterError;
@@ -27,10 +26,11 @@ pub use formal::{
     DEFAULT_FORMAL_VERIFICATION_TIMEOUT_SECONDS,
 };
 pub use keys::{
-    SuiExportPrivateKeyRequest, SuiExportPrivateKeyResponse, SuiGenerateKeyRequest,
-    SuiGenerateKeyResponse, SuiImportKeyRequest, SuiImportKeyResponse, SuiKeyAccount,
-    SuiKeyConfigStatus, SuiKeyDiagnostic, SuiKeyDiagnosticLevel, SuiKeyManager, SuiKeyState,
-    SuiRemoveKeyRequest, SuiRenameKeyAliasRequest, SuiSetActiveAddressRequest,
+    SuiAddNetworkEnvRequest, SuiExportPrivateKeyRequest, SuiExportPrivateKeyResponse,
+    SuiGenerateKeyRequest, SuiGenerateKeyResponse, SuiImportKeyRequest, SuiImportKeyResponse,
+    SuiKeyAccount, SuiKeyConfigStatus, SuiKeyDiagnostic, SuiKeyDiagnosticLevel, SuiKeyManager,
+    SuiKeyState, SuiNetworkEnv, SuiNetworkState, SuiRemoveKeyRequest, SuiRemoveNetworkEnvRequest,
+    SuiRenameKeyAliasRequest, SuiSetActiveAddressRequest, SuiSetActiveNetworkEnvRequest,
 };
 pub use settings::{SuiAdapterSettings, SuiAdapterSource};
 pub use status::{SuiAdapterSourceStatus, SuiAdapterStatus};

@@ -70,14 +70,42 @@ impl SuiAdapter {
         &self,
         command_kind: &str,
     ) -> Result<SuiPackageCommand, SuiAdapterError> {
-        self.package_command_for(SuiCommandKind::parse(command_kind)?)
+        self.package_command_with_publish_options(command_kind, None, false)
+    }
+
+    pub fn package_command_with_build_env(
+        &self,
+        command_kind: &str,
+        publish_build_env: Option<&str>,
+    ) -> Result<SuiPackageCommand, SuiAdapterError> {
+        self.package_command_with_publish_options(command_kind, publish_build_env, false)
+    }
+
+    pub fn package_command_with_publish_options(
+        &self,
+        command_kind: &str,
+        publish_build_env: Option<&str>,
+        with_unpublished_dependencies: bool,
+    ) -> Result<SuiPackageCommand, SuiAdapterError> {
+        self.package_command_for(
+            SuiCommandKind::parse(command_kind)?,
+            publish_build_env,
+            with_unpublished_dependencies,
+        )
     }
 
     pub fn package_command_for(
         &self,
         command_kind: SuiCommandKind,
+        publish_build_env: Option<&str>,
+        with_unpublished_dependencies: bool,
     ) -> Result<SuiPackageCommand, SuiAdapterError> {
-        Ok(SuiPackageCommand::new(command_kind, self.resolve()?))
+        SuiPackageCommand::new(
+            command_kind,
+            self.resolve()?,
+            publish_build_env,
+            with_unpublished_dependencies,
+        )
     }
 
     pub fn move_new_command(

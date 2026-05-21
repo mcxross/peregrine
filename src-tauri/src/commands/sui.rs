@@ -4,11 +4,13 @@ use crate::helper_args::{
 };
 use crate::{commands::files, validated_move_project_name};
 use peregrine_adapters::sui::{
-    SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus, SuiExecutionTarget,
-    SuiExportPrivateKeyRequest, SuiExportPrivateKeyResponse, SuiFormalVerificationCommand,
-    SuiFormalVerificationOptions, SuiGenerateKeyRequest, SuiGenerateKeyResponse,
-    SuiImportKeyRequest, SuiImportKeyResponse, SuiKeyManager, SuiKeyState, SuiMoveNewCommand,
-    SuiPackageCommand, SuiRemoveKeyRequest, SuiRenameKeyAliasRequest, SuiSetActiveAddressRequest,
+    SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus,
+    SuiAddNetworkEnvRequest, SuiExecutionTarget, SuiExportPrivateKeyRequest,
+    SuiExportPrivateKeyResponse, SuiFormalVerificationCommand, SuiFormalVerificationOptions,
+    SuiGenerateKeyRequest, SuiGenerateKeyResponse, SuiImportKeyRequest, SuiImportKeyResponse,
+    SuiKeyManager, SuiKeyState, SuiMoveNewCommand, SuiNetworkState, SuiPackageCommand,
+    SuiRemoveKeyRequest, SuiRemoveNetworkEnvRequest, SuiRenameKeyAliasRequest,
+    SuiSetActiveAddressRequest, SuiSetActiveNetworkEnvRequest,
 };
 use peregrine_dynamic_analysis::sui::formal_verification::{
     formal_verification_manifest, FormalVerificationOptions,
@@ -200,12 +202,18 @@ pub(crate) async fn run_security_command(
     root_path: String,
     package_path: String,
     command_kind: String,
+    build_env: Option<String>,
+    with_unpublished_dependencies: Option<bool>,
     stream_id: Option<String>,
 ) -> Result<CommandOutput, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let sui = sui_adapter(&app)?;
         let command = sui
-            .package_command(&command_kind)
+            .package_command_with_publish_options(
+                &command_kind,
+                build_env.as_deref(),
+                with_unpublished_dependencies.unwrap_or(false),
+            )
             .map_err(|error| error.to_string())?;
 
         run_package_command(
@@ -867,6 +875,60 @@ pub(crate) async fn load_sui_key_state() -> Result<SuiKeyState, String> {
     })
     .await
     .map_err(|error| format!("Could not join Sui key state load task: {error}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn load_sui_network_state() -> Result<SuiNetworkState, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let manager = sui_key_manager()?;
+        manager
+            .load_network_state()
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| format!("Could not join Sui network state load task: {error}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn add_sui_network_env(
+    request: SuiAddNetworkEnvRequest,
+) -> Result<SuiNetworkState, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let manager = sui_key_manager()?;
+        manager
+            .add_network_env(request)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| format!("Could not join Sui network env add task: {error}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn set_active_sui_network_env(
+    request: SuiSetActiveNetworkEnvRequest,
+) -> Result<SuiNetworkState, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let manager = sui_key_manager()?;
+        manager
+            .set_active_network_env(request)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| format!("Could not join Sui active network env update task: {error}"))?
+}
+
+#[tauri::command]
+pub(crate) async fn remove_sui_network_env(
+    request: SuiRemoveNetworkEnvRequest,
+) -> Result<SuiNetworkState, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let manager = sui_key_manager()?;
+        manager
+            .remove_network_env(request)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| format!("Could not join Sui network env remove task: {error}"))?
 }
 
 #[tauri::command]

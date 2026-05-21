@@ -62,6 +62,102 @@ impl SuiKeyManager {
         }
     }
 
+    pub fn load_network_state(&self) -> Result<SuiNetworkState, anyhow::Error> {
+        let paths = self.paths();
+
+        if !paths.client_config_path.is_file() {
+            return Ok(self.empty_network_state(SuiKeyConfigStatus::Missing));
+        }
+
+        match SuiClientConfig::load_with_lock(&paths.client_config_path) {
+            Ok(config) => Ok(self.network_state_from_config(&config, SuiKeyConfigStatus::Loaded)),
+            Err(error) => {
+                let mut state = self.empty_network_state(SuiKeyConfigStatus::Invalid);
+                state.diagnostics.push(SuiKeyDiagnostic {
+                    level: SuiKeyDiagnosticLevel::Error,
+                    message: format!(
+                        "Could not load Sui client config {}: {error}",
+                        paths.client_config_path.display()
+                    ),
+                    path: Some(paths.client_config_path.display().to_string()),
+                });
+                Ok(state)
+            }
+        }
+    }
+
+    pub fn add_network_env(
+        &self,
+        request: SuiAddNetworkEnvRequest,
+    ) -> Result<SuiNetworkState, anyhow::Error> {
+        let (mut config, _) = self.load_or_initialize_config()?;
+        let alias = normalized_env_alias(request.alias)?;
+        let rpc = normalized_rpc_url(request.rpc)?;
+        let ws = normalized_optional_string(request.ws);
+        let basic_auth = normalized_optional_string(request.basic_auth);
+
+        if config.envs.iter().any(|env| env.alias == alias) {
+            bail!("Environment config with name [{alias}] already exists.");
+        }
+
+        config.envs.push(SuiEnv {
+            alias: alias.clone(),
+            rpc,
+            ws,
+            basic_auth,
+            chain_id: None,
+        });
+
+        if config.active_env.is_none() {
+            config.active_env = Some(alias);
+        }
+
+        self.save_config(&config)?;
+        Ok(self.network_state_from_config(&config, SuiKeyConfigStatus::Loaded))
+    }
+
+    pub fn set_active_network_env(
+        &self,
+        request: SuiSetActiveNetworkEnvRequest,
+    ) -> Result<SuiNetworkState, anyhow::Error> {
+        let mut config = self.load_existing_config_for_write()?;
+        let alias = normalized_env_alias(request.alias)?;
+
+        if !config.envs.iter().any(|env| env.alias == alias) {
+            bail!("Environment config not found for [{alias}], add it before making it active.");
+        }
+
+        config.active_env = Some(alias);
+        self.save_config(&config)?;
+        Ok(self.network_state_from_config(&config, SuiKeyConfigStatus::Loaded))
+    }
+
+    pub fn remove_network_env(
+        &self,
+        request: SuiRemoveNetworkEnvRequest,
+    ) -> Result<SuiNetworkState, anyhow::Error> {
+        let mut config = self.load_existing_config_for_write()?;
+        let alias = normalized_env_alias(Some(request.alias))?;
+
+        if request.confirmation.trim() != alias {
+            bail!("Confirmation must match the environment alias exactly.");
+        }
+
+        let original_len = config.envs.len();
+        config.envs.retain(|env| env.alias != alias);
+
+        if config.envs.len() == original_len {
+            bail!("Environment config not found for [{alias}].");
+        }
+
+        if config.active_env.as_deref() == Some(alias.as_str()) {
+            config.active_env = config.envs.first().map(|env| env.alias.clone());
+        }
+
+        self.save_config(&config)?;
+        Ok(self.network_state_from_config(&config, SuiKeyConfigStatus::Loaded))
+    }
+
     pub async fn generate_key(
         &self,
         request: SuiGenerateKeyRequest,
@@ -295,6 +391,19 @@ impl SuiKeyManager {
         }
     }
 
+    fn empty_network_state(&self, config_status: SuiKeyConfigStatus) -> SuiNetworkState {
+        let paths = self.paths();
+
+        SuiNetworkState {
+            active_env: None,
+            client_config_path: paths.client_config_path.display().to_string(),
+            config_dir: paths.config_dir.display().to_string(),
+            config_status,
+            diagnostics: vec![],
+            envs: vec![],
+        }
+    }
+
     fn state_from_config(
         &self,
         config: &SuiClientConfig,
@@ -322,6 +431,37 @@ impl SuiKeyManager {
         }
 
         Ok(state)
+    }
+
+    fn network_state_from_config(
+        &self,
+        config: &SuiClientConfig,
+        config_status: SuiKeyConfigStatus,
+    ) -> SuiNetworkState {
+        let mut state = self.empty_network_state(config_status);
+        let active_env = config
+            .get_active_env()
+            .ok()
+            .map(|env| env.alias.clone())
+            .or_else(|| config.active_env.clone());
+
+        state.active_env = active_env.clone();
+        state.envs = config
+            .envs
+            .iter()
+            .map(|env| SuiNetworkEnv {
+                alias: env.alias.clone(),
+                basic_auth_configured: env.basic_auth.is_some(),
+                can_remove: true,
+                chain_id: env.chain_id.clone(),
+                is_active: active_env.as_deref() == Some(env.alias.as_str()),
+                is_builtin: is_builtin_env_alias(&env.alias),
+                rpc: env.rpc.clone(),
+                ws: env.ws.clone(),
+            })
+            .collect();
+
+        state
     }
 
     fn accounts_from_keystore(
@@ -425,6 +565,19 @@ impl SuiKeyManager {
             )
         })
     }
+
+    fn save_config(&self, config: &SuiClientConfig) -> Result<(), anyhow::Error> {
+        let paths = self.paths();
+
+        config
+            .save_with_lock(&paths.client_config_path)
+            .with_context(|| {
+                format!(
+                    "Could not save Sui client config {}",
+                    paths.client_config_path.display()
+                )
+            })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -451,6 +604,30 @@ pub struct SuiKeyState {
     pub keystore_path: String,
     pub supported_schemes: Vec<String>,
     pub supported_word_lengths: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SuiNetworkState {
+    pub active_env: Option<String>,
+    pub client_config_path: String,
+    pub config_dir: String,
+    pub config_status: SuiKeyConfigStatus,
+    pub diagnostics: Vec<SuiKeyDiagnostic>,
+    pub envs: Vec<SuiNetworkEnv>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SuiNetworkEnv {
+    pub alias: String,
+    pub basic_auth_configured: bool,
+    pub can_remove: bool,
+    pub chain_id: Option<String>,
+    pub is_active: bool,
+    pub is_builtin: bool,
+    pub rpc: String,
+    pub ws: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -552,6 +729,28 @@ pub struct SuiRemoveKeyRequest {
 #[serde(rename_all = "camelCase")]
 pub struct SuiExportPrivateKeyRequest {
     pub alias_or_address: String,
+    pub confirmation: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SuiAddNetworkEnvRequest {
+    pub alias: Option<String>,
+    pub basic_auth: Option<String>,
+    pub rpc: String,
+    pub ws: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SuiSetActiveNetworkEnvRequest {
+    pub alias: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SuiRemoveNetworkEnvRequest {
+    pub alias: String,
     pub confirmation: String,
 }
 
@@ -673,6 +872,46 @@ fn normalized_alias(alias: Option<String>) -> Option<String> {
         let alias = alias.trim().to_string();
         (!alias.is_empty()).then_some(alias)
     })
+}
+
+fn normalized_env_alias(alias: Option<String>) -> Result<String, anyhow::Error> {
+    let Some(alias) = normalized_alias(alias) else {
+        bail!("Sui environment alias is required.");
+    };
+
+    if alias.chars().any(char::is_whitespace) {
+        bail!("Sui environment alias cannot contain whitespace.");
+    }
+
+    Ok(alias)
+}
+
+fn normalized_rpc_url(rpc: String) -> Result<String, anyhow::Error> {
+    let rpc = rpc.trim().to_string();
+
+    if rpc.is_empty() {
+        bail!("Sui environment RPC URL is required.");
+    }
+
+    if !(rpc.starts_with("http://") || rpc.starts_with("https://")) {
+        bail!("Sui environment RPC URL must start with http:// or https://.");
+    }
+
+    Ok(rpc)
+}
+
+fn normalized_optional_string(value: Option<String>) -> Option<String> {
+    value.and_then(|value| {
+        let value = value.trim().to_string();
+        (!value.is_empty()).then_some(value)
+    })
+}
+
+fn is_builtin_env_alias(alias: &str) -> bool {
+    matches!(
+        alias,
+        "devnet" | "local" | "localnet" | "mainnet" | "testnet"
+    )
 }
 
 fn derive_keypair_from_mnemonic(
@@ -990,5 +1229,43 @@ mod tests {
             std::fs::read_to_string(config_dir.join(SUI_CLIENT_CONFIG)).expect("config"),
             "not: [valid"
         );
+    }
+
+    #[test]
+    fn network_envs_can_be_added_activated_and_removed() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let manager = SuiKeyManager::new(temp_dir.path().join("sui_config"));
+
+        let missing = manager.load_network_state().expect("network state");
+        assert_eq!(missing.config_status, SuiKeyConfigStatus::Missing);
+        assert!(missing.envs.is_empty());
+
+        let added = manager
+            .add_network_env(SuiAddNetworkEnvRequest {
+                alias: Some("staging".to_string()),
+                basic_auth: None,
+                rpc: "https://fullnode.testnet.sui.io:443".to_string(),
+                ws: None,
+            })
+            .expect("added env");
+
+        assert!(added.envs.iter().any(|env| env.alias == "staging"));
+
+        let active = manager
+            .set_active_network_env(SuiSetActiveNetworkEnvRequest {
+                alias: Some("staging".to_string()),
+            })
+            .expect("active env");
+        assert_eq!(active.active_env.as_deref(), Some("staging"));
+
+        let removed = manager
+            .remove_network_env(SuiRemoveNetworkEnvRequest {
+                alias: "staging".to_string(),
+                confirmation: "staging".to_string(),
+            })
+            .expect("removed env");
+
+        assert!(!removed.envs.iter().any(|env| env.alias == "staging"));
+        assert_ne!(removed.active_env.as_deref(), Some("staging"));
     }
 }

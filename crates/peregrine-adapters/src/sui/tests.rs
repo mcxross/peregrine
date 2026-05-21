@@ -119,27 +119,148 @@ fn coverage_summary_command_inspects_existing_coverage() {
 }
 
 #[test]
-fn publish_dry_run_command_does_not_use_pubfile_with_publish() {
+fn publish_dry_run_uses_ephemeral_test_publish() {
     let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
     let command = adapter
-        .package_command("publish-dry-run-testnet")
+        .package_command_with_build_env("publish-dry-run", Some("testnet"))
         .expect("command");
+    let pubfile_path = command
+        .temp_pubfile_path
+        .as_ref()
+        .expect("temp pubfile")
+        .display()
+        .to_string();
 
     assert_eq!(
         command.args,
         [
             "client",
-            "publish",
+            "test-publish",
             "--dry-run",
-            "--client.env",
+            "--pubfile-path",
+            pubfile_path.as_str(),
+            "--build-env",
             "testnet",
             "."
         ]
     );
-    assert_eq!(command.temp_pubfile_path, None);
     assert_eq!(
         command.display,
-        "sui client publish --dry-run --client.env testnet ."
+        format!(
+            "sui client test-publish --dry-run --pubfile-path {pubfile_path} --build-env testnet ."
+        )
+    );
+}
+
+#[test]
+fn bundled_publish_dry_run_uses_active_build_env_and_temp_pubfile() {
+    let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
+    let command = adapter
+        .package_command_with_build_env("publish-dry-run", Some("testnet"))
+        .expect("command");
+    let pubfile_path = command
+        .temp_pubfile_path
+        .as_ref()
+        .expect("temp pubfile")
+        .display()
+        .to_string();
+    let args = command
+        .bundled_args_for_package(Path::new("/tmp/package"))
+        .into_iter()
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        args,
+        [
+            "sui",
+            "client",
+            "test-publish",
+            "--dry-run",
+            "--pubfile-path",
+            pubfile_path.as_str(),
+            "--build-env",
+            "testnet",
+            "/tmp/package"
+        ]
+    );
+}
+
+#[test]
+fn publish_dry_run_can_include_unpublished_dependencies() {
+    let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
+    let command = adapter
+        .package_command_with_publish_options("publish-dry-run", Some("testnet"), true)
+        .expect("command");
+    let pubfile_path = command
+        .temp_pubfile_path
+        .as_ref()
+        .expect("temp pubfile")
+        .display()
+        .to_string();
+    let args = command
+        .bundled_args_for_package(Path::new("/tmp/package"))
+        .into_iter()
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+
+    assert!(command.with_unpublished_dependencies);
+    assert_eq!(
+        command.args,
+        [
+            "client",
+            "test-publish",
+            "--dry-run",
+            "--pubfile-path",
+            pubfile_path.as_str(),
+            "--build-env",
+            "testnet",
+            "--with-unpublished-dependencies",
+            "."
+        ]
+    );
+    assert_eq!(
+        args,
+        [
+            "sui",
+            "client",
+            "test-publish",
+            "--dry-run",
+            "--pubfile-path",
+            pubfile_path.as_str(),
+            "--build-env",
+            "testnet",
+            "--with-unpublished-dependencies",
+            "/tmp/package"
+        ]
+    );
+}
+
+#[test]
+fn publish_dry_run_requires_active_build_env() {
+    let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
+    let error = adapter
+        .package_command("publish-dry-run")
+        .expect_err("error");
+
+    assert_eq!(
+        error,
+        SuiAdapterError::CommandParse(
+            "Active Sui environment is required for publish dry-runs.".to_string()
+        )
+    );
+}
+
+#[test]
+fn publish_network_override_commands_are_not_supported() {
+    let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
+    let error = adapter
+        .package_command("publish-devnet")
+        .expect_err("error");
+
+    assert_eq!(
+        error,
+        SuiAdapterError::UnsupportedCommand("publish-devnet".to_string())
     );
 }
 
