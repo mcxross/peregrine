@@ -45,6 +45,7 @@ import {
   clearRecentProjects,
   loadRecentProjects,
   rememberRecentProject,
+  removeRecentProject,
 } from "@/features/empty-project/recent-project-store";
 import type { RecentProject } from "@/features/empty-project/types";
 
@@ -53,6 +54,7 @@ type EmptyProjectScreenProps = {
   onOpenProject?: () => void;
   onOpenRecentProject?: (project: RecentProject) => void;
   onClearRecentProjects?: () => void;
+  onRemoveRecentProject?: (project: RecentProject) => void;
   onProjectSelected?: (packageTree: PackageTree) => void;
   network: SuiNetworkSelection;
   onNetworkChange: (network: SuiNetworkSelection) => void;
@@ -63,6 +65,7 @@ export function EmptyProjectScreen({
   onOpenProject,
   onOpenRecentProject,
   onClearRecentProjects,
+  onRemoveRecentProject,
   onProjectSelected,
   network,
   onNetworkChange,
@@ -192,6 +195,20 @@ export function EmptyProjectScreen({
     setStoredRecentProjects([]);
     onClearRecentProjects?.();
   }, [onClearRecentProjects]);
+  const handleRemoveRecentProject = React.useCallback(
+    (project: RecentProject) => {
+      setStoredRecentProjects((currentProjects) => {
+        const nextProjects = removeRecentProject(
+          recentProjects ?? currentProjects,
+          project.id,
+        );
+
+        return recentProjects ? currentProjects : nextProjects;
+      });
+      onRemoveRecentProject?.(project);
+    },
+    [onRemoveRecentProject, recentProjects],
+  );
 
   if (pendingPackageTree) {
     return (
@@ -213,7 +230,6 @@ export function EmptyProjectScreen({
           onImportPackage={() => setIsImportPackageOpen(true)}
           onOpenProject={handleOpenProject}
           isLoading={isLoading}
-          networkLabel={networkLabel}
         />
         <Dialog
           open={isCreateProjectOpen}
@@ -257,6 +273,7 @@ export function EmptyProjectScreen({
             projects={visibleRecentProjects}
             onClear={handleClearRecentProjects}
             onOpenProject={handleOpenRecentProject}
+            onRemoveProject={handleRemoveRecentProject}
           />
         </ScrollArea>
       </div>

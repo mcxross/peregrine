@@ -1,4 +1,4 @@
-import { Clock3, FolderOpen, Package, RotateCw } from "lucide-react";
+import { Clock3, FolderOpen, Package, RotateCw, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,22 +8,19 @@ type RecentProjectsProps = {
   projects: RecentProject[];
   onClear?: () => void;
   onOpenProject?: (project: RecentProject) => void;
+  onRemoveProject?: (project: RecentProject) => void;
 };
 
 export function RecentProjects({
   projects,
   onClear,
   onOpenProject,
+  onRemoveProject,
 }: RecentProjectsProps) {
   return (
     <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold tracking-tight">Recent Projects</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Packages opened on this machine.
-          </p>
-        </div>
+        <h2 className="text-base font-semibold tracking-tight">Recent Projects</h2>
         {projects.length > 0 ? (
           <Button className="h-8 gap-2 text-xs" variant="ghost" size="sm" onClick={onClear}>
             <RotateCw className="size-3.5" aria-hidden="true" />
@@ -39,6 +36,7 @@ export function RecentProjects({
               key={project.id}
               project={project}
               onOpen={() => onOpenProject?.(project)}
+              onRemove={() => onRemoveProject?.(project)}
             />
           ))}
         </div>
@@ -54,42 +52,60 @@ export function RecentProjects({
 function RecentProjectRow({
   project,
   onOpen,
+  onRemove,
 }: {
   project: RecentProject;
   onOpen: () => void;
+  onRemove?: () => void;
 }) {
   return (
-    <Button
-      type="button"
-      onClick={onOpen}
-      className="grid h-auto w-full min-w-0 grid-cols-[1fr_auto] items-center gap-3 rounded-md px-3 py-3 text-left text-card-foreground"
-      variant="outline"
-      title={`${project.name} - ${project.packagePath}`}
-    >
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
-          <Package className="size-4.5" aria-hidden="true" />
+    <div className="group grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-md border bg-card text-card-foreground shadow-xs">
+      <Button
+        type="button"
+        onClick={onOpen}
+        className="grid h-auto w-full min-w-0 grid-cols-[1fr_auto] items-center gap-3 rounded-md px-3 py-3 text-left text-card-foreground"
+        variant="ghost"
+        title={`${project.name} - ${project.packagePath}`}
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+            <Package className="size-4.5" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold">{project.name}</div>
+            <div className="truncate text-xs text-muted-foreground">{compactPath(project.packagePath)}</div>
+          </div>
         </div>
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{project.name}</div>
-          <div className="truncate text-xs text-muted-foreground">{compactPath(project.packagePath)}</div>
-        </div>
-      </div>
 
-      <div className="grid justify-items-end gap-1 text-right">
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Clock3 className="size-3" aria-hidden="true" />
-          <span>{formatRecentTime(project.lastOpenedAt)}</span>
+        <div className="grid justify-items-end gap-1 text-right">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Clock3 className="size-3" aria-hidden="true" />
+            <span>{formatRecentTime(project.lastOpenedAt)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <FolderOpen className="size-3" aria-hidden="true" />
+            <span>
+              {moduleCountLabel(project.moduleCount)}
+              {project.packageCount > 1 ? ` / ${project.packageCount} packages` : ""}
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <FolderOpen className="size-3" aria-hidden="true" />
-          <span>
-            {moduleCountLabel(project.moduleCount)}
-            {project.packageCount > 1 ? ` / ${project.packageCount} packages` : ""}
-          </span>
-        </div>
-      </div>
-    </Button>
+      </Button>
+
+      {onRemove ? (
+        <Button
+          type="button"
+          aria-label={`Remove ${project.name} from recent projects`}
+          className="mr-2 size-8 shrink-0 opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100"
+          onClick={onRemove}
+          size="icon"
+          title="Remove from recent projects"
+          variant="ghost"
+        >
+          <X className="size-4" aria-hidden="true" />
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

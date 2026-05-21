@@ -1,4 +1,4 @@
-import { Download, FolderOpen, PackagePlus, Plus } from "lucide-react";
+import { FolderOpen, PackagePlus, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,7 +8,6 @@ type ProjectDropzoneProps = {
   onCreateProject?: () => void;
   onImportPackage?: () => void;
   onOpenProject?: () => void;
-  networkLabel?: string;
 };
 
 export function ProjectDropzone({
@@ -16,7 +15,6 @@ export function ProjectDropzone({
   onCreateProject,
   onImportPackage,
   onOpenProject,
-  networkLabel,
 }: ProjectDropzoneProps) {
   return (
     <Card className="mx-auto w-full max-w-[640px] rounded-md p-4 shadow-none">
@@ -29,8 +27,7 @@ export function ProjectDropzone({
           Open a Move package
         </h2>
         <p className="mt-2 max-w-[420px] text-sm leading-6 text-muted-foreground">
-          Drop a folder here or choose one from the file picker. Move.toml,
-          sources/, tests/, and dependencies are scanned locally.
+          Drop a folder here or choose one from the file picker.
         </p>
 
         <div className="mt-5 flex flex-col items-center justify-center gap-2 sm:flex-row sm:flex-wrap">
@@ -48,12 +45,6 @@ export function ProjectDropzone({
           </Button>
         </div>
 
-        <div className="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-          <Download className="size-4" aria-hidden="true" />
-          <span>
-            {networkLabel ? `Imports use ${networkLabel} GraphQL.` : "Drag and drop uses the same local scanner."}
-          </span>
-        </div>
       </div>
     </Card>
   );

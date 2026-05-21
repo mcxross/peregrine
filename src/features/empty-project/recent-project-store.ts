@@ -55,6 +55,18 @@ export function clearRecentProjects() {
   window.localStorage.removeItem(RECENT_PROJECTS_STORAGE_KEY);
 }
 
+export function removeRecentProject(projects: RecentProject[], projectId: string) {
+  const nextProjects = projects.filter((project) => project.id !== projectId);
+
+  if (nextProjects.length === 0) {
+    clearRecentProjects();
+  } else {
+    saveRecentProjects(nextProjects);
+  }
+
+  return nextProjects;
+}
+
 export function rememberRecentProject(
   projects: RecentProject[],
   packageTree: PackageTree,
