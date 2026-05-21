@@ -49,9 +49,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -515,6 +523,18 @@ export function ExecutionBuilderScreen({
     [addStep, clearDrag, isRunning, reorderStep],
   );
 
+  const clearCanvas = React.useCallback(() => {
+    if (isRunning) {
+      return;
+    }
+
+    clearDrag();
+    setRun(null);
+    setSelectedStepId("");
+    setSequence([]);
+    setStepResults({});
+  }, [clearDrag, isRunning]);
+
   const handleRunSequence = React.useCallback(async () => {
     if (!activeMovePackage || isRunning || sequence.length === 0) {
       return;
@@ -529,6 +549,7 @@ export function ExecutionBuilderScreen({
       return projectMetadata ?? defaultProjectMetadata();
     });
     let hasAttention = false;
+    let hasError = false;
 
     setProjectMetadata(runProjectMetadata);
 
@@ -600,6 +621,7 @@ export function ExecutionBuilderScreen({
         currentTree = outcome.packageTree ?? currentTree;
         currentPackage = resolveActiveMovePackage(currentTree, packageForLog);
         hasAttention = hasAttention || outcome.state === "attention";
+        hasError = hasError || outcome.state === "error";
         updateStepResult(step.id, outcome);
         onCommandLog(
           executionLogRun({
@@ -659,7 +681,7 @@ export function ExecutionBuilderScreen({
         ? {
             ...current,
             finishedAt: new Date(),
-            state: hasAttention ? "attention" : "success",
+            state: hasError ? "error" : hasAttention ? "attention" : "success",
           }
         : current,
     );
@@ -736,6 +758,7 @@ export function ExecutionBuilderScreen({
           onMoveStep={moveStep}
           onRemoveStep={removeStep}
           onReorderStep={reorderStep}
+          onClearCanvas={clearCanvas}
           onSelectStep={setSelectedStepId}
           onUpdateStep={updateStep}
           packageTree={packageTree}
@@ -885,6 +908,7 @@ type SequenceCanvasProps = {
   direction: SequenceDirection;
   dropIndex: number | null;
   isRunning: boolean;
+  onClearCanvas: () => void;
   onDropIndex: (event: React.DragEvent<HTMLElement>, index: number) => void;
   onDropPreview: (index: number | null) => void;
   onMoveStep: (stepId: string, direction: -1 | 1) => void;
@@ -912,6 +936,7 @@ function ExecutionFlowCanvas({
   direction,
   dropIndex,
   isRunning,
+  onClearCanvas,
   onDropIndex,
   onDropPreview,
   onMoveStep,
@@ -1086,47 +1111,61 @@ function ExecutionFlowCanvas({
   );
 
   return (
-    <main
-      className="h-full min-h-0 bg-[var(--app-window)]"
-      onDragLeave={handleDragLeave}
-      onDragOverCapture={handlePaneDragOver}
-      onDropCapture={handlePaneDrop}
-    >
-      <ReactFlow
-        key={`execution-flow-${direction}`}
-        colorMode="dark"
-        defaultViewport={{ x: 40, y: 80, zoom: 1 }}
-        edges={flowEdges}
-        edgeTypes={EXECUTION_EDGE_TYPES}
-        fitView
-        fitViewOptions={{ padding: 0.18 }}
-        maxZoom={1.5}
-        minZoom={0.22}
-        nodes={displayedNodes}
-        nodesDraggable={!isRunning}
-        nodesFocusable={false}
-        nodeTypes={EXECUTION_NODE_TYPES}
-        onDragOver={handlePaneDragOver}
-        onDrop={handlePaneDrop}
-        onNodeClick={(_event, node) => {
-          if (node.id !== EXECUTION_DROP_TARGET_ID) {
-            onSelectStep(node.id);
-          }
-        }}
-        onNodeDrag={handleNodeDrag}
-        onNodeDragStop={handleNodeDragStop}
-        onNodesChange={handleNodesChange}
-        panOnDrag
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background color="var(--border)" gap={18} size={1} />
-        <Controls
-          className="!bg-background/90 !shadow-none [&_button]:!border-border [&_button]:!bg-background [&_button]:!text-foreground"
-          position="bottom-right"
-          showInteractive={false}
-        />
-      </ReactFlow>
-    </main>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <main
+          className="h-full min-h-0 bg-[var(--app-window)]"
+          onDragLeave={handleDragLeave}
+          onDragOverCapture={handlePaneDragOver}
+          onDropCapture={handlePaneDrop}
+        >
+          <ReactFlow
+            key={`execution-flow-${direction}`}
+            colorMode="dark"
+            defaultViewport={{ x: 40, y: 80, zoom: 1 }}
+            edges={flowEdges}
+            edgeTypes={EXECUTION_EDGE_TYPES}
+            fitView
+            fitViewOptions={{ padding: 0.18 }}
+            maxZoom={1.5}
+            minZoom={0.22}
+            nodes={displayedNodes}
+            nodesDraggable={!isRunning}
+            nodesFocusable={false}
+            nodeTypes={EXECUTION_NODE_TYPES}
+            onDragOver={handlePaneDragOver}
+            onDrop={handlePaneDrop}
+            onNodeClick={(_event, node) => {
+              if (node.id !== EXECUTION_DROP_TARGET_ID) {
+                onSelectStep(node.id);
+              }
+            }}
+            onNodeDrag={handleNodeDrag}
+            onNodeDragStop={handleNodeDragStop}
+            onNodesChange={handleNodesChange}
+            panOnDrag
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background color="var(--border)" gap={18} size={1} />
+            <Controls
+              className="!bg-background/90 !shadow-none [&_button]:!border-border [&_button]:!bg-background [&_button]:!text-foreground"
+              position="bottom-right"
+              showInteractive={false}
+            />
+          </ReactFlow>
+        </main>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-44 border-[color:var(--app-border)] bg-[var(--app-panel)] text-foreground">
+        <ContextMenuItem
+          disabled={isRunning || sequence.length === 0}
+          onSelect={onClearCanvas}
+          variant="destructive"
+        >
+          <Trash2 className="size-4" aria-hidden="true" />
+          clear canvas
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
@@ -1288,7 +1327,7 @@ function ExecutionWorkflowNode({ data }: NodeProps<Node<ExecutionWorkflowNodeDat
                 <MoreVertical className="size-5" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem
                 disabled={data.step.locked || data.index <= 0}
                 onClick={() => data.onMoveStep(data.step.id, -1)}
@@ -1316,6 +1355,19 @@ function ExecutionWorkflowNode({ data }: NodeProps<Node<ExecutionWorkflowNodeDat
                 <Terminal className="mr-2 size-3.5" aria-hidden="true" />
                 {usesScript ? "Use default" : "Use script"}
               </DropdownMenuItem>
+              <DropdownMenuCheckboxItem
+                checked={!data.step.config.stopOnFailure}
+                onCheckedChange={(checked) =>
+                  data.onUpdateStep(data.step.id, {
+                    config: {
+                      stopOnFailure: checked !== true,
+                    },
+                  })
+                }
+              >
+                Continue after failure
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 disabled={data.step.locked}
