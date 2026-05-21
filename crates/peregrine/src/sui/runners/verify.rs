@@ -7,7 +7,9 @@ use crate::{
         runners::process::{command_step, run_peregrine_child},
     },
 };
-use peregrine_adapters::sui::{SuiFormalVerificationCommand, SuiFormalVerificationOptions};
+use peregrine_adapters::sui::{
+    SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiFormalVerificationOptions,
+};
 use peregrine_dynamic_analysis::sui::formal_verification::{
     formal_verification_manifest, FormalVerificationOptions,
 };
@@ -50,7 +52,8 @@ fn run_verify_target(context: &CliContext, args: &VerifyArgs, target: FormalTarg
             );
         }
     };
-    let command = SuiFormalVerificationCommand::new(&SuiFormalVerificationOptions {
+    let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
+    let command = adapter.formal_verification_command(&SuiFormalVerificationOptions {
         module_name: target.module_name.clone(),
         file_path: target.file_path.clone(),
         timeout_seconds: Some(args.timeout_seconds),

@@ -1,7 +1,8 @@
 use super::{
     bundled, system, SuiAdapterEnvironment, SuiAdapterError, SuiAdapterSettings, SuiAdapterSource,
     SuiAdapterSourceStatus, SuiAdapterStatus, SuiCommandKind, SuiExecutionTarget,
-    SuiMoveNewCommand, SuiPackageCommand,
+    SuiFormalVerificationCommand, SuiFormalVerificationOptions, SuiMoveNewCommand,
+    SuiPackageCommand,
 };
 
 pub struct SuiAdapter {
@@ -84,6 +85,13 @@ impl SuiAdapter {
         project_name: &str,
     ) -> Result<SuiMoveNewCommand, SuiAdapterError> {
         SuiMoveNewCommand::new(project_name, self.resolve_move_new())
+    }
+
+    pub fn formal_verification_command(
+        &self,
+        options: &SuiFormalVerificationOptions,
+    ) -> SuiFormalVerificationCommand {
+        SuiFormalVerificationCommand::new(options)
     }
 
     fn system_status(&self) -> SuiAdapterSourceStatus {

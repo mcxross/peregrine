@@ -67,16 +67,15 @@ import {
   buildMovePackage,
   defaultProjectMetadata,
   displayMovePackageName,
-  loadFilePreview,
   loadPackageTree,
   loadProjectMetadata,
   listenProjectMetadataChanged,
   projectMoveCoverageScriptPath,
   projectMoveTestScriptPath,
+  runFormalVerification,
   runSecurityScript,
   runSecurityCommand,
   type CommandOutput,
-  type FilePreview,
   type MovePackage,
   type PackageTree,
   type ProjectMetadata,
@@ -232,6 +231,7 @@ const publishTargets: { label: string; value: PublishTarget }[] = [
   { label: "Testnet", value: "testnet" },
   { label: "Mainnet", value: "mainnet" },
 ];
+const FORMAL_VERIFICATION_TIMEOUT_SECONDS = 45;
 
 const stepDefinitions: ExecutionStepDefinition[] = [
   {
@@ -294,11 +294,11 @@ const stepDefinitions: ExecutionStepDefinition[] = [
     label: "Formal Verification",
     shortLabel: "Formal",
     description:
-      "Checks the active package for formal-spec coverage signals such as `spec`, `ensures`, `aborts_if`, and invariants.",
+      "Runs bundled Sui Prover formal verification for each source module in the active package.",
     whenToUse:
-      "Use this before publish to confirm formal verification work exists and to see where specs are concentrated.",
+      "Use this before publish to verify formal specifications against the active package.",
     category: "Verify",
-    command: "Local formal spec scan",
+    command: "bundled sui-prover --path <package> --modules <module>",
     defaultStopOnFailure: false,
     icon: SquareFunction,
   },
@@ -2270,6 +2270,16 @@ async function executeStep({
     };
   }
 
+  if (step.kind === "formal") {
+    return executeFormalVerificationStep({
+      movePackage,
+      onCommandOutput,
+      packageTree,
+      startedAt,
+      streamId,
+    });
+  }
+
   if (definition.commandKind) {
     const output = await runSecurityCommand(
       packageTree,
@@ -2299,10 +2309,90 @@ async function executeStep({
   }
 
   return {
-    ...(await analyzeStep(step.kind, packageTree, movePackage)),
+    detail: null,
     finishedAt: new Date(),
     output: null,
+    state: "error",
     startedAt,
+    summary: "Unsupported execution step.",
+  };
+}
+
+async function executeFormalVerificationStep({
+  movePackage,
+  onCommandOutput,
+  packageTree,
+  startedAt,
+  streamId,
+}: {
+  movePackage: MovePackage;
+  onCommandOutput?: (output: CommandOutput) => void;
+  packageTree: PackageTree;
+  startedAt: Date;
+  streamId?: number | string;
+}): Promise<StepExecutionOutcome> {
+  if (movePackage.modules.length === 0) {
+    return {
+      detail: "No parseable Move modules were found for the active package.",
+      finishedAt: new Date(),
+      output: null,
+      startedAt,
+      state: "attention",
+      summary: "Formal verification requires parseable Move modules.",
+    };
+  }
+
+  const aggregateOutput: CommandOutput = {
+    status: 0,
+    stderr: "",
+    stdout: "",
+  };
+  const failedModules: string[] = [];
+
+  for (const moveModule of movePackage.modules) {
+    const output = await runFormalVerification(
+      packageTree,
+      movePackage.path,
+      moveModule.filePath,
+      moveModule.name,
+      {
+        onOutput: onCommandOutput,
+        streamId,
+        timeoutSeconds: FORMAL_VERIFICATION_TIMEOUT_SECONDS,
+      },
+    );
+
+    aggregateOutput.stdout += output.stdout;
+    aggregateOutput.stderr += output.stderr;
+
+    if (output.status !== 0) {
+      aggregateOutput.status = output.status ?? 1;
+      failedModules.push(moveModule.name);
+    }
+
+    onCommandOutput?.({ ...aggregateOutput });
+  }
+
+  const finishedAt = new Date();
+
+  if (failedModules.length > 0) {
+    return {
+      detail: `Failed modules: ${failedModules.join(", ")}`,
+      finishedAt,
+      output: aggregateOutput,
+      startedAt,
+      state: "error",
+      summary: `${failedModules.length} formal verification target${failedModules.length === 1 ? "" : "s"} failed.`,
+    };
+  }
+
+  return {
+    detail: `${movePackage.modules.length} module${movePackage.modules.length === 1 ? "" : "s"} verified with bundled Sui Prover.`,
+    finishedAt,
+    output: aggregateOutput,
+    startedAt,
+    state: "success",
+    summary: "Formal verification passed.",
   };
 }
 
@@ -2396,91 +2486,6 @@ async function executeConfiguredProjectScriptStep({
         ? `${definition.label} project script passed.`
         : `${definition.label} project script failed.`,
   };
-}
-
-async function analyzeStep(
-  kind: ExecutionStepKind,
-  packageTree: PackageTree,
-  movePackage: MovePackage,
-): Promise<Pick<StepExecutionOutcome, "detail" | "state" | "summary">> {
-  switch (kind) {
-    case "formal":
-      return analyzeFormalVerification(packageTree, movePackage);
-    case "build":
-    case "coverage":
-    case "test":
-    case "fuzz":
-    case "publish":
-      return {
-        detail: null,
-        state: "error",
-        summary: "Unsupported local analysis block.",
-      };
-  }
-}
-
-async function analyzeFormalVerification(
-  packageTree: PackageTree,
-  movePackage: MovePackage,
-): Promise<Pick<StepExecutionOutcome, "detail" | "state" | "summary">> {
-  const previews = await Promise.all(
-    movePackage.modules.map((moveModule) =>
-      loadFilePreview(packageTree, moveModule.filePath, { includeHighlightedHtml: false }).catch(() => null),
-    ),
-  );
-  const sourceFiles = previews.filter(isTextPreview);
-  let specBlocks = 0;
-  let conditions = 0;
-  let invariants = 0;
-  const filesWithSpecs: string[] = [];
-
-  for (const preview of sourceFiles) {
-    const source = preview.source;
-    const nextSpecBlocks = countMatches(source, /\bspec\b/g);
-    const nextConditions = countMatches(source, /\b(aborts_if|ensures|requires)\b/g);
-    const nextInvariants = countMatches(source, /\binvariant\b/g);
-
-    if (nextSpecBlocks || nextConditions || nextInvariants) {
-      filesWithSpecs.push(
-        `${preview.path}: ${nextSpecBlocks} spec blocks, ${nextConditions} conditions, ${nextInvariants} invariants`,
-      );
-    }
-
-    specBlocks += nextSpecBlocks;
-    conditions += nextConditions;
-    invariants += nextInvariants;
-  }
-
-  if (!sourceFiles.length) {
-    return {
-      detail: "No readable Move source files were found for the active package.",
-      state: "attention",
-      summary: "Formal verification scan could not read package sources.",
-    };
-  }
-
-  if (!specBlocks && !conditions && !invariants) {
-    return {
-      detail:
-        "No `spec`, `ensures`, `requires`, `aborts_if`, or `invariant` declarations were found.",
-      state: "attention",
-      summary: "No formal verification specs found.",
-    };
-  }
-
-  return {
-    detail: filesWithSpecs.join("\n"),
-    state: "success",
-    summary: `${specBlocks} specs, ${conditions} conditions, and ${invariants} invariants found.`,
-  };
-}
-
-function isTextPreview(preview: FilePreview | null): preview is Extract<FilePreview, { kind: "text" }> {
-  return preview?.kind === "text";
-}
-
-function countMatches(source: string, pattern: RegExp) {
-  return source.match(pattern)?.length ?? 0;
 }
 
 function publishCommandKind(step: ExecutionStep): SecurityCommandKind {

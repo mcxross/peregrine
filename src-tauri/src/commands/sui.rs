@@ -248,9 +248,18 @@ pub(crate) async fn run_formal_verification(
     stream_id: Option<String>,
 ) -> Result<CommandOutput, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let sui = sui_adapter(&app)?;
         run_formal_verification_worker(
             &root_path,
             &package_path,
+            sui.formal_verification_command(&SuiFormalVerificationOptions {
+                file_path: file_path.clone(),
+                module_name: module_name.clone(),
+                timeout_seconds,
+                verbose: true,
+                trace: false,
+                keep_temp: false,
+            }),
             FormalVerificationOptions {
                 file_path,
                 module_name,
@@ -290,19 +299,12 @@ fn run_movy_fuzz_worker(
 fn run_formal_verification_worker(
     root_path: &str,
     package_path: &str,
+    command: SuiFormalVerificationCommand,
     options: FormalVerificationOptions,
     stream: Option<CommandOutputStream>,
 ) -> Result<CommandOutput, String> {
     let manifest = formal_verification_manifest(root_path, package_path, &options)
         .map_err(|error| error.to_string())?;
-    let command = SuiFormalVerificationCommand::new(&SuiFormalVerificationOptions {
-        module_name: options.module_name.clone(),
-        file_path: options.file_path.clone(),
-        timeout_seconds: options.timeout_seconds,
-        verbose: options.verbose,
-        trace: options.trace,
-        keep_temp: options.keep_temp,
-    });
     let header = format!(
         "Starting bundled Sui Prover formal verification...\nCommand: {}\nPackage: {}\nFile: {}\nModule filter: {}\n\n",
         command.display,

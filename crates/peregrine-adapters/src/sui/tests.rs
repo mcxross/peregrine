@@ -52,8 +52,9 @@ fn move_build_command_uses_bundled_execution_by_default() {
 
 #[test]
 fn formal_verification_command_describes_bundled_prover_target() {
+    let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
     let options = SuiFormalVerificationOptions::new("vault", "sources/vault.move");
-    let command = SuiFormalVerificationCommand::new(&options);
+    let command = adapter.formal_verification_command(&options);
 
     assert_eq!(command.module_name, "vault");
     assert_eq!(command.file_path, "sources/vault.move");
