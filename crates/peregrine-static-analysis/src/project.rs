@@ -24,6 +24,9 @@ pub struct MovePackage {
     pub name: String,
     pub path: String,
     pub manifest_path: String,
+    pub has_source_files: bool,
+    pub has_source_modules: bool,
+    pub source_file_count: usize,
     pub surface: MovePackageSurface,
     pub modules: Vec<MoveModule>,
 }
@@ -68,6 +71,9 @@ fn build_move_package(root: &Path, model: MovePackageModel) -> MovePackage {
         name: model.name,
         path: model.path,
         manifest_path: model.manifest_path,
+        has_source_files: model.has_source_files,
+        has_source_modules: model.has_source_modules,
+        source_file_count: model.source_file_count,
         surface,
         modules: model.modules,
     }
@@ -221,8 +227,94 @@ public fun ping() {}
         let module = package.modules.first().expect("module");
 
         assert_eq!(package.name, "nested_paths");
+        assert!(package.has_source_files);
+        assert!(package.has_source_modules);
+        assert_eq!(package.source_file_count, 1);
         assert_eq!(module.name, "oracle");
         assert_eq!(module.file_path, "sources/helper/oracle.move");
+    }
+
+    #[test]
+    fn discover_project_marks_manifest_only_packages() {
+        let temp = tempdir().expect("tempdir");
+
+        fs::write(
+            temp.path().join("Move.toml"),
+            r#"
+[package]
+name = "manifest_only"
+"#,
+        )
+        .expect("manifest");
+
+        let project = discover_move_project_shallow(temp.path());
+        let package = project.packages.first().expect("package");
+
+        assert_eq!(package.name, "manifest_only");
+        assert!(!package.has_source_files);
+        assert!(!package.has_source_modules);
+        assert_eq!(package.source_file_count, 0);
+        assert!(package.modules.is_empty());
+    }
+
+    #[test]
+    fn discover_project_marks_commented_generated_sources_as_missing_modules() {
+        let temp = tempdir().expect("tempdir");
+
+        fs::write(
+            temp.path().join("Move.toml"),
+            r#"
+[package]
+name = "generated"
+"#,
+        )
+        .expect("manifest");
+        fs::create_dir_all(temp.path().join("sources")).expect("sources");
+        fs::write(
+            temp.path().join("sources/generated.move"),
+            r#"/*
+module generated::generated;
+*/"#,
+        )
+        .expect("source");
+
+        let project = discover_move_project_shallow(temp.path());
+        let package = project.packages.first().expect("package");
+
+        assert_eq!(package.name, "generated");
+        assert!(package.has_source_files);
+        assert!(!package.has_source_modules);
+        assert_eq!(package.source_file_count, 1);
+        assert!(package.modules.is_empty());
+    }
+
+    #[test]
+    fn discover_project_marks_invalid_sources_as_missing_modules() {
+        let temp = tempdir().expect("tempdir");
+
+        fs::write(
+            temp.path().join("Move.toml"),
+            r#"
+[package]
+name = "invalid"
+"#,
+        )
+        .expect("manifest");
+        fs::create_dir_all(temp.path().join("sources")).expect("sources");
+        fs::write(
+            temp.path().join("sources/invalid.move"),
+            "module invalid::broken { public fun",
+        )
+        .expect("source");
+
+        let project = discover_move_project_shallow(temp.path());
+        let package = project.packages.first().expect("package");
+
+        assert_eq!(package.name, "invalid");
+        assert!(package.has_source_files);
+        assert!(!package.has_source_modules);
+        assert_eq!(package.source_file_count, 1);
+        assert!(package.modules.is_empty());
     }
 
     #[test]

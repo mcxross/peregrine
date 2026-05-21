@@ -1,6 +1,9 @@
 use crate::{
     output::{elapsed_ms, CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, EXIT_SUCCESS},
-    sui::{args::SignaturesArgs, project::CliContext},
+    sui::{
+        args::SignaturesArgs,
+        project::{require_package_source_modules, CliContext},
+    },
 };
 use peregrine_move_model::{MoveFunctionSignature, MoveModule};
 use peregrine_static_analysis::{discover_move_project_fast, MovePackage};
@@ -26,6 +29,10 @@ pub fn run_signatures(context: &CliContext, args: &SignaturesArgs) -> CliStep {
         Ok(package) => package,
         Err(error) => return CliStep::failed("signatures", started_at, error),
     };
+    if let Err(error) = require_package_source_modules("signatures", &package) {
+        return CliStep::failed("signatures", started_at, error);
+    }
+
     let modules = match selected_modules(context, &package, args) {
         Ok(modules) => modules,
         Err(error) => return CliStep::failed("signatures", started_at, error),

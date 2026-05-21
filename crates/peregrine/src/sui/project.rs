@@ -3,7 +3,7 @@ use crate::{
     sui::args::{BytecodeArgs, VerifyArgs},
 };
 use peregrine_move_model::MoveModule;
-use peregrine_static_analysis::discover_move_project_fast;
+use peregrine_static_analysis::{discover_move_project_fast, MovePackage};
 use std::{
     ffi::OsStr,
     path::{Component, Path, PathBuf},
@@ -88,6 +88,9 @@ pub fn formal_targets(
             ),
         ));
     };
+
+    require_package_source_modules("verify", package)?;
+
     let requested_modules = args
         .modules
         .iter()
@@ -154,6 +157,9 @@ pub fn bytecode_target(
             ),
         ));
     };
+
+    require_package_source_modules("bytecode", package)?;
+
     let requested_module = args
         .module
         .as_deref()
@@ -211,6 +217,50 @@ pub fn resolve_output_path(workspace_root: &Path, output: Option<&Path>) -> Path
         Some(path) => workspace_root.join(path),
         None => workspace_root.to_path_buf(),
     }
+}
+
+pub fn require_package_source_modules(
+    source: &str,
+    package: &MovePackage,
+) -> Result<(), CliDiagnostic> {
+    if package.has_source_modules {
+        return Ok(());
+    }
+
+    Err(CliDiagnostic {
+        severity: CliDiagnosticSeverity::Error,
+        source: source.to_string(),
+        code: Some(if package.source_file_count == 0 {
+            "NoMoveSources".to_string()
+        } else {
+            "NoMoveSourceModules".to_string()
+        }),
+        message: move_source_unavailable_message(package),
+        file: Some(package.manifest_path.clone()),
+        span: None,
+    })
+}
+
+pub fn move_source_unavailable_message(package: &MovePackage) -> String {
+    let path = if package.path.is_empty() {
+        "."
+    } else {
+        package.path.as_str()
+    };
+
+    if package.source_file_count == 0 {
+        return format!(
+            "Move package `{}` ({path}) contains a Move.toml manifest but no Move source files under sources/. Call graph, type graph, bytecode, CFG, signatures, and verification require parseable source modules.",
+            package.name
+        );
+    }
+
+    format!(
+        "Move package `{}` ({path}) contains {} Move source {}, but no parseable Move modules were found. The source may be commented out or invalid. Call graph, type graph, bytecode, CFG, signatures, and verification require parseable source modules.",
+        package.name,
+        package.source_file_count,
+        if package.source_file_count == 1 { "file" } else { "files" }
+    )
 }
 
 fn resolve_package_root(project_root: &Path, package_path: &str) -> Result<PathBuf, CliDiagnostic> {
@@ -402,6 +452,62 @@ mod tests {
 
         assert_eq!(target.module_name, "actual");
         assert_eq!(target.file_path, "sources/not_the_module_name.move");
+    }
+
+    #[test]
+    fn bytecode_target_reports_manifest_only_package() {
+        let temp = tempdir().expect("tempdir");
+        fs::write(
+            temp.path().join("Move.toml"),
+            "[package]\nname = \"manifest_only\"\n",
+        )
+        .expect("manifest");
+        let context = resolve_context(temp.path(), ".").expect("context");
+        let args = BytecodeArgs {
+            module: None,
+            file: None,
+            interactive: false,
+            bytecode_map: false,
+            debug: false,
+        };
+
+        let error = bytecode_target(&context, &args).expect_err("manifest-only package");
+
+        assert_eq!(error.code.as_deref(), Some("NoMoveSources"));
+        assert_eq!(error.file.as_deref(), Some("Move.toml"));
+        assert!(error
+            .message
+            .contains("no Move source files under sources/"));
+    }
+
+    #[test]
+    fn bytecode_target_reports_source_files_without_parseable_modules() {
+        let temp = tempdir().expect("tempdir");
+        fs::create_dir_all(temp.path().join("sources")).expect("sources");
+        fs::write(
+            temp.path().join("Move.toml"),
+            "[package]\nname = \"generated\"\n",
+        )
+        .expect("manifest");
+        fs::write(
+            temp.path().join("sources/generated.move"),
+            "/*\nmodule generated::generated;\n*/\n",
+        )
+        .expect("source");
+        let context = resolve_context(temp.path(), ".").expect("context");
+        let args = BytecodeArgs {
+            module: None,
+            file: None,
+            interactive: false,
+            bytecode_map: false,
+            debug: false,
+        };
+
+        let error = bytecode_target(&context, &args).expect_err("comment-only package");
+
+        assert_eq!(error.code.as_deref(), Some("NoMoveSourceModules"));
+        assert_eq!(error.file.as_deref(), Some("Move.toml"));
+        assert!(error.message.contains("no parseable Move modules"));
     }
 
     #[test]

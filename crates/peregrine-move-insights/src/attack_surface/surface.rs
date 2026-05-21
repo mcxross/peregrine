@@ -3,6 +3,9 @@ pub fn package_surface(modules: &[MoveModule]) -> MovePackageSurface {
         name: "package".to_string(),
         path: String::new(),
         manifest_path: String::new(),
+        has_source_files: !modules.is_empty(),
+        has_source_modules: !modules.is_empty(),
+        source_file_count: modules.len(),
         modules: modules.to_vec(),
     };
 

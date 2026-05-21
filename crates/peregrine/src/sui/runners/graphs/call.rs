@@ -1,7 +1,7 @@
 use super::{
     common::{graph_step, requested_modules, DIM, EDGE, FUNCTION, HEADER, KIND, MODULE, RESET},
     dot::{dot_edge_attrs, dot_id, dot_label, DotEdgeStyle},
-    project::module_matches,
+    project::{module_matches, selected_source_package},
 };
 use crate::{
     output::{CliDiagnostic, CliStep},
@@ -19,6 +19,10 @@ use std::{
 
 pub fn run_call_graph(context: &CliContext, args: &CallGraphArgs) -> CliStep {
     let started_at = Instant::now();
+    if let Err(error) = selected_source_package(context, "call-graph") {
+        return CliStep::failed("call-graph", started_at, error);
+    }
+
     let graph =
         discover_move_project_graphs_for_package(&context.project_root, &context.package_path)
             .call_graph;

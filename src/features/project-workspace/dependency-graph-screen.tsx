@@ -14,7 +14,9 @@ import type { TypeGraphSourceLocation } from "@/features/project-workspace/type-
 import {
   displayMovePackageName,
   loadMoveGraphs,
+  moveSourceUnavailableMessage,
 } from "@/features/empty-project/filesystem-tree";
+import { MoveSourceUnavailableNotice } from "@/features/project-workspace/move-source-unavailable-notice";
 import { cn } from "@/lib/utils";
 
 const DependencyGraphView = React.lazy(() =>
@@ -69,12 +71,17 @@ export function DependencyGraphScreen({
   const [isLoadingMoveGraphs, setIsLoadingMoveGraphs] = React.useState(false);
   const [moveGraphError, setMoveGraphError] = React.useState<string | null>(null);
   const activePackagePath = activeMovePackage?.path ?? null;
+  const sourceUnavailableMessage = activeMovePackage
+    ? moveSourceUnavailableMessage(activeMovePackage)
+    : null;
   const activeTypeGraph = loadedMoveGraphs?.typeGraph ?? typeGraph;
   const activeCallGraph = loadedMoveGraphs?.callGraph ?? callGraph;
   const typeGraphReady =
-    hasTypeGraphPayload(typeGraph, activeMovePackage) || loadedMoveGraphs !== null;
+    !sourceUnavailableMessage
+    && (hasTypeGraphPayload(typeGraph, activeMovePackage) || loadedMoveGraphs !== null);
   const callGraphReady =
-    hasCallGraphPayload(callGraph, activeMovePackage) || loadedMoveGraphs !== null;
+    !sourceUnavailableMessage
+    && (hasCallGraphPayload(callGraph, activeMovePackage) || loadedMoveGraphs !== null);
   const firstTypeId = React.useMemo(
     () => (graphMode === "types" && typeGraphReady
       ? firstSelectableTypeId(activeTypeGraph.nodes, activeMovePackage)
@@ -104,10 +111,16 @@ export function DependencyGraphScreen({
     setLoadedMoveGraphs(null);
     setMoveGraphError(null);
     setSelectedTypeId(null);
-  }, [activePackagePath, rootPath, typeGraph]);
+  }, [
+    activeMovePackage?.hasSourceModules,
+    activeMovePackage?.sourceFileCount,
+    activePackagePath,
+    rootPath,
+    typeGraph,
+  ]);
 
   const ensureMoveGraphs = React.useCallback(async () => {
-    if (loadedMoveGraphs || isLoadingMoveGraphs || !rootPath) {
+    if (sourceUnavailableMessage || loadedMoveGraphs || isLoadingMoveGraphs || !rootPath) {
       return;
     }
 
@@ -127,7 +140,14 @@ export function DependencyGraphScreen({
     } finally {
       setIsLoadingMoveGraphs(false);
     }
-  }, [activeMovePackage, isLoadingMoveGraphs, loadedMoveGraphs, onMoveGraphsLoaded, rootPath]);
+  }, [
+    activeMovePackage,
+    isLoadingMoveGraphs,
+    loadedMoveGraphs,
+    onMoveGraphsLoaded,
+    rootPath,
+    sourceUnavailableMessage,
+  ]);
 
   React.useEffect(() => {
     if (
@@ -180,7 +200,22 @@ export function DependencyGraphScreen({
       </div>
 
       <div className="row-start-2 min-h-0 px-5 pb-3">
-        {graphMode === "types" && !typeGraphReady ? (
+        {graphMode === "dependencies" && sourceUnavailableMessage ? (
+          <MoveSourceUnavailableNotice
+            message={sourceUnavailableMessage}
+            title="Dependency Graph unavailable"
+          />
+        ) : graphMode === "types" && sourceUnavailableMessage ? (
+          <MoveSourceUnavailableNotice
+            message={sourceUnavailableMessage}
+            title="Type Graph unavailable"
+          />
+        ) : graphMode === "calls" && sourceUnavailableMessage ? (
+          <MoveSourceUnavailableNotice
+            message={sourceUnavailableMessage}
+            title="Call Graph unavailable"
+          />
+        ) : graphMode === "types" && !typeGraphReady ? (
           <DeferredGraphState
             description={`Mapping storage, authority, generics, and external type links for ${displayMovePackageName(activeMovePackage?.name ?? packageName)}.`}
             error={moveGraphError ?? (!rootPath ? "Move graph loading is unavailable in this view." : null)}
@@ -361,7 +396,7 @@ function DeferredGraphState({
   error: string | null;
   graphLabel: string;
   isLoading: boolean;
-  onRetry: () => void;
+  onRetry?: () => void;
 }) {
   return (
     <div className="grid h-full min-h-0 place-items-center rounded-md border border-[color:var(--app-border)] bg-card px-6 text-center">
@@ -372,7 +407,7 @@ function DeferredGraphState({
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           {error ? error : description}
         </p>
-        {error ? (
+        {error && onRetry ? (
           <button
             className="mt-4 h-8 rounded-md border border-[color:var(--app-border)] px-3 text-xs font-semibold text-foreground transition hover:bg-[var(--app-subtle)]"
             onClick={onRetry}

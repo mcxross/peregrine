@@ -1,7 +1,9 @@
 mod source_parser;
 
 use serde::Serialize;
-use source_parser::discover_modules;
+use source_parser::{
+    discover_modules_from_files, discover_source_files, has_parseable_source_module,
+};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -15,6 +17,9 @@ pub struct MovePackageModel {
     pub name: String,
     pub path: String,
     pub manifest_path: String,
+    pub has_source_files: bool,
+    pub has_source_modules: bool,
+    pub source_file_count: usize,
     pub modules: Vec<MoveModule>,
 }
 
@@ -140,10 +145,17 @@ pub fn build_move_package(
     });
     let path = relative_path(root, package_root)?;
     let manifest_path = relative_path(root, manifest_path)?;
+    let source_files = discover_source_files(package_root);
+    let source_file_count = source_files.len();
     let mut modules = if include_modules {
-        discover_modules(root, package_root)
+        discover_modules_from_files(root, &source_files)
     } else {
         Vec::new()
+    };
+    let has_source_modules = if include_modules {
+        !modules.is_empty()
+    } else {
+        has_parseable_source_module(root, &source_files)
     };
 
     modules.sort_by(|left, right| {
@@ -156,6 +168,9 @@ pub fn build_move_package(
         name,
         path,
         manifest_path,
+        has_source_files: source_file_count > 0,
+        has_source_modules,
+        source_file_count,
         modules,
     })
 }

@@ -15,17 +15,49 @@ use move_compiler::{
     shared::{CompilationEnv, PackageConfig},
     Flags,
 };
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
-pub(crate) fn discover_modules(root: &Path, package_root: &Path) -> Vec<MoveModule> {
-    let sources = package_root.join("sources");
+pub(crate) fn discover_modules_from_files(
+    root: &Path,
+    source_files: &[PathBuf],
+) -> Vec<MoveModule> {
     let mut modules = Vec::new();
 
-    collect_move_modules(root, &sources, &mut modules);
+    for path in source_files {
+        let Ok(source) = fs::read_to_string(&path) else {
+            continue;
+        };
+
+        modules.extend(parse_module_declarations(&source, root, path.as_path()));
+    }
+
     modules
 }
 
-fn collect_move_modules(root: &Path, directory: &Path, modules: &mut Vec<MoveModule>) {
+pub(crate) fn has_parseable_source_module(root: &Path, source_files: &[PathBuf]) -> bool {
+    source_files.iter().any(|path| {
+        let Ok(source) = fs::read_to_string(path) else {
+            return false;
+        };
+        let parsed = parse_module_declarations_with_status(&source, root, path.as_path());
+
+        !parsed.has_errors && !parsed.modules.is_empty()
+    })
+}
+
+pub(crate) fn discover_source_files(package_root: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+
+    collect_move_source_files(&package_root.join("sources"), &mut paths);
+    paths.sort();
+    paths
+}
+
+fn collect_move_source_files(directory: &Path, paths: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(directory) else {
         return;
     };
@@ -37,7 +69,7 @@ fn collect_move_modules(root: &Path, directory: &Path, modules: &mut Vec<MoveMod
         };
 
         if file_type.is_dir() {
-            collect_move_modules(root, &path, modules);
+            collect_move_source_files(&path, paths);
             continue;
         }
 
@@ -45,15 +77,24 @@ fn collect_move_modules(root: &Path, directory: &Path, modules: &mut Vec<MoveMod
             continue;
         }
 
-        let Ok(source) = fs::read_to_string(&path) else {
-            continue;
-        };
-
-        modules.extend(parse_module_declarations(&source, root, &path));
+        paths.push(path);
     }
 }
 
 pub fn parse_module_declarations(source: &str, root: &Path, path: &Path) -> Vec<MoveModule> {
+    parse_module_declarations_with_status(source, root, path).modules
+}
+
+struct ParsedModuleDeclarations {
+    has_errors: bool,
+    modules: Vec<MoveModule>,
+}
+
+fn parse_module_declarations_with_status(
+    source: &str,
+    root: &Path,
+    path: &Path,
+) -> ParsedModuleDeclarations {
     let package_config = PackageConfig {
         flavor: Flavor::Sui,
         ..PackageConfig::default()
@@ -68,10 +109,17 @@ pub fn parse_module_declarations(source: &str, root: &Path, path: &Path) -> Vec<
         None,
     );
     let Ok(definitions) = parse_file_string(&env, FileHash::new(source), source, None) else {
-        return Vec::new();
+        return ParsedModuleDeclarations {
+            has_errors: true,
+            modules: Vec::new(),
+        };
     };
+
     let Some(file_path) = relative_path(root, path) else {
-        return Vec::new();
+        return ParsedModuleDeclarations {
+            has_errors: env.has_errors(),
+            modules: Vec::new(),
+        };
     };
     let mut modules = Vec::new();
 
@@ -79,7 +127,10 @@ pub fn parse_module_declarations(source: &str, root: &Path, path: &Path) -> Vec<
         collect_ast_modules(definition, source, &file_path, None, &mut modules);
     }
 
-    modules
+    ParsedModuleDeclarations {
+        has_errors: env.has_errors(),
+        modules,
+    }
 }
 
 fn collect_ast_modules(

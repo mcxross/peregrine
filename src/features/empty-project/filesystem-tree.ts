@@ -44,9 +44,28 @@ export type MovePackage = {
   name: string;
   path: string;
   manifestPath: string;
+  hasSourceFiles: boolean;
+  hasSourceModules: boolean;
+  sourceFileCount: number;
   surface: MovePackageSurface;
   modules: MoveModule[];
 };
+
+export function moveSourceUnavailableMessage(
+  movePackage: Pick<MovePackage, "hasSourceModules" | "name" | "path" | "sourceFileCount">,
+) {
+  if (movePackage.hasSourceModules) {
+    return null;
+  }
+
+  const packagePath = movePackage.path || ".";
+
+  if (movePackage.sourceFileCount === 0) {
+    return `Move package ${displayMovePackageName(movePackage.name)} (${packagePath}) contains a Move.toml manifest but no Move source files under sources/. Dependency graph, call graph, type graph, and bytecode views require parseable source modules.`;
+  }
+
+  return `Move package ${displayMovePackageName(movePackage.name)} (${packagePath}) contains ${movePackage.sourceFileCount} Move source ${movePackage.sourceFileCount === 1 ? "file" : "files"}, but no parseable Move modules were found. The source may be commented out or invalid. Dependency graph, call graph, type graph, and bytecode views require parseable source modules.`;
+}
 
 export function displayMovePackageName(packageName: string) {
   const normalizedName = packageName.replace(/^onchain_/, "");

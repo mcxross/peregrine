@@ -1,7 +1,7 @@
 use super::{
     common::{graph_step, DIM, EDGE, FUNCTION, HEADER, KIND, MODULE, RESET},
     dot::{dot_edge_attrs, dot_id, dot_label, DotEdgeStyle},
-    project::{module_matches, selected_package},
+    project::{module_matches, selected_source_package},
 };
 use crate::{
     output::{elapsed_ms, CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep},
@@ -21,6 +21,11 @@ struct CfgTarget<'a> {
 
 pub fn run_cfg(context: &CliContext, args: &CfgArgs) -> CliStep {
     let started_at = Instant::now();
+    let package = match selected_source_package(context, "cfg") {
+        Ok(package) => package,
+        Err(error) => return CliStep::failed("cfg", started_at, error),
+    };
+
     let build = run_build(context);
 
     if build.status != CliStatus::Passed {
@@ -48,10 +53,6 @@ pub fn run_cfg(context: &CliContext, args: &CfgArgs) -> CliStep {
         };
     }
 
-    let package = match selected_package(context, "cfg") {
-        Ok(package) => package,
-        Err(error) => return CliStep::failed("cfg", started_at, error),
-    };
     let bytecode = match load_package_bytecode(&context.package_root, &package.name) {
         Ok(bytecode) => bytecode,
         Err(error) => {

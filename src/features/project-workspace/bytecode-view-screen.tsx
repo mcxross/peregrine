@@ -47,6 +47,7 @@ import {
   displayMovePackageName,
   loadFilePreview,
   loadMoveBytecodeView,
+  moveSourceUnavailableMessage,
   type FilePreview,
   type MoveBytecodeBasicBlockView,
   type MoveBytecodeCallView,
@@ -59,6 +60,7 @@ import {
   type MovePackage,
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
+import { MoveSourceUnavailableNotice } from "@/features/project-workspace/move-source-unavailable-notice";
 import { cn } from "@/lib/utils";
 
 const CodeEditor = React.lazy(() =>
@@ -137,6 +139,16 @@ export function BytecodeViewScreen({
     if (!activeMovePackage) {
       setView(null);
       setError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    const sourceUnavailableMessage = moveSourceUnavailableMessage(activeMovePackage);
+
+    if (sourceUnavailableMessage) {
+      setView(null);
+      setError(sourceUnavailableMessage);
+      setIsLoading(false);
       return;
     }
 
@@ -188,12 +200,14 @@ export function BytecodeViewScreen({
 
   React.useEffect(() => {
     setView(null);
-    setError(null);
+    setError(
+      activeMovePackage ? moveSourceUnavailableMessage(activeMovePackage) : null,
+    );
     setSelectedModulePath(null);
     setSelectedFunctionName(null);
     setSelectedOffset(null);
     setEditorTarget(null);
-  }, [activeMovePackage?.manifestPath, packageTree.rootPath]);
+  }, [activeMovePackage, packageTree.rootPath]);
 
   const selectedModule = view?.modules.find((module) => module.bytecodePath === selectedModulePath)
     ?? view?.modules[0]
@@ -370,12 +384,10 @@ export function BytecodeViewScreen({
       />
 
       {error ? (
-        <div className="grid min-h-0 place-items-center px-6">
-          <div className="max-w-xl rounded-md border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-100">
-            <div className="font-semibold">Bytecode unavailable</div>
-            <p className="mt-2 text-xs leading-5 text-red-100/80">{error}</p>
-          </div>
-        </div>
+        <MoveSourceUnavailableNotice
+          message={error}
+          title="Bytecode unavailable"
+        />
       ) : (
         <div
           className={cn(

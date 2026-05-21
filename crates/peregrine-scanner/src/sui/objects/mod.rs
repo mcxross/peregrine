@@ -2083,6 +2083,9 @@ mod tests {
             name: "test_package".to_string(),
             path: String::new(),
             manifest_path: "Move.toml".to_string(),
+            has_source_files: true,
+            has_source_modules: !modules.is_empty(),
+            source_file_count: 1,
             modules,
         }
     }
@@ -2104,6 +2107,9 @@ mod tests {
             name: "struct_abilities".to_string(),
             path: String::new(),
             manifest_path: "Move.toml".to_string(),
+            has_source_files: false,
+            has_source_modules: false,
+            source_file_count: 0,
             modules: Vec::new(),
         };
         let build_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(

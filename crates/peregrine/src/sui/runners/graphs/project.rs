@@ -1,4 +1,7 @@
-use crate::{output::CliDiagnostic, sui::project::CliContext};
+use crate::{
+    output::CliDiagnostic,
+    sui::project::{require_package_source_modules, CliContext},
+};
 use peregrine_static_analysis::{discover_move_project_fast, MovePackage};
 use std::{
     ffi::OsStr,
@@ -22,6 +25,17 @@ pub fn selected_package(context: &CliContext, source: &str) -> Result<MovePackag
                 ),
             )
         })
+}
+
+pub fn selected_source_package(
+    context: &CliContext,
+    source: &str,
+) -> Result<MovePackage, CliDiagnostic> {
+    let package = selected_package(context, source)?;
+
+    require_package_source_modules(source, &package)?;
+
+    Ok(package)
 }
 
 pub fn module_matches(requested: &str, address: Option<&str>, module_name: &str) -> bool {

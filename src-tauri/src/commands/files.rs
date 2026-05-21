@@ -7,6 +7,7 @@ use peregrine_move_graphs::{
     discover_move_state_access_graph_for_function, MoveCallGraph, MoveProjectGraphs,
     MoveStateAccessGraph, MoveTypeGraph, PackageDependencyGraph,
 };
+use peregrine_move_model::{build_move_package, MovePackageModel};
 use peregrine_static_analysis::{
     discover_move_project_fast, discover_move_project_shallow, AnalysisConfig, AnalysisEngine,
     AnalysisEngineOptions, AnalysisReport, MovePackage,
@@ -203,15 +204,12 @@ pub(crate) async fn load_move_bytecode_view(
     package_name: String,
 ) -> Result<MoveBytecodePackageView, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let package_root = resolve_package_child_path(&root_path, &package_path)?;
+        let root = PathBuf::from(&root_path)
+            .canonicalize()
+            .map_err(|error| format!("Could not read package directory {root_path}: {error}"))?;
+        let (package_root, package) = resolve_move_package(&root, &package_path)?;
 
-        if !package_root.is_dir() {
-            return Err("Selected package path is not a directory.".to_string());
-        }
-
-        if !package_root.join("Move.toml").is_file() {
-            return Err("Selected package does not contain a Move.toml file.".to_string());
-        }
+        require_move_source_modules(&package)?;
 
         load_package_bytecode(package_root, &package_name)
     })
@@ -270,16 +268,9 @@ fn build_move_state_access_graph(
     let root = PathBuf::from(&root_path)
         .canonicalize()
         .map_err(|error| format!("Could not read package directory {root_path}: {error}"))?;
-    let package_root = root.join(&package_path).canonicalize().map_err(|error| {
-        format!(
-            "Could not read Move package {}: {error}",
-            root.join(&package_path).display()
-        )
-    })?;
+    let (_, package) = resolve_move_package(&root, &package_path)?;
 
-    if !package_root.starts_with(&root) {
-        return Err("Move package must be inside the opened project.".to_string());
-    }
+    require_move_source_modules(&package)?;
 
     Ok(discover_move_state_access_graph_for_function(
         &root,
@@ -299,16 +290,9 @@ fn build_move_graphs(
         .map_err(|error| format!("Could not read package directory {root_path}: {error}"))?;
 
     if let Some(package_path) = package_path {
-        let package_root = root.join(&package_path).canonicalize().map_err(|error| {
-            format!(
-                "Could not read Move package {}: {error}",
-                root.join(&package_path).display()
-            )
-        })?;
+        let (_, package) = resolve_move_package(&root, &package_path)?;
 
-        if !package_root.starts_with(&root) {
-            return Err("Move package must be inside the opened project.".to_string());
-        }
+        require_move_source_modules(&package)?;
 
         return Ok(discover_move_project_graphs_for_package(
             &root,
@@ -317,6 +301,63 @@ fn build_move_graphs(
     }
 
     Ok(discover_move_project_graphs(&root))
+}
+
+fn resolve_move_package(
+    root: &Path,
+    package_path: &str,
+) -> Result<(PathBuf, MovePackageModel), String> {
+    let package_root = root.join(package_path).canonicalize().map_err(|error| {
+        format!(
+            "Could not read Move package {}: {error}",
+            root.join(package_path).display()
+        )
+    })?;
+
+    if !package_root.starts_with(root) {
+        return Err("Move package must be inside the opened project.".to_string());
+    }
+
+    let manifest_path = package_root.join("Move.toml");
+
+    if !manifest_path.is_file() {
+        return Err("Selected package does not contain a Move.toml file.".to_string());
+    }
+
+    let package = build_move_package(root, &manifest_path, false)
+        .ok_or_else(|| "Could not read selected Move package manifest.".to_string())?;
+
+    Ok((package_root, package))
+}
+
+fn require_move_source_modules(package: &MovePackageModel) -> Result<(), String> {
+    if package.has_source_modules {
+        return Ok(());
+    }
+
+    Err(move_source_unavailable_message(package))
+}
+
+fn move_source_unavailable_message(package: &MovePackageModel) -> String {
+    let path = if package.path.is_empty() {
+        "."
+    } else {
+        package.path.as_str()
+    };
+
+    if package.source_file_count == 0 {
+        return format!(
+            "Move package `{}` ({path}) contains a Move.toml manifest but no Move source files under sources/. Dependency graph, call graph, type graph, and bytecode views require parseable source modules.",
+            package.name
+        );
+    }
+
+    format!(
+        "Move package `{}` ({path}) contains {} Move source {}, but no parseable Move modules were found. The source may be commented out or invalid. Dependency graph, call graph, type graph, and bytecode views require parseable source modules.",
+        package.name,
+        package.source_file_count,
+        if package.source_file_count == 1 { "file" } else { "files" }
+    )
 }
 
 fn collect_paths(root: &Path, directory: &Path, paths: &mut Vec<String>) -> Result<(), String> {
@@ -491,5 +532,55 @@ mod tests {
 
         assert_eq!(source, "module 0x1::example { fun demo() {} }\n");
         assert_eq!(highlighted_html, "");
+    }
+
+    #[test]
+    fn build_move_graphs_reports_manifest_only_package() {
+        let directory = tempdir().expect("tempdir");
+        fs::write(
+            directory.path().join("Move.toml"),
+            "[package]\nname = \"manifest_only\"\n",
+        )
+        .expect("manifest");
+
+        let error = match build_move_graphs(
+            directory.path().to_string_lossy().into_owned(),
+            Some(".".to_string()),
+        ) {
+            Ok(_) => panic!("manifest-only package should not build source graphs"),
+            Err(error) => error,
+        };
+
+        assert!(error.contains("no Move source files under sources/"));
+        assert!(error.contains(
+            "Dependency graph, call graph, type graph, and bytecode views require parseable source modules"
+        ));
+    }
+
+    #[test]
+    fn build_move_graphs_reports_source_files_without_parseable_modules() {
+        let directory = tempdir().expect("tempdir");
+        fs::write(
+            directory.path().join("Move.toml"),
+            "[package]\nname = \"generated\"\n",
+        )
+        .expect("manifest");
+        fs::create_dir_all(directory.path().join("sources")).expect("sources");
+        fs::write(
+            directory.path().join("sources/generated.move"),
+            "/*\nmodule generated::generated;\n*/\n",
+        )
+        .expect("source");
+
+        let error = match build_move_graphs(
+            directory.path().to_string_lossy().into_owned(),
+            Some(".".to_string()),
+        ) {
+            Ok(_) => panic!("comment-only package should not build source graphs"),
+            Err(error) => error,
+        };
+
+        assert!(error.contains("no parseable Move modules"));
+        assert!(error.contains("commented out or invalid"));
     }
 }

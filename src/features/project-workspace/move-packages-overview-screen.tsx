@@ -24,6 +24,7 @@ import {
   analyzeMovePackage,
   displayMovePackageName,
   loadFilePreview,
+  moveSourceUnavailableMessage,
 } from "@/features/empty-project/filesystem-tree";
 import type {
   CodeEditorJumpRequest,
@@ -34,6 +35,7 @@ import {
   ModuleSignatureScreen,
   type SelectedMoveModule,
 } from "@/features/project-workspace/module-signature-screen";
+import { MoveSourceUnavailableNotice } from "@/features/project-workspace/move-source-unavailable-notice";
 import { sameSourcePath } from "@/features/project-workspace/source-paths";
 import { cn } from "@/lib/utils";
 
@@ -114,7 +116,10 @@ export function MovePackagesOverviewScreen({
   }, [movePackage?.manifestPath, packageTree.rootPath]);
 
   React.useEffect(() => {
-    if (!movePackage) {
+    if (!movePackage || !movePackage.hasSourceModules) {
+      setAnalysisReport(null);
+      setAnalysisError(null);
+      setIsAnalyzing(false);
       return;
     }
 
@@ -321,102 +326,105 @@ export function MovePackagesOverviewScreen({
     onSelectModule(movePackage, moduleToEdit);
   }, [isEditorMode, movePackage, onSelectModule, selectedModule]);
 
+  const sourceUnavailableMessage = movePackage ? moveSourceUnavailableMessage(movePackage) : null;
   const hasDetailPane = Boolean(selectedModule) || (isEditorMode && editorTabs.length > 0);
 
   return (
     <section className="grid h-full min-h-0 bg-[var(--app-window)]">
       {movePackage ? (
-        <div
-          ref={containerRef}
-          className={cn(
-            "grid min-h-0",
-            isResizing && "select-none",
-          )}
-          style={
-            hasDetailPane
-              ? { gridTemplateColumns: `${treePaneWidth}px 6px minmax(0, 1fr)` }
-              : { gridTemplateColumns: `${treePaneWidth}px minmax(0, 1fr)` }
-          }
-        >
-          <ScrollArea className="min-h-0 select-none">
-            <div className="grid gap-3 p-5">
-              <PackageCard
-                complexFunctionCounts={complexFunctionCounts}
-                isRoot={movePackage.name === rootPackage}
-                isEditorMode={isEditorMode}
-                movePackage={movePackage}
-                onSelectModule={onSelectModule}
-                onToggleEditorMode={toggleEditorMode}
-                selectedModulePath={selectedModule?.moveModule.filePath ?? null}
-              />
-            </div>
-          </ScrollArea>
-
-          {hasDetailPane ? (
-            <div
-              aria-label="Resize module tree"
-              aria-orientation="vertical"
-              className={cn(
-                "group relative cursor-col-resize border-r border-[color:var(--app-border)]",
-                isResizing && "border-primary/50",
-              )}
-              onPointerCancel={() => setIsResizing(false)}
-              onDragStart={(event) => event.preventDefault()}
-              onPointerDown={(event) => {
-                event.preventDefault();
-                event.currentTarget.setPointerCapture(event.pointerId);
-                setIsResizing(true);
-                resizeTreePane(event.clientX);
-              }}
-              onPointerMove={(event) => {
-                if (isResizing) {
-                  resizeTreePane(event.clientX);
-                }
-              }}
-              onPointerUp={(event) => {
-                event.currentTarget.releasePointerCapture(event.pointerId);
-                setIsResizing(false);
-              }}
-              role="separator"
-            >
-              <span
-                className={cn(
-                  "absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-primary/45",
-                  isResizing && "bg-primary/70",
-                )}
-              />
-            </div>
-          ) : null}
-
-          {hasDetailPane ? (
-            <div className="min-h-0 overflow-hidden">
-              {isEditorMode ? (
-                <ModuleSourceEditorWorkspace
-                  activeEditorPath={activeEditorPath}
-                  analysisError={analysisError}
-                  analysisReport={analysisReport}
-                  editorTabs={editorTabs}
-                  isAnalyzing={isAnalyzing}
-                  onActiveEditorPathChange={setActiveEditorPath}
-                  onClearSelectedModule={onClearSelectedModule}
-                  onEditorTabsChange={setEditorTabs}
+        sourceUnavailableMessage ? (
+          <MoveSourceUnavailableNotice
+            message={sourceUnavailableMessage}
+            title="Source modules unavailable"
+          />
+        ) : (
+          <div
+            ref={containerRef}
+            className={cn("grid min-h-0", isResizing && "select-none")}
+            style={
+              hasDetailPane
+                ? { gridTemplateColumns: `${treePaneWidth}px 6px minmax(0, 1fr)` }
+                : { gridTemplateColumns: `${treePaneWidth}px minmax(0, 1fr)` }
+            }
+          >
+            <ScrollArea className="min-h-0 select-none">
+              <div className="grid gap-3 p-5">
+                <PackageCard
+                  complexFunctionCounts={complexFunctionCounts}
+                  isRoot={movePackage.name === rootPackage}
+                  isEditorMode={isEditorMode}
+                  movePackage={movePackage}
                   onSelectModule={onSelectModule}
-                  packageTree={packageTree}
-                  sourceJumpRequest={sourceJumpRequest}
+                  onToggleEditorMode={toggleEditorMode}
+                  selectedModulePath={selectedModule?.moveModule.filePath ?? null}
                 />
-              ) : (
-                selectedModule ? (
-                <ModuleSignatureScreen
-                  selectedModule={selectedModule}
-                  onClose={onClearSelectedModule}
-                  rootPath={packageTree.rootPath}
-                  stateAccessGraph={packageTree.stateAccessGraph}
+              </div>
+            </ScrollArea>
+
+            {hasDetailPane ? (
+              <div
+                aria-label="Resize module tree"
+                aria-orientation="vertical"
+                className={cn(
+                  "group relative cursor-col-resize border-r border-[color:var(--app-border)]",
+                  isResizing && "border-primary/50",
+                )}
+                onPointerCancel={() => setIsResizing(false)}
+                onDragStart={(event) => event.preventDefault()}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  setIsResizing(true);
+                  resizeTreePane(event.clientX);
+                }}
+                onPointerMove={(event) => {
+                  if (isResizing) {
+                    resizeTreePane(event.clientX);
+                  }
+                }}
+                onPointerUp={(event) => {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                  setIsResizing(false);
+                }}
+                role="separator"
+              >
+                <span
+                  className={cn(
+                    "absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-primary/45",
+                    isResizing && "bg-primary/70",
+                  )}
                 />
-                ) : null
-              )}
-            </div>
-          ) : null}
-        </div>
+              </div>
+            ) : null}
+
+            {hasDetailPane ? (
+              <div className="min-h-0 overflow-hidden">
+                {isEditorMode ? (
+                  <ModuleSourceEditorWorkspace
+                    activeEditorPath={activeEditorPath}
+                    analysisError={analysisError}
+                    analysisReport={analysisReport}
+                    editorTabs={editorTabs}
+                    isAnalyzing={isAnalyzing}
+                    onActiveEditorPathChange={setActiveEditorPath}
+                    onClearSelectedModule={onClearSelectedModule}
+                    onEditorTabsChange={setEditorTabs}
+                    onSelectModule={onSelectModule}
+                    packageTree={packageTree}
+                    sourceJumpRequest={sourceJumpRequest}
+                  />
+                ) : selectedModule ? (
+                  <ModuleSignatureScreen
+                    selectedModule={selectedModule}
+                    onClose={onClearSelectedModule}
+                    rootPath={packageTree.rootPath}
+                    stateAccessGraph={packageTree.stateAccessGraph}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        )
       ) : (
         <div className="flex min-h-0 items-center justify-center px-6 text-center text-sm text-muted-foreground">
           No Move.toml files found in this workspace.
@@ -492,7 +500,9 @@ function PackageCard({
             />
           </div>
         ) : (
-          <p className="mt-2 text-sm text-muted-foreground">No modules in sources/.</p>
+          <p className="mt-2 max-w-[640px] text-sm leading-6 text-muted-foreground">
+            No modules in sources/.
+          </p>
         )}
       </div>
     </section>
