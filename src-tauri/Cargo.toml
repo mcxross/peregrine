@@ -20,6 +20,7 @@ serde_json = { workspace = true }
 tauri-plugin-dialog = { workspace = true }
 base64 = { workspace = true }
 pulldown-cmark = { workspace = true }
+reqwest = { workspace = true }
 syntect = { workspace = true }
 tokio = { workspace = true }
 peregrine-adapters = { workspace = true }

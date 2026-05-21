@@ -96,6 +96,7 @@ pub fn run() {
             commands::sui::get_sui_adapter_settings,
             commands::sui::save_sui_adapter_settings,
             commands::sui::load_sui_key_state,
+            commands::sui::load_sui_wallet_summary,
             commands::sui::generate_sui_key,
             commands::sui::import_sui_key,
             commands::sui::rename_sui_key_alias,

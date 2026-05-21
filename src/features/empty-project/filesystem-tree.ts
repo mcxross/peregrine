@@ -857,6 +857,18 @@ export type SuiExportPrivateKeyResponse = {
   exportedPrivateKey: string;
 };
 
+export type SuiWalletSummary = {
+  activeAddress?: string | null;
+  activeAlias?: string | null;
+  balance?: SuiBalanceSummary | null;
+  balanceError?: string | null;
+};
+
+export type SuiBalanceSummary = {
+  coinType: string;
+  totalBalanceMist: string;
+};
+
 export type FilePreview =
   | {
       kind: "text";
@@ -1154,6 +1166,14 @@ export async function saveSuiAdapterSettings(settings: SuiAdapterSettings) {
 
 export async function loadSuiKeyState() {
   return invoke<SuiKeyState>("load_sui_key_state");
+}
+
+export async function loadSuiWalletSummary(graphQlUrl: string | null) {
+  return invoke<SuiWalletSummary>("load_sui_wallet_summary", {
+    request: {
+      graphQlUrl,
+    },
+  });
 }
 
 export async function generateSuiKey(request: SuiGenerateKeyRequest) {

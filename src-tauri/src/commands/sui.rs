@@ -17,7 +17,7 @@ use peregrine_import_engine::sui::{
     default_import_root, BuildVerification, BuildableImportRequest, ImportEngine,
     ImportEngineConfig,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fs,
     io::Read,
@@ -25,12 +25,24 @@ use std::{
     process::{Command, Stdio},
     sync::mpsc,
     thread,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tauri::{Emitter, Manager};
 
 const SUI_ADAPTER_SETTINGS_CHANGED_EVENT: &str = "sui-adapter-settings-changed";
 const SUI_ADAPTER_SETTINGS_FILE: &str = "sui-adapter-settings.json";
+const SUI_COIN_TYPE: &str = "0x2::sui::SUI";
+const SUI_GRAPHQL_BALANCE_QUERY: &str = r#"
+query PeregrineSuiBalance($address: SuiAddress!, $coinType: String!) {
+  address(address: $address) {
+    balance(coinType: $coinType) {
+      totalBalance
+      coinBalance
+      addressBalance
+    }
+  }
+}
+"#;
 
 const COMMAND_OUTPUT_EVENT: &str = "command-output";
 #[derive(Serialize)]
@@ -39,6 +51,28 @@ pub(crate) struct CommandOutput {
     status: Option<i32>,
     stdout: String,
     stderr: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SuiWalletSummaryRequest {
+    graph_ql_url: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SuiWalletSummary {
+    active_address: Option<String>,
+    active_alias: Option<String>,
+    balance: Option<SuiBalanceSummary>,
+    balance_error: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SuiBalanceSummary {
+    coin_type: String,
+    total_balance_mist: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -834,6 +868,71 @@ pub(crate) async fn load_sui_key_state() -> Result<SuiKeyState, String> {
 }
 
 #[tauri::command]
+pub(crate) async fn load_sui_wallet_summary(
+    request: SuiWalletSummaryRequest,
+) -> Result<SuiWalletSummary, String> {
+    let state = tauri::async_runtime::spawn_blocking(move || {
+        let manager = sui_key_manager()?;
+        manager.load_state().map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| format!("Could not join Sui wallet summary load task: {error}"))??;
+
+    let active_account = state
+        .accounts
+        .iter()
+        .find(|account| account.is_active)
+        .or_else(|| {
+            state.active_address.as_ref().and_then(|address| {
+                state
+                    .accounts
+                    .iter()
+                    .find(|account| account.address == *address)
+            })
+        });
+    let active_address = active_account
+        .map(|account| account.address.clone())
+        .or_else(|| state.active_address.clone());
+    let active_alias = active_account.and_then(|account| account.alias.clone());
+
+    let Some(address) = active_address.clone() else {
+        return Ok(SuiWalletSummary {
+            active_address: None,
+            active_alias: None,
+            balance: None,
+            balance_error: None,
+        });
+    };
+
+    let Some(graph_ql_url) = request
+        .graph_ql_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|url| !url.is_empty())
+    else {
+        return Ok(SuiWalletSummary {
+            active_address: Some(address),
+            active_alias,
+            balance: None,
+            balance_error: Some("No GraphQL endpoint configured for this network.".to_string()),
+        });
+    };
+
+    let balance = fetch_sui_balance(graph_ql_url, &address).await;
+    let (balance, balance_error) = match balance {
+        Ok(balance) => (Some(balance), None),
+        Err(error) => (None, Some(error)),
+    };
+
+    Ok(SuiWalletSummary {
+        active_address: Some(address),
+        active_alias,
+        balance,
+        balance_error,
+    })
+}
+
+#[tauri::command]
 pub(crate) async fn generate_sui_key(
     request: SuiGenerateKeyRequest,
 ) -> Result<SuiGenerateKeyResponse, String> {
@@ -940,6 +1039,85 @@ pub(crate) fn sui_adapter(app: &tauri::AppHandle) -> Result<SuiAdapter, String> 
 
 fn sui_key_manager() -> Result<SuiKeyManager, String> {
     SuiKeyManager::new_default().map_err(|error| error.to_string())
+}
+
+async fn fetch_sui_balance(graph_ql_url: &str, address: &str) -> Result<SuiBalanceSummary, String> {
+    let url = reqwest::Url::parse(graph_ql_url)
+        .map_err(|error| format!("Invalid Sui GraphQL endpoint: {error}"))?;
+
+    match url.scheme() {
+        "http" | "https" => {}
+        scheme => {
+            return Err(format!(
+                "Unsupported Sui GraphQL endpoint scheme `{scheme}`. Use http or https."
+            ));
+        }
+    }
+
+    let payload = serde_json::json!({
+        "query": SUI_GRAPHQL_BALANCE_QUERY,
+        "variables": {
+            "address": address,
+            "coinType": SUI_COIN_TYPE,
+        },
+    });
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(8))
+        .build()
+        .map_err(|error| format!("Could not create Sui GraphQL client: {error}"))?;
+    let response = client
+        .post(url)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(payload.to_string())
+        .send()
+        .await
+        .map_err(|error| format!("Could not query Sui balance: {error}"))?;
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|error| format!("Could not read Sui balance response: {error}"))?;
+
+    if !status.is_success() {
+        return Err(format!(
+            "Sui balance query failed with HTTP status {status}."
+        ));
+    }
+
+    let value: serde_json::Value = serde_json::from_str(&body)
+        .map_err(|error| format!("Could not parse Sui balance response: {error}"))?;
+
+    if let Some(message) = first_graphql_error_message(&value) {
+        return Err(format!("Sui balance query failed: {message}"));
+    }
+
+    let total_balance_mist = value
+        .pointer("/data/address/balance/totalBalance")
+        .and_then(json_scalar_to_string)
+        .ok_or_else(|| "Sui balance response did not include a total balance.".to_string())?;
+
+    Ok(SuiBalanceSummary {
+        coin_type: SUI_COIN_TYPE.to_string(),
+        total_balance_mist,
+    })
+}
+
+fn first_graphql_error_message(value: &serde_json::Value) -> Option<String> {
+    value
+        .get("errors")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|errors| errors.first())
+        .and_then(|error| error.get("message"))
+        .and_then(serde_json::Value::as_str)
+        .map(ToOwned::to_owned)
+}
+
+fn json_scalar_to_string(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(value) => Some(value.clone()),
+        serde_json::Value::Number(value) => Some(value.to_string()),
+        _ => None,
+    }
 }
 
 fn load_sui_adapter_settings(app: &tauri::AppHandle) -> Result<SuiAdapterSettings, String> {

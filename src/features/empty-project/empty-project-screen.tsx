@@ -1,5 +1,5 @@
 import React from "react";
-import { ChevronDown, FolderOpen, Package, PackagePlus, Plus } from "lucide-react";
+import { FolderOpen, Package, PackagePlus, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,22 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SuiNetworkSelector } from "@/app/sui-network-selector";
 import {
-  networkOptions,
   suiGraphQlUrlForSelection,
   suiNetworkLabel,
-  type NetworkId,
   type SuiNetworkSelection,
 } from "@/app/sui-network";
 import {
@@ -472,7 +462,6 @@ function ImportMovePackageDialog({
   const [packageId, setPackageId] = React.useState("");
   const [saveRootPath, setSaveRootPath] = React.useState<string | null>(null);
   const [generateBuildable, setGenerateBuildable] = React.useState(false);
-  const [customGraphQlDraft, setCustomGraphQlDraft] = React.useState(network.customGraphQlUrl ?? "");
   const trimmedPackageId = packageId.trim();
   const packageIdError = trimmedPackageId && !isValidSuiPackageId(trimmedPackageId)
     ? "Use a Sui package ID: 0x followed by up to 64 hex characters."
@@ -485,10 +474,6 @@ function ImportMovePackageDialog({
       && saveRootPath
       && !isLoading,
   );
-
-  React.useEffect(() => {
-    setCustomGraphQlDraft(network.customGraphQlUrl ?? "");
-  }, [network.customGraphQlUrl]);
 
   return (
     <DialogContent
@@ -539,76 +524,15 @@ function ImportMovePackageDialog({
           <label className="text-sm font-medium" htmlFor="import-package-network">
             Network
           </label>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                className="h-10 justify-between rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 text-sm font-medium text-foreground hover:bg-[var(--app-elevated)]"
-                id="import-package-network"
-                type="button"
-                variant="ghost"
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="size-2.5 shrink-0 rounded-full bg-emerald-400" />
-                  <span className="truncate">{networkLabel}</span>
-                </span>
-                <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-80">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">
-                Sui network
-              </DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={network.id}
-                onValueChange={(value) => {
-                  onNetworkChange({
-                    id: value as NetworkId,
-                    customGraphQlUrl: network.customGraphQlUrl,
-                  });
-                }}
-              >
-                {networkOptions.map((option) => (
-                  <DropdownMenuRadioItem key={option.id} value={option.id}>
-                    <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                      <span>{option.label}</span>
-                      {option.id === "testnet" ? (
-                        <span className="text-[11px] text-muted-foreground">default</span>
-                      ) : null}
-                    </span>
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-
-              <DropdownMenuSeparator />
-
-              <div className="grid gap-2 p-2" onKeyDown={(event) => event.stopPropagation()}>
-                <DropdownMenuLabel className="px-0 py-0 text-xs text-muted-foreground">
-                  Custom GraphQL endpoint
-                </DropdownMenuLabel>
-                <Input
-                  className="h-8 text-xs"
-                  onChange={(event) => setCustomGraphQlDraft(event.target.value)}
-                  onKeyDown={(event) => event.stopPropagation()}
-                  placeholder="https://graphql.testnet.sui.io/graphql"
-                  value={customGraphQlDraft}
-                />
-                <Button
-                  className="h-8 justify-center text-xs"
-                  disabled={!customGraphQlDraft.trim()}
-                  onClick={() => {
-                    onNetworkChange({
-                      id: "custom",
-                      customGraphQlUrl: customGraphQlDraft.trim(),
-                    });
-                  }}
-                  type="button"
-                  variant="outline"
-                >
-                  Use custom GraphQL
-                </Button>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <SuiNetworkSelector
+            align="start"
+            buttonId="import-package-network"
+            className="w-full"
+            contentClassName="w-96"
+            network={network}
+            onNetworkChange={onNetworkChange}
+            size="default"
+          />
         </div>
 
         <div className="grid gap-2">

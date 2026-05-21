@@ -2,7 +2,6 @@ import React from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Bug,
-  ChevronDown,
   Code2,
   FlaskConical,
   Gauge,
@@ -17,28 +16,14 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { LayoutSettings } from "@/layout/layout-store";
 import {
   trafficLightInset,
   workspaceSidebarWidth,
 } from "@/layout/window-chrome";
-import {
-  networkOptions,
-  suiNetworkLabel,
-  type NetworkId,
-  type SuiNetworkSelection,
-} from "@/app/sui-network";
+import { SuiNetworkSelector } from "@/app/sui-network-selector";
+import type { SuiNetworkSelection } from "@/app/sui-network";
 import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 
 type TitlebarProps = {
@@ -195,12 +180,12 @@ export function Titlebar({
           />
           <TitlebarAction icon={Share} label="Export" />
           {showNetworkSelector ? (
-            <NetworkSelector network={network} onNetworkChange={onNetworkChange} />
+            <SuiNetworkSelector network={network} onNetworkChange={onNetworkChange} />
           ) : null}
         </div>
       ) : showNetworkSelector ? (
         <div className="flex h-full items-center justify-end pr-5" onPointerDown={(event) => event.stopPropagation()}>
-          <NetworkSelector network={network} onNetworkChange={onNetworkChange} />
+          <SuiNetworkSelector network={network} onNetworkChange={onNetworkChange} />
         </div>
       ) : (
         <div data-tauri-drag-region />
@@ -261,100 +246,6 @@ function WorkspaceActionButton({
         aria-hidden="true"
       />
     </Button>
-  );
-}
-
-function NetworkSelector({
-  network,
-  onNetworkChange,
-}: {
-  network: SuiNetworkSelection;
-  onNetworkChange: (network: SuiNetworkSelection) => void;
-}) {
-  const [customGraphQlDraft, setCustomGraphQlDraft] = React.useState(network.customGraphQlUrl ?? "");
-  const label = suiNetworkLabel(network);
-
-  React.useEffect(() => {
-    setCustomGraphQlDraft(network.customGraphQlUrl ?? "");
-  }, [network.customGraphQlUrl]);
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          aria-label={`Switch network. Current network: ${label}`}
-          className="h-8 gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2.5 text-xs font-medium text-foreground hover:bg-[var(--app-elevated)]"
-          type="button"
-          variant="ghost"
-        >
-          <span className="relative flex size-2.5 shrink-0">
-            <span className="absolute inline-flex size-full rounded-full bg-emerald-400 opacity-40" />
-            <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400" />
-          </span>
-          <span className="max-w-24 truncate">{label}</span>
-          <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden="true" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">
-          Sui network
-        </DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          value={network.id}
-          onValueChange={(value) => {
-            onNetworkChange({
-              id: value as NetworkId,
-              customGraphQlUrl: network.customGraphQlUrl,
-            });
-          }}
-        >
-          {networkOptions.map((option) => (
-            <DropdownMenuRadioItem key={option.id} value={option.id}>
-              <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                <span>{option.label}</span>
-                {option.id === "testnet" ? (
-                  <span className="text-[11px] text-muted-foreground">default</span>
-                ) : null}
-              </span>
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-
-        <DropdownMenuSeparator />
-
-        <div className="grid gap-2 p-2" onKeyDown={(event) => event.stopPropagation()}>
-          <DropdownMenuLabel className="px-0 py-0 text-xs text-muted-foreground">
-            Custom GraphQL endpoint
-          </DropdownMenuLabel>
-          <Input
-            className="h-8 text-xs"
-            onChange={(event) => setCustomGraphQlDraft(event.target.value)}
-            onKeyDown={(event) => event.stopPropagation()}
-            placeholder="https://graphql.testnet.sui.io/graphql"
-            value={customGraphQlDraft}
-          />
-          <Button
-            className="h-8 justify-center text-xs"
-            disabled={!customGraphQlDraft.trim()}
-            onClick={() => {
-              onNetworkChange({
-                id: "custom",
-                customGraphQlUrl: customGraphQlDraft.trim(),
-              });
-            }}
-            type="button"
-            variant="outline"
-          >
-            Use custom GraphQL
-          </Button>
-          {network.id === "custom" && network.customGraphQlUrl ? (
-            <p className="truncate text-[11px] text-muted-foreground" title={network.customGraphQlUrl}>
-              Active: {network.customGraphQlUrl}
-            </p>
-          ) : null}
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
