@@ -24,10 +24,12 @@ syntect = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
 peregrine-adapters = { workspace = true }
+peregrine-bytecode = { workspace = true }
 peregrine-dynamic-analysis = { workspace = true }
 peregrine-helper-protocol = { workspace = true }
 peregrine-indexer = { workspace = true }
 peregrine-import-engine = { workspace = true }
+peregrine-move-graphs = { workspace = true }
 peregrine-plugins = { workspace = true }
 peregrine-static-analysis = { workspace = true }
 

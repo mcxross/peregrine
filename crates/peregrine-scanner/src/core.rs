@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use peregrine_types::sui::move_model::MovePackageModel;
+use peregrine_move_model::MovePackageModel;
 use serde::Serialize;
 
 use crate::sui::objects::ObjectScanReport;

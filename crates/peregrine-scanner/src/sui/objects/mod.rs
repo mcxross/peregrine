@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 use std::path::PathBuf;
 
-use peregrine_types::sui::move_model::{MoveModule, MoveStructSignature};
+use peregrine_move_model::{MoveModule, MoveStructSignature};
 use serde::Serialize;
 
 use crate::{
@@ -2070,7 +2070,7 @@ fn capability_like_name(name: &str) -> bool {
 mod tests {
     use std::path::Path;
 
-    use peregrine_types::sui::move_model::{parse_module_declarations, MovePackageModel};
+    use peregrine_move_model::{parse_module_declarations, MovePackageModel};
 
     use super::*;
     use crate::core::{ScanInput, SourceMode};

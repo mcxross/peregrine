@@ -1,4 +1,4 @@
-use super::super::MovePackageModel;
+use peregrine_move_model::MovePackageModel;
 use serde::Deserialize;
 use serde_json::Value;
 use std::{

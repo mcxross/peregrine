@@ -1,0 +1,13 @@
+include!("builder/entry.rs");
+include!("builder/indexing.rs");
+include!("builder/source_relationships.rs");
+include!("builder/traversal.rs");
+include!("builder/calls.rs");
+include!("builder/types.rs");
+include!("builder/state_access.rs");
+include!("builder/resolution.rs");
+include!("builder/summary_enrichment.rs");
+include!("builder/finish.rs");
+include!("builder/inputs.rs");
+include!("builder/source_modules.rs");
+include!("builder/syntax.rs");

@@ -1,0 +1,10 @@
+include!("object_lifecycle/types.rs");
+include!("object_lifecycle/maps.rs");
+include!("object_lifecycle/indexes.rs");
+include!("object_lifecycle/direct_events.rs");
+include!("object_lifecycle/call_paths.rs");
+include!("object_lifecycle/risk_rules.rs");
+include!("object_lifecycle/predicates.rs");
+include!("object_lifecycle/signatures.rs");
+include!("object_lifecycle/operations.rs");
+include!("object_lifecycle/parsing.rs");

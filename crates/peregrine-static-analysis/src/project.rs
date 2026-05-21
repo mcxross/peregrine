@@ -1,28 +1,12 @@
-use peregrine_types::sui::move_model::{
-    discover_move_project_graphs, discover_move_project_graphs_for_package,
+use peregrine_move_graphs::{
     discover_move_project_model, discover_move_project_model_fast,
-    discover_move_project_model_shallow, discover_move_state_access_graph_for_function,
-    MovePackageModel,
+    discover_move_project_model_shallow, MoveCallGraph, MoveProjectModel, MoveStateAccessGraph,
+    MoveTypeGraph, PackageDependencyGraph,
 };
+use peregrine_move_insights::attack_surface::{package_surface_for_package, MovePackageSurface};
+use peregrine_move_model::{MoveModule, MovePackageModel};
 use serde::Serialize;
 use std::path::Path;
-
-use crate::sui::attack_surface::package_surface_for_package;
-
-pub use crate::sui::attack_surface::{
-    AdminControlFinding, CapabilityFinding, ExternalCallFinding, MovePackageSurface,
-    ObjectOwnershipFinding, PublicPackageRelationship,
-};
-pub use crate::sui::object_lifecycle::{
-    ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleRisk, ObjectLifecycleStage,
-};
-pub use peregrine_types::sui::move_model::{
-    MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode, MoveFunctionSignature, MoveModule,
-    MoveProjectGraphs, MoveSourceSpan, MoveStateAccessGraph, MoveStateAccessGraphEdge,
-    MoveStateAccessGraphNode, MoveStructField, MoveStructSignature, MoveTypeGraph,
-    MoveTypeGraphEdge, MoveTypeGraphNode, MoveUnresolvedCall, MoveUnresolvedStateAccess,
-    MoveUnresolvedType, PackageDependencyEdge, PackageDependencyGraph, PackageDependencyNode,
-};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -59,34 +43,7 @@ pub fn discover_move_project_shallow(root: &Path) -> MoveProject {
     build_move_project(root, model)
 }
 
-pub fn discover_project_graphs(root: &Path) -> MoveProjectGraphs {
-    discover_move_project_graphs(root)
-}
-
-pub fn discover_project_graphs_for_package(root: &Path, package_path: &str) -> MoveProjectGraphs {
-    discover_move_project_graphs_for_package(root, package_path)
-}
-
-pub fn discover_state_access_graph_for_function(
-    root: &Path,
-    package_path: &str,
-    address: Option<String>,
-    module_name: &str,
-    function_name: &str,
-) -> MoveStateAccessGraph {
-    discover_move_state_access_graph_for_function(
-        root,
-        package_path,
-        address,
-        module_name,
-        function_name,
-    )
-}
-
-fn build_move_project(
-    root: &Path,
-    model: peregrine_types::sui::move_model::MoveProjectModel,
-) -> MoveProject {
+fn build_move_project(root: &Path, model: MoveProjectModel) -> MoveProject {
     let packages = model
         .packages
         .into_iter()
@@ -119,8 +76,8 @@ fn build_move_package(root: &Path, model: MovePackageModel) -> MovePackage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sui::attack_surface::package_surface;
-    use peregrine_types::sui::move_model::parse_module_declarations;
+    use peregrine_move_insights::attack_surface::package_surface;
+    use peregrine_move_model::parse_module_declarations;
     use std::fs;
     use tempfile::tempdir;
 

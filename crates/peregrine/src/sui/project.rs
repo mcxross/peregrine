@@ -2,7 +2,8 @@ use crate::{
     output::{CliDiagnostic, CliDiagnosticSeverity},
     sui::args::{BytecodeArgs, VerifyArgs},
 };
-use peregrine_static_analysis::{discover_move_project_fast, MoveModule};
+use peregrine_move_model::MoveModule;
+use peregrine_static_analysis::discover_move_project_fast;
 use std::{
     ffi::OsStr,
     path::{Component, Path, PathBuf},

@@ -12424,10 +12424,12 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "peregrine-adapters",
+ "peregrine-bytecode",
  "peregrine-dynamic-analysis",
  "peregrine-helper-protocol",
  "peregrine-import-engine",
  "peregrine-indexer",
+ "peregrine-move-graphs",
  "peregrine-plugins",
  "peregrine-static-analysis",
  "pulldown-cmark 0.12.2",
@@ -12490,6 +12492,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "peregrine-bytecode"
+version = "0.1.0"
+dependencies = [
+ "move-binary-format 0.0.3",
+ "move-bytecode-source-map 0.1.0",
+ "move-decompiler",
+ "move-disassembler 0.1.0",
+ "move-ir-types 0.1.0",
+ "move-model-2 0.1.0",
+ "serde",
+ "walkdir",
+ "wat",
+]
+
+[[package]]
 name = "peregrine-cli"
 version = "0.1.0"
 dependencies = [
@@ -12498,9 +12515,12 @@ dependencies = [
  "move-cli",
  "move-package-alt-compilation",
  "peregrine-adapters",
+ "peregrine-bytecode",
  "peregrine-dynamic-analysis",
  "peregrine-helper-protocol",
  "peregrine-import-engine",
+ "peregrine-move-graphs",
+ "peregrine-move-model",
  "peregrine-static-analysis",
  "serde",
  "serde_json",
@@ -12554,8 +12574,8 @@ version = "0.1.0"
 dependencies = [
  "hex",
  "move-binary-format 0.0.3",
+ "peregrine-bytecode",
  "peregrine-package-resolution",
- "peregrine-static-analysis",
  "regex",
  "serde",
  "serde_json",
@@ -12581,6 +12601,36 @@ dependencies = [
  "tempfile",
  "toml 0.8.23",
  "walkdir",
+]
+
+[[package]]
+name = "peregrine-move-graphs"
+version = "0.1.0"
+dependencies = [
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "peregrine-move-model",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "peregrine-move-insights"
+version = "0.1.0"
+dependencies = [
+ "peregrine-move-model",
+ "peregrine-scanner",
+ "serde",
+]
+
+[[package]]
+name = "peregrine-move-model"
+version = "0.1.0"
+dependencies = [
+ "move-command-line-common 0.1.0",
+ "move-compiler 0.0.1",
+ "serde",
 ]
 
 [[package]]
@@ -12612,7 +12662,7 @@ name = "peregrine-scanner"
 version = "0.1.0"
 dependencies = [
  "move-binary-format 0.0.3",
- "peregrine-types",
+ "peregrine-move-model",
  "serde",
  "walkdir",
 ]
@@ -12622,16 +12672,12 @@ name = "peregrine-static-analysis"
 version = "0.1.0"
 dependencies = [
  "globset",
- "move-binary-format 0.0.3",
- "move-bytecode-source-map 0.1.0",
  "move-command-line-common 0.1.0",
  "move-compiler 0.0.1",
- "move-decompiler",
- "move-disassembler 0.1.0",
- "move-ir-types 0.1.0",
- "move-model-2 0.1.0",
+ "peregrine-move-graphs",
+ "peregrine-move-insights",
+ "peregrine-move-model",
  "peregrine-plugins",
- "peregrine-scanner",
  "peregrine-types",
  "serde",
  "serde_json",
@@ -12645,11 +12691,7 @@ dependencies = [
 name = "peregrine-types"
 version = "0.1.0"
 dependencies = [
- "move-command-line-common 0.1.0",
- "move-compiler 0.0.1",
  "serde",
- "serde_json",
- "tempfile",
  "toml 0.8.23",
 ]
 

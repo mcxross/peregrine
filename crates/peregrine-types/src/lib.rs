@@ -1,5 +1,4 @@
 pub mod analysis;
-pub mod sui;
 
 pub use analysis::{
     AnalysisConfig, AnalysisContext, AnalysisDiagnostic, AnalysisReport, AnalysisSection, Finding,

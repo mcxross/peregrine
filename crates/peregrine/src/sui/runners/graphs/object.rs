@@ -7,8 +7,8 @@ use crate::{
     output::{CliDiagnostic, CliStep},
     sui::{args::ObjectGraphArgs, project::CliContext},
 };
-use peregrine_static_analysis::{
-    discover_project_graphs_for_package, MoveStateAccessGraph, MoveStateAccessGraphEdge,
+use peregrine_move_graphs::{
+    discover_move_project_graphs_for_package, MoveStateAccessGraph, MoveStateAccessGraphEdge,
 };
 use serde_json::json;
 use std::{
@@ -18,8 +18,9 @@ use std::{
 
 pub fn run_object_graph(context: &CliContext, args: &ObjectGraphArgs) -> CliStep {
     let started_at = Instant::now();
-    let graph = discover_project_graphs_for_package(&context.project_root, &context.package_path)
-        .state_access_graph;
+    let graph =
+        discover_move_project_graphs_for_package(&context.project_root, &context.package_path)
+            .state_access_graph;
     let graph = filter_object_graph(graph, args);
 
     if graph.nodes.is_empty() {
@@ -294,7 +295,7 @@ fn display_command(args: &ObjectGraphArgs) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use peregrine_static_analysis::MoveStateAccessGraphNode;
+    use peregrine_move_graphs::MoveStateAccessGraphNode;
 
     #[test]
     fn object_graph_text_lists_accesses() {

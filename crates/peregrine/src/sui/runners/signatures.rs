@@ -2,9 +2,8 @@ use crate::{
     output::{elapsed_ms, CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, EXIT_SUCCESS},
     sui::{args::SignaturesArgs, project::CliContext},
 };
-use peregrine_static_analysis::{
-    discover_move_project_fast, MoveFunctionSignature, MoveModule, MovePackage,
-};
+use peregrine_move_model::{MoveFunctionSignature, MoveModule};
+use peregrine_static_analysis::{discover_move_project_fast, MovePackage};
 use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,

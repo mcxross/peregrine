@@ -7,7 +7,7 @@ use crate::{
     output::{elapsed_ms, CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep},
     sui::{args::CfgArgs, project::CliContext, runners::run_build},
 };
-use peregrine_static_analysis::sui::{
+use peregrine_bytecode::{
     load_package_bytecode, MoveBytecodeControlFlowView, MoveBytecodeFunctionView,
     MoveBytecodeModuleView,
 };
@@ -383,7 +383,7 @@ fn display_command(args: &CfgArgs) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use peregrine_static_analysis::sui::{
+    use peregrine_bytecode::{
         MoveBytecodeBasicBlockView, MoveBytecodeControlFlowEdgeView, MoveBytecodeInstructionView,
     };
 

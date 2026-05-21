@@ -1,14 +1,15 @@
 use crate::file_preview::{build_file_preview, FilePreview};
 use crate::validated_move_project_name;
 use base64::{engine::general_purpose, Engine};
-use peregrine_static_analysis::sui::bytecode_view::{
-    load_package_bytecode, MoveBytecodePackageView,
+use peregrine_bytecode::{load_package_bytecode, MoveBytecodePackageView};
+use peregrine_move_graphs::{
+    discover_move_project_graphs, discover_move_project_graphs_for_package,
+    discover_move_state_access_graph_for_function, MoveCallGraph, MoveProjectGraphs,
+    MoveStateAccessGraph, MoveTypeGraph, PackageDependencyGraph,
 };
 use peregrine_static_analysis::{
-    discover_move_project_fast, discover_move_project_shallow, discover_project_graphs,
-    discover_project_graphs_for_package, discover_state_access_graph_for_function, AnalysisConfig,
-    AnalysisEngine, AnalysisEngineOptions, AnalysisReport, MoveCallGraph, MovePackage,
-    MoveProjectGraphs, MoveStateAccessGraph, MoveTypeGraph, PackageDependencyGraph,
+    discover_move_project_fast, discover_move_project_shallow, AnalysisConfig, AnalysisEngine,
+    AnalysisEngineOptions, AnalysisReport, MovePackage,
 };
 use serde::Serialize;
 use std::{
@@ -280,7 +281,7 @@ fn build_move_state_access_graph(
         return Err("Move package must be inside the opened project.".to_string());
     }
 
-    Ok(discover_state_access_graph_for_function(
+    Ok(discover_move_state_access_graph_for_function(
         &root,
         &package_path,
         module_address,
@@ -309,10 +310,13 @@ fn build_move_graphs(
             return Err("Move package must be inside the opened project.".to_string());
         }
 
-        return Ok(discover_project_graphs_for_package(&root, &package_path));
+        return Ok(discover_move_project_graphs_for_package(
+            &root,
+            &package_path,
+        ));
     }
 
-    Ok(discover_project_graphs(&root))
+    Ok(discover_move_project_graphs(&root))
 }
 
 fn collect_paths(root: &Path, directory: &Path, paths: &mut Vec<String>) -> Result<(), String> {

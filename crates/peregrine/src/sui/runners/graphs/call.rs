@@ -7,8 +7,8 @@ use crate::{
     output::{CliDiagnostic, CliStep},
     sui::{args::CallGraphArgs, project::CliContext},
 };
-use peregrine_static_analysis::{
-    discover_project_graphs_for_package, MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode,
+use peregrine_move_graphs::{
+    discover_move_project_graphs_for_package, MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode,
     MoveUnresolvedCall,
 };
 use serde_json::json;
@@ -19,8 +19,9 @@ use std::{
 
 pub fn run_call_graph(context: &CliContext, args: &CallGraphArgs) -> CliStep {
     let started_at = Instant::now();
-    let graph = discover_project_graphs_for_package(&context.project_root, &context.package_path)
-        .call_graph;
+    let graph =
+        discover_move_project_graphs_for_package(&context.project_root, &context.package_path)
+            .call_graph;
     let graph = filter_call_graph(graph, args);
 
     if graph.nodes.is_empty() {

@@ -7,8 +7,8 @@ description = "Buildable on-chain Move package import engine for Peregrine"
 [dependencies]
 hex = { workspace = true }
 move-binary-format = { workspace = true }
+peregrine-bytecode = { workspace = true }
 peregrine-package-resolution = { workspace = true }
-peregrine-static-analysis = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

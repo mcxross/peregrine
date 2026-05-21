@@ -4,10 +4,14 @@ members = [
   "crates/peregrine",
   "crates/peregrine-adapters",
   "crates/peregrine-dynamic-analysis",
+  "crates/peregrine-bytecode",
   "crates/peregrine-helper",
   "crates/peregrine-helper-protocol",
   "crates/peregrine-indexer",
   "crates/peregrine-import-engine",
+  "crates/peregrine-move-graphs",
+  "crates/peregrine-move-insights",
+  "crates/peregrine-move-model",
   "crates/peregrine-package-resolution",
   "crates/peregrine-plugins",
   "crates/peregrine-scanner",
@@ -42,9 +46,13 @@ move-stackless-bytecode = { path = "../oss/sui-prover/crates/move-stackless-byte
 movy = { path = "../oss/movy/crates/movy", default-features = false, features = ["sui-fuzz"] }
 peregrine-adapters = { path = "crates/peregrine-adapters" }
 peregrine-dynamic-analysis = { path = "crates/peregrine-dynamic-analysis" }
+peregrine-bytecode = { path = "crates/peregrine-bytecode" }
 peregrine-helper-protocol = { path = "crates/peregrine-helper-protocol" }
 peregrine-indexer = { path = "crates/peregrine-indexer" }
 peregrine-import-engine = { path = "crates/peregrine-import-engine" }
+peregrine-move-graphs = { path = "crates/peregrine-move-graphs" }
+peregrine-move-insights = { path = "crates/peregrine-move-insights" }
+peregrine-move-model = { path = "crates/peregrine-move-model" }
 peregrine-package-resolution = { path = "crates/peregrine-package-resolution" }
 peregrine-plugins = { path = "crates/peregrine-plugins" }
 peregrine-scanner = { path = "crates/peregrine-scanner" }

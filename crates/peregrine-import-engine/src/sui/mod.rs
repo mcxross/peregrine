@@ -1,9 +1,9 @@
 use move_binary_format::file_format::CompiledModule;
+use peregrine_bytecode::{
+    decompile_package_bytecode_modules, DecompiledMoveModule, MoveModuleBytecodeInput,
+};
 use peregrine_package_resolution::sui::{
     fetch_move_package_from_graphql, normalize_sui_package_id, FetchedMovePackage,
-};
-use peregrine_static_analysis::sui::{
-    decompile_package_bytecode_modules, DecompiledMoveModule, MoveModuleBytecodeInput,
 };
 use regex::{Regex, RegexBuilder};
 use serde::Serialize;
