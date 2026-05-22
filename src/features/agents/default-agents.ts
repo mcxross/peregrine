@@ -12,98 +12,196 @@ const defaultExecution: AgentExecutionConfig = {
   persistMemory: false,
 };
 
+const defaultProvider = {
+  providerId: "ollama",
+  modelId: "",
+  endpoint: "http://127.0.0.1:11434",
+};
+
 const now = 1_779_062_400_000;
 
 export const defaultAgents: AgentDefinition[] = [
   {
-    id: "agent-code-review",
+    id: "agent-orchestrator",
     kind: "default",
-    name: "Code Review Agent",
-    description: "Reviews Move modules for correctness, maintainability, and risky diffs.",
+    name: "Orchestrator Agent",
+    description: "Plans runs, coordinates agents, and synthesizes results.",
     systemPrompt:
-      "Review the provided repository context. Focus on concrete issues, evidence, and validation steps.",
-    tools: ["index.context.lookup", "tool.run.tests", "report.findings"],
-    provider: {
-      providerId: "ai-gateway",
-      modelId: "openai/gpt-5.2",
-    },
+      "Plan Peregrine security workflows. Coordinate specialist agents and summarize only evidence-backed results.",
+    tools: [
+      "rust.index.package",
+      "rust.static.scan_package",
+      "rust.graph.object_lifecycle",
+      "rust.bytecode.disassemble",
+      "rust.dynamic.run_test",
+      "rust.validation.run_suite",
+      "rust.findings.triage",
+      "rust.report.synthesize",
+    ],
+    provider: defaultProvider,
     execution: defaultExecution,
-    status: "idle",
-    workflowId: "workflow-code-review",
+    status: "active",
+    workflowId: "workflow-orchestrator",
     updatedAt: now,
   },
   {
-    id: "agent-security-analysis",
+    id: "agent-static-analysis",
     kind: "default",
-    name: "Security Analysis Agent",
-    description: "Coordinates security review, tool evidence, and finding drafts.",
+    name: "Static Analysis Agent",
+    description: "Runs source-level analyzers and detects vulnerability patterns.",
     systemPrompt:
-      "Assess smart contract risk from bounded context packets and deterministic tool evidence.",
-    tools: ["index.context.lookup", "static.signals.read", "report.findings"],
-    provider: {
-      providerId: "ai-gateway",
-      modelId: "anthropic/claude-sonnet-4-5",
-    },
+      "Run source-level Peregrine analysis. Ground every finding in static tool output and concrete code locations.",
+    tools: [
+      "rust.static.scan_package",
+      "rust.static.inspect_function",
+      "rust.static.find_capabilities",
+      "rust.graph.call_graph.read",
+      "rust.index.read_symbols",
+      "rust.findings.emit",
+    ],
+    provider: defaultProvider,
     execution: defaultExecution,
-    status: "idle",
-    workflowId: "workflow-security-analysis",
+    status: "active",
+    workflowId: "workflow-static-analysis",
     updatedAt: now,
   },
   {
-    id: "agent-indexing",
+    id: "agent-dynamic-analysis",
     kind: "default",
-    name: "Indexing Agent",
-    description: "Monitors project indexing and requests targeted context refreshes.",
+    name: "Dynamic Analysis Agent",
+    description: "Executes tests, fuzzing, traces, and simulations to validate findings.",
     systemPrompt:
-      "Inspect index health and request bounded refreshes without making security conclusions.",
-    tools: ["index.status.read", "index.context.lookup", "index.refresh"],
-    provider: {
-      providerId: "ollama",
-      modelId: "llama3.2",
-      endpoint: "http://127.0.0.1:11434",
-    },
+      "Execute targeted validation. Prefer reproducible tests, traces, and state diffs over speculative conclusions.",
+    tools: [
+      "rust.dynamic.run_test",
+      "rust.dynamic.trace_execution",
+      "rust.dynamic.fuzz_function",
+      "rust.dynamic.state_diff",
+      "rust.test.generate_case",
+      "rust.findings.attach_trace",
+    ],
+    provider: defaultProvider,
+    execution: defaultExecution,
+    status: "idle",
+    workflowId: "workflow-dynamic-analysis",
+    updatedAt: now,
+  },
+  {
+    id: "agent-graph-reasoning",
+    kind: "default",
+    name: "Graph Reasoning Agent",
+    description: "Builds and interprets lifecycle, CFG, call, and capability graphs.",
+    systemPrompt:
+      "Interpret Peregrine graph output. Explain object lifecycle, control flow, call graph, and capability flow evidence.",
+    tools: [
+      "rust.graph.object_lifecycle",
+      "rust.graph.cfg",
+      "rust.graph.call_graph",
+      "rust.graph.capability_flow",
+      "rust.graph.finding_impact",
+      "rust.graph.path_query",
+      "rust.findings.attach_graph",
+    ],
+    provider: defaultProvider,
+    execution: defaultExecution,
+    status: "active",
+    workflowId: "workflow-graph-reasoning",
+    updatedAt: now,
+  },
+  {
+    id: "agent-bytecode",
+    kind: "default",
+    name: "Bytecode Agent",
+    description: "Inspects compiled Move bytecode and control flow.",
+    systemPrompt:
+      "Inspect compiled Move bytecode. Use bytecode control flow, source maps, and stack effects as evidence.",
+    tools: [
+      "rust.bytecode.disassemble",
+      "rust.bytecode.cfg",
+      "rust.bytecode.stack_effects",
+      "rust.bytecode.source_map",
+      "rust.findings.attach_bytecode",
+    ],
+    provider: defaultProvider,
+    execution: defaultExecution,
+    status: "idle",
+    workflowId: "workflow-bytecode",
+    updatedAt: now,
+  },
+  {
+    id: "agent-invariant",
+    kind: "default",
+    name: "Invariant Agent",
+    description: "Infers and checks invariants across modules and objects.",
+    systemPrompt:
+      "Infer candidate invariants from code, object state, and graph evidence. Mark unsupported invariants as hypotheses.",
+    tools: [
+      "rust.invariant.infer",
+      "rust.invariant.check",
+      "rust.validation.assert_property",
+      "rust.findings.emit",
+    ],
+    provider: defaultProvider,
+    execution: defaultExecution,
+    status: "idle",
+    workflowId: "workflow-invariant",
+    updatedAt: now,
+  },
+  {
+    id: "agent-patch",
+    kind: "default",
+    name: "Patch Agent",
+    description: "Proposes minimal, safe code changes to fix issues.",
+    systemPrompt:
+      "Propose minimal Move changes only after findings have evidence. Preserve behavior outside the issue scope.",
+    tools: [
+      "rust.patch.suggest",
+      "rust.patch.apply_preview",
+      "rust.findings.link_patch",
+    ],
+    provider: defaultProvider,
     execution: {
       ...defaultExecution,
-      mode: "manual",
-      maxSteps: 8,
-      requireToolApproval: false,
+      requireToolApproval: true,
     },
     status: "idle",
-    workflowId: "workflow-indexing",
-    updatedAt: now,
-  },
-  {
-    id: "agent-documentation",
-    kind: "default",
-    name: "Documentation Agent",
-    description: "Turns verified findings and context into audit-ready documentation.",
-    systemPrompt:
-      "Prepare concise documentation from evidence. Do not invent unsupported claims.",
-    tools: ["index.context.lookup", "report.export.markdown"],
-    provider: {
-      providerId: "ai-gateway",
-      modelId: "google/gemini-3-pro",
-    },
-    execution: defaultExecution,
-    status: "idle",
-    workflowId: "workflow-documentation",
+    workflowId: "workflow-patch",
     updatedAt: now,
   },
   {
     id: "agent-test-generation",
     kind: "default",
     name: "Test Generation Agent",
-    description: "Drafts adversarial test plans and validation commands.",
+    description: "Generates regression tests, scenarios, and validation suites.",
     systemPrompt:
-      "Generate test plans and patches only when supported by code context and expected checks.",
-    tools: ["index.context.lookup", "test.plan.create", "tool.run.tests"],
-    provider: {
-      providerId: "ai-gateway",
-      modelId: "openai/gpt-5.2",
-    },
+      "Generate regression tests and validation scenarios tied to concrete findings, code paths, and expected behavior.",
+    tools: [
+      "rust.test.generate_case",
+      "rust.dynamic.run_test",
+      "rust.dynamic.fuzz_function",
+      "rust.validation.run_suite",
+    ],
+    provider: defaultProvider,
     execution: defaultExecution,
     status: "idle",
     workflowId: "workflow-test-generation",
+    updatedAt: now,
+  },
+  {
+    id: "agent-report",
+    kind: "default",
+    name: "Report Agent",
+    description: "Produces human-readable audit reports and summaries.",
+    systemPrompt:
+      "Produce concise audit reports. Separate confirmed findings, evidence, residual risk, and next actions.",
+    tools: [
+      "rust.report.generate",
+      "rust.report.export_markdown",
+    ],
+    provider: defaultProvider,
+    execution: defaultExecution,
+    status: "idle",
+    workflowId: "workflow-report",
     updatedAt: now,
   },
 ];
@@ -158,11 +256,11 @@ export function createAgentWorkflow({
 
   const nodes = [
     node("trigger", "Manual trigger", 40, 90, "Starts the workflow."),
-    node("input", "Context packet", 230, 90, "Loads bounded project context."),
+    node("input", "Evidence packet", 230, 90, "Loads bounded project context and prior tool output."),
     node("agent", agentName, 440, 90, description),
-    node("tool", "Deterministic tools", 665, 20, "Runs allowed Peregrine tools."),
+    node("tool", "Rust tool gateway", 665, 20, "Runs allowed Peregrine tools."),
     node("condition", "Evidence gate", 665, 160, "Checks evidence completeness."),
-    node("output", "Report event", 900, 90, "Stores trace and output."),
+    node("output", "Run summary", 900, 90, "Stores trace, evidence, and output."),
   ];
 
   return {
@@ -192,4 +290,3 @@ function edge(workflowId: string, source: AgentWorkflowNodeType, target: AgentWo
     type: "smoothstep",
   };
 }
-

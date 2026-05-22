@@ -323,8 +323,11 @@ function StatusDot({ status }: { status: AgentStatus }) {
       className={cn(
         "size-2 rounded-full",
         status === "idle" && "bg-muted-foreground",
+        status === "active" && "bg-emerald-400",
         status === "running" && "animate-pulse bg-sky-400",
         status === "completed" && "bg-emerald-400",
+        status === "blocked" && "bg-red-400",
+        status === "needsApproval" && "bg-amber-400",
         status === "failed" && "bg-red-400",
       )}
     />

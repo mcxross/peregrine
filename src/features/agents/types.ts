@@ -1,6 +1,13 @@
 import type { Edge, Node } from "@xyflow/react";
 
-export type AgentStatus = "idle" | "running" | "failed" | "completed";
+export type AgentStatus =
+  | "active"
+  | "idle"
+  | "running"
+  | "blocked"
+  | "needsApproval"
+  | "failed"
+  | "completed";
 export type AgentKind = "default" | "custom";
 export type ProviderScope = "cloud" | "local";
 export type ExecutionMode = "manual" | "approvalGated" | "background";
@@ -88,9 +95,7 @@ export type ModelProviderDescriptor = {
   label: string;
   scope: ProviderScope;
   defaultEndpoint?: string;
-  defaultModelId: string;
-  modelIds: string[];
+  defaultModelId?: string;
   supportsTools: boolean;
   supportsLocalModels: boolean;
 };
-

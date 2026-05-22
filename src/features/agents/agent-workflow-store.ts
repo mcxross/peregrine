@@ -1,6 +1,7 @@
 import type {
   AgentDefinition,
   AgentExecutionLog,
+  AgentStatus,
   AgentStudioState,
   AgentWorkflow,
   AgentWorkflowNodeType,
@@ -67,7 +68,7 @@ export function createCustomAgent(): {
     id: workflowId,
     agentName: name,
     description: "Custom visual workflow.",
-    modelId: "llama3.2",
+    modelId: "",
     providerId: "ollama",
   });
 
@@ -82,7 +83,7 @@ export function createCustomAgent(): {
       tools: ["index.context.lookup"],
       provider: {
         providerId: "ollama",
-        modelId: "llama3.2",
+        modelId: "",
         endpoint: "http://127.0.0.1:11434",
       },
       execution: {
@@ -211,7 +212,12 @@ function normalizeAgentStudioState(parsed: Partial<AgentStudioState>): AgentStud
 }
 
 function mergeDefaultAgents(agents: AgentDefinition[]) {
-  const customAgents = agents.filter((agent) => agent.kind === "custom").map(clone);
+  const customAgents = agents
+    .filter((agent) => agent.kind === "custom")
+    .map((agent) => ({
+      ...clone(agent),
+      status: persistedAgentStatus(agent.status, "idle"),
+    }));
 
   return [
     ...defaultAgents.map((defaultAgent) => {
@@ -223,12 +229,23 @@ function mergeDefaultAgents(agents: AgentDefinition[]) {
         execution: storedAgent?.execution ?? defaultAgent.execution,
         systemPrompt: storedAgent?.systemPrompt ?? defaultAgent.systemPrompt,
         tools: storedAgent?.tools ?? defaultAgent.tools,
-        status: storedAgent?.status ?? defaultAgent.status,
+        status: persistedAgentStatus(storedAgent?.status, defaultAgent.status),
         updatedAt: storedAgent?.updatedAt ?? defaultAgent.updatedAt,
       };
     }),
     ...customAgents,
   ];
+}
+
+function persistedAgentStatus(
+  status: AgentStatus | undefined,
+  fallback: AgentStatus,
+): AgentStatus {
+  if (status === "active" || status === "idle") {
+    return status;
+  }
+
+  return fallback;
 }
 
 function mergeDefaultWorkflows(workflows: AgentWorkflow[]) {
