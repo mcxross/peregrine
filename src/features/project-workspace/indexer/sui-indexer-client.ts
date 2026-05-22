@@ -174,6 +174,21 @@ export function getContextPack(targetId: string, budget = defaultContextBudget()
   return invoke<unknown>("get_context_pack", { targetId, budget });
 }
 
+export type GraphView = {
+  nodes: string[];
+  edges: Array<[string, string]>;
+  trimmed: boolean;
+  trimReasons: string[];
+};
+
+export function getCallGraph(
+  functionId: string,
+  depth: number,
+  budget = defaultContextBudget("Level3"),
+) {
+  return invoke<GraphView>("get_call_graph", { functionId, depth, budget });
+}
+
 export function searchIndexedSymbols(
   packageId: string,
   query: string,

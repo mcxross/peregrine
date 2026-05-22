@@ -71,9 +71,13 @@ import type {
   AgentWorkflow,
 } from "@/features/agents/types";
 import {
+  displayMovePackageName,
   loadProjectMetadata,
   saveProjectMetadata,
+  type MovePackage,
+  type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
+import type { AgentToolProjectContext } from "@/features/agents/tools";
 import { cn } from "@/lib/utils";
 
 type AgentCategory = "Core" | "Analysis" | "Action" | "Output" | "Custom";
@@ -206,10 +210,27 @@ const TOOL_FAMILY_LABELS: Record<string, string> = {
 };
 
 export function AgentsScreen({
+  activeMovePackage,
+  packageTree,
   projectRootPath,
 }: {
+  activeMovePackage?: MovePackage | null;
+  packageTree?: PackageTree | null;
   projectRootPath?: string;
 }) {
+  const projectContext = React.useMemo<AgentToolProjectContext | null>(() => {
+    if (!projectRootPath || !activeMovePackage) {
+      return null;
+    }
+
+    return {
+      rootPath: projectRootPath,
+      packagePath: activeMovePackage.path || ".",
+      packageName: activeMovePackage.name,
+      manifestPath: activeMovePackage.manifestPath,
+      packageTree: packageTree ?? null,
+    };
+  }, [activeMovePackage, packageTree, projectRootPath]);
   const [state, setState] = React.useState<AgentStudioState>(() => loadAgentStudioState());
   const [isInspectorOpen, setIsInspectorOpen] = React.useState(true);
   const [activeMainTab, setActiveMainTab] = React.useState<MainTab>("agents");
@@ -592,7 +613,9 @@ export function AgentsScreen({
           agentId: runAgent.id,
           workflowId: runWorkflowState.id,
           level: "trace",
-          message: `${displayName} started. ${runAgent.name} is coordinating ${runAgent.tools.length} tools.`,
+          message: projectContext
+            ? `${displayName} started. ${runAgent.name} is coordinating ${runAgent.tools.length} tools against ${displayMovePackageName(projectContext.packageName)}.`
+            : `${displayName} started without an open Move package. Tool calls that need project context will fail until a project is loaded.`,
         }),
       ].slice(-120),
     }));
@@ -604,6 +627,7 @@ export function AgentsScreen({
         onTrace: (event) => {
           appendRunLog(runAgent.id, runWorkflowState.id, event);
         },
+        projectContext,
         signal: controller.signal,
         workflow: runWorkflowState,
       });
@@ -623,6 +647,14 @@ export function AgentsScreen({
         ),
         logs: [
           ...current.logs,
+          ...result.toolRuns.map((toolRun) =>
+            createExecutionLog({
+              agentId: runAgent.id,
+              workflowId: runWorkflowState.id,
+              level: toolRun.status === "failed" || toolRun.status === "denied" ? "warning" : "trace",
+              message: `Tool ${toolRun.toolId} (${toolRun.status}): ${toolRun.summary}`,
+            }),
+          ),
           createExecutionLog({
             agentId: runAgent.id,
             workflowId: runWorkflowState.id,

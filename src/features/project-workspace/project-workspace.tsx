@@ -496,7 +496,13 @@ function WorkspaceMainPanel({
   }
 
   if (activeWorkspaceTab === "Agents") {
-    return <AgentsScreen projectRootPath={packageTree.rootPath} />;
+    return (
+      <AgentsScreen
+        activeMovePackage={activeMovePackage}
+        packageTree={packageTree}
+        projectRootPath={packageTree.rootPath}
+      />
+    );
   }
 
   if (activeWorkspaceTab === "Bytecode") {

@@ -2,9 +2,14 @@ import {
   PeregrineAgentRuntime,
   type AgentContextPacket,
   type AgentRole,
-  type ToolGateway,
+  type ToolRunSummary,
 } from "@peregrine/agent-runtime";
 
+import {
+  createAgentToolRuntimeState,
+  createAgentWorkspaceRuntime,
+  type AgentToolProjectContext,
+} from "@/features/agents/tools";
 import { providerById } from "@/features/agents/model-providers/provider-adapters";
 import type {
   AgentDefinition,
@@ -14,6 +19,7 @@ import type {
 
 export type AgentRunResult = {
   text: string;
+  toolRuns: ToolRunSummary[];
 };
 
 export type AgentRunTraceEvent = {
@@ -24,28 +30,56 @@ export type AgentRunTraceEvent = {
 export async function runAgentWorkflowWithModel({
   agent,
   onTrace,
+  projectContext,
   signal,
   workflow,
 }: {
   agent: AgentDefinition;
   onTrace?: (event: AgentRunTraceEvent) => void;
+  projectContext?: AgentToolProjectContext | null;
   signal?: AbortSignal;
   workflow: AgentWorkflow;
 }): Promise<AgentRunResult> {
   const provider = providerById(agent.provider.providerId);
   const model = await provider.resolveLanguageModel(agent.provider);
-  const packet = buildWorkflowContextPacket(agent, workflow);
-  const prompt = buildAgentPrompt(agent, workflow);
+  const toolState = createAgentToolRuntimeState(
+    projectContext ?? {
+      rootPath: "",
+      packagePath: ".",
+      packageName: workflow.name,
+      manifestPath: "",
+      packageTree: null,
+    },
+  );
+  const toolRuns: ToolRunSummary[] = [];
+  const workspaceRuntime = createAgentWorkspaceRuntime({
+    state: toolState,
+    activeToolIds: agent.tools,
+    requireToolApproval: agent.execution.requireToolApproval,
+    onToolRun: (toolRun) => {
+      toolRuns.push(toolRun);
+      onTrace?.({
+        level: toolRun.status === "failed" || toolRun.status === "denied" ? "warning" : "trace",
+        message: `Tool ${toolRun.toolId}: ${toolRun.summary}`,
+      });
+    },
+  });
+  const packet = buildWorkflowContextPacket(agent, workflow, toolState, projectContext);
+  const prompt = buildAgentPrompt(agent, workflow, workspaceRuntime.tools);
   const runner = new PeregrineAgentRuntime({
     model,
-    tools: [],
-    toolGateway: noToolsGateway,
+    tools: workspaceRuntime.tools,
+    toolGateway: workspaceRuntime.toolRuntime,
     maxSteps: Math.max(1, agent.execution.maxSteps),
   });
 
   onTrace?.({
     level: "trace",
     message: `Prepared model call for ${agent.provider.providerId}/${agent.provider.modelId}. Endpoint: ${agent.provider.endpoint ?? "provider default"}.`,
+  });
+  onTrace?.({
+    level: "trace",
+    message: `Registered ${workspaceRuntime.tools.length} deterministic tools for ${agent.name}.`,
   });
   onTrace?.({
     level: "trace",
@@ -60,10 +94,10 @@ export async function runAgentWorkflowWithModel({
     packet,
     abortSignal: signal,
     prompt,
+    activeToolIds: agent.tools,
     timeout: {
       totalMs: 120_000,
     },
-    toolChoice: "none",
   });
 
   onTrace?.({
@@ -73,15 +107,23 @@ export async function runAgentWorkflowWithModel({
 
   return {
     text: result.text.trim(),
+    toolRuns,
   };
 }
 
-function buildAgentPrompt(agent: AgentDefinition, workflow: AgentWorkflow) {
+function buildAgentPrompt(
+  agent: AgentDefinition,
+  workflow: AgentWorkflow,
+  tools: Array<{ id: string; description: string }>,
+) {
   const nodes = workflow.nodes.map(formatNode).join("\n");
   const edges = workflow.edges.length
     ? workflow.edges
       .map((edge) => `- ${edge.source} -> ${edge.target}`)
       .join("\n")
+    : "- none";
+  const toolLines = tools.length
+    ? tools.map((tool) => `- ${tool.id}: ${tool.description}`).join("\n")
     : "- none";
 
   return [
@@ -93,17 +135,24 @@ function buildAgentPrompt(agent: AgentDefinition, workflow: AgentWorkflow) {
     "Workflow edges:",
     edges,
     "",
-    "Available tool identifiers configured for this agent:",
-    agent.tools.length ? agent.tools.map((tool) => `- ${tool}`).join("\n") : "- none",
+    "Deterministic Peregrine tools available in this run:",
+    toolLines,
     "",
-    "Because this workspace run does not yet expose deterministic tool outputs to the model, focus on analysis planning, requested checks, and expected evidence.",
+    "Use the configured tools when a claim can be checked deterministically.",
+    "Do not claim a check passed unless a tool result supports it.",
+    "Return a report with these sections: Run Summary, Reasoning Trace Summary, Findings or Output, Evidence Needed, Next Actions.",
   ].join("\n");
 }
 
 function buildWorkflowContextPacket(
   agent: AgentDefinition,
   workflow: AgentWorkflow,
+  toolState: ReturnType<typeof createAgentToolRuntimeState>,
+  projectContext?: AgentToolProjectContext | null,
 ): AgentContextPacket {
+  const rootPath = projectContext?.rootPath ?? "";
+  const packageName = projectContext?.packageName ?? workflow.name;
+
   return {
     task: {
       id: workflow.id,
@@ -115,13 +164,13 @@ function buildWorkflowContextPacket(
       agent.systemPrompt,
       "Run the configured Peregrine Agents workflow.",
       "Use the workflow graph as the task boundary.",
-      "Do not claim that deterministic repository tools ran unless explicit tool evidence is available.",
+      "Call deterministic Peregrine tools when evidence is required.",
       "Return a report with these sections: Run Summary, Reasoning Trace Summary, Findings or Output, Evidence Needed, Next Actions.",
     ].join("\n"),
     projectSummary: {
-      id: "local-project",
-      name: workflow.name,
-      rootPath: "",
+      id: rootPath || "local-project",
+      name: packageName,
+      rootPath,
       chain: "sui",
       modules: workflow.nodes.map((node) => ({
         id: node.id,
@@ -133,18 +182,35 @@ function buildWorkflowContextPacket(
     selectedCode: [],
     riskSignals: [],
     relevantGuides: [],
-    currentFindings: [],
+    currentFindings: toolState.session.triageFindings().map((finding) => ({
+      id: finding.id,
+      title: finding.title,
+      severity: finding.severity,
+      status: finding.status,
+      location: finding.location,
+      evidenceRefs: finding.evidenceRefs.map((ref) => ({
+        id: ref,
+        kind: "diagnostic" as const,
+        summary: finding.message,
+        source: finding.id,
+      })),
+    })),
     recentToolResults: [],
     allowedActions: [
       {
         actionClass: "readOnly",
-        description: "Read the provided workflow context.",
+        description: "Read project, index, graph, and bytecode context.",
         requiresApproval: false,
       },
       {
         actionClass: "toolExecution",
-        description: "Use deterministic tools only when registered in the agent runtime.",
+        description: "Run registered deterministic Peregrine tools.",
         requiresApproval: agent.execution.requireToolApproval,
+      },
+      {
+        actionClass: "generatedFileWrite",
+        description: "Generate draft reports or test templates.",
+        requiresApproval: true,
       },
     ],
     approvalPolicy: {
@@ -156,31 +222,11 @@ function buildWorkflowContextPacket(
     },
     outputContract: {
       format: "markdown",
-      requiredEvidence: false,
-      description: "Concise workflow report with observable evidence needs and next actions.",
+      requiredEvidence: true,
+      description: "Concise workflow report backed by deterministic tool evidence.",
     },
   };
 }
-
-const noToolsGateway: ToolGateway = {
-  async runTool(request) {
-    return {
-      status: "failed",
-      toolId: request.tool.id,
-      toolCallId: request.toolCallId,
-      action: request.tool.action,
-      summary: "No deterministic tools are registered for this UI workflow run.",
-      evidenceRefs: [],
-      diagnostics: [
-        {
-          level: "error",
-          source: "agents",
-          message: "No deterministic tools are registered for this UI workflow run.",
-        },
-      ],
-    };
-  },
-};
 
 function agentRoleForWorkflow(agent: AgentDefinition, workflow: AgentWorkflow): AgentRole {
   const text = `${agent.name} ${agent.description} ${workflow.name} ${workflow.description}`.toLowerCase();
