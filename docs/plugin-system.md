@@ -62,20 +62,20 @@ rules and unbundled plugins follow the same configuration path.
 Run a one-off analyzer plugin:
 
 ```sh
-peregrine-cli analyze --plugin ./target/plugin.wasm
-peregrine-cli analyze --plugin ./target/release/libplugin.dylib
+peregrine analyze --plugin ./target/plugin.wasm
+peregrine analyze --plugin ./target/release/libplugin.dylib
 ```
 
 Disable globally installed analyzer plugins for deterministic CI:
 
 ```sh
-peregrine-cli analyze --no-global-plugins
+peregrine analyze --no-global-plugins
 ```
 
 List discoverable bundled and plugin rule sets:
 
 ```sh
-peregrine-cli analyze --list-analyzers
+peregrine analyze --list-analyzers
 ```
 
 Package rule configuration stays in `peregrine.toml`:
