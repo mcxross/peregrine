@@ -28,17 +28,20 @@ import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 
 type TitlebarProps = {
   activeWorkspaceTab?: WorkspaceTab;
+  auditReportExportAvailable?: boolean;
   buildActionState?: WorkspaceActionState;
   coverageActionState?: WorkspaceActionState;
   formalActionState?: WorkspaceActionState;
   fuzzActionState?: WorkspaceActionState;
   isLeftPanelOpen?: boolean;
+  isExportingAuditReport?: boolean;
   layout: LayoutSettings;
   hasWorkspace?: boolean;
   mode?: WorkspaceMode;
   network: SuiNetworkSelection;
   onBuildPackage?: () => void;
   onCheckCoverage?: () => void;
+  onExportAuditReport?: () => void;
   onFormalVerification?: () => void;
   onFuzzPackage?: () => void;
   onNetworkChange: (network: SuiNetworkSelection) => void;
@@ -52,17 +55,20 @@ type TitlebarProps = {
 };
 
 export function Titlebar({
+  auditReportExportAvailable = false,
   buildActionState,
   coverageActionState,
   formalActionState,
   fuzzActionState,
   isLeftPanelOpen = true,
+  isExportingAuditReport = false,
   layout,
   hasWorkspace = true,
   mode = "security",
   network,
   onBuildPackage,
   onCheckCoverage,
+  onExportAuditReport,
   onFormalVerification,
   onFuzzPackage,
   onNetworkChange,
@@ -178,7 +184,18 @@ export function Titlebar({
             label={mode === "security" ? "Editor" : "Security"}
             onClick={onToggleMode}
           />
-          <TitlebarAction icon={Share} label="Export" />
+          <TitlebarAction
+            disabled={!auditReportExportAvailable || isExportingAuditReport}
+            icon={Share}
+            isRunning={isExportingAuditReport}
+            label="Export"
+            onClick={onExportAuditReport}
+            title={
+              auditReportExportAvailable
+                ? "Export latest audit report"
+                : "Run the full audit workflow to export a report"
+            }
+          />
           {showNetworkSelector ? (
             <SuiNetworkSelector network={network} onNetworkChange={onNetworkChange} />
           ) : null}
@@ -256,6 +273,7 @@ function TitlebarAction({
   label,
   onClick,
   suffix,
+  title,
 }: {
   disabled?: boolean;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
@@ -263,12 +281,14 @@ function TitlebarAction({
   label: string;
   onClick?: () => void;
   suffix?: string;
+  title?: string;
 }) {
   return (
     <Button
       className="h-auto gap-2 p-0 text-sm font-medium text-foreground hover:text-chart-1 disabled:opacity-50"
       disabled={disabled}
       onClick={onClick}
+      title={title ?? label}
       type="button"
       variant="ghost"
     >

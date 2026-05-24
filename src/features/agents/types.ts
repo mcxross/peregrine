@@ -90,6 +90,17 @@ export type AgentStudioState = {
   selectedWorkflowId: string;
 };
 
+export type AuditReportExport = {
+  auditSessionId: string;
+  defaultFileName: string;
+  generatedAt: string;
+  markdown: string;
+  packageName: string;
+  projectName: string;
+  reportJson: string;
+  traceJson?: string;
+};
+
 export type ModelProviderDescriptor = {
   id: string;
   label: string;

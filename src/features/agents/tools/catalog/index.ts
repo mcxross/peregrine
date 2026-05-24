@@ -6,11 +6,13 @@ import { createFindingsTools } from "@/features/agents/tools/catalog/findings-to
 import { createGraphTools } from "@/features/agents/tools/catalog/graph-tools";
 import { createIndexTools } from "@/features/agents/tools/catalog/index-tools";
 import { createInvariantTools } from "@/features/agents/tools/catalog/invariant-tools";
+import { createKnowledgeTools } from "@/features/agents/tools/catalog/knowledge-tools";
 import { createPatchTools } from "@/features/agents/tools/catalog/patch-tools";
 import { createReportTools } from "@/features/agents/tools/catalog/report-tools";
 import { createStaticTools } from "@/features/agents/tools/catalog/static-tools";
 import { createTestTools } from "@/features/agents/tools/catalog/test-tools";
 import { createValidationTools } from "@/features/agents/tools/catalog/validation-tools";
+import { createAuditTools } from "@/features/agents/tools/catalog/audit-tools";
 import { attachDefaultToolManifest } from "@/features/agents/tools/manifest";
 import type { AgentToolRuntimeState } from "@/features/agents/tools/types";
 
@@ -19,6 +21,7 @@ export function createAgentToolCatalog(
 ): DeterministicToolSpec[] {
   return [
     ...createIndexTools(state),
+    ...createKnowledgeTools(),
     ...createStaticTools(state),
     ...createGraphTools(state),
     ...createBytecodeTools(state),
@@ -29,6 +32,7 @@ export function createAgentToolCatalog(
     ...createPatchTools(state),
     ...createInvariantTools(state),
     ...createTestTools(state),
+    ...createAuditTools(state),
   ].map(attachDefaultToolManifest);
 }
 
@@ -37,6 +41,8 @@ export const AGENT_TOOL_IDS = [
   "rust.index.read_symbols",
   "index.context.lookup",
   "rust.index.package_overview",
+  "rust.knowledge.sui_move.search",
+  "rust.knowledge.sui_move.read",
   "rust.static.scan_package",
   "rust.static.inspect_function",
   "rust.static.find_capabilities",
@@ -72,4 +78,26 @@ export const AGENT_TOOL_IDS = [
   "rust.invariant.infer",
   "rust.invariant.check",
   "rust.test.generate_case",
+  "rust.audit.create_session",
+  "rust.audit.build_index",
+  "rust.audit.knowledge_graph",
+  "rust.audit.classify",
+  "rust.audit.threat_model",
+  "rust.audit.function_risk_map",
+  "rust.audit.invariants",
+  "rust.audit.static_analysis",
+  "rust.audit.graph_analysis",
+  "rust.audit.bytecode_review",
+  "rust.audit.attack_hypotheses",
+  "rust.audit.test_plan",
+  "rust.audit.dynamic_analysis",
+  "rust.audit.invariant_stress",
+  "rust.audit.confirm_findings",
+  "rust.audit.severity_ranking",
+  "rust.audit.remediation",
+  "rust.audit.regression_tests",
+  "rust.audit.report",
+  "rust.audit.trace",
+  "rust.audit.fix_verification",
+  "rust.audit.run_full",
 ] as const;

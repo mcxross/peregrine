@@ -50,9 +50,11 @@ export function attachDefaultToolManifest(
 
 function categoryForTool(toolId: string) {
   if (toolId.includes(".index.") || toolId.startsWith("index.")) return "index";
+  if (toolId.includes(".knowledge.")) return "knowledge";
   if (toolId.includes(".static.")) return "staticAnalysis";
   if (toolId.includes(".graph.")) return "graph";
   if (toolId.includes(".bytecode.")) return "bytecode";
+  if (toolId.includes(".audit.")) return "audit";
   if (toolId.includes(".dynamic.")) return "dynamicAnalysis";
   if (toolId.includes(".validation.")) return "validation";
   if (toolId.includes(".findings.")) return "finding";
@@ -67,6 +69,7 @@ function reducerForTool(toolId: string) {
   if (toolId.includes(".static.")) return "staticAnalysis";
   if (toolId.includes(".graph.")) return "graph";
   if (toolId.includes(".bytecode.")) return "bytecode";
+  if (toolId.includes(".audit.")) return "audit";
   if (toolId.includes(".fuzz")) return "fuzz";
   if (toolId.includes("assert_property") || toolId.includes("formal")) return "prover";
   if (toolId.includes(".dynamic.") || toolId.includes(".validation.")) return "command";
@@ -135,6 +138,11 @@ function whenToUse(toolId: string, category: string) {
   if (category === "index") {
     return ["Use to discover symbols or load bounded context before making code-specific claims."];
   }
+  if (category === "knowledge") {
+    return [
+      "Use when a Sui/Move language, framework, object model, prover, or security-review rule needs exact local documentation context.",
+    ];
+  }
   if (category === "staticAnalysis") {
     return ["Use for deterministic source-level findings, diagnostics, and precise locations."];
   }
@@ -143,6 +151,9 @@ function whenToUse(toolId: string, category: string) {
   }
   if (category === "bytecode") {
     return ["Use when source-level evidence is incomplete or compiled behavior must be checked."];
+  }
+  if (category === "audit") {
+    return ["Use to run the ordered end-to-end Peregrine audit workflow and emit audit packets."];
   }
   if (category === "dynamicAnalysis" || category === "validation") {
     return ["Use to validate high-impact claims with tests, fuzzing, or formal checks."];
@@ -181,6 +192,19 @@ function whenNotToUse(toolId: string, category: string) {
     ];
   }
 
+  if (category === "audit") {
+    return [
+      ...generic,
+      "Do not call individual audit stages out of order; use the full workflow when complete evidence is required.",
+    ];
+  }
+  if (category === "knowledge") {
+    return [
+      ...generic,
+      "Do not use as vulnerability proof; local documentation explains semantics, while source, graph, bytecode, and test evidence prove findings.",
+    ];
+  }
+
   if (category === "patch") {
     return [
       ...generic,
@@ -195,6 +219,8 @@ function expectedLatencyMs(toolId: string) {
   if (toolId.includes(".fuzz")) return 30_000;
   if (toolId.includes("assert_property")) return 45_000;
   if (toolId.includes(".validation.run_suite")) return 60_000;
+  if (toolId.includes(".audit.")) return 20_000;
+  if (toolId.includes(".knowledge.")) return 2_000;
   if (toolId.includes(".bytecode.")) return 4_000;
   if (toolId.includes(".index.package")) return 8_000;
   if (toolId.includes(".static.scan")) return 3_000;
@@ -203,6 +229,9 @@ function expectedLatencyMs(toolId: string) {
 
 function outputBudgetTokens(toolId: string) {
   if (toolId.includes(".bytecode.")) return 900;
+  if (toolId.includes(".audit.")) return 1_200;
+  if (toolId.includes(".knowledge.sui_move.read")) return 1_500;
+  if (toolId.includes(".knowledge.")) return 900;
   if (toolId.includes(".graph.")) return 800;
   if (toolId.includes(".fuzz") || toolId.includes("assert_property")) return 700;
   if (toolId.includes(".static.")) return 700;

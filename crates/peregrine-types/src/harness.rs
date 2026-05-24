@@ -64,8 +64,11 @@ pub enum SourcePrecision {
 pub enum FindingCandidateStatus {
     Confirmed,
     Likely,
+    Possible,
     Hypothesis,
     FalsePositive,
+    Informational,
+    NeedsHumanReview,
     NeedsValidation,
     Fixed,
     Accepted,
@@ -274,6 +277,167 @@ pub trait SecurityTool: Send + Sync {
     fn run(&self, input: ToolInput, context: ToolRunContext) -> ToolRunResult;
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AuditStageId {
+    AuditSession,
+    BuildNormalize,
+    SemanticGraphs,
+    Classification,
+    ThreatModel,
+    FunctionRiskMap,
+    Invariants,
+    StaticAnalysis,
+    GraphAnalysis,
+    BytecodeReview,
+    AttackHypotheses,
+    TargetedTests,
+    DynamicAnalysis,
+    InvariantStress,
+    ExploitConfirmation,
+    SeverityRanking,
+    Remediation,
+    RegressionTests,
+    AuditReport,
+    AuditTrace,
+    FixVerification,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AuditStageStatus {
+    Pending,
+    Running,
+    Succeeded,
+    Failed,
+    Skipped,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AuditFindingState {
+    Confirmed,
+    Likely,
+    Possible,
+    FalsePositive,
+    Informational,
+    NeedsHumanReview,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AuditFixState {
+    Open,
+    Fixed,
+    PartiallyFixed,
+    RegressionAdded,
+    RiskAccepted,
+    FalsePositive,
+    NeedsReview,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditStageRun {
+    pub id: String,
+    pub stage_id: AuditStageId,
+    pub status: AuditStageStatus,
+    pub started_at: String,
+    pub completed_at: Option<String>,
+    pub summary: String,
+    pub artifact_name: Option<String>,
+    pub filename: Option<String>,
+    pub evidence_ref: Option<EvidenceRef>,
+    pub diagnostics: Vec<ToolDiagnostic>,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceRef {
+    pub id: String,
+    pub kind: EvidenceKind,
+    pub summary: String,
+    pub source: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditSessionPacket {
+    pub schema_version: u8,
+    pub id: String,
+    pub project: String,
+    pub repo_root: String,
+    pub commit: String,
+    pub package_manifest: String,
+    pub target_modules: Vec<String>,
+    pub compiler_version: Option<String>,
+    pub dependency_graph: Option<Value>,
+    pub selected_chain_adapter: String,
+    pub enabled_tools: Vec<String>,
+    pub audit_profile: String,
+    pub threat_model_profile: String,
+    pub timestamp: String,
+    pub tool_versions: BTreeMap<String, String>,
+    pub policy_profile: Option<String>,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditPacket {
+    pub schema_version: u8,
+    pub audit_session_id: String,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
+    #[serde(flatten)]
+    pub body: Metadata,
+}
+
+pub type CanonicalProjectIndexPacket = AuditPacket;
+pub type AuditKnowledgeGraphPacket = AuditPacket;
+pub type ContractClassificationPacket = AuditPacket;
+pub type ThreatModelPacket = AuditPacket;
+pub type FunctionRiskMapPacket = AuditPacket;
+pub type InvariantRegistryPacket = AuditPacket;
+pub type StaticFindingsPacket = AuditPacket;
+pub type GraphEvidencePacket = AuditPacket;
+pub type BytecodeReviewPacket = AuditPacket;
+pub type AttackHypothesisPacket = AuditPacket;
+pub type TestPlanPacket = AuditPacket;
+pub type DynamicEvidencePacket = AuditPacket;
+pub type InvariantStressPacket = AuditPacket;
+pub type ConfirmedFindingsPacket = AuditPacket;
+pub type SeverityRankingPacket = AuditPacket;
+pub type RemediationPlanPacket = AuditPacket;
+pub type RegressionTestPacket = AuditPacket;
+pub type AuditReportPacket = AuditPacket;
+pub type FixVerificationPacket = AuditPacket;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditTraceArtifact {
+    pub name: String,
+    pub filename: String,
+    pub evidence_ref: Option<EvidenceRef>,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditTrace {
+    pub schema_version: u8,
+    pub audit_session_id: String,
+    pub generated_at: String,
+    pub artifacts: Vec<AuditTraceArtifact>,
+    pub stage_runs: Vec<AuditStageRun>,
+    pub findings: Vec<FindingCandidate>,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -287,9 +451,14 @@ mod tests {
             json!("falsePositive")
         );
         assert_eq!(
+            json!(FindingCandidateStatus::NeedsHumanReview),
+            json!("needsHumanReview")
+        );
+        assert_eq!(
             json!(ToolActionClass::ToolExecution),
             json!("toolExecution")
         );
+        assert_eq!(json!(AuditFixState::PartiallyFixed), json!("partiallyFixed"));
     }
 
     #[test]
@@ -321,5 +490,33 @@ mod tests {
         let encoded = serde_json::to_value(manifest).expect("manifest json");
         assert_eq!(encoded["reducerId"], "staticAnalysis");
         assert_eq!(encoded["inputSchema"]["type"], "object");
+    }
+
+    #[test]
+    fn serializes_audit_session_packet() {
+        let packet = AuditSessionPacket {
+            schema_version: 1,
+            id: "audit_1".to_string(),
+            project: "demo".to_string(),
+            repo_root: "/repo".to_string(),
+            commit: "abc".to_string(),
+            package_manifest: "Move.toml".to_string(),
+            target_modules: vec!["vault".to_string()],
+            compiler_version: Some("sui 1".to_string()),
+            dependency_graph: Some(json!({"nodes": []})),
+            selected_chain_adapter: "sui/move".to_string(),
+            enabled_tools: vec!["rust.audit.run_full".to_string()],
+            audit_profile: "full".to_string(),
+            threat_model_profile: "default".to_string(),
+            timestamp: "2026-05-24T00:00:00Z".to_string(),
+            tool_versions: BTreeMap::new(),
+            policy_profile: None,
+            metadata: Metadata::new(),
+        };
+
+        let encoded = serde_json::to_value(packet).expect("audit session json");
+        assert_eq!(encoded["schemaVersion"], 1);
+        assert_eq!(encoded["selectedChainAdapter"], "sui/move");
+        assert_eq!(encoded["targetModules"][0], "vault");
     }
 }

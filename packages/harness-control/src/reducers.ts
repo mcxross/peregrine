@@ -8,6 +8,7 @@ import type {
 } from "@peregrine/agent-runtime";
 
 import { createId } from "./ids";
+import { toFindingCandidate } from "./audit-types";
 
 export interface ToolEvidenceCompileRequest {
   tool: DeterministicToolSpec;
@@ -44,6 +45,8 @@ export function compileToolEvidence(
       return reduceGraph(request);
     case "bytecode":
       return reduceBytecode(request);
+    case "audit":
+      return reduceAudit(request);
     case "fuzz":
       return reduceFuzz(request);
     case "prover":
@@ -256,6 +259,115 @@ function reduceBytecode(request: ToolEvidenceCompileRequest): ToolEvidenceCompil
     evidence,
     [],
   );
+}
+
+function reduceAudit(request: ToolEvidenceCompileRequest): ToolEvidenceCompileResult {
+  const value = asRecord(request.output);
+  const packet = value?.packet ? asRecord(value.packet) : value;
+  const packetType =
+    stringValue(value?.artifactName)
+    ?? stringValue(packet?.artifactName)
+    ?? stringValue(value?.stageId)
+    ?? "audit";
+  const findings = asArray(packet?.findings)
+    .map((finding) => asRecord(finding))
+    .filter(Boolean);
+  const hypotheses = asArray(packet?.hypotheses);
+  const tests = asArray(packet?.tests);
+  const observation = auditPacketObservation(packetType, packet, request.summary);
+  const compact = {
+    reducer: "audit",
+    packetType,
+    findingCount: findings.length,
+    hypothesisCount: hypotheses.length,
+    testCount: tests.length,
+    summary: observation,
+  };
+  const evidence = [
+    evidenceItem(request, {
+      kind: "toolOutput",
+      claim: auditPacketClaim(packetType, packet),
+      observation,
+      confidence: request.status === "succeeded" ? "high" : "unknown",
+      sourcePrecision: "summary",
+      symbolRefs: findings
+        .flatMap((finding) => asArray(finding?.affectedSymbols))
+        .map((symbol) => stringValue(symbol))
+        .filter((symbol): symbol is string => Boolean(symbol))
+        .slice(0, 24),
+      metadata: compact,
+    }),
+  ];
+  const findingCandidates = findings
+    .map((finding) => {
+      try {
+        return toFindingCandidate(finding as unknown as Parameters<typeof toFindingCandidate>[0]);
+      } catch {
+        return null;
+      }
+    })
+    .filter((finding): finding is ReturnType<typeof toFindingCandidate> => Boolean(finding));
+
+  return compiled(request.summary, compact, evidence, findingCandidates);
+}
+
+function auditPacketClaim(packetType: string, packet: JsonRecord | undefined) {
+  switch (packetType) {
+    case "projectIndex":
+      return `Canonical project index captured ${asArray(packet?.modules).length} modules and ${asArray(packet?.functions).length} functions.`;
+    case "knowledgeGraph":
+      return "Audit knowledge graph captured graph relationships and unresolved edges.";
+    case "classification":
+      return `Contract classification selected ${asArray(packet?.profiles).length} profile(s).`;
+    case "threatModel":
+      return `Threat model identified ${asArray(packet?.entryPoints).length} entry point(s).`;
+    case "functionRiskMap":
+      return `Function risk map scored ${asArray(packet?.functions).length} function(s).`;
+    case "invariants":
+      return `Invariant registry contains ${asArray(packet?.invariants).length} candidate invariant(s).`;
+    case "staticFindings":
+      return `Static analysis packet contains ${asArray(packet?.findings).length} finding candidate(s).`;
+    case "graphEvidence":
+      return `Graph evidence packet contains ${asArray(packet?.trails).length} audit trail(s).`;
+    case "attackHypotheses":
+      return `Attack planner generated ${asArray(packet?.hypotheses).length} hypothesis/hypotheses.`;
+    case "testPlan":
+      return `Targeted test plan contains ${asArray(packet?.tests).length} test case(s).`;
+    case "confirmedFindings":
+      return `Exploit confirmation retained ${asArray(packet?.findings).length} finding candidate(s).`;
+    case "severityRanking":
+      return `Severity ranking ordered ${asArray(packet?.findings).length} finding candidate(s).`;
+    case "auditTrace":
+      return `Audit trace exported ${asArray(packet?.artifacts).length} artifact reference(s).`;
+    default:
+      return `Audit stage ${packetType} produced a packet.`;
+  }
+}
+
+function auditPacketObservation(
+  packetType: string,
+  packet: JsonRecord | undefined,
+  fallback: string,
+) {
+  if (packetType === "auditReport" && typeof packet?.markdown === "string") {
+    return excerpt(packet.markdown, 900);
+  }
+  if (packetType === "dynamicResults") {
+    return asArray(packet?.testResults)
+      .map((result) => stringValue(asRecord(result)?.observed))
+      .filter((value): value is string => Boolean(value))
+      .join("\n")
+      || fallback;
+  }
+  if (packetType === "invariantStress") {
+    return asArray(packet?.fuzzResults)
+      .map((result) => stringValue(asRecord(result)?.observed))
+      .filter((value): value is string => Boolean(value))
+      .join("\n")
+      || fallback;
+  }
+
+  return fallback;
 }
 
 function reduceFuzz(request: ToolEvidenceCompileRequest): ToolEvidenceCompileResult {
@@ -496,6 +608,7 @@ function inferReducerId(toolId: string) {
   if (toolId.includes(".static.")) return "staticAnalysis";
   if (toolId.includes(".graph.")) return "graph";
   if (toolId.includes(".bytecode.")) return "bytecode";
+  if (toolId.includes(".audit.")) return "audit";
   if (toolId.includes(".fuzz")) return "fuzz";
   if (toolId.includes("assert_property") || toolId.includes("formal")) return "prover";
   if (toolId.includes(".dynamic.run_test") || toolId.includes(".validation.")) return "command";

@@ -1,5 +1,11 @@
 export { buildAgentInstructions, buildAgentPrompt } from "./instructions";
 export {
+  SUI_MOVE_SECURITY_CONTEXT,
+  SUI_MOVE_SECURITY_GUIDE,
+  SUI_MOVE_SECURITY_KNOWLEDGE_SOURCE,
+  shouldAttachSuiMoveSecurityKnowledge,
+} from "./sui-move-knowledge";
+export {
   assertJsonSchemaDefinition,
   createAiSdkToolName,
   createAiSdkToolSet,

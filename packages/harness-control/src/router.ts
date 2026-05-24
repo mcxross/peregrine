@@ -179,10 +179,12 @@ function stageForRole(role?: AgentRole): ToolRouteStage {
 function stageForManifest(manifest: ToolManifest): ToolRouteStage {
   switch (manifest.category) {
     case "index":
+    case "knowledge":
     case "staticAnalysis":
       return 1;
     case "context":
     case "graph":
+    case "audit":
       return 2;
     case "bytecode":
     case "dynamicAnalysis":
@@ -200,9 +202,11 @@ function stageForManifest(manifest: ToolManifest): ToolRouteStage {
 
 function inferCategory(toolId: string) {
   if (toolId.includes(".index.") || toolId.startsWith("index.")) return "index";
+  if (toolId.includes(".knowledge.")) return "knowledge";
   if (toolId.includes(".static.")) return "staticAnalysis";
   if (toolId.includes(".graph.")) return "graph";
   if (toolId.includes(".bytecode.")) return "bytecode";
+  if (toolId.includes(".audit.")) return "audit";
   if (toolId.includes(".dynamic.")) return "dynamicAnalysis";
   if (toolId.includes(".validation.")) return "validation";
   if (toolId.includes(".findings.")) return "finding";
@@ -217,6 +221,7 @@ function inferReducerId(toolId: string) {
   if (toolId.includes(".static.")) return "staticAnalysis";
   if (toolId.includes(".graph.")) return "graph";
   if (toolId.includes(".bytecode.")) return "bytecode";
+  if (toolId.includes(".audit.")) return "audit";
   if (toolId.includes(".fuzz")) return "fuzz";
   if (toolId.includes("assert_property") || toolId.includes("formal")) return "prover";
   if (toolId.includes(".dynamic.") || toolId.includes(".validation.")) return "command";

@@ -1,5 +1,34 @@
 export { DenyByDefaultApprovalGate, StaticApprovalGate } from "./approvals";
 export {
+  buildAttackHypothesisSet,
+  buildAuditKnowledgeGraph,
+  buildAuditReport,
+  buildAuditTrace,
+  buildBytecodeReviewPacket,
+  buildCanonicalProjectIndex,
+  buildConfirmedFindingsSet,
+  buildContractClassification,
+  buildDynamicEvidencePacket,
+  buildFixVerificationPacket,
+  buildFunctionRiskMap,
+  buildGraphEvidencePacket,
+  buildInvariantRegistry,
+  buildInvariantStressReport,
+  buildRegressionTestPacket,
+  buildRemediationPlan,
+  buildSeverityRankedFindingList,
+  buildStaticFindingsSet,
+  buildTestPlanPacket,
+  buildThreatModel,
+  createAuditSessionPacket,
+} from "./audit-builders";
+export { AuditWorkflowRunner } from "./audit-workflow";
+export {
+  AUDIT_STAGE_SEQUENCE,
+  AUDIT_TRACE_FILENAMES,
+  toFindingCandidate,
+} from "./audit-types";
+export {
   ContentAddressedEvidenceStore,
   InMemoryEvidenceStore,
   LocalStorageEvidencePersistence,
@@ -16,6 +45,48 @@ export { requireManifest, routeTools, toolCapsule } from "./router";
 export { InMemorySessionStore } from "./session-store";
 export { HarnessToolRuntime } from "./tool-runtime";
 export { InMemoryToolRegistry } from "./tool-registry";
+export type {
+  AttackHypothesis,
+  AttackHypothesisSet,
+  AuditExecutionResult,
+  AuditFindingCandidate,
+  AuditFindingState,
+  AuditFixState,
+  AuditInvariant,
+  AuditKnowledgeGraph,
+  AuditPacketBundle,
+  AuditReport,
+  AuditSessionPacket,
+  AuditStageId,
+  AuditStageRun,
+  AuditStageStatus,
+  AuditTestCase,
+  AuditTrace,
+  AuditTraceArtifactName,
+  BytecodeReviewPacket,
+  CanonicalFunction,
+  CanonicalProjectIndex,
+  CanonicalStruct,
+  ConfirmedFindingsSet,
+  ContractClassificationReport,
+  DynamicEvidencePacket,
+  FixVerificationPacket,
+  FunctionRiskEntry,
+  FunctionRiskMap,
+  GraphEvidencePacket,
+  GraphEvidenceTrail,
+  InvariantRegistry,
+  InvariantStressReport,
+  RegressionTestPacket,
+  RemediationPlan,
+  SeverityRankedFindingList,
+  StaticFindingsSet,
+  ThreatModelPacket,
+} from "./audit-types";
+export type {
+  AuditRecordPacketRequest,
+  AuditWorkflowRunnerConfig,
+} from "./audit-workflow";
 export type {
   ApprovalDecision,
   ApprovalEvaluation,

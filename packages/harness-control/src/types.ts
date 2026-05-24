@@ -21,6 +21,14 @@ import type {
   ToolRunSummary,
 } from "@peregrine/agent-runtime";
 import type { LanguageModel } from "ai";
+import type {
+  AuditFindingCandidate,
+  AuditPacketBundle,
+  AuditSessionPacket,
+  AuditStageRun,
+  AuditTraceArtifactName,
+  AuditFixState,
+} from "./audit-types";
 
 export type SessionStatus =
   | "created"
@@ -56,6 +64,22 @@ export interface AssessmentSession {
   toolRuns: ToolRunSummary[];
   approvals: ApprovalDecision[];
   evidenceRefs: EvidenceRef[];
+  auditSession?: AuditSessionPacket;
+  auditStageRuns?: AuditStageRun[];
+  auditPackets?: Partial<AuditPacketBundle>;
+  auditPacketRefs?: Partial<Record<AuditTraceArtifactName, EvidenceRef>>;
+  confirmedFindings?: AuditFindingCandidate[];
+  regressionRefs?: EvidenceRef[];
+  fixVerificationHistory?: Array<{
+    id: string;
+    createdAt: string;
+    findingStatuses: Array<{
+      findingId: string;
+      previousState: AuditFixState;
+      nextState: AuditFixState;
+      evidence: string[];
+    }>;
+  }>;
   metadata?: JsonRecord;
 }
 

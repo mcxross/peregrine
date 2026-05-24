@@ -1,4 +1,8 @@
 import type { AgentContextPacket, AgentRole } from "./types";
+import {
+  SUI_MOVE_SECURITY_CONTEXT,
+  shouldAttachSuiMoveSecurityKnowledge,
+} from "./sui-move-knowledge";
 
 const ROLE_INSTRUCTIONS: Record<AgentRole, string> = {
   securityReview:
@@ -22,6 +26,12 @@ const ROLE_INSTRUCTIONS: Record<AgentRole, string> = {
 
 export function buildAgentInstructions(packet: AgentContextPacket) {
   const roleInstruction = ROLE_INSTRUCTIONS[packet.task.role];
+  const suiMoveSecurityKnowledge = shouldAttachSuiMoveSecurityKnowledge(
+    packet.task.role,
+    packet.projectSummary.chain,
+  )
+    ? ["", SUI_MOVE_SECURITY_CONTEXT]
+    : [];
   const allowedActions = packet.allowedActions
     .map((action) => {
       const approval = action.requiresApproval ? "approval required" : "allowed";
@@ -48,6 +58,7 @@ export function buildAgentInstructions(packet: AgentContextPacket) {
     "- Never claim a check passed unless a tool result supports it.",
     "- Never hide tool failures or missing evidence.",
     "- Do not propose direct source modification unless the packet allows it and approval policy is satisfied.",
+    ...suiMoveSecurityKnowledge,
     "",
     "Allowed action surface:",
     allowedActions || "- none",

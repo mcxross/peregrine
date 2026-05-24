@@ -78,6 +78,7 @@ pub fn run() {
             commands::files::load_file_preview,
             commands::files::save_text_file,
             commands::files::save_graph_png,
+            commands::files::save_text_export,
             commands::sui::build_move_package,
             commands::sui::run_security_command,
             commands::sui::run_movy_fuzz,

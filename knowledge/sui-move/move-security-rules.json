@@ -1,0 +1,77 @@
+{
+  "sourceCommit": "b636affe685a3a8221e6f209d18c444226efc9f7",
+  "rules": [
+    {
+      "id": "SEC-AC-1",
+      "category": "access-control",
+      "title": "Unprotected public mutation",
+      "prompt": "Check public or PTB-composable functions that mutate privileged state without capability, owner, witness, phase, or object-state authorization."
+    },
+    {
+      "id": "SEC-AC-2",
+      "category": "access-control",
+      "title": "Ignored authorization result",
+      "prompt": "Check authorization helpers that return booleans or validation values whose results are ignored or checked after mutation."
+    },
+    {
+      "id": "SEC-AC-3",
+      "category": "access-control",
+      "title": "Missing capability or witness guard",
+      "prompt": "Check critical mint, burn, config, withdrawal, ownership, and shared-state mutations for capability or witness requirements."
+    },
+    {
+      "id": "SEC-AR-1",
+      "category": "arithmetic",
+      "title": "Possible zero denominator",
+      "prompt": "Prove every denominator is nonzero before division, including oracle, pool, supply, and collection length inputs."
+    },
+    {
+      "id": "SEC-AR-2",
+      "category": "arithmetic",
+      "title": "Unchecked narrowing cast",
+      "prompt": "Check all narrowing casts for explicit upper-bound proof before the cast."
+    },
+    {
+      "id": "SEC-AR-3",
+      "category": "arithmetic",
+      "title": "Precision loss or premature flooring",
+      "prompt": "Check multiplication/division order, decimal scaling, basis-point math, and rounding near zero."
+    },
+    {
+      "id": "DES-OM-1",
+      "category": "object-model",
+      "title": "Unbounded VecMap or VecSet",
+      "prompt": "Check unbounded collections for gas griefing, DoS, and missed cleanup."
+    },
+    {
+      "id": "DES-OM-2",
+      "category": "object-model",
+      "title": "Shared mutable bottleneck",
+      "prompt": "Check shared mutable objects for unnecessary contention, broad write access, and missing state/version guards."
+    },
+    {
+      "id": "DES-BT-1",
+      "category": "object-model",
+      "title": "Blind transfer to object",
+      "prompt": "Check transfers to object IDs for a matching receive path and ability to recover or use the transferred asset."
+    },
+    {
+      "id": "PAT-VM-1",
+      "category": "upgradeability",
+      "title": "Missing version check",
+      "prompt": "Check upgradeable shared state mutations for version fields, migration paths, and stale-object rejection."
+    },
+    {
+      "id": "TST-AUTH-1",
+      "category": "testing",
+      "title": "Missing authorization negative test",
+      "prompt": "Generate negative tests proving unauthorized callers cannot change config, move assets, or mutate privileged state."
+    },
+    {
+      "id": "TST-STATE-1",
+      "category": "testing",
+      "title": "Missing repeated-call or wrong-order test",
+      "prompt": "Generate tests for repeated calls, wrong phase, reused receipts, stale state, and before-unlock/expiry behavior."
+    }
+  ]
+}

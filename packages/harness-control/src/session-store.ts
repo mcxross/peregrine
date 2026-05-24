@@ -22,6 +22,12 @@ export class InMemorySessionStore implements SessionStore {
       toolRuns: [],
       approvals: [],
       evidenceRefs: [],
+      auditStageRuns: [],
+      auditPackets: {},
+      auditPacketRefs: {},
+      confirmedFindings: [],
+      regressionRefs: [],
+      fixVerificationHistory: [],
       metadata: request.metadata,
     };
 
@@ -45,4 +51,3 @@ export class InMemorySessionStore implements SessionStore {
     return Array.from(this.sessions.values());
   }
 }
-

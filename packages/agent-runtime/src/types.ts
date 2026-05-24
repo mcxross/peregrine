@@ -78,8 +78,11 @@ export type SourcePrecision =
 export type FindingCandidateStatus =
   | "confirmed"
   | "likely"
+  | "possible"
   | "hypothesis"
   | "falsePositive"
+  | "informational"
+  | "needsHumanReview"
   | "needsValidation"
   | "fixed"
   | "accepted";
@@ -277,7 +280,15 @@ export interface FindingRef {
   id: string;
   title: string;
   severity: "critical" | "high" | "medium" | "low" | "info";
-  status: "open" | "fixed" | "accepted" | "falsePositive" | "needsReview";
+  status:
+    | "open"
+    | "fixed"
+    | "partiallyFixed"
+    | "regressionAdded"
+    | "riskAccepted"
+    | "accepted"
+    | "falsePositive"
+    | "needsReview";
   location?: string;
   evidenceRefs: EvidenceRef[];
 }

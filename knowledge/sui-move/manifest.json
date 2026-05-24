@@ -1,0 +1,53 @@
+{
+  "name": "peregrine-sui-move-knowledge",
+  "source": {
+    "kind": "bundled-corpus",
+    "retrievedFor": "Peregrine Sui Move audit harness knowledge base"
+  },
+  "localSourceRoot": "knowledge/sui-move/source",
+  "vendoredFileCount": 727,
+  "vendoredSizeApprox": "6.7 MB",
+  "scope": [
+    {
+      "sourcePath": ".move-book-docs",
+      "localPath": "knowledge/sui-move/source/move-book-docs"
+    },
+    {
+      "sourcePath": ".sui-docs",
+      "localPath": "knowledge/sui-move/source/sui-docs"
+    },
+    {
+      "sourcePath": ".sui-prover-docs",
+      "localPath": "knowledge/sui-move/source/sui-prover-docs"
+    },
+    {
+      "sourcePath": "skills/move-code-review",
+      "localPath": "knowledge/sui-move/source/move-code-review"
+    },
+    {
+      "sourcePath": "skills/move-code-quality",
+      "localPath": "knowledge/sui-move/source/move-code-quality"
+    },
+    {
+      "sourcePath": "skills/move-pr-review",
+      "localPath": "knowledge/sui-move/source/move-pr-review"
+    }
+  ],
+  "runtimeTools": [
+    "rust.knowledge.sui_move.search",
+    "rust.knowledge.sui_move.read"
+  ],
+  "runtimeContext": "packages/agent-runtime/src/sui-move-knowledge.ts",
+  "canonicality": {
+    "knowledgeBase": "advisory",
+    "canonicalEvidence": [
+      "audited source",
+      "compiler output",
+      "bytecode",
+      "Peregrine index facts",
+      "graph evidence",
+      "dynamic tests",
+      "state diffs"
+    ]
+  }
+}

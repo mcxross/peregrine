@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  buildAgentInstructions,
   buildAgentPrompt,
   createAiSdkToolName,
   createAiSdkToolSet,
@@ -71,6 +72,51 @@ describe("agent runtime tools", () => {
     expect(prompt).toContain("Peregrine ID: rust.static.scan_package");
     expect(prompt).toContain("Use the callable name exactly");
     expect(prompt).toContain("Package Intent");
+  });
+
+  test("security review instructions include Sui Move security knowledge", () => {
+    const packet: AgentContextPacket = {
+      task: {
+        id: "task_1",
+        role: "securityReview",
+        title: "Audit",
+        objective: "Review a Sui Move package.",
+      },
+      developerIntent: "Use tools.",
+      projectSummary: {
+        id: "project_1",
+        name: "demo",
+        rootPath: "/tmp/demo",
+        chain: "sui",
+        modules: [],
+      },
+      securityProfile: "test",
+      selectedCode: [],
+      riskSignals: [],
+      relevantGuides: [],
+      currentFindings: [],
+      recentToolResults: [],
+      toolCapsules: [],
+      allowedActions: [],
+      approvalPolicy: {
+        mode: "localAi",
+        networkAccess: "approvalRequired",
+        sourceModification: "approvalRequired",
+        dependencyModification: "approvalRequired",
+        secretAccess: "forbidden",
+      },
+      outputContract: {
+        format: "markdown",
+        requiredEvidence: true,
+        description: "Evidence-backed report.",
+      },
+    };
+    const instructions = buildAgentInstructions(packet);
+
+    expect(instructions).toContain("Sui/Move security knowledge pack");
+    expect(instructions).toContain("contract-hero/sui-pilot");
+    expect(instructions).toContain("public fun` is programmable-transaction-block composable");
+    expect(instructions).toContain("absence of `entry` is not by itself a safety boundary");
   });
 
   test("routes AI SDK tool execution through the Peregrine tool gateway", async () => {

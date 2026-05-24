@@ -170,7 +170,18 @@ function maxConfidence(values: EvidenceConfidence[]): EvidenceConfidence {
 
 function compareFindings(left: FindingCandidate, right: FindingCandidate) {
   const severityOrder = ["critical", "high", "medium", "low", "info"];
-  const statusOrder = ["confirmed", "likely", "needsValidation", "hypothesis", "falsePositive", "fixed", "accepted"];
+  const statusOrder = [
+    "confirmed",
+    "likely",
+    "possible",
+    "needsValidation",
+    "needsHumanReview",
+    "hypothesis",
+    "informational",
+    "falsePositive",
+    "fixed",
+    "accepted",
+  ];
 
   return (
     severityOrder.indexOf(left.severity) - severityOrder.indexOf(right.severity)

@@ -1,4 +1,10 @@
 import type { PackageTree } from "@/features/empty-project/filesystem-tree";
+import type {
+  AuditPacketBundle,
+  AuditSessionPacket,
+  AuditStageId,
+  AuditStageRun,
+} from "@peregrine/harness-control";
 
 export type AgentToolProjectContext = {
   rootPath: string;
@@ -12,6 +18,14 @@ export type AgentToolRuntimeState = {
   context: AgentToolProjectContext;
   indexPackageId: string | null;
   session: AgentToolSessionStore;
+  audit: AgentAuditRuntimeState;
+};
+
+export type AgentAuditRuntimeState = {
+  packets: Partial<AuditPacketBundle>;
+  sessionPacket: AuditSessionPacket | null;
+  stageRuns: AuditStageRun[];
+  completedStages: Set<AuditStageId>;
 };
 
 export type AgentFindingSeverity = "critical" | "high" | "medium" | "low" | "info";
@@ -97,5 +111,11 @@ export function createAgentToolRuntimeState(
     context,
     indexPackageId: null,
     session: new AgentToolSessionStore(),
+    audit: {
+      packets: {},
+      sessionPacket: null,
+      stageRuns: [],
+      completedStages: new Set(),
+    },
   };
 }

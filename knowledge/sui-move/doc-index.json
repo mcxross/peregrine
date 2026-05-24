@@ -1,0 +1,75 @@
+{
+  "sourceCommit": "b636affe685a3a8221e6f209d18c444226efc9f7",
+  "documents": [
+    {
+      "sourcePath": ".sui-docs/develop/security/best-practices.mdx",
+      "localPath": "knowledge/sui-move/source/sui-docs/develop/security/best-practices.mdx",
+      "topics": ["security", "best-practices", "sui"]
+    },
+    {
+      "sourcePath": ".sui-docs/develop/security/index.mdx",
+      "localPath": "knowledge/sui-move/source/sui-docs/develop/security/index.mdx",
+      "topics": ["security", "threat-model", "sui"]
+    },
+    {
+      "sourcePath": ".sui-docs/references/sui-move.mdx",
+      "localPath": "knowledge/sui-move/source/sui-docs/references/sui-move.mdx",
+      "topics": ["sui-move", "reference", "framework"]
+    },
+    {
+      "sourcePath": ".sui-docs/references/framework.mdx",
+      "localPath": "knowledge/sui-move/source/sui-docs/references/framework.mdx",
+      "topics": ["framework", "modules", "objects"]
+    },
+    {
+      "sourcePath": ".sui-docs/references/sui-framework-reference.mdx",
+      "localPath": "knowledge/sui-move/source/sui-docs/references/sui-framework-reference.mdx",
+      "topics": ["framework", "api-reference", "sui"]
+    },
+    {
+      "sourcePath": ".sui-docs/develop/write-move",
+      "localPath": "knowledge/sui-move/source/sui-docs/develop/write-move",
+      "topics": ["write-move", "objects", "dynamic-fields", "events", "testing"]
+    },
+    {
+      "sourcePath": ".sui-docs/develop/objects",
+      "localPath": "knowledge/sui-move/source/sui-docs/develop/objects",
+      "topics": ["objects", "ownership", "transfer", "shared-objects"]
+    },
+    {
+      "sourcePath": ".sui-docs/develop/transactions/ptbs",
+      "localPath": "knowledge/sui-move/source/sui-docs/develop/transactions/ptbs",
+      "topics": ["programmable-transactions", "public-functions", "composition"]
+    },
+    {
+      "sourcePath": ".move-book-docs/book",
+      "localPath": "knowledge/sui-move/source/move-book-docs/book",
+      "topics": ["move-book", "language", "abilities", "generics", "visibility"]
+    },
+    {
+      "sourcePath": ".move-book-docs/reference",
+      "localPath": "knowledge/sui-move/source/move-book-docs/reference",
+      "topics": ["move-reference", "bytecode", "semantics", "typing"]
+    },
+    {
+      "sourcePath": ".sui-prover-docs/guide",
+      "localPath": "knowledge/sui-move/source/sui-prover-docs/guide",
+      "topics": ["formal-verification", "specifications", "prover"]
+    },
+    {
+      "sourcePath": "skills/move-code-review/SKILL.md",
+      "localPath": "knowledge/sui-move/source/move-code-review/SKILL.md",
+      "topics": ["security-review", "finding-taxonomy", "workflow"]
+    },
+    {
+      "sourcePath": "skills/move-code-quality/SKILL.md",
+      "localPath": "knowledge/sui-move/source/move-code-quality/SKILL.md",
+      "topics": ["move-2024", "style", "public-vs-entry", "quality"]
+    },
+    {
+      "sourcePath": "skills/move-pr-review/references/orchestrator_checklist.md",
+      "localPath": "knowledge/sui-move/source/move-pr-review/references/orchestrator_checklist.md",
+      "topics": ["review-workflow", "checks", "orchestration"]
+    }
+  ]
+}

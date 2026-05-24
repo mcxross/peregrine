@@ -228,13 +228,25 @@ function mergeDefaultAgents(agents: AgentDefinition[]) {
         provider: storedAgent?.provider ?? defaultAgent.provider,
         execution: storedAgent?.execution ?? defaultAgent.execution,
         systemPrompt: storedAgent?.systemPrompt ?? defaultAgent.systemPrompt,
-        tools: storedAgent?.tools ?? defaultAgent.tools,
-        status: persistedAgentStatus(storedAgent?.status, defaultAgent.status),
+        tools: mergeDefaultAgentTools(defaultAgent.tools, storedAgent?.tools),
+        status: persistedDefaultAgentStatus(defaultAgent.id, storedAgent?.status, defaultAgent.status),
         updatedAt: storedAgent?.updatedAt ?? defaultAgent.updatedAt,
       };
     }),
     ...customAgents,
   ];
+}
+
+function persistedDefaultAgentStatus(
+  agentId: string,
+  status: AgentStatus | undefined,
+  fallback: AgentStatus,
+): AgentStatus {
+  if (agentId !== "agent-orchestrator") {
+    return fallback;
+  }
+
+  return persistedAgentStatus(status, fallback);
 }
 
 function persistedAgentStatus(
@@ -246,6 +258,14 @@ function persistedAgentStatus(
   }
 
   return fallback;
+}
+
+function mergeDefaultAgentTools(defaultTools: string[], storedTools: string[] | undefined) {
+  if (!storedTools) {
+    return defaultTools;
+  }
+
+  return Array.from(new Set([...defaultTools, ...storedTools]));
 }
 
 function mergeDefaultWorkflows(workflows: AgentWorkflow[]) {

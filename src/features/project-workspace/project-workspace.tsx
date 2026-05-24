@@ -39,6 +39,7 @@ import {
   type BuildLogSheetController,
   type BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
+import type { AuditReportExport } from "@/features/agents/types";
 import { assessmentSidebarItems } from "@/features/project-workspace/package-load-assessment-cards";
 import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
 import type { SelectedMoveModule } from "@/features/project-workspace/module-signature-screen";
@@ -98,6 +99,7 @@ type ProjectWorkspaceProps = {
   mode: WorkspaceMode;
   network: SuiNetworkSelection;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
+  onAuditReportExportReady?: (report: AuditReportExport | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onFormalVerificationTargetChange: (target: FormalVerificationTarget | null) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
@@ -179,6 +181,7 @@ export function ProjectWorkspace({
   mode,
   network,
   onActivePackageManifestPathChange,
+  onAuditReportExportReady,
   onCommandLog,
   onFormalVerificationTargetChange,
   onProjectSelected,
@@ -373,6 +376,7 @@ export function ProjectWorkspace({
               packageTree={packageTree}
               packageName={packageName}
               selectedModule={selectedModule}
+              onAuditReportExportReady={onAuditReportExportReady}
               onCommandLog={onCommandLog}
               onProjectSelected={onProjectSelected}
               onClearSelectedModule={() => setSelectedModule(null)}
@@ -430,6 +434,7 @@ function WorkspaceMainPanel({
   mode,
   network,
   onClearSelectedModule,
+  onAuditReportExportReady,
   onOpenSourceLocation,
   onSelectModule,
   packageTree,
@@ -446,6 +451,7 @@ function WorkspaceMainPanel({
   mode: WorkspaceMode;
   network: SuiNetworkSelection;
   onClearSelectedModule: () => void;
+  onAuditReportExportReady?: (report: AuditReportExport | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onOpenSourceLocation: (location: TypeGraphSourceLocation) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
@@ -499,6 +505,7 @@ function WorkspaceMainPanel({
     return (
       <AgentsScreen
         activeMovePackage={activeMovePackage}
+        onAuditReportExportReady={onAuditReportExportReady}
         packageTree={packageTree}
         projectRootPath={packageTree.rootPath}
       />

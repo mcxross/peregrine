@@ -13,6 +13,7 @@ import type {
   BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
 import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
+import type { AuditReportExport } from "@/features/agents/types";
 
 const ProjectWorkspace = React.lazy(() =>
   import("@/features/project-workspace/project-workspace").then((module) => ({
@@ -32,6 +33,7 @@ type WorkspaceProps = {
   network: SuiNetworkSelection;
   onNetworkChange: (network: SuiNetworkSelection) => void;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
+  onAuditReportExportReady?: (report: AuditReportExport | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onFormalVerificationTargetChange: (target: FormalVerificationTarget | null) => void;
   packageTree: PackageTree | null;
@@ -51,6 +53,7 @@ export function Workspace({
   network,
   onNetworkChange,
   onActivePackageManifestPathChange,
+  onAuditReportExportReady,
   onCommandLog,
   onFormalVerificationTargetChange,
   onWorkspaceTabChange,
@@ -71,6 +74,7 @@ export function Workspace({
           mode={mode}
           network={network}
           onActivePackageManifestPathChange={onActivePackageManifestPathChange}
+          onAuditReportExportReady={onAuditReportExportReady}
           onCommandLog={onCommandLog}
           onFormalVerificationTargetChange={onFormalVerificationTargetChange}
           onProjectSelected={onProjectSelected}

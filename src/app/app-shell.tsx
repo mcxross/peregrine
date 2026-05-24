@@ -1,4 +1,6 @@
 import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Titlebar } from "@/app/titlebar";
 import { defaultSuiNetworkSelection, type SuiNetworkSelection } from "@/app/sui-network";
@@ -37,6 +39,7 @@ import {
   type LaunchIndexState,
   useLaunchIndexer,
 } from "@/features/project-workspace/indexer/use-launch-indexer";
+import type { AuditReportExport } from "@/features/agents/types";
 import { defaultLayoutSettings } from "@/layout/layout-store";
 import { titlebarHeight } from "@/layout/window-chrome";
 
@@ -86,6 +89,9 @@ export function AppShell({
   const [isBuildSheetOpen, setIsBuildSheetOpen] = useState(false);
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
   const [isProjectConfigOpen, setIsProjectConfigOpen] = useState(false);
+  const [isExportingAuditReport, setIsExportingAuditReport] = useState(false);
+  const [latestAuditReportExport, setLatestAuditReportExport] =
+    useState<AuditReportExport | null>(null);
   const [formalVerificationTarget, setFormalVerificationTarget] =
     useState<FormalVerificationTarget | null>(null);
   const [lastScannedAt, setLastScannedAt] = useState<number | null>(null);
@@ -133,11 +139,29 @@ export function AppShell({
     resetLaunchIndex();
     setActivePackageManifestPath(packageTree?.activePackageManifestPath ?? null);
     setBuildRuns([]);
+    setLatestAuditReportExport(null);
     setFormalVerificationTarget(null);
     setIsBuildSheetOpen(false);
     setLaunchBuild(null);
     setLastScannedAt(packageTree ? Date.now() : null);
   }, [packageTree?.rootPath, packageTree?.activePackageManifestPath, resetLaunchIndex]);
+
+  const exportLatestAuditReport = useCallback(async () => {
+    if (!latestAuditReportExport || isExportingAuditReport) {
+      return;
+    }
+
+    setIsExportingAuditReport(true);
+
+    try {
+      await exportAuditReport(latestAuditReportExport);
+    } catch (error) {
+      console.error("Could not export audit report.", error);
+      window.alert(error instanceof Error ? error.message : "Could not export audit report.");
+    } finally {
+      setIsExportingAuditReport(false);
+    }
+  }, [isExportingAuditReport, latestAuditReportExport]);
 
   useEffect(() => {
     if (!packageTree) {
@@ -912,8 +936,11 @@ export function AppShell({
         hasWorkspace={!isSettings && Boolean(packageTree)}
         mode={workspaceMode}
         network={network}
+        auditReportExportAvailable={Boolean(latestAuditReportExport)}
+        isExportingAuditReport={isExportingAuditReport}
         onBuildPackage={runBuild}
         onCheckCoverage={checkCoverage}
+        onExportAuditReport={exportLatestAuditReport}
         onFuzzPackage={runFuzz}
         onNetworkChange={setNetwork}
         onOpenProjectConfig={() => setIsProjectConfigOpen(true)}
@@ -963,6 +990,7 @@ export function AppShell({
               mode={workspaceMode}
               network={network}
               onNetworkChange={setNetwork}
+              onAuditReportExportReady={setLatestAuditReportExport}
               onFormalVerificationTargetChange={setFormalVerificationTarget}
               onActivePackageManifestPathChange={setActivePackageManifestPath}
               onWorkspaceTabChange={setActiveWorkspaceTab}
@@ -1289,6 +1317,76 @@ function analyzerAssessmentDisplay(
 
 function formatLoadReportCount(count: number, label: string) {
   return `${count} ${label}${count === 1 ? "" : "s"}`;
+}
+
+async function exportAuditReport(report: AuditReportExport) {
+  const defaultPath = report.defaultFileName || "peregrine-audit-report.md";
+  let path: string | null;
+
+  try {
+    path = await save({
+      defaultPath,
+      filters: [
+        { name: "Markdown report", extensions: ["md"] },
+        { name: "JSON report packet", extensions: ["json"] },
+      ],
+      title: "Export audit report",
+    });
+  } catch (error) {
+    if (isTauriExportError(error)) {
+      downloadTextFallback(defaultPath, report.markdown, "text/markdown;charset=utf-8");
+      return;
+    }
+
+    throw error;
+  }
+
+  if (!path) {
+    return;
+  }
+
+  const selectedPath = path;
+  const contents = selectedPath.toLowerCase().endsWith(".json")
+    ? report.reportJson
+    : report.markdown;
+
+  try {
+    await invoke("save_text_export", {
+      path: selectedPath,
+      contents,
+    });
+  } catch (error) {
+    if (isTauriExportError(error)) {
+      downloadTextFallback(
+        selectedPath.split(/[\\/]/).pop() || defaultPath,
+        contents,
+        selectedPath.toLowerCase().endsWith(".json")
+          ? "application/json;charset=utf-8"
+          : "text/markdown;charset=utf-8",
+      );
+      return;
+    }
+
+    throw error;
+  }
+}
+
+function isTauriExportError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /invoke|tauri|not implemented|permission|command save_text_export not found/i.test(message);
+}
+
+function downloadTextFallback(fileName: string, contents: string, type: string) {
+  const blob = new Blob([contents], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function buildAssessmentDisplay(run: BuildLogRun): {

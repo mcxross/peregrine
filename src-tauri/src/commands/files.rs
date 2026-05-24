@@ -155,6 +155,15 @@ pub(crate) async fn save_graph_png(path: String, png_data_url: String) -> Result
 }
 
 #[tauri::command]
+pub(crate) async fn save_text_export(path: String, contents: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        fs::write(&path, contents).map_err(|error| format!("Could not write {path}: {error}"))
+    })
+    .await
+    .map_err(|error| format!("Could not join text export save task: {error}"))?
+}
+
+#[tauri::command]
 pub(crate) async fn analyze_move_package(
     app: tauri::AppHandle,
     root_path: String,

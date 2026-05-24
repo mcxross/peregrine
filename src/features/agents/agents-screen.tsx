@@ -81,6 +81,7 @@ import type {
   AgentStatus,
   AgentStudioState,
   AgentWorkflow,
+  AuditReportExport,
 } from "@/features/agents/types";
 import {
   displayMovePackageName,
@@ -173,45 +174,46 @@ type HarnessRoutePreview = {
 };
 
 const AGENT_FILTERS: Array<{ label: string; value: AgentFilter }> = [
-  { label: "All Agents", value: "all" },
-  { label: "Core", value: "Core" },
-  { label: "Analysis", value: "Analysis" },
-  { label: "Action", value: "Action" },
-  { label: "Output", value: "Output" },
+  { label: "Primary", value: "Core" },
+  { label: "Specialists", value: "Analysis" },
+  { label: "Actions", value: "Action" },
+  { label: "Reports", value: "Output" },
   { label: "Custom", value: "Custom" },
+  { label: "All", value: "all" },
 ];
 
 const RECOMMENDED_WORKFLOWS: RecommendedWorkflow[] = [
   {
     id: "full-package-audit",
-    title: "Full Package Audit",
-    description: "Static, dynamic, graph, bytecode, and validation analysis.",
-    steps: 9,
+    title: "Full Audit Workflow",
+    description: "Evidence-gated audit run from immutable session through report and trace export.",
+    steps: 21,
   },
-  {
-    id: "access-control-audit",
-    title: "Access Control Audit",
-    description: "Authorization, capabilities, and public entry function risks.",
-    steps: 6,
-  },
-  {
-    id: "shared-object-risk-audit",
-    title: "Shared Object Risk Audit",
-    description: "Shared object mutation, ownership, and lifecycle risks.",
-    steps: 7,
-  },
-  {
-    id: "capability-flow-audit",
-    title: "Capability Flow Audit",
-    description: "Tracks AdminCap, TreasuryCap, and custom capability movement.",
-    steps: 5,
-  },
+];
+
+const AUDIT_PHASES = [
+  "Session",
+  "Index",
+  "Graphs",
+  "Threats",
+  "Tests",
+  "Confirm",
+  "Report",
+  "Regress",
 ];
 
 const AGENT_METADATA: Record<string, AgentUiMetadata> = {
   "agent-orchestrator": {
     category: "Core",
-    capabilities: ["Planning", "Coordination", "Synthesis", "Evidence gates"],
+    capabilities: ["Full audit", "Stage ordering", "Evidence gates", "Trace export"],
+  },
+  "agent-intake": {
+    category: "Analysis",
+    capabilities: ["Audit session", "Scope", "Tool checks", "Build readiness"],
+  },
+  "agent-indexer": {
+    category: "Analysis",
+    capabilities: ["Canonical index", "Compiler facts", "Symbol map"],
   },
   "agent-static-analysis": {
     category: "Analysis",
@@ -233,9 +235,25 @@ const AGENT_METADATA: Record<string, AgentUiMetadata> = {
     category: "Analysis",
     capabilities: ["Invariant inference", "Property checks", "Object state"],
   },
+  "agent-threat-model": {
+    category: "Analysis",
+    capabilities: ["Classification", "Threat model", "Risk map", "Invariants"],
+  },
+  "agent-attack-planner": {
+    category: "Analysis",
+    capabilities: ["Attack hypotheses", "Validation strategy", "Evidence paths"],
+  },
   "agent-patch": {
     category: "Action",
     capabilities: ["Patch proposal", "Change preview", "Finding links"],
+  },
+  "agent-triage": {
+    category: "Analysis",
+    capabilities: ["Exploitability", "Severity scoring", "Finding states"],
+  },
+  "agent-remediation": {
+    category: "Action",
+    capabilities: ["Fix guidance", "Regression planning", "Safer redesigns"],
   },
   "agent-test-generation": {
     category: "Action",
@@ -245,9 +263,14 @@ const AGENT_METADATA: Record<string, AgentUiMetadata> = {
     category: "Output",
     capabilities: ["Audit report", "Finding summary", "Markdown export"],
   },
+  "agent-fix-verification": {
+    category: "Action",
+    capabilities: ["Changed files", "Affected reruns", "Status updates"],
+  },
 };
 
 const TOOL_FAMILY_LABELS: Record<string, string> = {
+  "rust.audit": "Audit workflow",
   "rust.bytecode": "Bytecode",
   "rust.dynamic": "Dynamic analysis",
   "rust.findings": "Findings",
@@ -268,10 +291,12 @@ const PACKAGE_INTENT_TOOL_IDS = new Set([
 
 export function AgentsScreen({
   activeMovePackage,
+  onAuditReportExportReady,
   packageTree,
   projectRootPath,
 }: {
   activeMovePackage?: MovePackage | null;
+  onAuditReportExportReady?: (report: AuditReportExport | null) => void;
   packageTree?: PackageTree | null;
   projectRootPath?: string;
 }) {
@@ -291,7 +316,7 @@ export function AgentsScreen({
   const [state, setState] = React.useState<AgentStudioState>(() => loadAgentStudioState());
   const [isInspectorOpen, setIsInspectorOpen] = React.useState(true);
   const [activeMainTab, setActiveMainTab] = React.useState<MainTab>("agents");
-  const [agentFilter, setAgentFilter] = React.useState<AgentFilter>("all");
+  const [agentFilter, setAgentFilter] = React.useState<AgentFilter>("Core");
   const [inspectorTab, setInspectorTab] = React.useState<InspectorTab>("overview");
   const [activeRunName, setActiveRunName] = React.useState("");
   const [runDetailsByAgentId, setRunDetailsByAgentId] = React.useState<Record<string, AgentRunDetail>>({});
@@ -382,6 +407,28 @@ export function AgentsScreen({
     return () => window.clearTimeout(timeout);
   }, [isProjectStateLoaded, projectRootPath, state]);
 
+  React.useEffect(() => {
+    if (
+      agentFilter !== "Core"
+      || selectedAgent.kind === "custom"
+      || agentMetadata(selectedAgent).category === "Core"
+    ) {
+      return;
+    }
+
+    const orchestrator = state.agents.find((agent) => agent.id === "agent-orchestrator");
+
+    if (!orchestrator) {
+      return;
+    }
+
+    setState((current) => ({
+      ...current,
+      selectedAgentId: orchestrator.id,
+      selectedWorkflowId: orchestrator.workflowId,
+    }));
+  }, [agentFilter, selectedAgent, state.agents]);
+
   if (!selectedAgent || !selectedWorkflow) {
     return null;
   }
@@ -410,10 +457,7 @@ export function AgentsScreen({
             {activeMainTab !== "details" ? (
               <>
                 <SummaryCards
-                  agentCount={state.agents.length}
                   lastRunLabel={lastRunLabel(state.logs)}
-                  toolCount={uniqueToolCount(state.agents)}
-                  workflowCount={state.workflows.length}
                 />
 
                 <RecommendedWorkflows
@@ -446,7 +490,7 @@ export function AgentsScreen({
                 </TabsList>
                 <div className="hidden items-center gap-2 text-[11px] text-muted-foreground md:flex">
                   <CircleDot className="size-3 text-emerald-300" />
-                  {state.agents.filter((agent) => agent.status === "active").length} active agents
+                  Orchestrated audit surface
                 </div>
               </div>
 
@@ -650,6 +694,11 @@ export function AgentsScreen({
   }
 
   async function runWorkflow() {
+    if (selectedAgent.tools.includes("rust.audit.run_full")) {
+      await runFullAuditWorkflowFor(selectedAgent, selectedWorkflow, selectedWorkflow.name);
+      return;
+    }
+
     await runWorkflowFor(selectedAgent, selectedWorkflow, selectedWorkflow.name);
   }
 
@@ -659,6 +708,11 @@ export function AgentsScreen({
     const orchestratorWorkflow =
       state.workflows.find((workflow) => workflow.id === orchestrator.workflowId)
       ?? selectedWorkflow;
+
+    if (recommendedWorkflow.id === "full-package-audit") {
+      await runFullAuditWorkflowFor(orchestrator, orchestratorWorkflow, recommendedWorkflow.title);
+      return;
+    }
 
     await runWorkflowFor(orchestrator, orchestratorWorkflow, recommendedWorkflow.title);
   }
@@ -1141,6 +1195,166 @@ export function AgentsScreen({
     }
   }
 
+  async function runFullAuditWorkflowFor(
+    runAgent: AgentDefinition,
+    runWorkflowState: AgentWorkflow,
+    displayName: string,
+  ) {
+    if (activeRunControllerRef.current) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const previousStatus = runAgent.status;
+    activeRunControllerRef.current = controller;
+    onAuditReportExportReady?.(null);
+    startRunDetail(runAgent, runWorkflowState, displayName, "running", {
+      kind: "status",
+      level: "trace",
+      message: projectContext
+        ? `Started deterministic full audit against ${displayMovePackageName(projectContext.packageName)}.`
+        : "Started deterministic full audit without an open Move package.",
+      title: "Run started",
+    });
+
+    setState((current) => ({
+      ...current,
+      selectedAgentId: runAgent.id,
+      selectedWorkflowId: runWorkflowState.id,
+      agents: current.agents.map((agent) =>
+        agent.id === runAgent.id ? { ...agent, status: "running" } : agent,
+      ),
+      workflows: current.workflows.map((workflow) =>
+        workflow.id === runWorkflowState.id ? markWorkflowStatus(workflow, "running") : workflow,
+      ),
+      logs: [
+        ...current.logs,
+        createExecutionLog({
+          agentId: runAgent.id,
+          workflowId: runWorkflowState.id,
+          level: "trace",
+          message: projectContext
+            ? `${displayName} started through rust.audit.run_full against ${displayMovePackageName(projectContext.packageName)}.`
+            : `${displayName} started without an open Move package. Project-dependent stages may fail.`,
+        }),
+      ].slice(-120),
+    }));
+
+    try {
+      const { runFullAuditWorkflowDeterministic } = await import("@/features/agents/agent-runner");
+      const result = await runFullAuditWorkflowDeterministic({
+        agent: runAgent,
+        onTrace: (event) => {
+          appendRunLog(runAgent.id, runWorkflowState.id, event);
+          appendRunDetailEvent(runAgent.id, {
+            kind: event.level === "trace" ? "trace" : "status",
+            level: event.level,
+            message: event.message,
+            title: event.level === "trace" ? "Runtime trace" : "Runtime update",
+          });
+        },
+        onStream: (event) => {
+          recordRunStreamEvent(runAgent.id, event);
+        },
+        projectContext,
+        signal: controller.signal,
+        workflow: runWorkflowState,
+      });
+
+      if (result.text) {
+        appendRunDetailText(runAgent.id, "responseText", result.text);
+      }
+      if (result.auditReportExport) {
+        onAuditReportExportReady?.(result.auditReportExport);
+      }
+      attachRunDetailToolRuns(runAgent.id, result.toolRuns);
+      finishRunDetail(runAgent.id, "completed", {
+        kind: "status",
+        level: "info",
+        message: `${displayName} completed through the deterministic audit workflow.`,
+        title: "Run completed",
+      });
+
+      setState((current) => ({
+        ...current,
+        agents: current.agents.map((agent) =>
+          agent.id === runAgent.id
+            ? {
+                ...agent,
+                status: previousStatus === "active" ? "active" : "idle",
+              }
+            : agent,
+        ),
+        workflows: current.workflows.map((workflow) =>
+          workflow.id === runWorkflowState.id ? markWorkflowStatus(workflow, "completed") : workflow,
+        ),
+        logs: [
+          ...current.logs,
+          ...result.toolRuns.map((toolRun) =>
+            createExecutionLog({
+              agentId: runAgent.id,
+              workflowId: runWorkflowState.id,
+              level: toolRun.status === "failed" || toolRun.status === "denied" ? "warning" : "trace",
+              message: `Tool ${toolRun.toolId} (${toolRun.status}): ${toolRun.summary}`,
+            }),
+          ),
+          createExecutionLog({
+            agentId: runAgent.id,
+            workflowId: runWorkflowState.id,
+            level: "info",
+            message: `Agent report:\n${result.text || "Full audit workflow streamed stage output."}`,
+          }),
+          createExecutionLog({
+            agentId: runAgent.id,
+            workflowId: runWorkflowState.id,
+            level: "info",
+            message: `${displayName} completed.`,
+          }),
+        ].slice(-120),
+      }));
+    } catch (error) {
+      const aborted = isAbortError(error);
+
+      finishRunDetail(runAgent.id, aborted ? "stopped" : "blocked", {
+        kind: aborted ? "status" : "error",
+        level: aborted ? "warning" : "error",
+        message: aborted
+          ? `${displayName} stopped before the audit completed.`
+          : `Full audit failed: ${error instanceof Error ? error.message : String(error)}`,
+        title: aborted ? "Run stopped" : "Run failed",
+      });
+
+      setState((current) => ({
+        ...current,
+        agents: current.agents.map((agent) =>
+          agent.id === runAgent.id
+            ? { ...agent, status: previousStatus === "active" ? "active" : "idle" }
+            : agent,
+        ),
+        workflows: current.workflows.map((workflow) =>
+          workflow.id === runWorkflowState.id
+            ? markWorkflowStatus(workflow, aborted ? "idle" : "blocked")
+            : workflow,
+        ),
+        logs: [
+          ...current.logs,
+          createExecutionLog({
+            agentId: runAgent.id,
+            workflowId: runWorkflowState.id,
+            level: aborted ? "warning" : "error",
+            message: aborted
+              ? `${displayName} stopped before the audit completed.`
+              : `Full audit failed: ${error instanceof Error ? error.message : String(error)}`,
+          }),
+        ].slice(-120),
+      }));
+    } finally {
+      if (activeRunControllerRef.current === controller) {
+        activeRunControllerRef.current = null;
+      }
+    }
+  }
+
   function appendRunLog(
     agentId: string,
     workflowId: string,
@@ -1187,7 +1401,7 @@ function PageHeader({
     <header className="border-b border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 py-3">
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
         <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-normal">Agents</h1>
+          <h1 className="text-base font-semibold tracking-normal">Audit Harness</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="relative">
@@ -1231,20 +1445,14 @@ function PageHeader({
 }
 
 function SummaryCards({
-  agentCount,
   lastRunLabel,
-  toolCount,
-  workflowCount,
 }: {
-  agentCount: number;
   lastRunLabel: string;
-  toolCount: number;
-  workflowCount: number;
 }) {
   const cards = [
-    { icon: Bot, label: "Agents", value: String(agentCount) },
-    { icon: Workflow, label: "Workflows", value: String(workflowCount) },
-    { icon: Hammer, label: "Tools", value: String(toolCount) },
+    { icon: Workflow, label: "Workflow", value: "Full audit" },
+    { icon: Network, label: "Phases", value: String(AUDIT_PHASES.length) },
+    { icon: FileText, label: "Trace", value: "21 artifacts" },
     { icon: Clock3, label: "Last Run", value: lastRunLabel },
   ];
 
@@ -1281,41 +1489,49 @@ function RecommendedWorkflows({
   onRun: (workflow: RecommendedWorkflow) => void;
   workflows: RecommendedWorkflow[];
 }) {
+  const primaryWorkflow = workflows[0];
+
+  if (!primaryWorkflow) {
+    return null;
+  }
+
   return (
-    <section className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold">Recommended Workflows</h2>
+    <section className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-3">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h2 className="min-w-0 truncate text-sm font-semibold">{primaryWorkflow.title}</h2>
+            <Badge className="rounded px-1.5 py-0.5 text-[10px]" variant="secondary">
+              {primaryWorkflow.steps} stages
+            </Badge>
+          </div>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
+            {primaryWorkflow.description}
+          </p>
+        </div>
+        <Button
+          className="h-9 gap-1.5 text-xs"
+          disabled={disabled}
+          onClick={() => onRun(primaryWorkflow)}
+          type="button"
+        >
+          <Play className="size-3.5" />
+          Run Full Audit
+        </Button>
       </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-2">
-        {workflows.map((workflow) => (
-          <article
-            className="grid min-h-[122px] min-w-0 grid-rows-[auto_1fr_auto] overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-3 transition hover:border-foreground/15 hover:bg-[var(--app-subtle)]"
-            key={workflow.id}
+      <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,92px),1fr))] gap-1.5">
+        {AUDIT_PHASES.map((phase, index) => (
+          <div
+            className="grid min-h-11 min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-1.5"
+            key={phase}
           >
-            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-              <h3 className="min-w-0 text-sm font-semibold leading-5">{workflow.title}</h3>
-              <Badge className="rounded px-1.5 py-0.5 text-[10px]" variant="secondary">
-                {workflow.steps} steps
-              </Badge>
-            </div>
-            <p className="mt-2 min-w-0 pr-8 text-[11px] leading-4 text-muted-foreground">
-              {workflow.description}
-            </p>
-            <div className="mt-1 flex min-w-0 justify-end">
-              <Button
-                aria-label={`Run ${workflow.title}`}
-                className="size-7 border-[color:var(--app-border)] bg-[var(--app-elevated)] text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground"
-                disabled={disabled}
-                onClick={() => onRun(workflow)}
-                size="icon-xs"
-                title={`Run ${workflow.title}`}
-                type="button"
-                variant="outline"
-              >
-                <Play className="size-3.5" />
-              </Button>
-            </div>
-          </article>
+            <span className="grid size-5 place-items-center rounded border border-[color:var(--app-border)] text-[10px] font-semibold tabular-nums text-muted-foreground">
+              {index + 1}
+            </span>
+            <span className="min-w-0 truncate text-[11px] font-medium text-muted-foreground">
+              {phase}
+            </span>
+          </div>
         ))}
       </div>
     </section>
@@ -1341,6 +1557,10 @@ function AgentsTable({
 }) {
   return (
     <section className="overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
+      <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5">
+        <h2 className="text-sm font-semibold">Audit Agents</h2>
+        <span className="text-[11px] text-muted-foreground">{agents.length} shown</span>
+      </div>
       <div className="overflow-x-auto">
         <div className="min-w-[860px]">
           <div className="grid grid-cols-[36px_minmax(250px,1.7fr)_112px_96px_92px_74px_36px] items-center gap-3 border-b border-[color:var(--app-border)] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -1398,33 +1618,30 @@ function AgentRow({
   return (
     <div
       className={cn(
-        "grid cursor-default grid-cols-[36px_minmax(250px,1.7fr)_112px_96px_92px_74px_36px] items-center gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5 text-xs transition last:border-b-0",
+        "grid grid-cols-[minmax(0,1fr)_36px] items-center border-b border-[color:var(--app-border)] text-xs transition last:border-b-0",
         selected
           ? "border-l-2 border-l-primary bg-[var(--app-subtle)]"
           : "border-l-2 border-l-transparent hover:bg-[var(--app-subtle)]",
       )}
-      onClick={() => onOpenAgentDetails(agent)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpenAgentDetails(agent);
-        }
-      }}
-      role="button"
-      tabIndex={0}
     >
-      <AgentIcon agent={agent} />
-      <div className="min-w-0">
-        <div className="truncate font-semibold text-foreground">{agent.name}</div>
-        <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-          {agent.description}
+      <button
+        className="grid min-h-[52px] w-full grid-cols-[36px_minmax(250px,1.7fr)_112px_96px_92px_74px] items-center gap-3 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        onClick={() => onOpenAgentDetails(agent)}
+        type="button"
+      >
+        <AgentIcon agent={agent} />
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-foreground">{agent.name}</div>
+          <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+            {agent.description}
+          </div>
         </div>
-      </div>
-      <CategoryBadge category={metadata.category} />
-      <StatusBadge status={agent.status} />
-      <span className="text-[11px] text-muted-foreground">{lastRun}</span>
-      <span className="tabular-nums text-[11px] text-muted-foreground">{agent.tools.length}</span>
-      <div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
+        <CategoryBadge category={metadata.category} />
+        <StatusBadge status={agent.status} />
+        <span className="text-[11px] text-muted-foreground">{lastRun}</span>
+        <span className="tabular-nums text-[11px] text-muted-foreground">{agent.tools.length}</span>
+      </button>
+      <div className="flex justify-end pr-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -1494,6 +1711,9 @@ function AgentDetailScreen({
   const duration = run
     ? durationLabel((run.completedAt ?? Date.now()) - run.startedAt)
     : "Not run";
+  const responseTitle = agent.tools.includes("rust.audit.run_full")
+    ? "Audit Output"
+    : "Model Response";
 
   return (
     <section className="min-w-0 space-y-3">
@@ -1541,6 +1761,11 @@ function AgentDetailScreen({
         <MetricTile label="Findings" value={String(run?.findingCandidates.length ?? 0)} />
       </div>
 
+      <AuditResultsPanel
+        evidence={run?.evidence ?? []}
+        findingCandidates={run?.findingCandidates ?? []}
+      />
+
       <HarnessCorrelationPanel
         capsules={routeCapsules}
         decisions={routeDecisions}
@@ -1554,7 +1779,7 @@ function AgentDetailScreen({
           <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5">
             <div className="flex min-w-0 items-center gap-2">
               <MessageSquareText className="size-4 text-muted-foreground" />
-              <h3 className="truncate text-sm font-semibold">Model Response</h3>
+              <h3 className="truncate text-sm font-semibold">{responseTitle}</h3>
             </div>
             {agentIsRunning ? (
               <span className="shrink-0 text-[11px] text-sky-300">Streaming</span>
@@ -1631,6 +1856,314 @@ function AgentDetailScreen({
         </section>
       </div>
     </section>
+  );
+}
+
+function AuditResultsPanel({
+  evidence,
+  findingCandidates,
+}: {
+  evidence: SecurityEvidenceItem[];
+  findingCandidates: FindingCandidate[];
+}) {
+  return (
+    <section className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
+      <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <ShieldCheck className="size-4 text-muted-foreground" />
+          <h3 className="truncate text-sm font-semibold">Evidence & Findings</h3>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span>{evidence.length} evidence</span>
+          <span className="text-muted-foreground/50">/</span>
+          <span>{findingCandidates.length} findings</span>
+        </div>
+      </header>
+
+      <div className="grid min-w-0 gap-3 p-3 xl:grid-cols-2">
+        <ResultColumn
+          count={evidence.length}
+          emptyLabel="No evidence packets have been reduced for this run."
+          title="Evidence Cards"
+        >
+          {evidence.slice(0, 12).map((item) => (
+            <EvidenceDetailCard item={item} key={item.id} />
+          ))}
+        </ResultColumn>
+
+        <ResultColumn
+          count={findingCandidates.length}
+          emptyLabel="No finding candidates were emitted by this run."
+          title="Finding Cards"
+        >
+          {findingCandidates.slice(0, 12).map((finding) => (
+            <FindingDetailCard finding={finding} key={finding.id} />
+          ))}
+        </ResultColumn>
+      </div>
+    </section>
+  );
+}
+
+function ResultColumn({
+  children,
+  count,
+  emptyLabel,
+  title,
+}: {
+  children: React.ReactNode;
+  count: number;
+  emptyLabel: string;
+  title: string;
+}) {
+  const hasContent = React.Children.count(children) > 0;
+
+  return (
+    <section className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-2.5">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h4 className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </h4>
+        <Badge className="rounded px-1.5 py-0.5 text-[10px]" variant="secondary">
+          {count}
+        </Badge>
+      </div>
+      {hasContent ? (
+        <div className="grid max-h-[440px] gap-2 overflow-auto pr-1">{children}</div>
+      ) : (
+        <div className="grid min-h-28 place-items-center rounded-md border border-dashed border-[color:var(--app-border)] px-3 py-4 text-center text-[11px] leading-4 text-muted-foreground">
+          {emptyLabel}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function EvidenceDetailCard({ item }: { item: SecurityEvidenceItem }) {
+  const title = evidenceCardTitle(item);
+
+  return (
+    <details className="group rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2 py-2">
+      <summary className="grid min-h-10 cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-start gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+        <span className="min-w-0">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="min-w-0 truncate text-xs font-semibold">{title}</span>
+            <span className={cn("shrink-0 text-[10px] font-semibold", confidenceClass(item.confidence))}>
+              {item.confidence}
+            </span>
+          </span>
+          <span className="mt-1 block line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+            {item.claim}
+          </span>
+        </span>
+        <ChevronRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground transition group-open:rotate-90" />
+      </summary>
+      <div className="mt-2 grid gap-2 border-t border-[color:var(--app-border)] pt-2 text-[11px] leading-4 text-muted-foreground">
+        <DetailPair label="Observation" value={item.observation} />
+        <DetailPair label="Precision" value={item.sourcePrecision} />
+        {item.symbolRefs.length ? (
+          <DetailPair label="Symbols" value={item.symbolRefs.slice(0, 8).join(", ")} />
+        ) : null}
+        {item.followUp ? <DetailPair label="Follow-up" value={item.followUp} /> : null}
+      </div>
+    </details>
+  );
+}
+
+function evidenceCardTitle(item: SecurityEvidenceItem) {
+  const packetType = typeof item.metadata?.packetType === "string"
+    ? item.metadata.packetType
+    : undefined;
+
+  return packetType ?? item.kind;
+}
+
+function FindingDetailCard({ finding }: { finding: FindingCandidate }) {
+  const confirmed = finding.status === "confirmed";
+
+  return (
+    <details className="group rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2 py-2">
+      <summary className="grid min-h-10 cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-start gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+        <span className="min-w-0">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="min-w-0 truncate text-xs font-semibold" title={finding.title}>
+              {finding.title}
+            </span>
+            <FindingSeverityBadge confirmed={confirmed} severity={finding.severity} />
+          </span>
+          <span className="mt-1 block truncate text-[11px] text-muted-foreground">
+            {findingStatusLabel(finding.status)} - {finding.confidence}
+          </span>
+        </span>
+        <ChevronRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground transition group-open:rotate-90" />
+      </summary>
+      <div className="mt-2 grid gap-2 border-t border-[color:var(--app-border)] pt-2 text-[11px] leading-4 text-muted-foreground">
+        <DetailPair label="Category" value={finding.category} />
+        <DetailPair label="Status meaning" value={findingStatusExplanation(finding)} />
+        <DetailPair label="Why severity" value={findingSeverityRationale(finding)} />
+        <DetailPair label="Impact if true" value={findingImpact(finding)} />
+        {finding.affectedSymbols.length ? (
+          <DetailPair label="Affected" value={finding.affectedSymbols.slice(0, 8).join(", ")} />
+        ) : null}
+        {finding.exploitScenario ? (
+          <DetailPair label="Scenario" value={finding.exploitScenario} />
+        ) : null}
+        <DetailPair label="Mitigation" value={findingMitigation(finding)} />
+        <DetailPair
+          label="Validation"
+          value={findingValidationText(finding)}
+        />
+        {finding.evidenceRefs.length ? (
+          <DetailPair label="Evidence summary" value={finding.evidenceRefs.slice(0, 4).join("; ")} />
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
+function FindingSeverityBadge({
+  confirmed,
+  severity,
+}: {
+  confirmed: boolean;
+  severity: FindingCandidate["severity"];
+}) {
+  return (
+    <Badge
+      className={cn(
+        "rounded px-1.5 py-0.5 text-[10px]",
+        severity === "critical" && "bg-red-500/20 text-red-200",
+        severity === "high" && "bg-red-500/15 text-red-300",
+        severity === "medium" && "bg-amber-500/15 text-amber-300",
+        severity === "low" && "bg-sky-500/15 text-sky-300",
+        severity === "info" && "bg-muted text-muted-foreground",
+      )}
+      variant="secondary"
+    >
+      {confirmed ? severity : `${severity} candidate`}
+    </Badge>
+  );
+}
+
+function findingStatusLabel(status: FindingCandidate["status"]) {
+  if (status === "hypothesis" || status === "possible") {
+    return "candidate";
+  }
+  if (status === "needsValidation") {
+    return "needs validation";
+  }
+  if (status === "needsHumanReview") {
+    return "needs review";
+  }
+
+  return status;
+}
+
+function findingStatusExplanation(finding: FindingCandidate) {
+  if (finding.status === "confirmed") {
+    return "Confirmed means the harness found deterministic evidence tied to this finding. Treat it as an active issue unless a human review proves the evidence is invalid.";
+  }
+  if (finding.status === "likely") {
+    return "Likely means multiple evidence sources point at the issue. Keep it open and prioritize validation or remediation.";
+  }
+  if (finding.status === "possible" || finding.status === "hypothesis") {
+    return "This is an evidence-backed candidate from static or graph analysis. It stays open until targeted validation proves exploitability, mitigation, accepted risk, or a concrete false positive.";
+  }
+  if (finding.status === "needsHumanReview" || finding.status === "needsValidation") {
+    return "The harness found a security-relevant signal and needs human review or a targeted validation run before final disposition.";
+  }
+
+  return `Current finding state: ${finding.status}.`;
+}
+
+function findingSeverityRationale(finding: FindingCandidate) {
+  const evidenceText = finding.evidenceRefs.join(" ").toLowerCase();
+  const traits = [
+    /public|entry|transaction-callable/.test(evidenceText) ? "reachable public or transaction-callable surface" : "",
+    /mint|burn|supply|coin|balance|withdraw|deposit|asset/.test(evidenceText) ? "asset or supply movement" : "",
+    /shared|lifecycle|mutat/.test(evidenceText) ? "shared or lifecycle-sensitive state mutation" : "",
+    /oracle|price|clock|time/.test(evidenceText) ? "oracle, price, or time dependency" : "",
+    /external package|external call|dependency/.test(evidenceText) ? "external dependency interaction" : "",
+    /admin|cap|authority|owner/.test(evidenceText) ? "authorization or capability boundary" : "",
+  ].filter(Boolean);
+  const basis = traits.length
+    ? traits.join(", ")
+    : "the affected symbol, static rule, and available evidence chain";
+  const prefix = finding.status === "confirmed"
+    ? "Severity is assigned from observed evidence involving"
+    : "Candidate severity is assigned because the evidence shows";
+
+  return `${prefix} ${basis}. Confidence is ${finding.confidence}; this should drive validation priority, not dismissal.`;
+}
+
+function findingImpact(finding: FindingCandidate) {
+  const assetImpact = typeof finding.metadata?.assetImpact === "string"
+    ? finding.metadata.assetImpact
+    : undefined;
+
+  if (assetImpact) {
+    return assetImpact;
+  }
+  if (finding.category === "surface-risk") {
+    return "Potential unauthorized state mutation, asset movement, accounting corruption, stale price use, or dependency-triggered behavior on a reachable public surface.";
+  }
+  if (finding.category.includes("complexity")) {
+    return "Complex code paths increase review risk and can hide missing checks, but complexity alone is not an exploit.";
+  }
+  if (finding.title.toLowerCase().includes("unchecked")) {
+    return "Unchecked results can hide failed operations or skipped validation, depending on the affected call.";
+  }
+
+  return "Impact depends on whether the evidence chain is reachable by the stated actor and can change assets, privileges, or protocol state.";
+}
+
+function findingMitigation(finding: FindingCandidate) {
+  if (finding.patchRecommendation?.minimalChange) {
+    return finding.patchRecommendation.minimalChange;
+  }
+
+  const title = finding.title.toLowerCase();
+  if (finding.category === "surface-risk" || title.includes("high-risk public surface")) {
+    return "Require explicit capability or owner authorization, validate state, amount, oracle freshness, and bounds before mutation or transfer, and add a negative regression for unauthorized or malformed calls.";
+  }
+  if (title.includes("function_complexity")) {
+    return "Split the function into smaller helpers around authorization, accounting, and effects; add focused tests for each branch that mutates state or moves assets.";
+  }
+  if (title.includes("module_complexity")) {
+    return "Separate protocol concerns into smaller modules or helper APIs and add module-level invariants for critical accounting and authorization boundaries.";
+  }
+  if (title.includes("unchecked_return")) {
+    return "Use, assert, or explicitly document the returned value. If the return encodes success, failure, amount, or object state, abort on unexpected values.";
+  }
+
+  return "Define the intended invariant, add the smallest guard before mutation, and attach a regression test that fails before the fix and passes after it.";
+}
+
+function findingValidationText(finding: FindingCandidate) {
+  const commands = finding.validationPlan.commands.length
+            ? finding.validationPlan.commands.join(", ")
+            : "No validation command attached";
+  const expected = finding.validationPlan.expectedEvidence.length
+    ? ` Expected: ${finding.validationPlan.expectedEvidence.join(" ")}`
+    : "";
+
+  return `${commands}.${expected || " Keep this candidate open until validation produces a proof, mitigation, accepted risk, or a documented false positive."}`;
+}
+
+function DetailPair({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="grid gap-0.5">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+        {label}
+      </span>
+      <span className="break-words text-muted-foreground">{value}</span>
+    </div>
   );
 }
 
@@ -2724,7 +3257,7 @@ function AgentIcon({ agent }: { agent: AgentDefinition }) {
 function CategoryBadge({ category }: { category: AgentCategory }) {
   return (
     <Badge className="rounded px-1.5 py-0.5 text-[10px]" variant="secondary">
-      {category}
+      {categoryLabel(category)}
     </Badge>
   );
 }
@@ -2865,6 +3398,23 @@ function categoryForAgent(name: string): AgentCategory {
   return "Analysis";
 }
 
+function categoryLabel(category: AgentCategory) {
+  if (category === "Core") {
+    return "Primary";
+  }
+  if (category === "Analysis") {
+    return "Specialist";
+  }
+  if (category === "Action") {
+    return "Action";
+  }
+  if (category === "Output") {
+    return "Report";
+  }
+
+  return category;
+}
+
 function agentIcon(agent: AgentDefinition) {
   const normalized = agent.name.toLowerCase();
 
@@ -2972,10 +3522,6 @@ function agentLastRunLabel(logs: AgentExecutionLog[], agent: AgentDefinition) {
     .reduce((max, log) => Math.max(max, log.timestamp), 0);
 
   return latest ? relativeTimeLabel(latest) : "Never";
-}
-
-function uniqueToolCount(agents: AgentDefinition[]) {
-  return new Set(agents.flatMap((agent) => agent.tools)).size;
 }
 
 function createRunSnapshot({
@@ -3168,7 +3714,7 @@ function extractToolResultEvidence(output: unknown): {
   const record = asRecord(output);
 
   return {
-    evidence: asSecurityEvidenceItems(record?.evidence),
+    evidence: asSecurityEvidenceItems(record?.evidence ?? record?.securityEvidence),
     findingCandidates: asFindingCandidates(record?.findingCandidates),
   };
 }
