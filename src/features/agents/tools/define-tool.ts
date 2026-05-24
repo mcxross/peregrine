@@ -13,6 +13,7 @@ export function defineAgentTool<Input, Output>(spec: {
   description: string;
   inputSchema: JsonSchemaDefinition;
   outputSchema?: JsonSchemaDefinition;
+  manifest?: DeterministicToolSpec["manifest"];
   action: AgentActionRequest;
   examples?: Array<{ input: Input }>;
   execute: (

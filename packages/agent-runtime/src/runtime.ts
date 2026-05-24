@@ -44,7 +44,7 @@ export class PeregrineAgentRuntime {
   }
 
   async generate(request: AgentGenerateRequest): Promise<AgentGenerateResult> {
-    const { agent } = this.createAgent(request);
+    const { agent, toolSet } = this.createAgent(request);
     const callOptions = {
       abortSignal: request.abortSignal,
       timeout: request.timeout,
@@ -56,7 +56,7 @@ export class PeregrineAgentRuntime {
         })
       : await agent.generate({
           ...callOptions,
-          prompt: buildAgentPrompt(request.packet, request.prompt),
+          prompt: buildAgentPrompt(request.packet, request.prompt, toolSet.toolNamesById),
         });
 
     return {
@@ -67,7 +67,7 @@ export class PeregrineAgentRuntime {
   }
 
   async stream(request: AgentStreamRequest): Promise<AgentStreamResult> {
-    const { agent } = this.createAgent(request);
+    const { agent, toolSet } = this.createAgent(request);
     const callOptions = {
       abortSignal: request.abortSignal,
       timeout: request.timeout,
@@ -79,7 +79,7 @@ export class PeregrineAgentRuntime {
         })
       : await agent.stream({
           ...callOptions,
-          prompt: buildAgentPrompt(request.packet, request.prompt),
+          prompt: buildAgentPrompt(request.packet, request.prompt, toolSet.toolNamesById),
         });
 
     return {

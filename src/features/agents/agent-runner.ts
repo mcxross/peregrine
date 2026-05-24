@@ -1,9 +1,12 @@
 import {
   PeregrineAgentRuntime,
+  createAiSdkToolName,
   type AgentContextPacket,
   type AgentRole,
+  type ToolCapsule,
   type ToolRunSummary,
 } from "@peregrine/agent-runtime";
+import type { ToolRouteDecision } from "@peregrine/harness-control";
 
 import {
   createAgentToolRuntimeState,
@@ -27,15 +30,60 @@ export type AgentRunTraceEvent = {
   message: string;
 };
 
+export type AgentRunStreamEvent =
+  | {
+      capsules: ToolCapsule[];
+      decisions: ToolRouteDecision[];
+      type: "route-plan";
+    }
+  | { type: "text-delta"; text: string }
+  | { type: "reasoning-delta"; text: string }
+  | {
+      input?: unknown;
+      title?: string;
+      toolCallId: string;
+      toolName: string;
+      type: "tool-call";
+    }
+  | {
+      output?: unknown;
+      summary: string;
+      title?: string;
+      toolCallId: string;
+      toolName: string;
+      type: "tool-result";
+    }
+  | {
+      message: string;
+      title?: string;
+      toolCallId?: string;
+      toolName?: string;
+      type: "tool-error";
+    }
+  | {
+      approvalId: string;
+      toolCallId: string;
+      toolName: string;
+      type: "tool-approval-request";
+    }
+  | { toolCallId: string; toolName: string; type: "tool-output-denied" }
+  | { type: "step-start" }
+  | { finishReason?: string; type: "step-finish" }
+  | { finishReason?: string; type: "finish" }
+  | { reason?: string; type: "abort" }
+  | { message: string; type: "error" };
+
 export async function runAgentWorkflowWithModel({
   agent,
   onTrace,
+  onStream,
   projectContext,
   signal,
   workflow,
 }: {
   agent: AgentDefinition;
   onTrace?: (event: AgentRunTraceEvent) => void;
+  onStream?: (event: AgentRunStreamEvent) => void;
   projectContext?: AgentToolProjectContext | null;
   signal?: AbortSignal;
   workflow: AgentWorkflow;
@@ -52,9 +100,12 @@ export async function runAgentWorkflowWithModel({
     },
   );
   const toolRuns: ToolRunSummary[] = [];
+  const role = agentRoleForWorkflow(agent, workflow);
   const workspaceRuntime = createAgentWorkspaceRuntime({
     state: toolState,
     activeToolIds: agent.tools,
+    objective: agent.description || workflow.description,
+    role,
     requireToolApproval: agent.execution.requireToolApproval,
     onToolRun: (toolRun) => {
       toolRuns.push(toolRun);
@@ -64,8 +115,11 @@ export async function runAgentWorkflowWithModel({
       });
     },
   });
-  const packet = buildWorkflowContextPacket(agent, workflow, toolState, projectContext);
-  const prompt = buildAgentPrompt(agent, workflow, workspaceRuntime.tools);
+  const packet = {
+    ...buildWorkflowContextPacket(agent, workflow, toolState, projectContext),
+    toolCapsules: workspaceRuntime.toolCapsules,
+  };
+  const prompt = buildAgentPrompt(agent, workflow, workspaceRuntime.toolCapsules);
   const runner = new PeregrineAgentRuntime({
     model,
     tools: workspaceRuntime.tools,
@@ -83,6 +137,17 @@ export async function runAgentWorkflowWithModel({
   });
   onTrace?.({
     level: "trace",
+    message: `Tool router selected ${workspaceRuntime.routePlan.tools.length} tools and skipped ${
+      workspaceRuntime.routePlan.decisions.filter((decision) => !decision.selected).length
+    }.`,
+  });
+  onStream?.({
+    type: "route-plan",
+    capsules: workspaceRuntime.toolCapsules,
+    decisions: workspaceRuntime.routePlan.decisions,
+  });
+  onTrace?.({
+    level: "trace",
     message: `Agent context packet sent: ${formatTraceText(JSON.stringify(packet), 1_200)}`,
   });
   onTrace?.({
@@ -90,7 +155,7 @@ export async function runAgentWorkflowWithModel({
     message: `User prompt sent: ${formatTraceText(prompt, 1_200)}`,
   });
 
-  const result = await runner.generate({
+  const stream = await runner.stream({
     packet,
     abortSignal: signal,
     prompt,
@@ -99,6 +164,91 @@ export async function runAgentWorkflowWithModel({
       totalMs: 120_000,
     },
   });
+  let text = "";
+  let streamAbortReason: string | undefined;
+  let streamError: Error | null = null;
+
+  for await (const part of stream.result.fullStream) {
+    switch (part.type) {
+      case "text-delta":
+        text += part.text;
+        onStream?.({ type: "text-delta", text: part.text });
+        break;
+      case "reasoning-delta":
+        onStream?.({ type: "reasoning-delta", text: part.text });
+        break;
+      case "tool-call":
+        onStream?.({
+          type: "tool-call",
+          input: part.input,
+          title: part.title,
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+        });
+        break;
+      case "tool-result":
+        onStream?.({
+          type: "tool-result",
+          output: part.output,
+          summary: summarizeStreamOutput(part.output),
+          title: part.title,
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+        });
+        break;
+      case "tool-error":
+        onStream?.({
+          type: "tool-error",
+          message: errorMessage(part.error),
+          title: part.title,
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+        });
+        break;
+      case "tool-approval-request":
+        onStream?.({
+          type: "tool-approval-request",
+          approvalId: part.approvalId,
+          toolCallId: part.toolCall.toolCallId,
+          toolName: part.toolCall.toolName,
+        });
+        break;
+      case "tool-output-denied":
+        onStream?.({
+          type: "tool-output-denied",
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+        });
+        break;
+      case "start-step":
+        onStream?.({ type: "step-start" });
+        break;
+      case "finish-step":
+        onStream?.({ type: "step-finish", finishReason: part.finishReason });
+        break;
+      case "finish":
+        onStream?.({ type: "finish", finishReason: part.finishReason });
+        break;
+      case "abort":
+        streamAbortReason = part.reason;
+        onStream?.({ type: "abort", reason: part.reason });
+        break;
+      case "error":
+        streamError = new Error(errorMessage(part.error));
+        onStream?.({ type: "error", message: streamError.message });
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (streamError) {
+    throw streamError;
+  }
+
+  if (streamAbortReason !== undefined || signal?.aborted) {
+    throw createAbortError(streamAbortReason);
+  }
 
   onTrace?.({
     level: "info",
@@ -106,15 +256,59 @@ export async function runAgentWorkflowWithModel({
   });
 
   return {
-    text: result.text.trim(),
+    text: text.trim(),
     toolRuns,
   };
+}
+
+function summarizeStreamOutput(output: unknown) {
+  if (
+    output
+    && typeof output === "object"
+    && "summary" in output
+    && typeof (output as { summary?: unknown }).summary === "string"
+  ) {
+    return (output as { summary: string }).summary;
+  }
+
+  return formatTraceText(safeStringify(output ?? null), 360);
+}
+
+function errorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  return formatTraceText(safeStringify(error ?? "Unknown error"), 360);
+}
+
+function createAbortError(reason?: string) {
+  if (typeof DOMException !== "undefined") {
+    return new DOMException(reason ?? "Aborted", "AbortError");
+  }
+
+  const error = new Error(reason ?? "Aborted");
+  error.name = "AbortError";
+  return error;
+}
+
+function safeStringify(value: unknown) {
+  try {
+    const json = JSON.stringify(value);
+    return json ?? String(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function buildAgentPrompt(
   agent: AgentDefinition,
   workflow: AgentWorkflow,
-  tools: Array<{ id: string; description: string }>,
+  tools: ToolCapsule[],
 ) {
   const nodes = workflow.nodes.map(formatNode).join("\n");
   const edges = workflow.edges.length
@@ -123,7 +317,20 @@ function buildAgentPrompt(
       .join("\n")
     : "- none";
   const toolLines = tools.length
-    ? tools.map((tool) => `- ${tool.id}: ${tool.description}`).join("\n")
+    ? tools
+      .map(
+        (tool) =>
+          [
+            `- callable: ${tool.callableName ?? createAiSdkToolName(tool.id)}`,
+            `  Peregrine id: ${tool.id}`,
+            `  description: ${tool.description}`,
+            `  category: ${tool.category}`,
+            `  risk: ${tool.risk}`,
+            `  use: ${tool.whenToUse.join("; ")}`,
+            `  avoid: ${tool.whenNotToUse.join("; ")}`,
+          ].join("\n"),
+      )
+      .join("\n")
     : "- none";
 
   return [
@@ -138,9 +345,12 @@ function buildAgentPrompt(
     "Deterministic Peregrine tools available in this run:",
     toolLines,
     "",
+    "When invoking a tool, use the callable name exactly. The Peregrine id is only for evidence lineage and UI display.",
+    "First establish Package Intent: identify what the package appears to implement, its main assets, actors, entrypoints, capabilities, and trust boundaries.",
+    "Choose specialized security tools only after the package intent is stated or explicitly blocked by missing evidence.",
     "Use the configured tools when a claim can be checked deterministically.",
     "Do not claim a check passed unless a tool result supports it.",
-    "Return a report with these sections: Run Summary, Reasoning Trace Summary, Findings or Output, Evidence Needed, Next Actions.",
+    "Return a report with these sections: Run Summary, Package Intent, Security Tool Plan, Reasoning Trace Summary, Findings or Output, Evidence Needed, Next Actions.",
   ].join("\n");
 }
 
@@ -164,8 +374,10 @@ function buildWorkflowContextPacket(
       agent.systemPrompt,
       "Run the configured Peregrine Agents workflow.",
       "Use the workflow graph as the task boundary.",
+      "First establish Package Intent before selecting specialized security checks.",
       "Call deterministic Peregrine tools when evidence is required.",
-      "Return a report with these sections: Run Summary, Reasoning Trace Summary, Findings or Output, Evidence Needed, Next Actions.",
+      "Use callable tool names exactly; dotted Peregrine IDs are lineage identifiers, not callable names.",
+      "Return a report with these sections: Run Summary, Package Intent, Security Tool Plan, Reasoning Trace Summary, Findings or Output, Evidence Needed, Next Actions.",
     ].join("\n"),
     projectSummary: {
       id: rootPath || "local-project",
@@ -223,7 +435,8 @@ function buildWorkflowContextPacket(
     outputContract: {
       format: "markdown",
       requiredEvidence: true,
-      description: "Concise workflow report backed by deterministic tool evidence.",
+      description:
+        "Concise workflow report that establishes package intent before evidence-backed security findings.",
     },
   };
 }

@@ -1,6 +1,15 @@
 import React from "react";
+import type {
+  AgentRole,
+  FindingCandidate,
+  SecurityEvidenceItem,
+  ToolCapsule,
+  ToolRunSummary,
+} from "@peregrine/agent-runtime";
+import { routeTools, type ToolRouteDecision } from "@peregrine/harness-control";
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Binary,
   Bot,
@@ -11,13 +20,16 @@ import {
   Clock3,
   FileText,
   Hammer,
+  MessageSquareText,
   MoreHorizontal,
   Network,
   Play,
   Plus,
   ShieldCheck,
   Square,
+  Terminal,
   Workflow,
+  Wrench,
   X,
 } from "lucide-react";
 
@@ -77,12 +89,17 @@ import {
   type MovePackage,
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
-import type { AgentToolProjectContext } from "@/features/agents/tools";
+import {
+  createAgentToolRuntimeState,
+  resolveAgentTools,
+  type AgentToolProjectContext,
+} from "@/features/agents/tools";
+import type { AgentRunStreamEvent } from "@/features/agents/agent-runner";
 import { cn } from "@/lib/utils";
 
 type AgentCategory = "Core" | "Analysis" | "Action" | "Output" | "Custom";
 type AgentFilter = "all" | AgentCategory;
-type MainTab = "agents" | "runs" | "activity";
+type MainTab = "agents" | "runs" | "activity" | "details";
 type InspectorTab = "overview" | "tools" | "permissions" | "runs";
 
 type AgentUiMetadata = {
@@ -118,6 +135,41 @@ type RunSnapshot = {
     state: "active" | "blocked" | "done" | "pending";
   }>;
   warningCount: number;
+};
+
+type AgentRunDetailStatus = "idle" | "running" | "completed" | "blocked" | "stopped";
+
+type AgentRunDetailEvent = {
+  id: string;
+  kind: "status" | "model" | "reasoning" | "tool" | "error" | "trace";
+  level: AgentExecutionLog["level"];
+  message: string;
+  timestamp: number;
+  title: string;
+};
+
+type AgentRunDetail = {
+  agentId: string;
+  completedAt?: number;
+  displayName: string;
+  evidence: SecurityEvidenceItem[];
+  events: AgentRunDetailEvent[];
+  findingCandidates: FindingCandidate[];
+  id: string;
+  reasoningText: string;
+  responseText: string;
+  routeDecisions: ToolRouteDecision[];
+  startedAt: number;
+  status: AgentRunDetailStatus;
+  toolCapsules: ToolCapsule[];
+  toolRuns: ToolRunSummary[];
+  workflowId: string;
+  workflowName: string;
+};
+
+type HarnessRoutePreview = {
+  capsules: ToolCapsule[];
+  decisions: ToolRouteDecision[];
 };
 
 const AGENT_FILTERS: Array<{ label: string; value: AgentFilter }> = [
@@ -209,6 +261,11 @@ const TOOL_FAMILY_LABELS: Record<string, string> = {
   "rust.validation": "Validation",
 };
 
+const PACKAGE_INTENT_TOOL_IDS = new Set([
+  "rust.index.package",
+  "rust.index.package_overview",
+]);
+
 export function AgentsScreen({
   activeMovePackage,
   packageTree,
@@ -237,6 +294,7 @@ export function AgentsScreen({
   const [agentFilter, setAgentFilter] = React.useState<AgentFilter>("all");
   const [inspectorTab, setInspectorTab] = React.useState<InspectorTab>("overview");
   const [activeRunName, setActiveRunName] = React.useState("");
+  const [runDetailsByAgentId, setRunDetailsByAgentId] = React.useState<Record<string, AgentRunDetail>>({});
   const activeRunControllerRef = React.useRef<AbortController | null>(null);
   const [isProjectStateLoaded, setIsProjectStateLoaded] = React.useState(false);
 
@@ -255,6 +313,16 @@ export function AgentsScreen({
     logs: state.logs,
     workflow: selectedWorkflow,
   });
+  const selectedRunDetail = runDetailsByAgentId[selectedAgent.id];
+  const selectedHarnessPreview = React.useMemo(
+    () =>
+      createHarnessRoutePreview({
+        agent: selectedAgent,
+        projectContext,
+        workflow: selectedWorkflow,
+      }),
+    [projectContext, selectedAgent, selectedWorkflow],
+  );
 
   React.useEffect(() => {
     let cancelled = false;
@@ -339,18 +407,22 @@ export function AgentsScreen({
 
         <ScrollArea className="min-h-0 min-w-0 overflow-hidden">
           <div className="min-w-0 space-y-4 p-4 pb-6">
-            <SummaryCards
-              agentCount={state.agents.length}
-              lastRunLabel={lastRunLabel(state.logs)}
-              toolCount={uniqueToolCount(state.agents)}
-              workflowCount={state.workflows.length}
-            />
+            {activeMainTab !== "details" ? (
+              <>
+                <SummaryCards
+                  agentCount={state.agents.length}
+                  lastRunLabel={lastRunLabel(state.logs)}
+                  toolCount={uniqueToolCount(state.agents)}
+                  workflowCount={state.workflows.length}
+                />
 
-            <RecommendedWorkflows
-              disabled={isRunInProgress}
-              onRun={(workflow) => void runRecommendedWorkflow(workflow)}
-              workflows={RECOMMENDED_WORKFLOWS}
-            />
+                <RecommendedWorkflows
+                  disabled={isRunInProgress}
+                  onRun={(workflow) => void runRecommendedWorkflow(workflow)}
+                  workflows={RECOMMENDED_WORKFLOWS}
+                />
+              </>
+            ) : null}
 
             <Tabs
               className="min-h-0 min-w-0 gap-3"
@@ -368,6 +440,9 @@ export function AgentsScreen({
                   <TabsTrigger className="h-9 px-3 text-xs" value="activity">
                     Activity
                   </TabsTrigger>
+                  <TabsTrigger className="h-9 px-3 text-xs" value="details">
+                    Details
+                  </TabsTrigger>
                 </TabsList>
                 <div className="hidden items-center gap-2 text-[11px] text-muted-foreground md:flex">
                   <CircleDot className="size-3 text-emerald-300" />
@@ -381,6 +456,7 @@ export function AgentsScreen({
                   logs={state.logs}
                   onDeleteAgent={deleteAgent}
                   onDuplicateAgent={duplicateSelectedAgent}
+                  onOpenAgentDetails={openAgentDetails}
                   onSelectAgent={selectAgent}
                   selectedAgentId={selectedAgent.id}
                 />
@@ -390,6 +466,7 @@ export function AgentsScreen({
                 <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
                   <RunStatusCard
                     activeAgent={selectedAgent.name}
+                    onOpenDetails={() => openAgentDetails(selectedAgent)}
                     run={selectedRunSnapshot}
                     workflowName={activeRunName || selectedWorkflow.name}
                   />
@@ -406,6 +483,18 @@ export function AgentsScreen({
                   rows={activityRows(state.logs, state.agents)}
                 />
               </TabsContent>
+
+              <TabsContent className="mt-0" value="details">
+                <AgentDetailScreen
+                  agent={selectedAgent}
+                  isRunInProgress={isRunInProgress}
+                  onRunWorkflow={() => void runWorkflow()}
+                  onStopRun={stopWorkflowRun}
+                  plannedRoute={selectedHarnessPreview}
+                  run={selectedRunDetail}
+                  workflow={selectedWorkflow}
+                />
+              </TabsContent>
             </Tabs>
           </div>
         </ScrollArea>
@@ -416,6 +505,7 @@ export function AgentsScreen({
         agent={selectedAgent}
         isOpen={isInspectorOpen}
         logs={state.logs}
+        onOpenDetails={() => openAgentDetails(selectedAgent)}
         run={selectedRunSnapshot}
         onRunWorkflow={() => void runWorkflow()}
         onTabChange={setInspectorTab}
@@ -483,6 +573,17 @@ export function AgentsScreen({
 
   function selectAgent(agent: AgentDefinition) {
     setInspectorTab("overview");
+    setIsInspectorOpen(true);
+    setState((current) => ({
+      ...current,
+      selectedAgentId: agent.id,
+      selectedWorkflowId: agent.workflowId,
+    }));
+  }
+
+  function openAgentDetails(agent: AgentDefinition) {
+    setActiveMainTab("details");
+    setInspectorTab("runs");
     setIsInspectorOpen(true);
     setState((current) => ({
       ...current,
@@ -562,6 +663,303 @@ export function AgentsScreen({
     await runWorkflowFor(orchestrator, orchestratorWorkflow, recommendedWorkflow.title);
   }
 
+  function startRunDetail(
+    runAgent: AgentDefinition,
+    runWorkflowState: AgentWorkflow,
+    displayName: string,
+    status: AgentRunDetailStatus,
+    initialEvent: Omit<AgentRunDetailEvent, "id" | "timestamp">,
+  ) {
+    const timestamp = Date.now();
+
+    setActiveMainTab("details");
+    setInspectorTab("runs");
+    setIsInspectorOpen(true);
+    setActiveRunName(displayName);
+    setRunDetailsByAgentId((current) => ({
+      ...current,
+      [runAgent.id]: {
+        agentId: runAgent.id,
+        displayName,
+        evidence: [],
+        events: [createRunDetailEvent(initialEvent, timestamp)],
+        findingCandidates: [],
+        id: createRunDetailId(runAgent.id),
+        reasoningText: "",
+        responseText: "",
+        routeDecisions: [],
+        startedAt: timestamp,
+        status,
+        toolCapsules: [],
+        toolRuns: [],
+        workflowId: runWorkflowState.id,
+        workflowName: runWorkflowState.name,
+      },
+    }));
+  }
+
+  function appendRunDetailEvent(
+    agentId: string,
+    event: Omit<AgentRunDetailEvent, "id" | "timestamp">,
+  ) {
+    const timestamp = Date.now();
+
+    setRunDetailsByAgentId((current) => {
+      const detail = current[agentId];
+
+      if (!detail) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [agentId]: {
+          ...detail,
+          events: [
+            ...detail.events,
+            createRunDetailEvent(event, timestamp),
+          ].slice(-160),
+        },
+      };
+    });
+  }
+
+  function appendRunDetailText(
+    agentId: string,
+    field: "reasoningText" | "responseText",
+    text: string,
+  ) {
+    setRunDetailsByAgentId((current) => {
+      const detail = current[agentId];
+
+      if (!detail) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [agentId]: {
+          ...detail,
+          [field]: `${detail[field]}${text}`,
+        },
+      };
+    });
+  }
+
+  function updateRunDetailRoute(
+    agentId: string,
+    capsules: ToolCapsule[],
+    decisions: ToolRouteDecision[],
+  ) {
+    setRunDetailsByAgentId((current) => {
+      const detail = current[agentId];
+
+      if (!detail) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [agentId]: {
+          ...detail,
+          routeDecisions: decisions,
+          toolCapsules: capsules,
+        },
+      };
+    });
+  }
+
+  function appendRunDetailEvidence(
+    agentId: string,
+    evidence: SecurityEvidenceItem[],
+    findingCandidates: FindingCandidate[],
+  ) {
+    if (!evidence.length && !findingCandidates.length) {
+      return;
+    }
+
+    setRunDetailsByAgentId((current) => {
+      const detail = current[agentId];
+
+      if (!detail) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [agentId]: {
+          ...detail,
+          evidence: mergeById(detail.evidence, evidence),
+          findingCandidates: mergeById(detail.findingCandidates, findingCandidates),
+        },
+      };
+    });
+  }
+
+  function attachRunDetailToolRuns(agentId: string, toolRuns: ToolRunSummary[]) {
+    setRunDetailsByAgentId((current) => {
+      const detail = current[agentId];
+
+      if (!detail) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [agentId]: {
+          ...detail,
+          toolRuns: mergeById(detail.toolRuns, toolRuns),
+        },
+      };
+    });
+  }
+
+  function finishRunDetail(
+    agentId: string,
+    status: AgentRunDetailStatus,
+    event: Omit<AgentRunDetailEvent, "id" | "timestamp">,
+  ) {
+    const timestamp = Date.now();
+
+    setRunDetailsByAgentId((current) => {
+      const detail = current[agentId];
+
+      if (!detail) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [agentId]: {
+          ...detail,
+          completedAt: timestamp,
+          events: [
+            ...detail.events,
+            createRunDetailEvent(event, timestamp),
+          ].slice(-160),
+          status,
+        },
+      };
+    });
+  }
+
+  function recordRunStreamEvent(agentId: string, event: AgentRunStreamEvent) {
+    switch (event.type) {
+      case "route-plan": {
+        const selectedCount = event.decisions.filter((decision) => decision.selected).length;
+        const skippedCount = event.decisions.length - selectedCount;
+
+        updateRunDetailRoute(agentId, event.capsules, event.decisions);
+        appendRunDetailEvent(agentId, {
+          kind: "tool",
+          level: "trace",
+          title: "Tool router",
+          message: `Selected ${selectedCount} active tool capsules; skipped ${skippedCount}.`,
+        });
+        break;
+      }
+      case "text-delta":
+        appendRunDetailText(agentId, "responseText", event.text);
+        break;
+      case "reasoning-delta":
+        appendRunDetailText(agentId, "reasoningText", event.text);
+        break;
+      case "tool-call":
+        appendRunDetailEvent(agentId, {
+          kind: "tool",
+          level: "trace",
+          title: event.title ?? displayStreamToolName(event.toolName),
+          message: event.input === undefined
+            ? `${displayStreamToolName(event.toolName)} called.`
+            : `${displayStreamToolName(event.toolName)} called.\nInput: ${formatDetailPayload(event.input, 520)}`,
+        });
+        break;
+      case "tool-result":
+        {
+          const extracted = extractToolResultEvidence(event.output);
+
+          appendRunDetailEvidence(
+            agentId,
+            extracted.evidence,
+            extracted.findingCandidates,
+          );
+        }
+        appendRunDetailEvent(agentId, {
+          kind: "tool",
+          level: "info",
+          title: event.title ?? displayStreamToolName(event.toolName),
+          message: event.summary || `${displayStreamToolName(event.toolName)} returned output.`,
+        });
+        break;
+      case "tool-error":
+        appendRunDetailEvent(agentId, {
+          kind: "error",
+          level: "error",
+          title: event.title ?? (event.toolName ? displayStreamToolName(event.toolName) : "Tool error"),
+          message: event.message,
+        });
+        break;
+      case "tool-approval-request":
+        appendRunDetailEvent(agentId, {
+          kind: "tool",
+          level: "warning",
+          title: "Tool approval requested",
+          message: `${displayStreamToolName(event.toolName)} requested approval (${event.approvalId}).`,
+        });
+        break;
+      case "tool-output-denied":
+        appendRunDetailEvent(agentId, {
+          kind: "tool",
+          level: "warning",
+          title: "Tool output denied",
+          message: `${displayStreamToolName(event.toolName)} output was denied.`,
+        });
+        break;
+      case "step-start":
+        appendRunDetailEvent(agentId, {
+          kind: "model",
+          level: "trace",
+          title: "Model step started",
+          message: "The model is evaluating the next step.",
+        });
+        break;
+      case "step-finish":
+        appendRunDetailEvent(agentId, {
+          kind: "model",
+          level: "trace",
+          title: "Model step finished",
+          message: `Finish reason: ${event.finishReason ?? "unknown"}.`,
+        });
+        break;
+      case "finish":
+        appendRunDetailEvent(agentId, {
+          kind: "model",
+          level: "info",
+          title: "Stream finished",
+          message: `Finish reason: ${event.finishReason ?? "unknown"}.`,
+        });
+        break;
+      case "abort":
+        appendRunDetailEvent(agentId, {
+          kind: "status",
+          level: "warning",
+          title: "Run stopped",
+          message: event.reason ?? "The run was stopped before completion.",
+        });
+        break;
+      case "error":
+        appendRunDetailEvent(agentId, {
+          kind: "error",
+          level: "error",
+          title: "Stream error",
+          message: event.message,
+        });
+        break;
+      default:
+        break;
+    }
+  }
+
   async function runWorkflowFor(
     runAgent: AgentDefinition,
     runWorkflowState: AgentWorkflow,
@@ -572,8 +970,14 @@ export function AgentsScreen({
     }
 
     if (!runAgent.provider.modelId.trim()) {
-      setActiveMainTab("runs");
-      setActiveRunName(displayName);
+      const message = `No model selected for ${providerById(runAgent.provider.providerId).label}. Refresh the model list or select an installed model before running ${displayName}.`;
+
+      startRunDetail(runAgent, runWorkflowState, displayName, "blocked", {
+        kind: "error",
+        level: "error",
+        message,
+        title: "Model unavailable",
+      });
       setState((current) => ({
         ...current,
         selectedAgentId: runAgent.id,
@@ -584,7 +988,7 @@ export function AgentsScreen({
             agentId: runAgent.id,
             workflowId: runWorkflowState.id,
             level: "error",
-            message: `No model selected for ${providerById(runAgent.provider.providerId).label}. Refresh the model list or select an installed model before running ${displayName}.`,
+            message,
           }),
         ].slice(-120),
       }));
@@ -594,8 +998,14 @@ export function AgentsScreen({
     const controller = new AbortController();
     const previousStatus = runAgent.status;
     activeRunControllerRef.current = controller;
-    setActiveMainTab("runs");
-    setActiveRunName(displayName);
+    startRunDetail(runAgent, runWorkflowState, displayName, "running", {
+      kind: "status",
+      level: "trace",
+      message: projectContext
+        ? `${runAgent.name} started ${displayName} against ${displayMovePackageName(projectContext.packageName)}.`
+        : `${runAgent.name} started ${displayName} without an open Move package.`,
+      title: "Run started",
+    });
 
     setState((current) => ({
       ...current,
@@ -626,10 +1036,29 @@ export function AgentsScreen({
         agent: runAgent,
         onTrace: (event) => {
           appendRunLog(runAgent.id, runWorkflowState.id, event);
+          appendRunDetailEvent(runAgent.id, {
+            kind: event.level === "trace" ? "trace" : "status",
+            level: event.level,
+            message: event.message,
+            title: event.level === "trace" ? "Runtime trace" : "Runtime update",
+          });
+        },
+        onStream: (event) => {
+          recordRunStreamEvent(runAgent.id, event);
         },
         projectContext,
         signal: controller.signal,
         workflow: runWorkflowState,
+      });
+
+      attachRunDetailToolRuns(runAgent.id, result.toolRuns);
+      finishRunDetail(runAgent.id, "completed", {
+        kind: "status",
+        level: "info",
+        message: result.text
+          ? `${displayName} completed with a streamed response.`
+          : `${displayName} completed without model text.`,
+        title: "Run completed",
       });
 
       setState((current) => ({
@@ -671,6 +1100,15 @@ export function AgentsScreen({
       }));
     } catch (error) {
       const aborted = isAbortError(error);
+
+      finishRunDetail(runAgent.id, aborted ? "stopped" : "blocked", {
+        kind: aborted ? "status" : "error",
+        level: aborted ? "warning" : "error",
+        message: aborted
+          ? `${displayName} stopped before the model completed.`
+          : `Model call failed: ${error instanceof Error ? error.message : String(error)}`,
+        title: aborted ? "Run stopped" : "Run failed",
+      });
 
       setState((current) => ({
         ...current,
@@ -889,6 +1327,7 @@ function AgentsTable({
   logs,
   onDeleteAgent,
   onDuplicateAgent,
+  onOpenAgentDetails,
   onSelectAgent,
   selectedAgentId,
 }: {
@@ -896,6 +1335,7 @@ function AgentsTable({
   logs: AgentExecutionLog[];
   onDeleteAgent: (agent: AgentDefinition) => void;
   onDuplicateAgent: (agent: AgentDefinition) => void;
+  onOpenAgentDetails: (agent: AgentDefinition) => void;
   onSelectAgent: (agent: AgentDefinition) => void;
   selectedAgentId: string;
 }) {
@@ -920,6 +1360,7 @@ function AgentsTable({
                 lastRun={agentLastRunLabel(logs, agent)}
                 onDeleteAgent={onDeleteAgent}
                 onDuplicateAgent={onDuplicateAgent}
+                onOpenAgentDetails={onOpenAgentDetails}
                 onSelectAgent={onSelectAgent}
                 selected={selectedAgentId === agent.id}
               />
@@ -940,6 +1381,7 @@ function AgentRow({
   lastRun,
   onDeleteAgent,
   onDuplicateAgent,
+  onOpenAgentDetails,
   onSelectAgent,
   selected,
 }: {
@@ -947,6 +1389,7 @@ function AgentRow({
   lastRun: string;
   onDeleteAgent: (agent: AgentDefinition) => void;
   onDuplicateAgent: (agent: AgentDefinition) => void;
+  onOpenAgentDetails: (agent: AgentDefinition) => void;
   onSelectAgent: (agent: AgentDefinition) => void;
   selected: boolean;
 }) {
@@ -960,11 +1403,11 @@ function AgentRow({
           ? "border-l-2 border-l-primary bg-[var(--app-subtle)]"
           : "border-l-2 border-l-transparent hover:bg-[var(--app-subtle)]",
       )}
-      onClick={() => onSelectAgent(agent)}
+      onClick={() => onOpenAgentDetails(agent)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          onSelectAgent(agent);
+          onOpenAgentDetails(agent);
         }
       }}
       role="button"
@@ -999,6 +1442,9 @@ function AgentRow({
             <DropdownMenuItem className="text-xs" onSelect={() => onSelectAgent(agent)}>
               Open settings
             </DropdownMenuItem>
+            <DropdownMenuItem className="text-xs" onSelect={() => onOpenAgentDetails(agent)}>
+              Open run details
+            </DropdownMenuItem>
             <DropdownMenuItem className="text-xs" onSelect={() => onDuplicateAgent(agent)}>
               Duplicate
             </DropdownMenuItem>
@@ -1021,11 +1467,409 @@ function AgentRow({
   );
 }
 
+function AgentDetailScreen({
+  agent,
+  isRunInProgress,
+  onRunWorkflow,
+  onStopRun,
+  plannedRoute,
+  run,
+  workflow,
+}: {
+  agent: AgentDefinition;
+  isRunInProgress: boolean;
+  onRunWorkflow: () => void;
+  onStopRun: () => void;
+  plannedRoute: HarnessRoutePreview;
+  run?: AgentRunDetail;
+  workflow: AgentWorkflow;
+}) {
+  const provider = providerById(agent.provider.providerId);
+  const agentIsRunning = agent.status === "running" || run?.status === "running";
+  const responseText = run?.responseText.trim();
+  const reasoningText = run?.reasoningText.trim();
+  const routeCapsules = run?.toolCapsules.length ? run.toolCapsules : plannedRoute.capsules;
+  const routeDecisions = run?.routeDecisions.length ? run.routeDecisions : plannedRoute.decisions;
+  const skippedToolCount = routeDecisions.filter((decision) => !decision.selected).length;
+  const duration = run
+    ? durationLabel((run.completedAt ?? Date.now()) - run.startedAt)
+    : "Not run";
+
+  return (
+    <section className="min-w-0 space-y-3">
+      <div className="grid gap-3 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+        <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3">
+          <AgentIcon agent={agent} />
+          <div className="min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h2 className="min-w-0 truncate text-base font-semibold">{agent.name}</h2>
+              <StatusBadge status={agent.status} />
+              {run ? <RunDetailStatusBadge status={run.status} /> : null}
+            </div>
+            <p className="mt-1 min-w-0 text-xs leading-5 text-muted-foreground">
+              {agent.description}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          {agentIsRunning ? (
+            <Button className="h-8 gap-1.5 text-xs" onClick={onStopRun} type="button" variant="outline">
+              <Square className="size-3.5" />
+              Stop
+            </Button>
+          ) : null}
+          <Button
+            className="h-8 gap-1.5 text-xs"
+            disabled={isRunInProgress}
+            onClick={onRunWorkflow}
+            type="button"
+          >
+            <Play className="size-3.5" />
+            Run
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,160px),1fr))] gap-2">
+        <MetricTile label="Workflow" value={run?.displayName ?? workflow.name} />
+        <MetricTile label="Provider" value={provider.label} />
+        <MetricTile label="Model" value={agent.provider.modelId || "No model"} />
+        <MetricTile label="Duration" value={duration} />
+        <MetricTile label="Routed" value={String(routeCapsules.length)} />
+        <MetricTile label="Skipped" value={String(skippedToolCount)} />
+        <MetricTile label="Evidence" value={String(run?.evidence.length ?? 0)} />
+        <MetricTile label="Findings" value={String(run?.findingCandidates.length ?? 0)} />
+      </div>
+
+      <HarnessCorrelationPanel
+        capsules={routeCapsules}
+        decisions={routeDecisions}
+        evidence={run?.evidence ?? []}
+        findingCandidates={run?.findingCandidates ?? []}
+        toolRuns={run?.toolRuns ?? []}
+      />
+
+      <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)]">
+        <section className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
+          <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5">
+            <div className="flex min-w-0 items-center gap-2">
+              <MessageSquareText className="size-4 text-muted-foreground" />
+              <h3 className="truncate text-sm font-semibold">Model Response</h3>
+            </div>
+            {agentIsRunning ? (
+              <span className="shrink-0 text-[11px] text-sky-300">Streaming</span>
+            ) : null}
+          </header>
+          <div className="grid min-h-[320px] content-start gap-3 p-3">
+            {responseText ? (
+              <pre className="min-h-[240px] whitespace-pre-wrap break-words rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-3 text-xs leading-5 text-foreground">
+                {responseText}
+              </pre>
+            ) : (
+              <div className="grid min-h-[240px] place-items-center rounded-md border border-dashed border-[color:var(--app-border)] bg-[var(--app-elevated)] p-6 text-center text-xs leading-5 text-muted-foreground">
+                {agentIsRunning
+                  ? "Waiting for streamed model text."
+                  : "No model response has been captured for this agent."}
+              </div>
+            )}
+
+            {reasoningText ? (
+              <section className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-3">
+                <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Terminal className="size-3.5" />
+                  Reasoning Stream
+                </div>
+                <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-4 text-muted-foreground">
+                  {reasoningText}
+                </pre>
+              </section>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
+          <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5">
+            <div className="flex min-w-0 items-center gap-2">
+              <Terminal className="size-4 text-muted-foreground" />
+              <h3 className="truncate text-sm font-semibold">Run Activity</h3>
+            </div>
+            <span className="shrink-0 text-[11px] text-muted-foreground">
+              {run?.events.length ?? 0} events
+            </span>
+          </header>
+          <div className="max-h-[520px] overflow-auto p-3">
+            {run?.events.length ? (
+              <div className="grid gap-2">
+                {run.events.map((event) => (
+                  <div
+                    className="grid min-w-0 grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-2"
+                    key={event.id}
+                  >
+                    <RunDetailEventIcon event={event} />
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-center justify-between gap-2">
+                        <span className={cn("min-w-0 truncate text-xs font-semibold", logLevelClass(event.level))}>
+                          {event.title}
+                        </span>
+                        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                          {timeLabel(event.timestamp)}
+                        </span>
+                      </div>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-[11px] leading-4 text-muted-foreground">
+                        {event.message}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid min-h-[260px] place-items-center rounded-md border border-dashed border-[color:var(--app-border)] bg-[var(--app-elevated)] p-6 text-center text-xs leading-5 text-muted-foreground">
+                Open or run this agent to see runtime activity.
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function HarnessCorrelationPanel({
+  capsules,
+  decisions,
+  evidence,
+  findingCandidates,
+  toolRuns,
+}: {
+  capsules: ToolCapsule[];
+  decisions: ToolRouteDecision[];
+  evidence: SecurityEvidenceItem[];
+  findingCandidates: FindingCandidate[];
+  toolRuns: ToolRunSummary[];
+}) {
+  const selectedCount = decisions.filter((decision) => decision.selected).length;
+  const skippedCount = decisions.length - selectedCount;
+  const categories = categoryCounts(capsules);
+  const latestRuns = toolRuns.slice(-5).reverse();
+  const intentCapsules = capsules.filter((capsule) => PACKAGE_INTENT_TOOL_IDS.has(capsule.id));
+  const intentRuns = toolRuns.filter((toolRun) => PACKAGE_INTENT_TOOL_IDS.has(toolRun.toolId));
+
+  return (
+    <section className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
+      <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <Network className="size-4 text-muted-foreground" />
+          <h3 className="truncate text-sm font-semibold">Harness Correlation</h3>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span>{selectedCount} routed</span>
+          <span className="text-muted-foreground/50">/</span>
+          <span>{skippedCount} skipped</span>
+        </div>
+      </header>
+
+      <div className="grid gap-3 p-3 xl:grid-cols-4">
+        <HarnessColumn
+          emptyLabel="Intent discovery tools are not routed for this agent."
+          icon={<FileText className="size-3.5" />}
+          title="Package Intent"
+        >
+          {intentCapsules.length || intentRuns.length ? (
+            <div className="grid gap-2">
+              <div className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Intent Gate
+                </div>
+                <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                  {intentRuns.some((run) => run.status === "succeeded")
+                    ? "Package intent evidence has started to land."
+                    : "Run index and overview before specialized checks."}
+                </p>
+              </div>
+              <div className="grid gap-1.5">
+                {(intentRuns.length ? intentRuns : intentCapsules).slice(0, 4).map((item) => {
+                  const id = "toolId" in item ? item.toolId : item.id;
+                  const status = "status" in item ? item.status : "routed";
+
+                  return (
+                    <div
+                      className="grid min-w-0 gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2"
+                      key={`${id}-${status}`}
+                    >
+                      <span className="min-w-0 truncate font-mono text-[11px] text-foreground" title={id}>
+                        {"callableName" in item ? item.callableName ?? id : id}
+                      </span>
+                      <span className="min-w-0 truncate text-[10px] text-muted-foreground">
+                        {status}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </HarnessColumn>
+
+        <HarnessColumn
+          emptyLabel="No active capsules routed."
+          icon={<Wrench className="size-3.5" />}
+          title="Tool Router"
+        >
+          {capsules.length ? (
+            <div className="grid gap-2">
+              <div className="flex flex-wrap gap-1.5">
+                {categories.map(([category, count]) => (
+                  <Badge className="rounded px-2 py-1 text-[10px]" key={category} variant="secondary">
+                    {category}: {count}
+                  </Badge>
+                ))}
+              </div>
+              <div className="grid gap-1.5">
+                {capsules.slice(0, 6).map((capsule) => (
+                  <div
+                    className="grid min-w-0 gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2"
+                    key={capsule.id}
+                  >
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <span
+                        className="min-w-0 truncate font-mono text-[11px] text-foreground"
+                        title={capsule.callableName ?? capsule.id}
+                      >
+                        {capsule.callableName ?? capsule.id}
+                      </span>
+                      <Badge className="rounded px-1.5 py-0.5 text-[10px]" variant="secondary">
+                        {capsule.risk}
+                      </Badge>
+                    </div>
+                    <p className="min-w-0 truncate font-mono text-[10px] text-muted-foreground" title={capsule.id}>
+                      {capsule.id}
+                    </p>
+                    <p className="min-w-0 truncate text-[11px] text-muted-foreground">
+                      {capsule.category}
+                      {capsule.outputBudgetTokens ? ` - ${capsule.outputBudgetTokens} token cap` : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </HarnessColumn>
+
+        <HarnessColumn
+          emptyLabel="No reduced evidence captured."
+          icon={<Terminal className="size-3.5" />}
+          title="Evidence Compiler"
+        >
+          {evidence.length ? (
+            <div className="grid gap-1.5">
+              {evidence.slice(0, 6).map((item) => (
+                <div
+                  className="grid min-w-0 gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2"
+                  key={item.id}
+                >
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-[11px] font-semibold">{item.kind}</span>
+                    <span className={cn("shrink-0 text-[10px] font-semibold", confidenceClass(item.confidence))}>
+                      {item.confidence}
+                    </span>
+                  </div>
+                  <p className="line-clamp-2 min-w-0 text-[11px] leading-4 text-muted-foreground">
+                    {item.claim}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </HarnessColumn>
+
+        <HarnessColumn
+          emptyLabel="No finding candidates emitted."
+          icon={<ShieldCheck className="size-3.5" />}
+          title="Finding Engine"
+        >
+          {findingCandidates.length ? (
+            <div className="grid gap-1.5">
+              {findingCandidates.slice(0, 6).map((finding) => (
+                <div
+                  className="grid min-w-0 gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2"
+                  key={finding.id}
+                >
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-[11px] font-semibold" title={finding.title}>
+                      {finding.title}
+                    </span>
+                    <SeverityBadge severity={finding.severity} />
+                  </div>
+                  <p className="min-w-0 truncate text-[11px] text-muted-foreground">
+                    {finding.status} - {finding.confidence}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : latestRuns.length ? (
+            <div className="grid gap-1.5">
+              {latestRuns.map((toolRun) => (
+                <div
+                  className="grid min-w-0 gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2"
+                  key={toolRun.id}
+                >
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <span className="min-w-0 truncate font-mono text-[11px]" title={toolRun.toolId}>
+                      {toolRun.toolId}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      {toolRun.status}
+                    </span>
+                  </div>
+                  <p className="line-clamp-2 min-w-0 text-[11px] leading-4 text-muted-foreground">
+                    {toolRun.summary}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </HarnessColumn>
+      </div>
+    </section>
+  );
+}
+
+function HarnessColumn({
+  children,
+  emptyLabel,
+  icon,
+  title,
+}: {
+  children: React.ReactNode;
+  emptyLabel: string;
+  icon: React.ReactNode;
+  title: string;
+}) {
+  const hasContent = React.Children.count(children) > 0;
+
+  return (
+    <section className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-2.5">
+      <div className="mb-2 flex min-w-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {icon}
+        <span className="truncate">{title}</span>
+      </div>
+      {hasContent ? (
+        children
+      ) : (
+        <div className="grid min-h-24 place-items-center rounded-md border border-dashed border-[color:var(--app-border)] px-3 py-4 text-center text-[11px] leading-4 text-muted-foreground">
+          {emptyLabel}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function AgentInspector({
   activeTab,
   agent,
   isOpen,
   logs,
+  onOpenDetails,
   onRunWorkflow,
   onTabChange,
   onToggleOpen,
@@ -1037,6 +1881,7 @@ function AgentInspector({
   agent: AgentDefinition;
   isOpen: boolean;
   logs: AgentExecutionLog[];
+  onOpenDetails: () => void;
   onRunWorkflow: () => void;
   onTabChange: (tab: InspectorTab) => void;
   onToggleOpen: () => void;
@@ -1315,6 +2160,7 @@ function AgentInspector({
               <PermissionsList compact />
 
               <LastRunCard
+                onOpenDetails={onOpenDetails}
                 run={run}
                 report={report}
                 workflowName={workflow.name}
@@ -1393,6 +2239,7 @@ function AgentInspector({
               <RunStatusCard
                 activeAgent={agent.name}
                 compact
+                onOpenDetails={onOpenDetails}
                 run={run}
                 workflowName={workflow.name}
               />
@@ -1411,11 +2258,13 @@ function AgentInspector({
 function RunStatusCard({
   activeAgent,
   compact = false,
+  onOpenDetails,
   run,
   workflowName,
 }: {
   activeAgent: string;
   compact?: boolean;
+  onOpenDetails?: () => void;
   run: RunSnapshot;
   workflowName: string;
 }) {
@@ -1432,7 +2281,13 @@ function RunStatusCard({
             <span>Active Tool: {run.activeTool}</span>
           </div>
         </div>
-        <Button className="h-7 px-2 text-[11px]" type="button" variant="outline">
+        <Button
+          className="h-7 px-2 text-[11px]"
+          disabled={!onOpenDetails}
+          onClick={onOpenDetails}
+          type="button"
+          variant="outline"
+        >
           Open Run
         </Button>
       </div>
@@ -1585,10 +2440,12 @@ function ActivityTable({ rows }: { rows: ActivityRow[] }) {
 }
 
 function LastRunCard({
+  onOpenDetails,
   report,
   run,
   workflowName,
 }: {
+  onOpenDetails?: () => void;
   report?: string;
   run: RunSnapshot;
   workflowName: string;
@@ -1612,7 +2469,13 @@ function LastRunCard({
             {report}
           </pre>
         ) : null}
-        <Button className="mt-3 h-8 w-full text-xs" type="button" variant="outline">
+        <Button
+          className="mt-3 h-8 w-full text-xs"
+          disabled={!onOpenDetails}
+          onClick={onOpenDetails}
+          type="button"
+          variant="outline"
+        >
           View Run Details
         </Button>
       </div>
@@ -1745,6 +2608,25 @@ function InfoPair({
   );
 }
 
+function MetricTile({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1 truncate text-xs font-semibold" title={value}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function PermissionValue({ value }: { value: string }) {
   return (
     <span
@@ -1757,6 +2639,44 @@ function PermissionValue({ value }: { value: string }) {
       title={permissionTitle(value)}
     >
       {value}
+    </span>
+  );
+}
+
+function RunDetailStatusBadge({ status }: { status: AgentRunDetailStatus }) {
+  return (
+    <Badge
+      className={cn(
+        "rounded px-1.5 py-0.5 text-[10px]",
+        status === "idle" && "bg-muted text-muted-foreground",
+        status === "running" && "bg-sky-500/15 text-sky-300",
+        status === "completed" && "bg-emerald-500/15 text-emerald-300",
+        status === "blocked" && "bg-red-500/15 text-red-300",
+        status === "stopped" && "bg-amber-500/15 text-amber-300",
+      )}
+      variant="secondary"
+    >
+      {detailStatusLabel(status)}
+    </Badge>
+  );
+}
+
+function RunDetailEventIcon({ event }: { event: AgentRunDetailEvent }) {
+  const iconClass = cn(
+    "size-3.5",
+    event.level === "error" && "text-red-300",
+    event.level === "warning" && "text-amber-300",
+    event.level === "trace" && "text-sky-300",
+    event.level === "info" && "text-emerald-300",
+  );
+
+  return (
+    <span className="mt-0.5 grid size-6 place-items-center rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
+      {event.kind === "tool" ? <Wrench className={iconClass} /> : null}
+      {event.kind === "model" || event.kind === "reasoning" ? <MessageSquareText className={iconClass} /> : null}
+      {event.kind === "error" ? <AlertTriangle className={iconClass} /> : null}
+      {event.kind === "status" ? <CheckCircle2 className={iconClass} /> : null}
+      {event.kind === "trace" ? <Terminal className={iconClass} /> : null}
     </span>
   );
 }
@@ -1845,6 +2765,38 @@ function RunStatusBadge({ status }: { status: RunSnapshot["status"] }) {
       {status}
     </Badge>
   );
+}
+
+function SeverityBadge({ severity }: { severity: FindingCandidate["severity"] }) {
+  return (
+    <Badge
+      className={cn(
+        "rounded px-1.5 py-0.5 text-[10px]",
+        severity === "critical" && "bg-red-500/20 text-red-200",
+        severity === "high" && "bg-red-500/15 text-red-300",
+        severity === "medium" && "bg-amber-500/15 text-amber-300",
+        severity === "low" && "bg-sky-500/15 text-sky-300",
+        severity === "info" && "bg-muted text-muted-foreground",
+      )}
+      variant="secondary"
+    >
+      {severity}
+    </Badge>
+  );
+}
+
+function confidenceClass(confidence: SecurityEvidenceItem["confidence"]) {
+  if (confidence === "confirmed" || confidence === "high") {
+    return "text-emerald-300";
+  }
+  if (confidence === "medium") {
+    return "text-sky-300";
+  }
+  if (confidence === "low") {
+    return "text-amber-300";
+  }
+
+  return "text-muted-foreground";
 }
 
 function markWorkflowStatus(workflow: AgentWorkflow, status: AgentStatus): AgentWorkflow {
@@ -2126,6 +3078,211 @@ function extractEvidenceArtifacts(logs: AgentExecutionLog[]) {
   }
 
   return Array.from(artifacts);
+}
+
+function createHarnessRoutePreview({
+  agent,
+  projectContext,
+  workflow,
+}: {
+  agent: AgentDefinition;
+  projectContext: AgentToolProjectContext | null;
+  workflow: AgentWorkflow;
+}): HarnessRoutePreview {
+  const toolState = createAgentToolRuntimeState(
+    projectContext ?? {
+      rootPath: "",
+      packagePath: ".",
+      packageName: workflow.name,
+      manifestPath: "",
+      packageTree: null,
+    },
+  );
+  const routePlan = routeTools(resolveAgentTools(toolState, agent.tools), {
+    activeToolIds: agent.tools,
+    objective: agent.description || workflow.description,
+    role: agentRoleForHarnessPreview(agent, workflow),
+  });
+
+  return {
+    capsules: routePlan.capsules,
+    decisions: routePlan.decisions,
+  };
+}
+
+function agentRoleForHarnessPreview(
+  agent: AgentDefinition,
+  workflow: AgentWorkflow,
+): AgentRole {
+  const text = `${agent.name} ${agent.description} ${workflow.name} ${workflow.description}`.toLowerCase();
+
+  if (text.includes("test")) {
+    return "testGeneration";
+  }
+  if (text.includes("fuzz")) {
+    return "fuzzCampaign";
+  }
+  if (text.includes("formal") || text.includes("spec")) {
+    return "formalSpec";
+  }
+  if (text.includes("patch")) {
+    return "patch";
+  }
+  if (text.includes("document") || text.includes("report")) {
+    return "report";
+  }
+  if (text.includes("triage")) {
+    return "triage";
+  }
+  if (text.includes("ci")) {
+    return "ci";
+  }
+
+  return "securityReview";
+}
+
+function categoryCounts(capsules: ToolCapsule[]) {
+  const counts = new Map<string, number>();
+
+  for (const capsule of capsules) {
+    counts.set(capsule.category, (counts.get(capsule.category) ?? 0) + 1);
+  }
+
+  return Array.from(counts.entries());
+}
+
+function mergeById<T extends { id: string }>(existing: T[], incoming: T[]) {
+  const merged = new Map(existing.map((item) => [item.id, item] as const));
+
+  for (const item of incoming) {
+    merged.set(item.id, item);
+  }
+
+  return Array.from(merged.values());
+}
+
+function extractToolResultEvidence(output: unknown): {
+  evidence: SecurityEvidenceItem[];
+  findingCandidates: FindingCandidate[];
+} {
+  const record = asRecord(output);
+
+  return {
+    evidence: asSecurityEvidenceItems(record?.evidence),
+    findingCandidates: asFindingCandidates(record?.findingCandidates),
+  };
+}
+
+function asSecurityEvidenceItems(value: unknown): SecurityEvidenceItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is SecurityEvidenceItem => {
+    const record = asRecord(item);
+    return Boolean(
+      record
+        && typeof record.id === "string"
+        && typeof record.kind === "string"
+        && typeof record.claim === "string"
+        && typeof record.observation === "string"
+        && typeof record.confidence === "string",
+    );
+  });
+}
+
+function asFindingCandidates(value: unknown): FindingCandidate[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is FindingCandidate => {
+    const record = asRecord(item);
+    return Boolean(
+      record
+        && typeof record.id === "string"
+        && typeof record.title === "string"
+        && typeof record.severity === "string"
+        && typeof record.confidence === "string"
+        && typeof record.status === "string",
+    );
+  });
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function createRunDetailId(agentId: string) {
+  return `${agentId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createRunDetailEvent(
+  event: Omit<AgentRunDetailEvent, "id" | "timestamp">,
+  timestamp: number,
+): AgentRunDetailEvent {
+  return {
+    ...event,
+    id: `event-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
+    timestamp,
+  };
+}
+
+function detailStatusLabel(status: AgentRunDetailStatus) {
+  if (status === "running") {
+    return "Running";
+  }
+  if (status === "completed") {
+    return "Completed";
+  }
+  if (status === "blocked") {
+    return "Blocked";
+  }
+  if (status === "stopped") {
+    return "Stopped";
+  }
+
+  return "Idle";
+}
+
+function displayStreamToolName(toolName: string) {
+  return toolName.replace(/_/g, ".");
+}
+
+function formatDetailPayload(payload: unknown, maxLength: number) {
+  if (payload === undefined) {
+    return "";
+  }
+
+  if (typeof payload === "string") {
+    return formatTraceText(payload, maxLength);
+  }
+
+  try {
+    return formatTraceText(JSON.stringify(payload), maxLength);
+  } catch {
+    return formatTraceText(String(payload), maxLength);
+  }
+}
+
+function formatTraceText(text: string, maxLength: number) {
+  const compact = text.replace(/\s+/g, " ").trim();
+
+  if (compact.length <= maxLength) {
+    return compact;
+  }
+
+  return `${compact.slice(0, maxLength)}...`;
+}
+
+function timeLabel(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 function relativeTimeLabel(timestamp: number) {

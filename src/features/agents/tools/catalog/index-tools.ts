@@ -88,7 +88,8 @@ export function createIndexTools(state: AgentToolRuntimeState): DeterministicToo
     defineAgentTool<Record<string, never>, unknown>({
       id: "rust.index.package_overview",
       title: "Read package overview",
-      description: "Read high-level index health and counts for the active indexed package.",
+      description:
+        "Read high-level indexed package metadata for package intent discovery and analysis planning.",
       inputSchema: {
         type: "object",
         properties: {},

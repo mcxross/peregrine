@@ -12715,6 +12715,7 @@ name = "peregrine-types"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
  "toml 0.8.23",
 ]
 

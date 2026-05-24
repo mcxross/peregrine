@@ -167,6 +167,7 @@ export interface ContextPacketInput {
   guides?: GuideRef[];
   currentFindings?: FindingRef[];
   recentToolResults?: ToolRunSummary[];
+  toolCapsules?: AgentContextPacket["toolCapsules"];
   allowedActions?: AllowedAction[];
   outputContract: OutputContract;
   tokenBudget?: AgentContextPacket["tokenBudget"];

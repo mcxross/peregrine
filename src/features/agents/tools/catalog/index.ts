@@ -11,6 +11,7 @@ import { createReportTools } from "@/features/agents/tools/catalog/report-tools"
 import { createStaticTools } from "@/features/agents/tools/catalog/static-tools";
 import { createTestTools } from "@/features/agents/tools/catalog/test-tools";
 import { createValidationTools } from "@/features/agents/tools/catalog/validation-tools";
+import { attachDefaultToolManifest } from "@/features/agents/tools/manifest";
 import type { AgentToolRuntimeState } from "@/features/agents/tools/types";
 
 export function createAgentToolCatalog(
@@ -28,7 +29,7 @@ export function createAgentToolCatalog(
     ...createPatchTools(state),
     ...createInvariantTools(state),
     ...createTestTools(state),
-  ];
+  ].map(attachDefaultToolManifest);
 }
 
 export const AGENT_TOOL_IDS = [

@@ -51,7 +51,6 @@ describe("peregrine harness", () => {
     expect(result.status).toBe("succeeded");
     expect(updated?.toolRuns).toHaveLength(1);
     expect(updated?.toolRuns[0].toolId).toBe("index.lookup");
-    expect(updated?.evidenceRefs).toHaveLength(1);
+    expect(updated?.evidenceRefs).toHaveLength(2);
   });
 });
-

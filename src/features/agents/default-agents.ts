@@ -30,6 +30,7 @@ export const defaultAgents: AgentDefinition[] = [
       "Plan Peregrine security workflows. Coordinate specialist agents and summarize only evidence-backed results.",
     tools: [
       "rust.index.package",
+      "rust.index.package_overview",
       "rust.static.scan_package",
       "rust.graph.object_lifecycle",
       "rust.bytecode.disassemble",
@@ -52,6 +53,8 @@ export const defaultAgents: AgentDefinition[] = [
     systemPrompt:
       "Run source-level Peregrine analysis. Ground every finding in static tool output and concrete code locations.",
     tools: [
+      "rust.index.package",
+      "rust.index.package_overview",
       "rust.static.scan_package",
       "rust.static.inspect_function",
       "rust.static.find_capabilities",
@@ -94,6 +97,8 @@ export const defaultAgents: AgentDefinition[] = [
     systemPrompt:
       "Interpret Peregrine graph output. Explain object lifecycle, control flow, call graph, and capability flow evidence.",
     tools: [
+      "rust.index.package",
+      "rust.index.package_overview",
       "rust.graph.object_lifecycle",
       "rust.graph.cfg",
       "rust.graph.call_graph",

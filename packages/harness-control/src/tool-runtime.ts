@@ -1,6 +1,7 @@
 import type {
   AgentRuntimeToolResult,
   DeterministicToolExecutionResult,
+  DeterministicToolSpec,
   EvidenceCandidate,
   EvidenceRef,
   ToolGateway,
@@ -8,6 +9,8 @@ import type {
 } from "@peregrine/agent-runtime";
 
 import { createId } from "./ids";
+import { correlateFindings } from "./finding-engine";
+import { compileToolEvidence } from "./reducers";
 import type {
   ApprovalDecision,
   ApprovalRequest,
@@ -114,16 +117,45 @@ export class HarnessToolRuntime implements ToolGateway {
       });
       const normalized = normalizeExecutionResult<Output>(execution);
       const status = normalized.status ?? "succeeded";
-      const summary =
+      const toolRunId = createId("tool_run");
+      const fallbackSummary =
         normalized.summary ??
         `${request.tool.id} ${status === "succeeded" ? "completed" : "failed"}.`;
+      const compiledEvidence = compileToolEvidence({
+        tool: request.tool as DeterministicToolSpec,
+        output: normalized.output,
+        status,
+        summary: fallbackSummary,
+        toolRunId,
+      });
+      const correlatedFindings = correlateFindings({
+        evidence: compiledEvidence.evidence,
+        candidates: compiledEvidence.findingCandidates,
+      });
+      const summary = compiledEvidence.summary;
       const evidenceRefs = await this.recordEvidence([
         ...(normalized.evidence ?? []),
+        ...compiledEvidence.evidence.map((item) => ({
+          kind: item.kind,
+          source: request.tool.id,
+          summary: `${item.claim} ${item.observation}`,
+          raw: item,
+          metadata: {
+            evidenceItemId: item.id,
+            confidence: item.confidence,
+            sourcePrecision: item.sourcePrecision,
+            toolRunId,
+          },
+        })),
         {
           kind: status === "succeeded" ? "toolOutput" : "toolFailure",
           source: request.tool.id,
           summary,
           raw: toEvidenceRaw(normalized.output),
+          metadata: {
+            toolRunId,
+            reducerId: request.tool.manifest?.reducerId,
+          },
         },
       ]);
 
@@ -134,11 +166,17 @@ export class HarnessToolRuntime implements ToolGateway {
           toolCallId: request.toolCallId,
           action,
           summary,
-          output: normalized.output,
+          output: compiledEvidence.modelOutput as Output,
           evidenceRefs,
-          diagnostics: normalized.diagnostics ?? [],
+          securityEvidence: compiledEvidence.evidence,
+          findingCandidates: correlatedFindings.findings,
+          diagnostics: [
+            ...(normalized.diagnostics ?? []),
+            ...compiledEvidence.diagnostics,
+          ],
         },
         request,
+        toolRunId,
       );
     } catch (error) {
       const message =
@@ -156,11 +194,11 @@ export class HarnessToolRuntime implements ToolGateway {
       ]);
 
       return this.finalizeResult(
-        {
-          status: "failed",
-          toolId: request.tool.id,
-          toolCallId: request.toolCallId,
-          action,
+          {
+            status: "failed",
+            toolId: request.tool.id,
+            toolCallId: request.toolCallId,
+            action,
           summary: message,
           evidenceRefs,
           diagnostics: [
@@ -209,9 +247,10 @@ export class HarnessToolRuntime implements ToolGateway {
   private finalizeResult<Input, Output>(
     result: AgentRuntimeToolResult<Output>,
     request: ToolGatewayRequest<Input, Output>,
+    id = createId("tool_run"),
   ) {
     const toolRun: ToolRunSummary = {
-      id: createId("tool_run"),
+      id,
       toolId: result.toolId,
       status: result.status,
       summary: result.summary,

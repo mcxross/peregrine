@@ -47,8 +47,12 @@ describe("harness tool runtime", () => {
     });
 
     expect(result.status).toBe("succeeded");
-    expect(result.evidenceRefs).toHaveLength(1);
-    expect(evidenceStore.list()[0].kind).toBe("toolOutput");
+    expect(result.evidenceRefs).toHaveLength(2);
+    expect(result.securityEvidence).toHaveLength(1);
+    expect(evidenceStore.list().map((record) => record.kind)).toEqual([
+      "toolOutput",
+      "toolOutput",
+    ]);
   });
 
   test("denies approval-required actions when no approval gate is connected", async () => {
@@ -92,4 +96,3 @@ describe("harness tool runtime", () => {
     expect(evidenceStore.list()).toHaveLength(1);
   });
 });
-

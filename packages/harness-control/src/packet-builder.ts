@@ -14,6 +14,7 @@ export function buildAgentContextPacket(
     relevantGuides: input.guides ?? [],
     currentFindings: input.currentFindings ?? input.session.findings,
     recentToolResults: input.recentToolResults ?? input.session.toolRuns.slice(-8),
+    toolCapsules: input.toolCapsules,
     allowedActions: input.allowedActions ?? defaultAllowedActions(),
     approvalPolicy: {
       mode: "localAi",
@@ -61,4 +62,3 @@ export function defaultAllowedActions(): AgentContextPacket["allowedActions"] {
     },
   ];
 }
-

@@ -1,6 +1,5 @@
 import type {
   GenerateTextResult,
-  JSONValue,
   LanguageModel,
   ModelMessage,
   StopCondition,
@@ -9,7 +8,7 @@ import type {
   ToolChoice,
 } from "ai";
 
-export type JsonRecord = Record<string, JSONValue | undefined>;
+export type JsonRecord = Record<string, unknown>;
 
 export type JsonSchemaDefinition = {
   readonly [key: string]: unknown;
@@ -49,7 +48,153 @@ export type EvidenceKind =
   | "humanApproval"
   | "acceptedRisk"
   | "agentOutput"
-  | "diagnostic";
+  | "diagnostic"
+  | "graphSignal"
+  | "bytecodeSignal"
+  | "staticFinding";
+
+export type ToolRunStatus =
+  | "succeeded"
+  | "failed"
+  | "denied"
+  | "skipped"
+  | "timedOut";
+
+export type EvidenceConfidence =
+  | "confirmed"
+  | "high"
+  | "medium"
+  | "low"
+  | "unknown";
+
+export type SourcePrecision =
+  | "compiler"
+  | "sourceMap"
+  | "bytecode"
+  | "summary"
+  | "heuristic"
+  | "unknown";
+
+export type FindingCandidateStatus =
+  | "confirmed"
+  | "likely"
+  | "hypothesis"
+  | "falsePositive"
+  | "needsValidation"
+  | "fixed"
+  | "accepted";
+
+export type FindingCandidateSeverity =
+  | "critical"
+  | "high"
+  | "medium"
+  | "low"
+  | "info";
+
+export interface CodeLocation {
+  file: string;
+  startLine?: number;
+  endLine?: number;
+  symbol?: string;
+}
+
+export interface ToolPrerequisite {
+  toolId: string;
+  reason: string;
+  required: boolean;
+}
+
+export interface ToolCost {
+  risk: RiskLevel;
+  expectedLatencyMs?: number;
+  tokenBudgetHint?: number;
+  outputBudgetTokens?: number;
+}
+
+export interface ToolSideEffect {
+  actionClass: ActionClass;
+  description: string;
+  requiresApproval: boolean;
+}
+
+export interface ToolManifest {
+  id: string;
+  version: string;
+  chain?: string;
+  category: string;
+  description: string;
+  whenToUse: string[];
+  whenNotToUse: string[];
+  prerequisites: ToolPrerequisite[];
+  inputSchema: JsonSchemaDefinition;
+  outputSchema?: JsonSchemaDefinition;
+  cost: ToolCost;
+  actionClass: ActionClass;
+  sideEffects: ToolSideEffect[];
+  timeoutMs?: number;
+  reducerId?: string;
+  metadata?: JsonRecord;
+}
+
+export interface ToolCapsule {
+  callableName?: string;
+  id: string;
+  title?: string;
+  description: string;
+  category: string;
+  actionClass: ActionClass;
+  risk: RiskLevel;
+  whenToUse: string[];
+  whenNotToUse: string[];
+  prerequisites: ToolPrerequisite[];
+  inputSchema: JsonSchemaDefinition;
+  outputBudgetTokens?: number;
+}
+
+export interface SecurityEvidenceItem {
+  id: string;
+  kind: EvidenceKind;
+  claim: string;
+  observation: string;
+  confidence: EvidenceConfidence;
+  sourcePrecision: SourcePrecision;
+  location?: CodeLocation;
+  symbolRefs: string[];
+  toolRunId?: string;
+  rawRef?: string;
+  freshness?: string;
+  followUp?: string;
+  metadata?: JsonRecord;
+}
+
+export interface ValidationPlan {
+  commands: string[];
+  expectedEvidence: string[];
+  required: boolean;
+}
+
+export interface PatchRecommendation {
+  summary: string;
+  affectedLocations: CodeLocation[];
+  minimalChange: string;
+  regressionTests: string[];
+  verificationCommands: string[];
+}
+
+export interface FindingCandidate {
+  id: string;
+  title: string;
+  category: string;
+  severity: FindingCandidateSeverity;
+  confidence: EvidenceConfidence;
+  status: FindingCandidateStatus;
+  affectedSymbols: string[];
+  exploitScenario?: string;
+  evidenceRefs: string[];
+  validationPlan: ValidationPlan;
+  patchRecommendation?: PatchRecommendation;
+  metadata?: JsonRecord;
+}
 
 export interface EvidenceRef {
   id: string;
@@ -65,6 +210,7 @@ export interface EvidenceCandidate {
   raw?: unknown;
   rawPath?: string;
   contentHash?: string;
+  metadata?: JsonRecord;
 }
 
 export interface AgentDiagnostic {
@@ -139,7 +285,7 @@ export interface FindingRef {
 export interface ToolRunSummary {
   id: string;
   toolId: string;
-  status: "succeeded" | "failed" | "denied" | "requiresApproval";
+  status: ToolRunStatus | "requiresApproval";
   summary: string;
   evidenceRefs: EvidenceRef[];
   diagnostics?: AgentDiagnostic[];
@@ -166,6 +312,7 @@ export interface AgentContextPacket {
   relevantGuides: GuideRef[];
   currentFindings: FindingRef[];
   recentToolResults: ToolRunSummary[];
+  toolCapsules?: ToolCapsule[];
   allowedActions: AllowedAction[];
   approvalPolicy: ApprovalPolicySnapshot;
   outputContract: OutputContract;
@@ -214,6 +361,7 @@ export interface DeterministicToolSpec<Input = unknown, Output = unknown> {
   description: string;
   inputSchema: JsonSchemaDefinition;
   outputSchema?: JsonSchemaDefinition;
+  manifest?: ToolManifest;
   action: AgentActionRequest;
   examples?: Array<{ input: Input }>;
   execute: (
@@ -226,13 +374,15 @@ export interface DeterministicToolSpec<Input = unknown, Output = unknown> {
 }
 
 export interface AgentRuntimeToolResult<Output = unknown> {
-  status: "succeeded" | "failed" | "denied" | "requiresApproval";
+  status: ToolRunStatus | "requiresApproval";
   toolId: string;
   toolCallId: string;
   action: AgentActionRequest;
   summary: string;
   output?: Output;
   evidenceRefs: EvidenceRef[];
+  securityEvidence?: SecurityEvidenceItem[];
+  findingCandidates?: FindingCandidate[];
   diagnostics: AgentDiagnostic[];
 }
 
