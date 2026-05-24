@@ -71,7 +71,16 @@ import {
   type SuiKeyAccount,
   type SuiKeyState,
 } from "@/features/empty-project/filesystem-tree";
+import {
+  checkMoveAnalyzerAdapter,
+  getMoveAnalyzerAdapterSettings,
+  saveMoveAnalyzerAdapterSettings,
+  type MoveAnalyzerAdapterSettings,
+  type MoveAnalyzerAdapterSource,
+  type MoveAnalyzerAdapterStatus,
+} from "@/features/project-workspace/editor/lsp/move-analyzer-api";
 import { cn } from "@/lib/utils";
+import { MoveAnalyzerSettingsSection } from "@/screens/move-analyzer-settings-section";
 import { useTheme } from "@/theme/theme-provider";
 import type { ThemeId, ThemeMode } from "@/theme/themes";
 
@@ -97,8 +106,8 @@ const settingsGroups: {
   },
   {
     id: "toolchain",
-    label: "Sui CLI",
-    description: "Move toolchain",
+    label: "Toolchain",
+    description: "Sui and Move Analyzer",
     icon: TerminalSquare,
   },
   {
@@ -131,6 +140,14 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
   const [suiStatus, setSuiStatus] = React.useState<SuiAdapterStatus | null>(null);
   const [suiSettingsError, setSuiSettingsError] = React.useState<string | null>(null);
   const [isSavingSuiSettings, setIsSavingSuiSettings] = React.useState(false);
+  const [moveAnalyzerSettings, setMoveAnalyzerSettings] = React.useState<MoveAnalyzerAdapterSettings>({
+    binaryPath: null,
+    source: "bundledLibrary",
+  });
+  const [moveAnalyzerBinaryPathInput, setMoveAnalyzerBinaryPathInput] = React.useState("");
+  const [moveAnalyzerStatus, setMoveAnalyzerStatus] = React.useState<MoveAnalyzerAdapterStatus | null>(null);
+  const [moveAnalyzerSettingsError, setMoveAnalyzerSettingsError] = React.useState<string | null>(null);
+  const [isSavingMoveAnalyzerSettings, setIsSavingMoveAnalyzerSettings] = React.useState(false);
   const [suiKeyState, setSuiKeyState] = React.useState<SuiKeyState | null>(null);
   const [suiKeyError, setSuiKeyError] = React.useState<string | null>(null);
   const [isLoadingSuiKeys, setIsLoadingSuiKeys] = React.useState(false);
@@ -139,6 +156,9 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
   const [analyzerError, setAnalyzerError] = React.useState<string | null>(null);
   const [isLoadingAnalyzers, setIsLoadingAnalyzers] = React.useState(false);
   const effectiveSuiSource = suiSettings.cliPath?.trim() ? "system" : suiSettings.source;
+  const effectiveMoveAnalyzerSource = moveAnalyzerSettings.binaryPath?.trim()
+    ? "system"
+    : moveAnalyzerSettings.source;
   const activePackagePath = activeMovePackage?.path ?? null;
 
   React.useEffect(() => {
@@ -158,6 +178,31 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
       .catch((error) => {
         if (isMounted) {
           setSuiSettingsError(getSettingsErrorMessage(error));
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    Promise.all([getMoveAnalyzerAdapterSettings(), checkMoveAnalyzerAdapter()])
+      .then(([settings, status]) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setMoveAnalyzerSettings(settings);
+        setMoveAnalyzerBinaryPathInput(settings.binaryPath ?? "");
+        setMoveAnalyzerStatus(status);
+        setMoveAnalyzerSettingsError(null);
+      })
+      .catch((error) => {
+        if (isMounted) {
+          setMoveAnalyzerSettingsError(getSettingsErrorMessage(error));
         }
       });
 
@@ -286,6 +331,81 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
     setSuiCliPathInput(selectedPath);
     await saveSuiCliPath(selectedPath);
   }, [saveSuiCliPath]);
+
+  const updateMoveAnalyzerSource = React.useCallback(
+    async (source: MoveAnalyzerAdapterSource) => {
+      if (source === effectiveMoveAnalyzerSource || isSavingMoveAnalyzerSettings) {
+        return;
+      }
+
+      const nextSettings: MoveAnalyzerAdapterSettings = {
+        ...moveAnalyzerSettings,
+        binaryPath: source === "bundledLibrary" ? null : moveAnalyzerSettings.binaryPath ?? null,
+        source,
+      };
+      setMoveAnalyzerSettings(nextSettings);
+      setIsSavingMoveAnalyzerSettings(true);
+      setMoveAnalyzerSettingsError(null);
+
+      try {
+        const savedSettings = await saveMoveAnalyzerAdapterSettings(nextSettings);
+        const status = await checkMoveAnalyzerAdapter();
+
+        setMoveAnalyzerSettings(savedSettings);
+        setMoveAnalyzerBinaryPathInput(savedSettings.binaryPath ?? "");
+        setMoveAnalyzerStatus(status);
+      } catch (error) {
+        setMoveAnalyzerSettingsError(getSettingsErrorMessage(error));
+      } finally {
+        setIsSavingMoveAnalyzerSettings(false);
+      }
+    },
+    [effectiveMoveAnalyzerSource, isSavingMoveAnalyzerSettings, moveAnalyzerSettings],
+  );
+
+  const saveMoveAnalyzerBinaryPath = React.useCallback(
+    async (path: string) => {
+      if (isSavingMoveAnalyzerSettings) {
+        return;
+      }
+
+      const binaryPath = path.trim() || null;
+      const nextSettings: MoveAnalyzerAdapterSettings = {
+        ...moveAnalyzerSettings,
+        binaryPath,
+        source: binaryPath ? "system" : moveAnalyzerSettings.source,
+      };
+
+      setMoveAnalyzerSettings(nextSettings);
+      setIsSavingMoveAnalyzerSettings(true);
+      setMoveAnalyzerSettingsError(null);
+
+      try {
+        const savedSettings = await saveMoveAnalyzerAdapterSettings(nextSettings);
+        const status = await checkMoveAnalyzerAdapter();
+
+        setMoveAnalyzerSettings(savedSettings);
+        setMoveAnalyzerBinaryPathInput(savedSettings.binaryPath ?? "");
+        setMoveAnalyzerStatus(status);
+      } catch (error) {
+        setMoveAnalyzerSettingsError(getSettingsErrorMessage(error));
+      } finally {
+        setIsSavingMoveAnalyzerSettings(false);
+      }
+    },
+    [isSavingMoveAnalyzerSettings, moveAnalyzerSettings],
+  );
+
+  const chooseMoveAnalyzerBinaryPath = React.useCallback(async () => {
+    const selectedPath = await openMoveAnalyzerBinaryPath();
+
+    if (!selectedPath) {
+      return;
+    }
+
+    setMoveAnalyzerBinaryPathInput(selectedPath);
+    await saveMoveAnalyzerBinaryPath(selectedPath);
+  }, [saveMoveAnalyzerBinaryPath]);
   const chooseAnalyzerPlugin = React.useCallback(async () => {
     const selectedPath = await openAnalyzerPluginPath();
 
@@ -423,10 +543,19 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
 
           {activeGroup === "toolchain" ? (
             <ToolchainSettings
+              chooseMoveAnalyzerBinaryPath={chooseMoveAnalyzerBinaryPath}
               chooseSuiCliPath={chooseSuiCliPath}
+              effectiveMoveAnalyzerSource={effectiveMoveAnalyzerSource}
               effectiveSuiSource={effectiveSuiSource}
+              isSavingMoveAnalyzerSettings={isSavingMoveAnalyzerSettings}
               isSavingSuiSettings={isSavingSuiSettings}
+              moveAnalyzerBinaryPathInput={moveAnalyzerBinaryPathInput}
+              moveAnalyzerSettings={moveAnalyzerSettings}
+              moveAnalyzerSettingsError={moveAnalyzerSettingsError}
+              moveAnalyzerStatus={moveAnalyzerStatus}
+              saveMoveAnalyzerBinaryPath={saveMoveAnalyzerBinaryPath}
               saveSuiCliPath={saveSuiCliPath}
+              setMoveAnalyzerBinaryPathInput={setMoveAnalyzerBinaryPathInput}
               suiCliPathInput={suiCliPathInput}
               isLoadingSuiKeys={isLoadingSuiKeys}
               refreshSuiKeys={refreshSuiKeys}
@@ -438,6 +567,7 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
               suiSettingsError={suiSettingsError}
               suiStatus={suiStatus}
               updateSuiSource={updateSuiSource}
+              updateMoveAnalyzerSource={updateMoveAnalyzerSource}
               setSuiCliPathInput={setSuiCliPathInput}
             />
           ) : null}
@@ -646,12 +776,21 @@ function ThemePreviewPill({
 }
 
 function ToolchainSettings({
+  chooseMoveAnalyzerBinaryPath,
   chooseSuiCliPath,
+  effectiveMoveAnalyzerSource,
   effectiveSuiSource,
+  isSavingMoveAnalyzerSettings,
   isLoadingSuiKeys,
   isSavingSuiSettings,
+  moveAnalyzerBinaryPathInput,
+  moveAnalyzerSettings,
+  moveAnalyzerSettingsError,
+  moveAnalyzerStatus,
   refreshSuiKeys,
+  saveMoveAnalyzerBinaryPath,
   saveSuiCliPath,
+  setMoveAnalyzerBinaryPathInput,
   setSuiCliPathInput,
   setSuiKeyError,
   setSuiKeyState,
@@ -661,14 +800,24 @@ function ToolchainSettings({
   suiSettings,
   suiSettingsError,
   suiStatus,
+  updateMoveAnalyzerSource,
   updateSuiSource,
 }: {
+  chooseMoveAnalyzerBinaryPath: () => Promise<void>;
   chooseSuiCliPath: () => Promise<void>;
+  effectiveMoveAnalyzerSource: MoveAnalyzerAdapterSource;
   effectiveSuiSource: SuiAdapterSource;
+  isSavingMoveAnalyzerSettings: boolean;
   isLoadingSuiKeys: boolean;
   isSavingSuiSettings: boolean;
+  moveAnalyzerBinaryPathInput: string;
+  moveAnalyzerSettings: MoveAnalyzerAdapterSettings;
+  moveAnalyzerSettingsError: string | null;
+  moveAnalyzerStatus: MoveAnalyzerAdapterStatus | null;
   refreshSuiKeys: () => Promise<void>;
+  saveMoveAnalyzerBinaryPath: (path: string) => Promise<void>;
   saveSuiCliPath: (path: string) => Promise<void>;
+  setMoveAnalyzerBinaryPathInput: (path: string) => void;
   setSuiCliPathInput: (path: string) => void;
   setSuiKeyError: (error: string | null) => void;
   setSuiKeyState: (state: SuiKeyState | null) => void;
@@ -678,10 +827,24 @@ function ToolchainSettings({
   suiSettings: SuiAdapterSettings;
   suiSettingsError: string | null;
   suiStatus: SuiAdapterStatus | null;
+  updateMoveAnalyzerSource: (source: MoveAnalyzerAdapterSource) => Promise<void>;
   updateSuiSource: (source: SuiAdapterSource) => Promise<void>;
 }) {
   return (
     <>
+      <MoveAnalyzerSettingsSection
+        binaryPathInput={moveAnalyzerBinaryPathInput}
+        chooseBinaryPath={chooseMoveAnalyzerBinaryPath}
+        effectiveSource={effectiveMoveAnalyzerSource}
+        error={moveAnalyzerSettingsError}
+        isSaving={isSavingMoveAnalyzerSettings}
+        saveBinaryPath={saveMoveAnalyzerBinaryPath}
+        settings={moveAnalyzerSettings}
+        setBinaryPathInput={setMoveAnalyzerBinaryPathInput}
+        status={moveAnalyzerStatus}
+        updateSource={updateMoveAnalyzerSource}
+      />
+
       <SettingsSection title="Sui CLI">
         <SettingsRow
           label="Source"
@@ -710,14 +873,14 @@ function ToolchainSettings({
 
         <div className="border-t border-border/70">
           <div className="grid gap-2 px-4 py-3.5 text-xs text-muted-foreground">
-            <SuiSourceStatusRow
+            <ToolSourceStatusRow
               active={effectiveSuiSource === "bundled"}
               label="Bundled crate"
               path={suiStatus?.bundled.path ?? null}
               version={suiStatus?.bundled.version ?? null}
               available={suiStatus?.bundled.available ?? false}
             />
-            <SuiSourceStatusRow
+            <ToolSourceStatusRow
               active={effectiveSuiSource === "system"}
               label="User installed"
               path={suiStatus?.system.path ?? null}
@@ -2250,7 +2413,7 @@ function SegmentedControl({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SuiSourceStatusRow({
+function ToolSourceStatusRow({
   active,
   available,
   label,
@@ -2313,6 +2476,18 @@ async function openSuiCliPath(): Promise<string | null> {
   return typeof selectedPath === "string" ? selectedPath : null;
 }
 
+async function openMoveAnalyzerBinaryPath(): Promise<string | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+
+  const selectedPath = await open({
+    directory: false,
+    multiple: false,
+    title: "Select move-analyzer",
+  });
+
+  return typeof selectedPath === "string" ? selectedPath : null;
+}
+
 async function openAnalyzerPluginPath(): Promise<string | null> {
   const { open } = await import("@tauri-apps/plugin-dialog");
 
@@ -2335,5 +2510,5 @@ function getSettingsErrorMessage(error: unknown) {
     return error.message;
   }
 
-  return typeof error === "string" ? error : "Could not update Sui CLI settings.";
+  return typeof error === "string" ? error : "Could not update settings.";
 }

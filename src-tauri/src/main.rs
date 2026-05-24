@@ -2,7 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use peregrine_lib::helper_args::{
-    BUNDLED_SUI_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG, MOVY_FUZZ_HELPER_ARG,
+    BUNDLED_SUI_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG, MOVE_ANALYZER_HELPER_ARG,
+    MOVY_FUZZ_HELPER_ARG,
 };
 
 fn main() {
@@ -18,6 +19,9 @@ fn main() {
         }
         Some(arg) if arg.as_os_str() == std::ffi::OsStr::new(FORMAL_VERIFICATION_HELPER_ARG) => {
             run_formal_verification_helper(args);
+        }
+        Some(arg) if arg.as_os_str() == std::ffi::OsStr::new(MOVE_ANALYZER_HELPER_ARG) => {
+            run_move_analyzer_helper();
         }
         _ => peregrine_lib::run(),
     }
@@ -35,6 +39,10 @@ fn run_bundled_sui_helper(args: impl IntoIterator<Item = std::ffi::OsString>) {
             std::process::exit(1);
         }
     }
+}
+
+fn run_move_analyzer_helper() {
+    peregrine_adapters::move_analyzer::run_bundled_move_analyzer_stdio();
 }
 
 fn run_movy_fuzz_helper(mut args: impl Iterator<Item = std::ffi::OsString>) {

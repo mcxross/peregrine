@@ -16,6 +16,12 @@ import {
 import { shell } from "@codemirror/legacy-modes/mode/shell";
 import { toml } from "@codemirror/legacy-modes/mode/toml";
 import {
+  linter,
+  lintGutter,
+  setDiagnostics,
+  type Diagnostic as CodeMirrorDiagnostic,
+} from "@codemirror/lint";
+import {
   EditorState,
   RangeSetBuilder,
   StateEffect,
@@ -36,15 +42,30 @@ import {
 import { tags } from "@lezer/highlight";
 import React from "react";
 
+import {
+  lspPositionToOffset,
+  moveAnalyzerEditorExtensions,
+  type CodeEditorMoveAnalyzerFeatures,
+} from "@/features/project-workspace/editor/lsp/code-editor-move-analyzer";
+import type {
+  MoveAnalyzerDiagnostic,
+  MoveAnalyzerResolvedLocation,
+  MoveAnalyzerWorkspaceEdit,
+} from "@/features/project-workspace/editor/lsp/types";
+
 type CodeEditorProps = {
   complexityHighlights?: ComplexityHighlight[];
+  diagnostics?: MoveAnalyzerDiagnostic[];
   jumpRequest?: CodeEditorJumpRequest | null;
   language: string;
+  moveAnalyzer?: CodeEditorMoveAnalyzerFeatures | null;
   sourceSelectionRequest?: CodeEditorSourceSelectionRequest | null;
   sourceSpanHighlights?: CodeEditorSourceSpanHighlight[];
   value: string;
   onCursorByteOffsetChange?: (byteOffset: number) => void;
   onChange: (value: string) => void;
+  onMoveAnalyzerLocation?: (location: MoveAnalyzerResolvedLocation) => void;
+  onMoveAnalyzerWorkspaceEdit?: (edit: MoveAnalyzerWorkspaceEdit) => Promise<void> | void;
 };
 
 export type CodeEditorJumpRequest = {
@@ -191,26 +212,45 @@ class CompactMoveAddressWidget extends WidgetType {
 
 export function CodeEditor({
   complexityHighlights = EMPTY_COMPLEXITY_HIGHLIGHTS,
+  diagnostics = [],
   jumpRequest = null,
   language,
+  moveAnalyzer = null,
   sourceSelectionRequest = null,
   sourceSpanHighlights = EMPTY_SOURCE_SPAN_HIGHLIGHTS,
   value,
   onCursorByteOffsetChange,
   onChange,
+  onMoveAnalyzerLocation,
+  onMoveAnalyzerWorkspaceEdit,
 }: CodeEditorProps) {
   const hostRef = React.useRef<HTMLDivElement | null>(null);
   const editorRef = React.useRef<EditorView | null>(null);
+  const moveAnalyzerRef = React.useRef(moveAnalyzer);
   const onChangeRef = React.useRef(onChange);
   const onCursorByteOffsetChangeRef = React.useRef(onCursorByteOffsetChange);
+  const onMoveAnalyzerLocationRef = React.useRef(onMoveAnalyzerLocation);
+  const onMoveAnalyzerWorkspaceEditRef = React.useRef(onMoveAnalyzerWorkspaceEdit);
 
   React.useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
 
   React.useEffect(() => {
+    moveAnalyzerRef.current = moveAnalyzer;
+  }, [moveAnalyzer]);
+
+  React.useEffect(() => {
     onCursorByteOffsetChangeRef.current = onCursorByteOffsetChange;
   }, [onCursorByteOffsetChange]);
+
+  React.useEffect(() => {
+    onMoveAnalyzerLocationRef.current = onMoveAnalyzerLocation;
+  }, [onMoveAnalyzerLocation]);
+
+  React.useEffect(() => {
+    onMoveAnalyzerWorkspaceEditRef.current = onMoveAnalyzerWorkspaceEdit;
+  }, [onMoveAnalyzerWorkspaceEdit]);
 
   React.useEffect(() => {
     if (!hostRef.current) {
@@ -231,6 +271,21 @@ export function CodeEditor({
           onChangeRef.current(nextValue);
         }, (byteOffset) => {
           onCursorByteOffsetChangeRef.current?.(byteOffset);
+        }, {
+          completion: (position, context) =>
+            moveAnalyzerRef.current?.completion(position, context) ?? Promise.resolve(null),
+          definition: (position) =>
+            moveAnalyzerRef.current?.definition(position) ?? Promise.resolve([]),
+          hover: (position) =>
+            moveAnalyzerRef.current?.hover(position) ?? Promise.resolve(null),
+          references: (position) =>
+            moveAnalyzerRef.current?.references(position) ?? Promise.resolve([]),
+          rename: (position, newName) =>
+            moveAnalyzerRef.current?.rename(position, newName) ?? Promise.resolve(null),
+        }, (location) => {
+          onMoveAnalyzerLocationRef.current?.(location);
+        }, (edit) => {
+          return onMoveAnalyzerWorkspaceEditRef.current?.(edit) ?? Promise.resolve();
         }),
       }),
     });
@@ -241,6 +296,9 @@ export function CodeEditor({
     });
     editor.dispatch({
       effects: setSourceSpanHighlights.of(sourceSpanHighlights),
+    });
+    editor.dispatch({
+      ...setDiagnostics(editor.state, buildLintDiagnostics(editor.state, diagnostics)),
     });
 
     return () => {
@@ -293,6 +351,18 @@ export function CodeEditor({
       effects: setSourceSpanHighlights.of(sourceSpanHighlights),
     });
   }, [sourceSpanHighlights]);
+
+  React.useEffect(() => {
+    const editor = editorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    editor.dispatch({
+      ...setDiagnostics(editor.state, buildLintDiagnostics(editor.state, diagnostics)),
+    });
+  }, [diagnostics]);
 
   React.useEffect(() => {
     const editor = editorRef.current;
@@ -352,6 +422,9 @@ function editorExtensions(
   language: string,
   onChange: (value: string) => void,
   onCursorByteOffsetChange: (byteOffset: number) => void,
+  moveAnalyzer: CodeEditorMoveAnalyzerFeatures,
+  onMoveAnalyzerLocation: (location: MoveAnalyzerResolvedLocation) => void,
+  onMoveAnalyzerWorkspaceEdit: (edit: MoveAnalyzerWorkspaceEdit) => Promise<void> | void,
 ) {
   return [
     lineNumbers(),
@@ -363,9 +436,16 @@ function editorExtensions(
     highlightActiveLineGutter(),
     syntaxHighlighting(editorHighlightStyle, { fallback: true }),
     keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+    linter(() => [], { delay: 100000 }),
+    lintGutter(),
     complexityHighlightField,
     sourceSpanHighlightField,
     language.toLowerCase() === "move" ? compactMoveAddressField : [],
+    moveAnalyzerEditorExtensions(language, {
+      ...moveAnalyzer,
+      applyWorkspaceEdit: onMoveAnalyzerWorkspaceEdit,
+      openLocation: onMoveAnalyzerLocation,
+    }),
     editorTheme,
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
@@ -382,6 +462,28 @@ function editorExtensions(
     }),
     languageExtension(language),
   ];
+}
+
+function buildLintDiagnostics(
+  state: EditorState,
+  diagnostics: MoveAnalyzerDiagnostic[],
+): CodeMirrorDiagnostic[] {
+  if (!diagnostics.length) {
+    return [];
+  }
+
+  return diagnostics.map((diagnostic) => {
+    const from = lspPositionToOffset(state, diagnostic.range.start);
+    const rawTo = lspPositionToOffset(state, diagnostic.range.end);
+    const to = Math.max(from, rawTo);
+
+    return {
+      from,
+      message: diagnostic.source ? `${diagnostic.source}: ${diagnostic.message}` : diagnostic.message,
+      severity: diagnostic.severity === "hint" ? "info" : diagnostic.severity,
+      to: to > from ? to : Math.min(state.doc.length, from + 1),
+    };
+  });
 }
 
 function buildCompactMoveAddressDecorations(state: EditorState) {
@@ -721,6 +823,36 @@ const editorTheme = EditorView.theme(
       color: "inherit",
       textDecoration: "underline dotted #94a3b8",
       textUnderlineOffset: "3px",
+    },
+    ".cm-tooltip": {
+      backgroundColor: "#101722",
+      border: "1px solid #2c384b",
+      borderRadius: "6px",
+      boxShadow: "0 16px 40px rgba(0,0,0,0.35)",
+      color: "#e5edf7",
+    },
+    ".cm-moveAnalyzerHover, .cm-moveAnalyzerCompletionInfo": {
+      fontFamily:
+        'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+      fontSize: "12px",
+      lineHeight: "1.5",
+      maxWidth: "520px",
+      overflow: "auto",
+      padding: "8px 10px",
+      whiteSpace: "pre-wrap",
+    },
+    ".cm-tooltip-autocomplete": {
+      backgroundColor: "#101722",
+      border: "1px solid #2c384b",
+      borderRadius: "6px",
+    },
+    ".cm-tooltip-autocomplete ul": {
+      maxHeight: "260px",
+      minWidth: "260px",
+    },
+    ".cm-tooltip-autocomplete ul li[aria-selected]": {
+      backgroundColor: "#1d4ed8",
+      color: "#f8fafc",
     },
     ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
       backgroundColor: "#24496f",

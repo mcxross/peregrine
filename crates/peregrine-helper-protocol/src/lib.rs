@@ -9,6 +9,7 @@ pub const BUNDLED_SUI_HELPER_ARG: &str = "--peregrine-bundled-sui";
 pub const FORMAL_VERIFICATION_HELPER_ARG: &str = "--peregrine-formal-verification";
 pub const HELPER_ENV_VAR: &str = "PEREGRINE_HELPER";
 pub const JSON_PROTOCOL_HELPER_ARG: &str = "--peregrine-helper-json";
+pub const MOVE_ANALYZER_HELPER_ARG: &str = "--peregrine-move-analyzer";
 pub const MOVY_FUZZ_HELPER_ARG: &str = "--peregrine-movy-fuzz";
 
 #[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]

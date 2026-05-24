@@ -5,6 +5,7 @@ mod menu;
 mod state;
 
 use state::IndexerCommandState;
+use state::MoveAnalyzerCommandState;
 
 pub(crate) fn validated_move_project_name(project_name: &str) -> Result<String, String> {
     let project_name = project_name.trim();
@@ -41,6 +42,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(IndexerCommandState::default())
+        .manage(MoveAnalyzerCommandState::default())
         .invoke_handler(tauri::generate_handler![
             commands::indexer::greet,
             commands::indexer::index_package,
@@ -95,6 +97,12 @@ pub fn run() {
             commands::sui::check_sui_adapter,
             commands::sui::get_sui_adapter_settings,
             commands::sui::save_sui_adapter_settings,
+            commands::move_analyzer::check_move_analyzer_adapter,
+            commands::move_analyzer::get_move_analyzer_adapter_settings,
+            commands::move_analyzer::save_move_analyzer_adapter_settings,
+            commands::move_analyzer::start_move_analyzer_server,
+            commands::move_analyzer::send_move_analyzer_message,
+            commands::move_analyzer::stop_move_analyzer_server,
             commands::sui::load_sui_key_state,
             commands::sui::load_sui_network_state,
             commands::sui::add_sui_network_env,

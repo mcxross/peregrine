@@ -1,6 +1,16 @@
 import { FileText, X } from "lucide-react";
 import React from "react";
 
+import type { CodeEditorJumpRequest } from "@/features/project-workspace/editor/code-editor";
+import type {
+  MoveAnalyzerDiagnostic,
+  MoveAnalyzerResolvedLocation,
+  MoveAnalyzerWorkspaceEdit,
+} from "@/features/project-workspace/editor/lsp/types";
+import type {
+  MoveAnalyzerClientStatus,
+  MoveAnalyzerLspFeatures,
+} from "@/features/project-workspace/editor/lsp/use-move-analyzer";
 import type { OpenFileTab } from "@/features/project-workspace/editor/types";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +21,12 @@ const PreviewRenderer = React.lazy(() =>
 type EditorTabsProps = {
   tabs: OpenFileTab[];
   activePath: string | null;
+  diagnosticsByPath?: Record<string, MoveAnalyzerDiagnostic[]>;
+  jumpRequest?: CodeEditorJumpRequest | null;
+  moveAnalyzerLspFeatures?: MoveAnalyzerLspFeatures | null;
+  moveAnalyzerStatus?: MoveAnalyzerClientStatus;
+  onMoveAnalyzerLocation?: (location: MoveAnalyzerResolvedLocation) => void;
+  onMoveAnalyzerWorkspaceEdit?: (edit: MoveAnalyzerWorkspaceEdit) => Promise<void> | void;
   onActivateTab: (path: string) => void;
   onCloseTab: (path: string) => void;
   onUpdateTabSource: (path: string, source: string) => void;
@@ -19,6 +35,12 @@ type EditorTabsProps = {
 export function EditorTabs({
   tabs,
   activePath,
+  diagnosticsByPath = {},
+  jumpRequest = null,
+  moveAnalyzerLspFeatures = null,
+  moveAnalyzerStatus,
+  onMoveAnalyzerLocation,
+  onMoveAnalyzerWorkspaceEdit,
   onActivateTab,
   onCloseTab,
   onUpdateTabSource,
@@ -70,7 +92,13 @@ export function EditorTabs({
           }
         >
           <PreviewRenderer
+            diagnostics={diagnosticsByPath[activeTab.path] ?? []}
+            jumpRequest={jumpRequest}
+            moveAnalyzerLspFeatures={moveAnalyzerLspFeatures}
+            moveAnalyzerStatus={moveAnalyzerStatus}
             tab={activeTab}
+            onMoveAnalyzerLocation={onMoveAnalyzerLocation}
+            onMoveAnalyzerWorkspaceEdit={onMoveAnalyzerWorkspaceEdit}
             onUpdateSource={(source) => onUpdateTabSource(activeTab.path, source)}
           />
         </React.Suspense>

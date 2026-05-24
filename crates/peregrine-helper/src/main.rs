@@ -1,7 +1,7 @@
 use peregrine_helper_protocol::{
     parse_helper_request, HelperRequest, HelperResponse, BUNDLED_SUI_HELPER_ARG,
     BYTECODE_VIEWER_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG, JSON_PROTOCOL_HELPER_ARG,
-    MOVY_FUZZ_HELPER_ARG,
+    MOVE_ANALYZER_HELPER_ARG, MOVY_FUZZ_HELPER_ARG,
 };
 use std::io::{self, Read};
 
@@ -24,6 +24,9 @@ fn main() {
         }
         Some(arg) if arg.as_os_str() == std::ffi::OsStr::new(FORMAL_VERIFICATION_HELPER_ARG) => {
             run_formal_verification_helper(args);
+        }
+        Some(arg) if arg.as_os_str() == std::ffi::OsStr::new(MOVE_ANALYZER_HELPER_ARG) => {
+            run_move_analyzer_helper();
         }
         Some(arg) => {
             eprintln!("unknown Peregrine helper mode: {}", arg.to_string_lossy());
@@ -81,6 +84,10 @@ fn run_bundled_sui_helper(args: impl IntoIterator<Item = std::ffi::OsString>) {
             std::process::exit(1);
         }
     }
+}
+
+fn run_move_analyzer_helper() {
+    peregrine_adapters::move_analyzer::run_bundled_move_analyzer_stdio();
 }
 
 fn run_bytecode_viewer_helper(mut args: impl Iterator<Item = std::ffi::OsString>) {

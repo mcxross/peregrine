@@ -46,6 +46,7 @@ move-decompiler = { path = "../oss/sui/external-crates/move/crates/move-decompil
 move-disassembler = { path = "../oss/sui/external-crates/move/crates/move-disassembler" }
 move-ir-types = { path = "../oss/sui/external-crates/move/crates/move-ir-types" }
 move-model-2 = { path = "../oss/sui/external-crates/move/crates/move-model-2" }
+move-analyzer = { path = "../oss/sui/external-crates/move/crates/move-analyzer" }
 move-package-alt-compilation = { path = "../oss/sui/external-crates/move/crates/move-package-alt-compilation" }
 move-prover-boogie-backend = { path = "../oss/sui-prover/crates/move-prover-boogie-backend" }
 move-stackless-bytecode = { path = "../oss/sui-prover/crates/move-stackless-bytecode" }
