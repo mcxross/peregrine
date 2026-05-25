@@ -1,18 +1,20 @@
 pub mod facts;
 pub mod objects;
+pub mod tests;
 
 use crate::{
     core::{PackageScanner, ScanInput, ScanReport, ScannerOutput},
-    sui::objects::ObjectScanner,
+    sui::{objects::ObjectScanner, tests::TestsScanner},
 };
 
 pub fn scan_package(input: ScanInput<'_>) -> ScanReport {
     let package_id = input.package_model.name.clone();
-    let scanners = vec![ObjectScanner.scan(&input)];
+    let scanners = vec![ObjectScanner.scan(&input), TestsScanner.scan(&input)];
     let diagnostics = scanners
         .iter()
         .flat_map(|output| match output {
             ScannerOutput::Objects(objects) => objects.diagnostics.clone(),
+            ScannerOutput::Tests(tests) => tests.diagnostics.clone(),
         })
         .collect();
 

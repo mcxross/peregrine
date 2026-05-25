@@ -1,4 +1,6 @@
-fn function_parameters_contain_type(signature: &str, type_name: &str) -> bool {
+use peregrine_move_model::MoveFunctionSignature;
+
+pub(super) fn function_parameters_contain_type(signature: &str, type_name: &str) -> bool {
     let Some(parameters) = function_parameters(signature) else {
         return false;
     };
@@ -41,7 +43,7 @@ fn type_reference_matches(source: &str, type_name: &str) -> bool {
         .any(|token| token == short_name || token == type_name)
 }
 
-fn privileged_function(function: &MoveFunctionSignature) -> bool {
+pub(super) fn privileged_function(function: &MoveFunctionSignature) -> bool {
     let name = function.name.to_ascii_lowercase();
     let body = function.body.as_deref().unwrap_or("").to_ascii_lowercase();
     const PRIVILEGED_TERMS: &[&str] = &[

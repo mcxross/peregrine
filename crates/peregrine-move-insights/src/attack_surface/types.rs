@@ -1,22 +1,6 @@
-use peregrine_move_model::{MoveFunctionSignature, MoveModule, MovePackageModel};
-use peregrine_scanner::{
-    core::{ScanInput, ScannerOutput, SourceMode},
-    sui::{
-        objects::{
-            ObjectLifecycleFunctionRef as ScannerLifecycleFunctionRef,
-            ObjectLifecycleModel as ScannerLifecycleModel,
-            ObjectLifecycleStageModel as ScannerLifecycleStageModel, ObjectScanReport,
-        },
-        scan_package,
-    },
-};
 use serde::Serialize;
-use std::collections::HashSet;
-use std::path::PathBuf;
 
-use super::object_lifecycle::{
-    object_lifecycle_risks, ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleStage,
-};
+use crate::object_lifecycle::ObjectLifecycleMap;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

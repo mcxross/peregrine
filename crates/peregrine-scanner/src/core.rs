@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use peregrine_move_model::MovePackageModel;
 use serde::Serialize;
 
-use crate::sui::objects::ObjectScanReport;
+use crate::sui::{objects::ObjectScanReport, tests::TestsScanReport};
 
 pub trait PackageScanner {
     fn id(&self) -> &'static str;
@@ -43,6 +43,7 @@ pub struct ScanReport {
 #[serde(rename_all = "camelCase", tag = "kind", content = "report")]
 pub enum ScannerOutput {
     Objects(ObjectScanReport),
+    Tests(TestsScanReport),
 }
 
 #[derive(Clone, Debug, Serialize)]

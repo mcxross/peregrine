@@ -1,3 +1,18 @@
+use peregrine_move_model::{MoveModule, MovePackageModel};
+use std::path::PathBuf;
+
+use crate::scanner_report::{package_scanner_report_for_package, MovePackageScannerReport};
+
+use super::{
+    admin::admin_control_findings,
+    calls::{external_call_findings, public_package_relationships},
+    from_scanner_report::{
+        capability_findings_from_object_scan, object_lifecycle_maps_from_object_scan,
+        object_ownership_findings_from_object_scan, ownership_count,
+    },
+    types::MovePackageSurface,
+};
+
 pub fn package_surface(modules: &[MoveModule]) -> MovePackageSurface {
     let model = MovePackageModel {
         name: "package".to_string(),
@@ -17,21 +32,29 @@ pub fn package_surface_for_package(
     package_root: Option<PathBuf>,
     build_root: Option<PathBuf>,
 ) -> MovePackageSurface {
+    let scanner_report = package_scanner_report_for_package(model, package_root, build_root);
+    package_surface_from_scanner_report(model, &scanner_report)
+}
+
+pub fn package_surface_from_scanner_report(
+    model: &MovePackageModel,
+    scanner_report: &MovePackageScannerReport,
+) -> MovePackageSurface {
     let modules = &model.modules;
     let entry_function_count = modules
         .iter()
         .flat_map(|module| module.functions.iter())
         .filter(|function| function.is_transaction_callable)
         .count();
-    let object_scan = scanner_object_report(model, package_root, build_root);
-    let capability_findings = scanner_capability_findings(&object_scan);
+    let object_scan = &scanner_report.objects;
+    let capability_findings = capability_findings_from_object_scan(object_scan);
     let mut capability_structs = capability_findings
         .iter()
         .filter(|finding| finding.confidence != "low")
         .map(|finding| finding.qualified_name.clone())
         .collect::<Vec<_>>();
-    let object_ownership_findings = scanner_object_ownership_findings(&object_scan);
-    let object_lifecycle_maps = scanner_object_lifecycle_maps(&object_scan, modules);
+    let object_ownership_findings = object_ownership_findings_from_object_scan(object_scan);
+    let object_lifecycle_maps = object_lifecycle_maps_from_object_scan(object_scan, modules);
     let admin_control_findings = admin_control_findings(modules, &capability_structs);
     let external_call_findings = external_call_findings(modules);
     let public_package_relationships = public_package_relationships(modules);

@@ -12638,6 +12638,7 @@ dependencies = [
  "peregrine-move-model",
  "peregrine-scanner",
  "serde",
+ "tempfile",
 ]
 
 [[package]]
@@ -12690,6 +12691,8 @@ dependencies = [
  "move-binary-format 0.0.3",
  "peregrine-move-model",
  "serde",
+ "tempfile",
+ "toml 0.8.23",
  "walkdir",
 ]
 

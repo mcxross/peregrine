@@ -3,7 +3,9 @@ use peregrine_move_graphs::{
     discover_move_project_model_shallow, MoveCallGraph, MoveProjectModel, MoveStateAccessGraph,
     MoveTypeGraph, PackageDependencyGraph,
 };
-use peregrine_move_insights::attack_surface::{package_surface_for_package, MovePackageSurface};
+use peregrine_move_insights::report::{
+    package_insights_report_for_package, MovePackageInsightsReport,
+};
 use peregrine_move_model::{MoveModule, MovePackageModel};
 use serde::Serialize;
 use std::path::Path;
@@ -27,7 +29,7 @@ pub struct MovePackage {
     pub has_source_files: bool,
     pub has_source_modules: bool,
     pub source_file_count: usize,
-    pub surface: MovePackageSurface,
+    pub insights: MovePackageInsightsReport,
     pub modules: Vec<MoveModule>,
 }
 
@@ -65,7 +67,8 @@ fn build_move_project(root: &Path, model: MoveProjectModel) -> MoveProject {
 fn build_move_package(root: &Path, model: MovePackageModel) -> MovePackage {
     let package_root = root.join(&model.path);
     let build_root = package_root.join("build").join(&model.name);
-    let surface = package_surface_for_package(&model, Some(package_root), Some(build_root));
+    let insights =
+        package_insights_report_for_package(&model, Some(package_root), Some(build_root));
 
     MovePackage {
         name: model.name,
@@ -74,7 +77,7 @@ fn build_move_package(root: &Path, model: MovePackageModel) -> MovePackage {
         has_source_files: model.has_source_files,
         has_source_modules: model.has_source_modules,
         source_file_count: model.source_file_count,
-        surface,
+        insights,
         modules: model.modules,
     }
 }

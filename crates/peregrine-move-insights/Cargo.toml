@@ -8,3 +8,6 @@ description = "Move package overview insight models for Peregrine"
 peregrine-move-model = { workspace = true }
 peregrine-scanner = { workspace = true }
 serde = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

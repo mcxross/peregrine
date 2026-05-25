@@ -8,4 +8,8 @@ description = "Generic scanner models for Peregrine Move packages"
 move-binary-format = { workspace = true }
 peregrine-move-model = { workspace = true }
 serde = { workspace = true }
+toml = { workspace = true }
 walkdir = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

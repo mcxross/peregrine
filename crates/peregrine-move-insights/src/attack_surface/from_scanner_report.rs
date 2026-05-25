@@ -1,31 +1,20 @@
-fn scanner_object_report(
-    model: &MovePackageModel,
-    package_root: Option<PathBuf>,
-    build_root: Option<PathBuf>,
-) -> ObjectScanReport {
-    let report = scan_package(ScanInput {
-        package_model: model,
-        package_root,
-        build_root,
-        source_mode: SourceMode::BestAvailable,
-    });
+use peregrine_move_model::MoveModule;
+use peregrine_scanner::sui::objects::{
+    ObjectLifecycleFunctionRef as ScannerLifecycleFunctionRef,
+    ObjectLifecycleModel as ScannerLifecycleModel,
+    ObjectLifecycleStageModel as ScannerLifecycleStageModel, ObjectScanReport,
+};
+use std::collections::HashSet;
 
-    report
-        .scanners
-        .into_iter()
-        .find_map(|output| match output {
-            ScannerOutput::Objects(objects) => Some(objects),
-        })
-        .unwrap_or_else(|| ObjectScanReport {
-            capability_findings: Vec::new(),
-            ownership_findings: Vec::new(),
-            lifecycle_maps: Vec::new(),
-            shared_object_structs: Vec::new(),
-            diagnostics: report.diagnostics,
-        })
-}
+use crate::object_lifecycle::{
+    object_lifecycle_risks, ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleStage,
+};
 
-fn scanner_capability_findings(report: &ObjectScanReport) -> Vec<CapabilityFinding> {
+use super::types::{CapabilityFinding, ObjectOwnershipFinding};
+
+pub(super) fn capability_findings_from_object_scan(
+    report: &ObjectScanReport,
+) -> Vec<CapabilityFinding> {
     report
         .capability_findings
         .iter()
@@ -44,7 +33,9 @@ fn scanner_capability_findings(report: &ObjectScanReport) -> Vec<CapabilityFindi
         .collect()
 }
 
-fn scanner_object_ownership_findings(report: &ObjectScanReport) -> Vec<ObjectOwnershipFinding> {
+pub(super) fn object_ownership_findings_from_object_scan(
+    report: &ObjectScanReport,
+) -> Vec<ObjectOwnershipFinding> {
     report
         .ownership_findings
         .iter()
@@ -65,7 +56,7 @@ fn scanner_object_ownership_findings(report: &ObjectScanReport) -> Vec<ObjectOwn
         .collect()
 }
 
-fn scanner_object_lifecycle_maps(
+pub(super) fn object_lifecycle_maps_from_object_scan(
     report: &ObjectScanReport,
     modules: &[MoveModule],
 ) -> Vec<ObjectLifecycleMap> {
@@ -73,14 +64,14 @@ fn scanner_object_lifecycle_maps(
         .lifecycle_maps
         .iter()
         .map(|lifecycle| {
-            let mut map = scanner_lifecycle_map(lifecycle);
+            let mut map = lifecycle_map_from_scanner(lifecycle);
             map.risks = object_lifecycle_risks(modules, &map);
             map
         })
         .collect()
 }
 
-fn scanner_lifecycle_map(lifecycle: &ScannerLifecycleModel) -> ObjectLifecycleMap {
+fn lifecycle_map_from_scanner(lifecycle: &ScannerLifecycleModel) -> ObjectLifecycleMap {
     ObjectLifecycleMap {
         type_name: lifecycle.type_name.clone(),
         module_name: lifecycle.module_name.clone(),
@@ -91,24 +82,24 @@ fn scanner_lifecycle_map(lifecycle: &ScannerLifecycleModel) -> ObjectLifecycleMa
         stages: lifecycle
             .stages
             .iter()
-            .map(scanner_lifecycle_stage)
+            .map(lifecycle_stage_from_scanner)
             .collect(),
         touched_by: lifecycle
             .touched_by
             .iter()
-            .map(scanner_lifecycle_function_ref)
+            .map(lifecycle_function_ref_from_scanner)
             .collect(),
         risks: Vec::new(),
     }
 }
 
-fn scanner_lifecycle_stage(stage: &ScannerLifecycleStageModel) -> ObjectLifecycleStage {
+fn lifecycle_stage_from_scanner(stage: &ScannerLifecycleStageModel) -> ObjectLifecycleStage {
     ObjectLifecycleStage {
         kind: stage.kind.as_str().to_string(),
         functions: stage
             .functions
             .iter()
-            .map(scanner_lifecycle_function_ref)
+            .map(lifecycle_function_ref_from_scanner)
             .collect(),
         evidence: stage
             .evidence
@@ -118,7 +109,7 @@ fn scanner_lifecycle_stage(stage: &ScannerLifecycleStageModel) -> ObjectLifecycl
     }
 }
 
-fn scanner_lifecycle_function_ref(
+fn lifecycle_function_ref_from_scanner(
     function: &ScannerLifecycleFunctionRef,
 ) -> ObjectLifecycleFunctionRef {
     ObjectLifecycleFunctionRef {
@@ -139,7 +130,7 @@ fn scanner_lifecycle_function_ref(
     }
 }
 
-fn ownership_count(findings: &[ObjectOwnershipFinding], kind: &str) -> usize {
+pub(super) fn ownership_count(findings: &[ObjectOwnershipFinding], kind: &str) -> usize {
     findings
         .iter()
         .filter(|finding| finding.ownership_kind == kind && finding.confidence != "low")

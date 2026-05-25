@@ -1,4 +1,12 @@
-fn admin_control_findings(
+use peregrine_move_model::MoveModule;
+use std::collections::HashSet;
+
+use super::{
+    signature_helpers::{function_parameters_contain_type, privileged_function},
+    types::AdminControlFinding,
+};
+
+pub(super) fn admin_control_findings(
     modules: &[MoveModule],
     capability_structs: &[String],
 ) -> Vec<AdminControlFinding> {

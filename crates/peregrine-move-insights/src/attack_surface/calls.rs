@@ -1,4 +1,9 @@
-fn external_call_findings(modules: &[MoveModule]) -> Vec<ExternalCallFinding> {
+use peregrine_move_model::MoveModule;
+use std::collections::HashSet;
+
+use super::types::{ExternalCallFinding, PublicPackageRelationship};
+
+pub(super) fn external_call_findings(modules: &[MoveModule]) -> Vec<ExternalCallFinding> {
     let local_modules = modules
         .iter()
         .map(|module| module.name.as_str())
@@ -47,7 +52,9 @@ fn external_call_findings(modules: &[MoveModule]) -> Vec<ExternalCallFinding> {
     findings
 }
 
-fn public_package_relationships(modules: &[MoveModule]) -> Vec<PublicPackageRelationship> {
+pub(super) fn public_package_relationships(
+    modules: &[MoveModule],
+) -> Vec<PublicPackageRelationship> {
     let public_package_functions = modules
         .iter()
         .flat_map(|module| {
