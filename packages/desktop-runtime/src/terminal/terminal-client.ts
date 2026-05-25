@@ -5,6 +5,7 @@ export const TERMINAL_OUTPUT_EVENT = "terminal-output";
 export const TERMINAL_EXIT_EVENT = "terminal-exit";
 
 export type TerminalStartRequest = {
+  command?: string;
   cwd: string;
   cols: number;
   rows: number;

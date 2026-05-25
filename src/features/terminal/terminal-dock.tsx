@@ -3,9 +3,24 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import { GripHorizontal, Pencil, Plus, SquareTerminal, X } from "lucide-react";
+import {
+  Bot,
+  Check,
+  ChevronDown,
+  GripHorizontal,
+  Pencil,
+  Plus,
+  SquareTerminal,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
   listenTerminalExit,
@@ -25,11 +40,30 @@ type TerminalDockProps = {
 
 type TerminalTab = {
   id: string;
+  kind: TerminalSessionKind;
   title: string;
 };
 
+type TerminalSessionKind = "terminal" | "codex" | "claude";
+
 const MIN_TERMINAL_HEIGHT = 180;
 const MAX_TERMINAL_HEIGHT = 560;
+const SESSION_KIND_OPTIONS: Array<{
+  description: string;
+  kind: TerminalSessionKind;
+  label: string;
+}> = [
+  {
+    description: "Start an OpenAI Codex coding-agent session",
+    kind: "codex",
+    label: "Codex",
+  },
+  {
+    description: "Start a Claude coding-agent session",
+    kind: "claude",
+    label: "Claude",
+  },
+];
 
 export function TerminalDock({
   cwd,
@@ -41,13 +75,16 @@ export function TerminalDock({
   const initialTab = React.useMemo(() => createTerminalTab(1), []);
   const [tabs, setTabs] = React.useState<TerminalTab[]>([initialTab]);
   const [activeTabId, setActiveTabId] = React.useState(initialTab.id);
+  const [selectedSessionKind, setSelectedSessionKind] =
+    React.useState<TerminalSessionKind>("terminal");
 
-  const addTab = React.useCallback(() => {
-    const tab = createTerminalTab(nextTabIndexRef.current);
+  const addTab = React.useCallback((kind: TerminalSessionKind = selectedSessionKind) => {
+    const tab = createTerminalTab(nextTabIndexRef.current, kind);
     nextTabIndexRef.current += 1;
     setTabs((current) => [...current, tab]);
     setActiveTabId(tab.id);
-  }, []);
+    setSelectedSessionKind(kind);
+  }, [selectedSessionKind]);
 
   const renameTab = React.useCallback((tabId: string, title: string) => {
     const nextTitle = title.trim();
@@ -137,11 +174,11 @@ export function TerminalDock({
               />
             ))}
             <Button
-              aria-label="Open new terminal tab"
+              aria-label={`Open new ${sessionKindLabel(selectedSessionKind)} session`}
               className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-              onClick={addTab}
+              onClick={() => addTab()}
               size="icon-xs"
-              title="New terminal"
+              title={`New ${sessionKindLabel(selectedSessionKind)} session`}
               type="button"
               variant="ghost"
             >
@@ -149,6 +186,10 @@ export function TerminalDock({
             </Button>
           </div>
           <div className="flex min-w-0 items-center gap-2">
+            <AgentSessionPicker
+              onSelect={(kind) => addTab(kind)}
+              selectedKind={selectedSessionKind}
+            />
             <Button
               aria-label="Close terminal"
               className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
@@ -196,6 +237,8 @@ function TerminalPane({
   const resizeTimerRef = React.useRef<number | null>(null);
   const activeRef = React.useRef(active);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+
+  const sessionKind = tab.kind;
 
   React.useEffect(() => {
     activeRef.current = active;
@@ -386,6 +429,7 @@ function TerminalPane({
         unlistenExit = exitUnlisten;
         return startTerminal({
           cols: Math.max(terminal.cols, 80),
+          command: sessionKindCommand(sessionKind),
           cwd,
           rows: Math.max(terminal.rows, 24),
         });
@@ -442,7 +486,7 @@ function TerminalPane({
         });
       }
     };
-  }, [cwd]);
+  }, [cwd, sessionKind]);
 
   return (
     <div
@@ -459,6 +503,54 @@ function TerminalPane({
         </span>
       ) : null}
     </div>
+  );
+}
+
+function AgentSessionPicker({
+  onSelect,
+  selectedKind,
+}: {
+  onSelect: (kind: TerminalSessionKind) => void;
+  selectedKind: TerminalSessionKind;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label="Choose agent session"
+          className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+          size="sm"
+          title="Choose agent session"
+          type="button"
+          variant="ghost"
+        >
+          <Bot className="size-3.5" aria-hidden="true" />
+          <span className="hidden sm:inline">{sessionKindLabel(selectedKind)}</span>
+          <ChevronDown className="size-3" aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {SESSION_KIND_OPTIONS.map((option) => (
+          <DropdownMenuItem
+            className="grid grid-cols-[1rem_minmax(0,1fr)] gap-x-2 gap-y-0.5 py-2"
+            key={option.kind}
+            onSelect={() => onSelect(option.kind)}
+          >
+            <span className="flex size-4 items-center justify-center">
+              {option.kind === selectedKind ? (
+                <Check className="size-3.5 text-primary" aria-hidden="true" />
+              ) : null}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-xs font-medium leading-4">{option.label}</span>
+              <span className="block truncate text-[11px] leading-4 text-muted-foreground">
+                {option.description}
+              </span>
+            </span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -584,7 +676,7 @@ function TerminalTabButton({
   );
 }
 
-function createTerminalTab(index: number): TerminalTab {
+function createTerminalTab(index: number, kind: TerminalSessionKind = "terminal"): TerminalTab {
   const token =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
@@ -592,8 +684,31 @@ function createTerminalTab(index: number): TerminalTab {
 
   return {
     id: `terminal-tab-${token}`,
-    title: `Terminal ${index}`,
+    kind,
+    title: `${sessionKindLabel(kind)} ${index}`,
   };
+}
+
+function sessionKindLabel(kind: TerminalSessionKind) {
+  switch (kind) {
+    case "terminal":
+      return "Terminal";
+    case "codex":
+      return "Codex";
+    case "claude":
+      return "Claude";
+  }
+}
+
+function sessionKindCommand(kind: TerminalSessionKind) {
+  switch (kind) {
+    case "terminal":
+      return undefined;
+    case "codex":
+      return "codex";
+    case "claude":
+      return "claude";
+  }
 }
 
 function clampTerminalHeight(height: number) {

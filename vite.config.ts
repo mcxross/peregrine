@@ -15,6 +15,10 @@ export default defineConfig(async () => ({
         __dirname,
         "./packages/agent-runtime/src/index.ts",
       ),
+      "@peregrine/coding-agent-adapters": path.resolve(
+        __dirname,
+        "./packages/coding-agent-adapters/src/index.ts",
+      ),
       "@peregrine/desktop-runtime": path.resolve(
         __dirname,
         "./packages/desktop-runtime/src/index.ts",

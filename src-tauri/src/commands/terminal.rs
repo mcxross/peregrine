@@ -10,6 +10,7 @@ pub(crate) const TERMINAL_EXIT_EVENT: &str = "terminal-exit";
 pub(crate) struct TerminalStartRequest {
     cwd: String,
     cols: u16,
+    command: Option<String>,
     rows: u16,
 }
 
@@ -65,6 +66,7 @@ pub(crate) async fn terminal_start(
     let response = terminal_manager.start(
         RuntimeTerminalStartRequest {
             cols: request.cols,
+            command: request.command,
             cwd: request.cwd,
             rows: request.rows,
         },

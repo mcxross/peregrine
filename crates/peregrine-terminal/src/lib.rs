@@ -17,6 +17,7 @@ pub struct TerminalManager {
 pub struct TerminalStartRequest {
     pub cwd: String,
     pub cols: u16,
+    pub command: Option<String>,
     pub rows: u16,
 }
 
@@ -49,7 +50,7 @@ impl TerminalManager {
     ) -> Result<TerminalStartResponse, String> {
         let cwd = validated_cwd(&request.cwd)?;
         let size = terminal_size(request.cols, request.rows);
-        let shell = default_shell();
+        let command_spec = TerminalCommandSpec::new(request.command)?;
         let session_id = new_session_id();
 
         let pty_system = NativePtySystem::default();
@@ -57,15 +58,17 @@ impl TerminalManager {
             .openpty(size)
             .map_err(|error| format!("Could not open terminal PTY: {error}"))?;
 
-        let mut command = CommandBuilder::new(&shell);
+        let mut command = command_spec.command_builder();
         command.cwd(cwd.as_os_str());
         command.env("TERM", "xterm-256color");
         command.env("COLORTERM", "truecolor");
 
-        let child = pair
-            .slave
-            .spawn_command(command)
-            .map_err(|error| format!("Could not start terminal shell `{shell}`: {error}"))?;
+        let child = pair.slave.spawn_command(command).map_err(|error| {
+            format!(
+                "Could not start terminal command `{}`: {error}",
+                command_spec.display_name
+            )
+        })?;
 
         drop(pair.slave);
 
@@ -169,6 +172,56 @@ impl TerminalManager {
 
         Ok(())
     }
+}
+
+struct TerminalCommandSpec {
+    display_name: String,
+    program: String,
+    args: Vec<String>,
+}
+
+impl TerminalCommandSpec {
+    fn new(command: Option<String>) -> Result<Self, String> {
+        let Some(command) = command else {
+            let shell = default_shell();
+            return Ok(Self {
+                display_name: shell.clone(),
+                program: shell,
+                args: Vec::new(),
+            });
+        };
+
+        let command = command.trim();
+
+        if command.is_empty() {
+            return Err("Terminal command cannot be empty.".to_string());
+        }
+
+        let shell = default_shell();
+
+        Ok(Self {
+            display_name: command.to_string(),
+            program: shell,
+            args: vec![
+                "-lc".to_string(),
+                format!("{}; {}", user_path_bootstrap(), command),
+            ],
+        })
+    }
+
+    fn command_builder(&self) -> CommandBuilder {
+        let mut command = CommandBuilder::new(&self.program);
+
+        for arg in &self.args {
+            command.arg(arg);
+        }
+
+        command
+    }
+}
+
+fn user_path_bootstrap() -> &'static str {
+    r#"if [ -n "${HOME:-}" ]; then export PATH="$HOME/.local/bin:$HOME/bin:$HOME/.bun/bin:$HOME/Library/pnpm:$PATH"; fi"#
 }
 
 fn spawn_terminal_reader(
