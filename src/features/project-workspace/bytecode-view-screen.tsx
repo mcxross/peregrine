@@ -59,7 +59,7 @@ import {
   type MoveBytecodeSourceSpan,
   type MovePackage,
   type PackageTree,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import { MoveSourceUnavailableNotice } from "@/features/project-workspace/move-source-unavailable-notice";
 import { cn } from "@/lib/utils";
 

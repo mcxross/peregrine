@@ -70,7 +70,7 @@ import {
   type SuiGenerateKeyResponse,
   type SuiKeyAccount,
   type SuiKeyState,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import {
   checkMoveAnalyzerAdapter,
   getMoveAnalyzerAdapterSettings,
@@ -78,7 +78,7 @@ import {
   type MoveAnalyzerAdapterSettings,
   type MoveAnalyzerAdapterSource,
   type MoveAnalyzerAdapterStatus,
-} from "@/features/project-workspace/editor/lsp/move-analyzer-api";
+} from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 import { MoveAnalyzerSettingsSection } from "@/screens/move-analyzer-settings-section";
 import { useTheme } from "@/theme/theme-provider";

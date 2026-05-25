@@ -31,12 +31,12 @@ import type {
   MoveStateAccessGraph,
   MoveStateAccessGraphEdge,
   MoveStateAccessGraphNode,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import {
   displayMovePackageName,
   loadMoveStateAccessGraph,
-} from "@/features/empty-project/filesystem-tree";
-import { tokenizeMoveSignature } from "@/features/project-workspace/module-signature/move-signature";
+} from "@peregrine/desktop-runtime";
+import { tokenizeMoveSignature } from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 export type SelectedMoveModule = {

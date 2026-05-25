@@ -26,7 +26,7 @@ import {
   suiNetworkLabel,
   suiNetworkSelectionFromEnv,
   type SuiNetworkSelection,
-} from "@/app/sui-network";
+} from "@peregrine/desktop-runtime";
 import {
   addSuiNetworkEnv,
   loadSuiNetworkState,
@@ -36,7 +36,7 @@ import {
   type SuiNetworkEnv,
   type SuiNetworkState,
   type SuiWalletSummary,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 type SuiNetworkSelectorProps = {

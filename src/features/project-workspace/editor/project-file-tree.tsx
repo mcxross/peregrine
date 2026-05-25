@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import {
   displayMovePackageName,
   type PackageTree,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 

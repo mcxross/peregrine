@@ -1,15 +1,14 @@
 import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Titlebar } from "@/app/titlebar";
-import { defaultSuiNetworkSelection, type SuiNetworkSelection } from "@/app/sui-network";
-import type { FormalVerificationTarget, WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
 import { Workspace } from "@/app/workspace";
 import { Button } from "@/components/ui/button";
 import {
+  createPackageLoadAssessment,
   buildMovePackage,
   defaultProjectMetadata,
+  defaultSuiNetworkSelection,
   displayMovePackageName,
   loadPackageTree,
   loadPackageTreeDetails,
@@ -21,25 +20,27 @@ import {
   runMovyFuzz,
   runSecurityScript,
   runSecurityCommand,
+  saveTextExport,
   saveProjectMetadata,
+  type AuditReportExport,
+  type BuildLogRun,
+  type BuildLogUpdateOptions,
+  type FormalVerificationTarget,
   type MovePackage,
   type PackageTree,
-} from "@/features/empty-project/filesystem-tree";
-import type {
-  BuildLogRun,
-  BuildLogSheetController,
-  BuildLogUpdateOptions,
-} from "@/features/project-workspace/build-log-sheet";
-import {
-  createPackageLoadAssessment,
   type PackageLoadAssessment,
   type PackageLoadAssessmentState,
-} from "@/features/project-workspace/package-load-assessment";
+  type SuiNetworkSelection,
+  type WorkspaceMode,
+  type WorkspaceTab,
+} from "@peregrine/desktop-runtime";
+import type {
+  BuildLogSheetController,
+} from "@/features/project-workspace/build-log-sheet";
 import {
   type LaunchIndexState,
   useLaunchIndexer,
 } from "@/features/project-workspace/indexer/use-launch-indexer";
-import type { AuditReportExport } from "@/features/agents/types";
 import { defaultLayoutSettings } from "@/layout/layout-store";
 import { titlebarHeight } from "@/layout/window-chrome";
 
@@ -1350,10 +1351,7 @@ async function exportAuditReport(report: AuditReportExport) {
     : report.markdown;
 
   try {
-    await invoke("save_text_export", {
-      path: selectedPath,
-      contents,
-    });
+    await saveTextExport(selectedPath, contents);
   } catch (error) {
     if (isTauriExportError(error)) {
       downloadTextFallback(

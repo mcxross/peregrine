@@ -19,13 +19,13 @@ import type {
   MoveModule,
   MovePackage,
   PackageTree,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import {
   analyzeMovePackage,
   displayMovePackageName,
   loadFilePreview,
   moveSourceUnavailableMessage,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import type {
   CodeEditorJumpRequest,
   ComplexityHighlight,
@@ -36,7 +36,7 @@ import {
   type SelectedMoveModule,
 } from "@/features/project-workspace/module-signature-screen";
 import { MoveSourceUnavailableNotice } from "@/features/project-workspace/move-source-unavailable-notice";
-import { sameSourcePath } from "@/features/project-workspace/source-paths";
+import { sameSourcePath } from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 const TREE_PANE_DEFAULT_WIDTH = 460;

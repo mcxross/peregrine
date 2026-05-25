@@ -7,18 +7,18 @@ import {
   type MoveModule,
   type MovePackage,
   type PackageTree,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import type { CodeEditorJumpRequest } from "@/features/project-workspace/editor/code-editor";
 import { EditorTabs } from "@/features/project-workspace/editor/editor-tabs";
 import type {
   MoveAnalyzerResolvedLocation,
   MoveAnalyzerWorkspaceEdit,
-} from "@/features/project-workspace/editor/lsp/types";
+} from "@peregrine/desktop-runtime";
 import { useMoveAnalyzer } from "@/features/project-workspace/editor/lsp/use-move-analyzer";
-import { applyMoveAnalyzerTextEdits } from "@/features/project-workspace/editor/lsp/workspace-edit";
+import { applyMoveAnalyzerTextEdits } from "@peregrine/desktop-runtime";
 import { ProjectFileTree } from "@/features/project-workspace/editor/project-file-tree";
 import type { OpenFileTab } from "@/features/project-workspace/editor/types";
-import { findModuleByPath } from "@/features/project-workspace/source-paths";
+import { findModuleByPath } from "@peregrine/desktop-runtime";
 
 type ProjectSourceEditorWorkspaceProps = {
   activeMovePackage: MovePackage | null;

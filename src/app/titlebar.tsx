@@ -1,5 +1,4 @@
 import React from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Bug,
   FlaskConical,
@@ -21,8 +20,11 @@ import {
   workspaceSidebarWidth,
 } from "@/layout/window-chrome";
 import { SuiNetworkSelector } from "@/app/sui-network-selector";
-import type { SuiNetworkSelection } from "@/app/sui-network";
-import type { WorkspaceTab } from "@/app/workspace-types";
+import {
+  startWindowDrag,
+  type SuiNetworkSelection,
+  type WorkspaceTab,
+} from "@peregrine/desktop-runtime";
 
 type TitlebarProps = {
   activeWorkspaceTab?: WorkspaceTab;
@@ -78,7 +80,7 @@ export function Titlebar({
       return;
     }
 
-    getCurrentWindow().startDragging().catch(() => {
+    startWindowDrag().catch(() => {
       // Browser previews do not expose the native Tauri window API.
     });
   };

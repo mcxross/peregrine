@@ -28,26 +28,26 @@ import type {
   FormalVerificationTarget,
   WorkspaceMode,
   WorkspaceTab,
-} from "@/app/workspace-types";
-import type { SuiNetworkSelection } from "@/app/sui-network";
+} from "@peregrine/desktop-runtime";
+import type { SuiNetworkSelection } from "@peregrine/desktop-runtime";
 import {
   displayMovePackageName,
   type MoveModule,
   type MovePackage,
   type PackageTree,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import {
   BuildLogSheet,
   type BuildLogRun,
   type BuildLogSheetController,
   type BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
-import type { AuditReportExport } from "@/features/agents/types";
+import type { AuditReportExport } from "@peregrine/desktop-runtime";
 import { assessmentSidebarItems } from "@/features/project-workspace/package-load-assessment-cards";
-import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
+import type { PackageLoadAssessment } from "@peregrine/desktop-runtime";
 import type { SelectedMoveModule } from "@/features/project-workspace/module-signature-screen";
 import type { ExploreGraphMode } from "@/features/project-workspace/dependency-graph-screen";
-import { findSourceModule } from "@/features/project-workspace/source-paths";
+import { findSourceModule } from "@peregrine/desktop-runtime";
 import type { TypeGraphSourceLocation } from "@/features/project-workspace/type-graph-view";
 import type { SurfaceDetailKind } from "@/features/project-workspace/surface-detail-screen";
 import {

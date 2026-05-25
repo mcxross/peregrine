@@ -6,30 +6,11 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   displayMovePackageName,
-  type CommandOutput,
-} from "@/features/empty-project/filesystem-tree";
+  type BuildLogRun,
+} from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
-export type BuildRunState = "running" | "success" | "error";
-
-export type BuildLogRun = {
-  canRerun?: boolean;
-  command: string;
-  error: string | null;
-  emptyText?: string;
-  finishedAt: Date | null;
-  id: number;
-  metadata?: { label: string; value: string }[];
-  note?: string | null;
-  output: CommandOutput | null;
-  packageName: string;
-  packagePath: string;
-  runningText?: string;
-  startedAt: Date;
-  state: BuildRunState;
-  title?: string;
-  workingDirectory: string;
-};
+export type { BuildLogRun, BuildLogUpdateOptions } from "@peregrine/desktop-runtime";
 
 type BuildLogSheetProps = {
   bottomInset?: number;
@@ -40,10 +21,6 @@ type BuildLogSheetProps = {
 };
 
 export type BuildLogSheetController = Omit<BuildLogSheetProps, "bottomInset">;
-export type BuildLogUpdateOptions = {
-  open?: boolean;
-  reset?: boolean;
-};
 
 const DEFAULT_SHEET_HEIGHT = 360;
 const MIN_SHEET_HEIGHT = 180;

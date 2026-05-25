@@ -8,7 +8,7 @@ import {
   type MoveAnalyzerAdapterSettings,
   type MoveAnalyzerAdapterSource,
   type MoveAnalyzerAdapterStatus,
-} from "@/features/project-workspace/editor/lsp/move-analyzer-api";
+} from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 const moveAnalyzerSourceOptions: { value: MoveAnalyzerAdapterSource; label: string }[] = [

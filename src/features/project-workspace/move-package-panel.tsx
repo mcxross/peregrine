@@ -10,8 +10,8 @@ import {
 import type {
   MoveModule,
   MovePackage,
-} from "@/features/empty-project/filesystem-tree";
-import { displayMovePackageName } from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
+import { displayMovePackageName } from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 export type PackageBuildStatus = {

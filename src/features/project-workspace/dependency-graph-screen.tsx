@@ -7,13 +7,13 @@ import type {
   MoveTypeGraphNode,
   MoveTypeGraph,
   PackageDependencyGraph,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import type { TypeGraphSourceLocation } from "@/features/project-workspace/type-graph-view";
 import {
   displayMovePackageName,
   loadMoveGraphs,
   moveSourceUnavailableMessage,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import { MoveSourceUnavailableNotice } from "@/features/project-workspace/move-source-unavailable-notice";
 import { cn } from "@/lib/utils";
 

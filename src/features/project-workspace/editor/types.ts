@@ -1,4 +1,4 @@
-import type { FilePreview } from "@/features/empty-project/filesystem-tree";
+import type { FilePreview } from "@peregrine/desktop-runtime";
 
 export type OpenFileTab = {
   path: string;

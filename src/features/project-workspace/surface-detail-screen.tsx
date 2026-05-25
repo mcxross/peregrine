@@ -38,7 +38,7 @@ import type {
   ObjectLifecycleStageKind,
   ObjectOwnershipFinding,
   PublicPackageRelationship,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 const OBJECT_TREE_PANE_DEFAULT_WIDTH = 460;

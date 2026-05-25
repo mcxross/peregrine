@@ -38,8 +38,8 @@ import type {
   MovePackage,
   MoveSourceSpan,
   MoveUnresolvedCall,
-} from "@/features/empty-project/filesystem-tree";
-import { displayMovePackageName } from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
+import { displayMovePackageName } from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 type CallGraphViewProps = {

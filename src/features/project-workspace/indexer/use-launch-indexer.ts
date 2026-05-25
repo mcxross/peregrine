@@ -1,12 +1,12 @@
 import { useCallback, useRef, useState } from "react";
 
-import type { MovePackage, PackageTree } from "@/features/empty-project/filesystem-tree";
+import type { MovePackage, PackageTree } from "@peregrine/desktop-runtime";
 import {
   cancelIndex,
   createIndexRunId,
   indexPackage,
   listenToIndexProgress,
-} from "@/features/project-workspace/indexer/sui-indexer-client";
+} from "@peregrine/desktop-runtime";
 
 export type LaunchIndexState = {
   key: string;

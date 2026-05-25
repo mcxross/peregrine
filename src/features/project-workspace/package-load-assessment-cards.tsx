@@ -18,8 +18,8 @@ import type {
   PackageLoadAssessmentCommandId,
   PackageLoadAssessmentState,
   PackageLoadAssessmentStep,
-} from "@/features/project-workspace/package-load-assessment";
-import { packageLoadAssessmentCommands } from "@/features/project-workspace/package-load-assessment";
+} from "@peregrine/desktop-runtime";
+import { packageLoadAssessmentCommands } from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 type PackageLoadAssessmentCardsProps = {

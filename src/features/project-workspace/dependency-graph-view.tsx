@@ -15,7 +15,6 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import React from "react";
 import { Download, Maximize2, Minimize2 } from "lucide-react";
@@ -26,8 +25,11 @@ import type {
   PackageDependencyEdge,
   PackageDependencyGraph,
   PackageDependencyNode,
-} from "@/features/empty-project/filesystem-tree";
-import { displayMovePackageName } from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
+import {
+  displayMovePackageName,
+  saveGraphPng,
+} from "@peregrine/desktop-runtime";
 
 type DependencyGraphViewProps = {
   className?: string;
@@ -498,10 +500,7 @@ async function downloadGraphPng({
     return;
   }
 
-  await invoke("save_graph_png", {
-    path,
-    pngDataUrl: canvas.toDataURL("image/png"),
-  });
+  await saveGraphPng(path, canvas.toDataURL("image/png"));
 }
 
 function drawExportBackground(context: CanvasRenderingContext2D, width: number, height: number) {

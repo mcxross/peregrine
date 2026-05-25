@@ -18,7 +18,7 @@ import {
   suiGraphQlUrlForSelection,
   suiNetworkLabel,
   type SuiNetworkSelection,
-} from "@/app/sui-network";
+} from "@peregrine/desktop-runtime";
 import {
   createMoveProject,
   displayMovePackageName,
@@ -27,7 +27,7 @@ import {
   moveProjectPathExists,
   type MovePackage,
   type PackageTree,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import { ProjectDropzone } from "@/features/empty-project/project-dropzone";
 import { RecentProjects } from "@/features/empty-project/recent-projects";
 import {
@@ -36,8 +36,8 @@ import {
   loadRecentProjects,
   rememberRecentProject,
   removeRecentProject,
-} from "@/features/empty-project/recent-project-store";
-import type { RecentProject } from "@/features/empty-project/types";
+} from "@peregrine/desktop-runtime";
+import type { RecentProject } from "@peregrine/desktop-runtime";
 
 type EmptyProjectScreenProps = {
   recentProjects?: RecentProject[];

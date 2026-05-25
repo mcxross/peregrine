@@ -17,12 +17,16 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
+  Box,
   Boxes,
+  Braces,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Crosshair,
   FileCode2,
+  Hexagon,
+  KeyRound,
   Layers3,
   ListTree,
   Maximize2,
@@ -39,8 +43,8 @@ import type {
   MovePackage,
   MoveSourceSpan,
   MoveTypeGraph,
-} from "@/features/empty-project/filesystem-tree";
-import { displayMovePackageName } from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
+import { displayMovePackageName } from "@peregrine/desktop-runtime";
 import { CanvasNotice, EmptyTypeGraphState } from "@/features/project-workspace/type-graph/components";
 import {
   BUILTIN_COLOR,
@@ -63,11 +67,11 @@ import {
   type TypeGraphScope,
   type TypeGraphSourceLocation,
   type TypeRenderGraph,
-} from "@/features/project-workspace/type-graph/model";
-import * as typeGraphModel from "@/features/project-workspace/type-graph/graph-model";
+} from "@peregrine/desktop-runtime";
+import * as typeGraphModel from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
-export type { TypeGraphSourceLocation } from "@/features/project-workspace/type-graph/model";
+export type { TypeGraphSourceLocation } from "@peregrine/desktop-runtime";
 
 type TypeGraphViewProps = {
   className?: string;
@@ -1150,7 +1154,7 @@ function InspectorRow({ label, value }: { label: string; value: string }) {
 
 function TypeGraphNode({ data }: NodeProps<Node<TypeFlowNodeData>>) {
   const isTypeNode = Boolean(data.node);
-  const Icon = typeGraphModel.nodeIcon(data.kind, data.node);
+  const Icon = typeGraphNodeIcon(data);
   const selectTypeId = data.selectTypeId;
   const showInlineActions = isTypeNode && (data.selected || data.kind === "local");
   const isFieldNode = data.kind === "field";
@@ -1373,6 +1377,42 @@ function TypeGraphNode({ data }: NodeProps<Node<TypeFlowNodeData>>) {
       ) : null}
     </div>
   );
+}
+
+function typeGraphNodeIcon(node: RenderNode) {
+  if (node.kind === "function") {
+    return Workflow;
+  }
+
+  if (node.kind === "field") {
+    return ListTree;
+  }
+
+  if (node.node?.kind === "enum") {
+    return Hexagon;
+  }
+
+  if (typeGraphModel.isCapabilityLike(node.node)) {
+    return ShieldAlert;
+  }
+
+  if (typeGraphModel.isResourceLike(node.node)) {
+    return KeyRound;
+  }
+
+  if (node.kind === "builtin") {
+    return Braces;
+  }
+
+  if (node.kind === "framework") {
+    return Box;
+  }
+
+  if (node.kind === "external") {
+    return FileCode2;
+  }
+
+  return Boxes;
 }
 
 function NodeCardAction({

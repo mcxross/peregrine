@@ -9,6 +9,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "@peregrine/agent-runtime": ["./packages/agent-runtime/src/index.ts"],
+      "@peregrine/desktop-runtime": ["./packages/desktop-runtime/src/index.ts"],
       "@peregrine/harness-control": ["./packages/harness-control/src/index.ts"]
     },
 

@@ -1,19 +1,19 @@
 import React from "react";
 import { EmptyProjectScreen } from "@/features/empty-project/empty-project-screen";
-import type { SuiNetworkSelection } from "@/app/sui-network";
+import type { SuiNetworkSelection } from "@peregrine/desktop-runtime";
 import type {
   FormalVerificationTarget,
   WorkspaceMode,
   WorkspaceTab,
-} from "@/app/workspace-types";
-import type { PackageTree } from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
+import type { PackageTree } from "@peregrine/desktop-runtime";
 import type {
   BuildLogRun,
   BuildLogSheetController,
   BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
-import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
-import type { AuditReportExport } from "@/features/agents/types";
+import type { PackageLoadAssessment } from "@peregrine/desktop-runtime";
+import type { AuditReportExport } from "@peregrine/desktop-runtime";
 
 const ProjectWorkspace = React.lazy(() =>
   import("@/features/project-workspace/project-workspace").then((module) => ({

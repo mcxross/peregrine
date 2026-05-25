@@ -57,12 +57,12 @@ import {
   loadAgentStudioState,
   loadAgentStudioStateFromProjectMetadata,
   saveAgentStudioState,
-} from "@/features/agents/agent-workflow-store";
+} from "@peregrine/desktop-runtime";
 import {
   loadProviderModelOptions,
   modelProviderAdapters,
   providerById,
-} from "@/features/agents/model-providers/provider-adapters";
+} from "@peregrine/desktop-runtime";
 import type {
   AgentDefinition,
   AgentExecutionLog,
@@ -71,16 +71,16 @@ import type {
   AgentStudioState,
   AgentWorkflow,
   AuditReportExport,
-} from "@/features/agents/types";
+} from "@peregrine/desktop-runtime";
 import {
   displayMovePackageName,
   loadProjectMetadata,
   saveProjectMetadata,
   type MovePackage,
   type PackageTree,
-} from "@/features/empty-project/filesystem-tree";
-import type { AgentToolProjectContext } from "@/features/agents/tools";
-import type { AgentRunStreamEvent } from "@/features/agents/agent-runner";
+} from "@peregrine/desktop-runtime";
+import type { AgentToolProjectContext } from "@peregrine/desktop-runtime";
+import type { AgentRunStreamEvent } from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 type AgentCategory = "Core" | "Analysis" | "Action" | "Output" | "Custom";
@@ -939,7 +939,7 @@ export function AgentsScreen({
     }));
 
     try {
-      const { runAgentWorkflowWithModel } = await import("@/features/agents/agent-runner");
+      const { runAgentWorkflowWithModel } = await import("@peregrine/desktop-runtime");
       const result = await runAgentWorkflowWithModel({
         agent: runAgent,
         onTrace: (event) => {
@@ -1095,7 +1095,7 @@ export function AgentsScreen({
     }));
 
     try {
-      const { runFullAuditWorkflowDeterministic } = await import("@/features/agents/agent-runner");
+      const { runFullAuditWorkflowDeterministic } = await import("@peregrine/desktop-runtime");
       const result = await runFullAuditWorkflowDeterministic({
         agent: runAgent,
         onTrace: (event) => {

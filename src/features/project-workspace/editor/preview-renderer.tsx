@@ -14,7 +14,7 @@ import type {
   MoveAnalyzerDiagnostic,
   MoveAnalyzerResolvedLocation,
   MoveAnalyzerWorkspaceEdit,
-} from "@/features/project-workspace/editor/lsp/types";
+} from "@peregrine/desktop-runtime";
 import type { OpenFileTab } from "@/features/project-workspace/editor/types";
 
 type PreviewRendererProps = {

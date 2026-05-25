@@ -2,7 +2,7 @@ import { Clock3, FolderOpen, Package, RotateCw, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import type { RecentProject } from "@/features/empty-project/types";
+import type { RecentProject } from "@peregrine/desktop-runtime";
 
 type RecentProjectsProps = {
   projects: RecentProject[];

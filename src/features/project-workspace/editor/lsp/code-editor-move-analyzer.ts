@@ -18,7 +18,7 @@ import type {
   MoveAnalyzerRange,
   MoveAnalyzerResolvedLocation,
   MoveAnalyzerWorkspaceEdit,
-} from "@/features/project-workspace/editor/lsp/types";
+} from "@peregrine/desktop-runtime";
 
 export type CodeEditorMoveAnalyzerFeatures = {
   completion: (

@@ -51,7 +51,7 @@ import type {
   MoveAnalyzerDiagnostic,
   MoveAnalyzerResolvedLocation,
   MoveAnalyzerWorkspaceEdit,
-} from "@/features/project-workspace/editor/lsp/types";
+} from "@peregrine/desktop-runtime";
 
 type CodeEditorProps = {
   complexityHighlights?: ComplexityHighlight[];

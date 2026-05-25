@@ -6,25 +6,28 @@ import {
   listenMoveAnalyzerExit,
   listenMoveAnalyzerMessages,
   listenMoveAnalyzerStderr,
+  normalizeMoveAnalyzerCompletionList,
+  normalizeMoveAnalyzerHover,
+  normalizeMoveAnalyzerLocations,
+  normalizeMoveAnalyzerPublishDiagnostics,
+  normalizeMoveAnalyzerWorkspaceEdit,
   sendMoveAnalyzerMessage,
+  showMoveAnalyzerMessageText,
   startMoveAnalyzerServer,
   stopMoveAnalyzerServer,
+  textDocumentPositionParams,
   type JsonRpcMessage,
-} from "@/features/project-workspace/editor/lsp/move-analyzer-api";
-import { fileUri, relativePathFromFileUri } from "@/features/project-workspace/editor/lsp/path-utils";
+} from "@peregrine/desktop-runtime";
+import { fileUri } from "@peregrine/desktop-runtime";
 import type {
   MoveAnalyzerCompletionList,
-  MoveAnalyzerCompletionItem,
   MoveAnalyzerCompletionContext,
   MoveAnalyzerDiagnostic,
-  MoveAnalyzerDiagnosticSeverity,
   MoveAnalyzerHover,
   MoveAnalyzerPosition,
-  MoveAnalyzerRange,
   MoveAnalyzerResolvedLocation,
-  MoveAnalyzerTextEdit,
   MoveAnalyzerWorkspaceEdit,
-} from "@/features/project-workspace/editor/lsp/types";
+} from "@peregrine/desktop-runtime";
 
 type UseMoveAnalyzerOptions = {
   rootPath: string;
@@ -185,7 +188,7 @@ export function useMoveAnalyzer({ rootPath, tabs }: UseMoveAnalyzerOptions) {
         context,
       });
 
-      return normalizeCompletionList(result);
+      return normalizeMoveAnalyzerCompletionList(result);
     },
     async definition(path, position) {
       const result = await request("textDocument/definition", textDocumentPositionParams(
@@ -194,7 +197,7 @@ export function useMoveAnalyzer({ rootPath, tabs }: UseMoveAnalyzerOptions) {
         position,
       ));
 
-      return normalizeLocations(sessionRootPathRef.current || rootPath, result);
+      return normalizeMoveAnalyzerLocations(sessionRootPathRef.current || rootPath, result);
     },
     async hover(path, position) {
       const result = await request("textDocument/hover", textDocumentPositionParams(
@@ -203,7 +206,7 @@ export function useMoveAnalyzer({ rootPath, tabs }: UseMoveAnalyzerOptions) {
         position,
       ));
 
-      return normalizeHover(result);
+      return normalizeMoveAnalyzerHover(result);
     },
     async references(path, position) {
       const result = await request("textDocument/references", {
@@ -217,7 +220,7 @@ export function useMoveAnalyzer({ rootPath, tabs }: UseMoveAnalyzerOptions) {
         },
       });
 
-      return normalizeLocations(sessionRootPathRef.current || rootPath, result);
+      return normalizeMoveAnalyzerLocations(sessionRootPathRef.current || rootPath, result);
     },
     async rename(path, position, newName) {
       const result = await request("textDocument/rename", {
@@ -229,7 +232,7 @@ export function useMoveAnalyzer({ rootPath, tabs }: UseMoveAnalyzerOptions) {
         newName,
       });
 
-      return normalizeWorkspaceEdit(sessionRootPathRef.current || rootPath, result);
+      return normalizeMoveAnalyzerWorkspaceEdit(sessionRootPathRef.current || rootPath, result);
     },
   }), [request, rootPath]);
 
@@ -445,7 +448,7 @@ export function useMoveAnalyzer({ rootPath, tabs }: UseMoveAnalyzerOptions) {
         }
 
         if (message.method === "window/showMessage") {
-          const analyzerMessage = showMessageText(message.params);
+          const analyzerMessage = showMoveAnalyzerMessageText(message.params);
 
           if (analyzerMessage) {
             setStatus((current) => ({
@@ -643,189 +646,6 @@ function rejectPendingRequests(
   pendingRequests.clear();
 }
 
-function textDocumentPositionParams(
-  rootPath: string,
-  path: string,
-  position: MoveAnalyzerPosition,
-) {
-  return {
-    position,
-    textDocument: {
-      uri: fileUri(rootPath, path),
-    },
-  };
-}
-
-function normalizeHover(result: unknown): MoveAnalyzerHover | null {
-  if (!isRecord(result) || !("contents" in result)) {
-    return null;
-  }
-
-  return {
-    contents: result.contents as MoveAnalyzerHover["contents"],
-    range: isRange(result.range) ? result.range : undefined,
-  };
-}
-
-function normalizeCompletionList(result: unknown): MoveAnalyzerCompletionList | null {
-  if (!result) {
-    return null;
-  }
-
-  if (Array.isArray(result)) {
-    return {
-      isIncomplete: false,
-      items: result.filter(isCompletionItem),
-    };
-  }
-
-  if (!isRecord(result) || !Array.isArray(result.items)) {
-    return null;
-  }
-
-  return {
-    isIncomplete: result.isIncomplete === true,
-    items: result.items.filter(isCompletionItem),
-  };
-}
-
-function normalizeLocations(
-  rootPath: string,
-  result: unknown,
-): MoveAnalyzerResolvedLocation[] {
-  if (!result) {
-    return [];
-  }
-
-  const locations = Array.isArray(result) ? result : [result];
-
-  return locations.flatMap((location) => {
-    if (isLocation(location)) {
-      const path = relativePathFromFileUri(rootPath, location.uri);
-
-      return path ? [{ path, range: location.range, uri: location.uri }] : [];
-    }
-
-    if (isLocationLink(location)) {
-      const path = relativePathFromFileUri(rootPath, location.targetUri);
-
-      return path
-        ? [{
-            path,
-            range: location.targetSelectionRange ?? location.targetRange,
-            uri: location.targetUri,
-          }]
-        : [];
-    }
-
-    return [];
-  });
-}
-
-function normalizeWorkspaceEdit(
-  rootPath: string,
-  result: unknown,
-): MoveAnalyzerWorkspaceEdit | null {
-  if (!isRecord(result)) {
-    return null;
-  }
-
-  const editsByPath: Record<string, MoveAnalyzerTextEdit[]> = {};
-
-  if (isRecord(result.changes)) {
-    for (const [uri, edits] of Object.entries(result.changes)) {
-      addTextEdits(rootPath, editsByPath, uri, edits);
-    }
-  }
-
-  if (Array.isArray(result.documentChanges)) {
-    for (const change of result.documentChanges) {
-      if (!isRecord(change) || !isRecord(change.textDocument) || typeof change.textDocument.uri !== "string") {
-        continue;
-      }
-
-      addTextEdits(rootPath, editsByPath, change.textDocument.uri, change.edits);
-    }
-  }
-
-  return Object.keys(editsByPath).length ? { editsByPath } : null;
-}
-
-function addTextEdits(
-  rootPath: string,
-  editsByPath: Record<string, MoveAnalyzerTextEdit[]>,
-  uri: string,
-  edits: unknown,
-) {
-  if (!Array.isArray(edits)) {
-    return;
-  }
-
-  const path = relativePathFromFileUri(rootPath, uri);
-
-  if (!path) {
-    return;
-  }
-
-  const textEdits = edits.filter(isTextEdit);
-
-  if (!textEdits.length) {
-    return;
-  }
-
-  editsByPath[path] = [...(editsByPath[path] ?? []), ...textEdits];
-}
-
-function isCompletionItem(value: unknown): value is MoveAnalyzerCompletionItem {
-  if (!isRecord(value) || typeof value.label !== "string") {
-    return false;
-  }
-
-  return value.textEdit == null || isTextEdit(value.textEdit);
-}
-
-function isTextEdit(value: unknown): value is MoveAnalyzerTextEdit {
-  return isRecord(value)
-    && typeof value.newText === "string"
-    && isRange(value.range);
-}
-
-function isLocation(value: unknown): value is {
-  range: MoveAnalyzerRange;
-  uri: string;
-} {
-  return isRecord(value)
-    && typeof value.uri === "string"
-    && isRange(value.range);
-}
-
-function isLocationLink(value: unknown): value is {
-  targetRange: MoveAnalyzerRange;
-  targetSelectionRange?: MoveAnalyzerRange;
-  targetUri: string;
-} {
-  return isRecord(value)
-    && typeof value.targetUri === "string"
-    && isRange(value.targetRange)
-    && (value.targetSelectionRange == null || isRange(value.targetSelectionRange));
-}
-
-function isRange(value: unknown): value is MoveAnalyzerRange {
-  return isRecord(value)
-    && isPosition(value.start)
-    && isPosition(value.end);
-}
-
-function isPosition(value: unknown): value is MoveAnalyzerPosition {
-  return isRecord(value)
-    && typeof value.character === "number"
-    && typeof value.line === "number";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object";
-}
-
 function clearChangeTimer(uri: string, timers: Map<string, ReturnType<typeof globalThis.setTimeout>>) {
   const timer = timers.get(uri);
 
@@ -846,84 +666,20 @@ function applyPublishDiagnostics(
   params: unknown,
   setDiagnosticsByPath: React.Dispatch<React.SetStateAction<Record<string, MoveAnalyzerDiagnostic[]>>>,
 ) {
-  if (!isPublishDiagnosticsParams(params)) {
-    return;
-  }
+  const normalized = normalizeMoveAnalyzerPublishDiagnostics(rootPath, params);
 
-  const relativePath = relativePathFromFileUri(rootPath, params.uri);
-
-  if (!relativePath) {
+  if (!normalized) {
     return;
   }
 
   setDiagnosticsByPath((current) => ({
     ...current,
-    [relativePath]: params.diagnostics.map(normalizeDiagnostic),
+    [normalized.path]: normalized.diagnostics,
   }));
-}
-
-function normalizeDiagnostic(diagnostic: LspDiagnostic): MoveAnalyzerDiagnostic {
-  return {
-    message: diagnostic.message,
-    range: diagnostic.range,
-    severity: diagnosticSeverity(diagnostic.severity),
-    source: diagnostic.source ?? "move-analyzer",
-  };
-}
-
-function diagnosticSeverity(severity: number | undefined): MoveAnalyzerDiagnosticSeverity {
-  switch (severity) {
-    case 1:
-      return "error";
-    case 2:
-      return "warning";
-    case 3:
-      return "info";
-    case 4:
-      return "hint";
-    default:
-      return "error";
-  }
-}
-
-type LspDiagnostic = {
-  message: string;
-  range: {
-    end: { character: number; line: number };
-    start: { character: number; line: number };
-  };
-  source?: string | null;
-  severity?: number;
-};
-
-function isPublishDiagnosticsParams(value: unknown): value is {
-  diagnostics: LspDiagnostic[];
-  uri: string;
-} {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const candidate = value as { diagnostics?: unknown; uri?: unknown };
-
-  return typeof candidate.uri === "string" && Array.isArray(candidate.diagnostics);
 }
 
 function basename(path: string) {
   return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
-}
-
-function showMessageText(params: unknown) {
-  if (!params || typeof params !== "object") {
-    return null;
-  }
-
-  const candidate = params as { message?: unknown; type?: unknown };
-  const isErrorOrWarning = candidate.type === 1 || candidate.type === 2;
-
-  return isErrorOrWarning && typeof candidate.message === "string"
-    ? candidate.message
-    : null;
 }
 
 function getErrorMessage(error: unknown, fallback: string) {

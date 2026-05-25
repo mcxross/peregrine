@@ -36,13 +36,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   createWorkflowNode,
-} from "@/features/agents/agent-workflow-store";
+} from "@peregrine/desktop-runtime";
 import type {
   AgentStatus,
   AgentWorkflow,
   AgentWorkflowNodeData,
   AgentWorkflowNodeType,
-} from "@/features/agents/types";
+} from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 type AgentWorkflowCanvasProps = {

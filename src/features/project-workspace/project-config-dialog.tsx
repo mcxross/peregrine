@@ -21,7 +21,7 @@ import {
   type MovePackage,
   type PackageTree,
   type ProjectMetadata,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 type ProjectConfigDialogProps = {

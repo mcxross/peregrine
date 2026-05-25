@@ -80,7 +80,7 @@ import {
   type PackageTree,
   type ProjectMetadata,
   type SecurityCommandKind,
-} from "@/features/empty-project/filesystem-tree";
+} from "@peregrine/desktop-runtime";
 import type {
   BuildLogRun,
   BuildLogUpdateOptions,
@@ -88,7 +88,7 @@ import type {
 import {
   suiNetworkLabel,
   type SuiNetworkSelection,
-} from "@/app/sui-network";
+} from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 type ExecutionBuilderScreenProps = {

@@ -1,6 +1,6 @@
 import React from "react";
 
-import { displayMovePackageName } from "@/features/empty-project/filesystem-tree";
+import { displayMovePackageName } from "@peregrine/desktop-runtime";
 import { cn } from "@/lib/utils";
 
 export function CanvasNotice({
