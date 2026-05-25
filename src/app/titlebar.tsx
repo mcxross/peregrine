@@ -90,7 +90,7 @@ export function Titlebar({
       data-tauri-drag-region
       onPointerDown={handlePointerDown}
       className={cn(
-        "grid h-[58px] select-none border-b border-[color:var(--app-border)] bg-[var(--app-chrome)] text-foreground backdrop-blur",
+        "grid h-[58px] select-none border-b border-[color:var(--app-border)] bg-[var(--app-chrome)] text-foreground",
         layout.chrome === "compact" && "h-12",
       )}
       style={{
@@ -159,7 +159,7 @@ export function Titlebar({
             ))}
             <Button
               aria-label="Project configuration"
-              className="group h-8 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2 text-muted-foreground hover:bg-[var(--app-elevated)] hover:text-foreground"
+              className="group h-8 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-2 text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground"
               onClick={onOpenProjectConfig}
               title="Project configuration"
               type="button"
@@ -231,7 +231,7 @@ function WorkspaceActionButton({
   return (
     <Button
       aria-label={action.label}
-      className="group h-8 gap-1.5 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2 text-foreground hover:bg-[var(--app-elevated)]"
+      className="group h-8 gap-1.5 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-2 text-foreground hover:bg-[var(--app-subtle)]"
       disabled={isDisabled}
       onClick={onClick}
       title={action.label}

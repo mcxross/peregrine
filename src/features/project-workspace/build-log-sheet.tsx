@@ -84,7 +84,7 @@ export function BuildLogSheet({
       aria-label="Command logs"
       aria-hidden={!isOpen}
       className={cn(
-        "absolute inset-x-0 z-40 grid grid-rows-[auto_minmax(0,1fr)] border-x-0 border-b-0 border-t border-[color:var(--app-border)] bg-[var(--app-panel)] shadow-[0_-18px_60px_rgba(0,0,0,0.45)] transition-transform duration-200",
+        "absolute inset-x-0 z-40 grid grid-rows-[auto_minmax(0,1fr)] border-x-0 border-b-0 border-t border-[color:var(--app-border)] bg-[var(--app-panel)] shadow-[0_-12px_28px_rgba(0,0,0,0.26)] transition-transform duration-200",
         isResizing && "transition-none",
         isOpen
           ? "pointer-events-auto translate-y-0"
@@ -98,7 +98,7 @@ export function BuildLogSheet({
     >
       <button
         aria-label="Resize build log sheet"
-        className="absolute left-1/2 top-0 z-10 flex h-5 w-16 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[var(--app-panel)] text-muted-foreground shadow-sm hover:text-foreground"
+        className="absolute left-1/2 top-0 z-10 flex h-5 w-16 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize items-center justify-center rounded border border-[color:var(--app-border)] bg-[var(--app-panel)] text-muted-foreground shadow-none hover:text-foreground"
         onPointerDown={handleResizeStart}
         type="button"
       >

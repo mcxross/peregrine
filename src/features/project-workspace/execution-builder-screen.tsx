@@ -702,7 +702,7 @@ export function ExecutionBuilderScreen({
 
   return (
     <section className="relative h-full min-h-0 bg-[var(--app-window)] text-foreground">
-      <div className="absolute right-4 top-4 z-20 flex shrink-0 items-center gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)]/95 p-1 shadow-sm backdrop-blur">
+      <div className="absolute right-4 top-4 z-20 flex shrink-0 items-center gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-1 shadow-none">
         <div className="flex rounded bg-[var(--app-window)] p-0.5">
           <Button
             aria-label="Use horizontal workflow layout"
@@ -889,7 +889,7 @@ function StepPalette({
       </ScrollArea>
       {hoveredStep ? (
         <div
-          className="pointer-events-none absolute left-[calc(100%+8px)] z-50 w-72 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-3 text-xs shadow-xl shadow-black/35"
+          className="pointer-events-none absolute left-[calc(100%+8px)] z-50 w-72 rounded-md border border-[color:var(--app-border)] bg-[var(--popover)] p-3 text-xs shadow-[0_12px_30px_rgba(0,0,0,0.34)]"
           style={{ top: hoveredStep.top }}
         >
           <div className="flex min-w-0 items-center justify-between gap-3">

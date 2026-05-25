@@ -223,7 +223,7 @@ export function SuiNetworkSelector({
           <Button
             aria-label={`Switch network. Current network: ${label}`}
             className={cn(
-              "gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] font-medium text-foreground hover:bg-[var(--app-elevated)]",
+              "gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] font-medium text-foreground hover:bg-[var(--app-subtle)]",
               size === "compact" ? "h-8 px-2.5 text-xs" : "h-10 justify-between px-3 text-sm",
               className,
             )}
@@ -268,7 +268,7 @@ export function SuiNetworkSelector({
             </div>
 
             {activeAddress ? (
-              <div className="grid gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-2">
+              <div className="grid gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-2">
                 <div className="flex min-w-0 items-center justify-between gap-2">
                   <span className="truncate font-mono text-xs text-muted-foreground" title={activeAddress}>
                     {truncateMiddle(activeAddress, 16, 12)}
@@ -296,7 +296,7 @@ export function SuiNetworkSelector({
                 ) : null}
               </div>
             ) : (
-              <p className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-xs text-muted-foreground">
+              <p className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3 py-2 text-xs text-muted-foreground">
                 Generate or import a Sui key in Settings to show an active address here.
               </p>
             )}

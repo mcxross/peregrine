@@ -1307,7 +1307,7 @@ function FunctionCallGraphHover({
       {position
         ? createPortal(
           <div
-            className="fixed z-[9999] w-[28rem] rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-3 text-left shadow-2xl"
+            className="fixed z-[9999] w-[28rem] rounded-md border border-[color:var(--app-border)] bg-[var(--popover)] p-3 text-left shadow-[0_12px_30px_rgba(0,0,0,0.34)]"
             onMouseEnter={clearCloseTimer}
             onMouseLeave={scheduleClose}
             style={{ left: position.left, top: position.top }}
@@ -1491,7 +1491,7 @@ function InstructionPanel({
       <ScrollArea className="min-h-0 min-w-0">
         <div className="max-w-full min-w-0 overflow-x-auto overflow-y-hidden">
           <table className="w-full min-w-[34rem] table-fixed border-collapse font-mono text-xs">
-          <thead className="sticky top-0 z-10 bg-[var(--app-window)] text-[11px] text-muted-foreground shadow-[0_1px_0_var(--app-border)]">
+          <thead className="sticky top-0 z-10 border-b border-[color:var(--app-border)] bg-[var(--app-window)] text-[11px] text-muted-foreground shadow-none">
             <tr className="text-left">
               <th className="w-12 px-3 py-2 font-semibold">#</th>
               <th className="w-14 px-2 py-2 font-semibold">Offset</th>

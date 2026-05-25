@@ -777,7 +777,7 @@ function StateAccessDiagram({
 function StateAccessFlowNode({ data }: NodeProps<Node<StateAccessFlowNodeData>>) {
   if (data.kind === "function") {
     return (
-      <div className="relative h-[104px] w-72 overflow-hidden border border-cyan-400/70 bg-cyan-400/[0.04] text-left shadow-[0_0_0_1px_rgba(34,211,238,0.08)]">
+      <div className="relative h-[104px] w-72 overflow-hidden border border-cyan-400/70 bg-cyan-400/[0.04] text-left shadow-none">
         <Handle
           className="!size-2 !border-background"
           id="out"
@@ -803,7 +803,7 @@ function StateAccessFlowNode({ data }: NodeProps<Node<StateAccessFlowNodeData>>)
   }
 
   return (
-    <div className="relative w-[28rem] overflow-hidden border border-rose-400/75 bg-[var(--app-window)] text-left shadow-[0_0_0_1px_rgba(251,113,133,0.08)]">
+    <div className="relative w-[28rem] overflow-hidden border border-rose-400/75 bg-[var(--app-window)] text-left shadow-none">
       <div className="h-16 border-b border-slate-700/80 px-4 py-3">
         <div className="truncate text-sm font-semibold text-foreground">
           {truncateLabel(data.title, 36)}

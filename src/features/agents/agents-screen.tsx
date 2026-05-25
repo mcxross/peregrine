@@ -1257,7 +1257,7 @@ function PageHeader({
           <label className="relative">
             <span className="sr-only">Filter agents</span>
             <select
-              className="h-8 appearance-none rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] pl-3 pr-8 text-xs text-foreground outline-none transition hover:bg-[var(--app-subtle)]"
+              className="h-8 appearance-none rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] pl-3 pr-8 text-xs text-foreground outline-none transition-colors hover:bg-[var(--app-subtle)]"
               onChange={(event) => onFilterChange(event.target.value as AgentFilter)}
               value={agentFilter}
             >
@@ -1335,7 +1335,7 @@ function SummaryCards({
     <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-2">
       {cards.map((card) => (
         <div
-          className="rounded border border-[color:var(--app-border)] bg-black/10 px-2 py-1.5"
+          className="rounded border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2 py-1.5"
           key={card.label}
         >
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
@@ -2465,7 +2465,7 @@ function AgentInspector({
         value={activeTab}
       >
         <div className="border-b border-[color:var(--app-border)] px-4 py-3">
-          <TabsList className="grid h-8 w-full min-w-0 grid-cols-[repeat(3,minmax(0,1fr))] overflow-hidden rounded-md bg-[var(--app-surface)] p-0.5">
+          <TabsList className="grid h-8 w-full min-w-0 grid-cols-[repeat(3,minmax(0,1fr))] overflow-hidden rounded-md bg-[var(--app-panel)] p-0.5">
             <TabsTrigger className="h-full min-w-0 flex-none overflow-hidden text-ellipsis px-1 text-[11px]" value="overview">
               Overview
             </TabsTrigger>
@@ -2492,7 +2492,7 @@ function AgentInspector({
                   </LabelledField>
                   <LabelledField label="Description">
                     <textarea
-                      className="min-h-16 w-full resize-none rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-xs leading-5 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      className="min-h-16 w-full resize-none rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3 py-2 text-xs leading-5 outline-none focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/35"
                       onChange={(event) => onUpdateAgent({ description: event.target.value })}
                       value={agent.description}
                     />
@@ -2514,7 +2514,7 @@ function AgentInspector({
               <SettingsBlock title="Model">
                 <LabelledField label="Provider">
                   <select
-                    className="h-8 w-full min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 text-xs outline-none"
+                    className="h-8 w-full min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3 text-xs outline-none"
                     onChange={(event) => {
                       const nextProvider = providerById(event.target.value);
                       onUpdateAgent({
@@ -2537,7 +2537,7 @@ function AgentInspector({
                 <LabelledField label="Model">
                   {modelList.modelIds.length ? (
                     <select
-                      className="h-8 w-full min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 text-xs outline-none"
+                      className="h-8 w-full min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3 text-xs outline-none"
                       onChange={(event) =>
                         onUpdateAgent({
                           provider: {
@@ -2571,7 +2571,7 @@ function AgentInspector({
                     />
                   )}
                 </LabelledField>
-                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2">
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2 py-2">
                   <p className="min-w-0 truncate text-[10px] leading-4 text-muted-foreground" title={modelList.source}>
                     {modelList.status === "loading"
                       ? "Inspecting models..."
@@ -2628,7 +2628,7 @@ function AgentInspector({
               <SettingsBlock title="Execution Policy">
                 <LabelledField label="Mode">
                   <select
-                    className="h-8 w-full min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 text-xs outline-none"
+                    className="h-8 w-full min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3 text-xs outline-none"
                     onChange={(event) =>
                       onUpdateAgent({
                         execution: {
@@ -2721,7 +2721,7 @@ function LastRunCard({
           </p>
         ) : null}
         {report ? (
-          <pre className="mt-3 max-h-28 overflow-auto whitespace-pre-wrap break-words rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-2 text-[11px] leading-4 text-muted-foreground">
+          <pre className="mt-3 max-h-28 overflow-auto whitespace-pre-wrap break-words rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-2 text-[11px] leading-4 text-muted-foreground">
             {report}
           </pre>
         ) : null}

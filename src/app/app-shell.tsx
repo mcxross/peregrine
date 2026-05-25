@@ -1090,7 +1090,7 @@ function LaunchStatusToastCard({
   const isSuccess = state === "success";
 
   return (
-    <div className="pointer-events-auto flex items-center gap-3 rounded-md border border-[color:var(--app-border)] bg-[color-mix(in_oklch,var(--app-panel)_88%,transparent)] px-3 py-2 text-sm shadow-2xl shadow-black/35 backdrop-blur-md">
+    <div className="pointer-events-auto flex items-center gap-3 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] px-3 py-2 text-sm shadow-[0_12px_28px_rgba(0,0,0,0.28)]">
       <div className="grid size-8 shrink-0 place-items-center rounded bg-[var(--app-subtle)]">
         {isRunning ? <Loader2 className="size-4 animate-spin text-sky-300" aria-hidden="true" /> : null}
         {isSuccess ? <CheckCircle2 className="size-4 text-emerald-400" aria-hidden="true" /> : null}

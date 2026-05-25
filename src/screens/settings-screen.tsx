@@ -523,7 +523,7 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
       <section className="min-h-0 overflow-auto">
         <div className="mx-auto flex w-full max-w-4xl flex-col px-6 pb-24 pt-10 sm:px-8 lg:px-12 lg:pt-20">
           <header className="mb-10">
-            <div className="mb-3 flex size-10 items-center justify-center rounded-lg border border-[color:var(--app-border)] bg-[var(--app-surface)] text-muted-foreground">
+            <div className="mb-3 flex size-10 items-center justify-center rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] text-muted-foreground">
               <ActiveGroupIcon className="size-5" aria-hidden="true" />
             </div>
             <h1 className="text-2xl font-semibold tracking-tight">{activeSettingsGroup.label}</h1>
@@ -664,7 +664,7 @@ function ThemeDropdown({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          className="h-auto w-full min-w-0 justify-between rounded-xl px-3 py-2 sm:w-[28rem]"
+          className="h-auto w-full min-w-0 justify-between rounded-md px-3 py-2 sm:w-[28rem]"
           type="button"
           variant="outline"
         >
@@ -678,14 +678,14 @@ function ThemeDropdown({
       >
         {themes.map((theme) => (
           <DropdownMenuItem
-            className="grid cursor-default grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-lg p-2"
+            className="grid cursor-default grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-md p-2"
             key={theme.id}
             onSelect={() => setThemeId(theme.id as ThemeId)}
           >
             <ThemeSelectSummary theme={theme} />
             <span
               className={cn(
-                "mt-1 flex size-5 items-center justify-center rounded-full border text-primary",
+                "mt-1 flex size-5 items-center justify-center rounded border text-primary",
                 themeId === theme.id
                   ? "border-primary/50 bg-primary/10"
                   : "border-border text-transparent",
@@ -710,7 +710,7 @@ function ThemeSelectSummary({
     <span className="grid min-w-0 flex-1 gap-2 text-left">
       <span className="flex min-w-0 items-center gap-3">
         <span
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-card text-sm font-semibold shadow-xs"
+          className="flex size-8 shrink-0 items-center justify-center rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] text-sm font-semibold shadow-none"
           style={{ color: theme.swatch }}
         >
           Aa
@@ -1595,7 +1595,7 @@ function ImportSuiKeyDialog({
           <LabeledField label="Secret input">
             <textarea
               autoComplete="off"
-              className="min-h-28 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              className="min-h-28 w-full rounded-md border border-input bg-[var(--app-panel)] px-3 py-2 text-sm shadow-none outline-none focus-visible:border-ring focus-visible:ring-[2px] focus-visible:ring-ring/35"
               onChange={(event) => setInputString(event.target.value)}
               value={inputString}
             />
@@ -1853,7 +1853,7 @@ function SecretRevealDialog({
           </DialogDescription>
         </DialogHeader>
         <textarea
-          className="min-h-28 w-full rounded-md border border-input bg-muted px-3 py-2 font-mono text-sm shadow-xs outline-none"
+          className="min-h-28 w-full rounded-md border border-input bg-[var(--app-panel)] px-3 py-2 font-mono text-sm shadow-none outline-none"
           readOnly
           value={revealedSecret?.secret ?? ""}
         />
@@ -2342,7 +2342,7 @@ function SettingsNavButton({
     <button
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex min-w-[12rem] items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition lg:min-w-0",
+        "flex min-w-[12rem] items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition lg:min-w-0",
         active
           ? "bg-accent text-foreground"
           : "text-muted-foreground hover:bg-accent/55 hover:text-foreground",
@@ -2369,7 +2369,7 @@ function SettingsSection({
   return (
     <section className="mb-10">
       <h2 className="mb-3 text-[13px] font-medium text-muted-foreground">{title}</h2>
-      <div className="-mx-4 overflow-hidden rounded-2xl border border-border/70 bg-card">
+      <div className="-mx-4 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
         {children}
       </div>
     </section>
@@ -2407,7 +2407,7 @@ function SettingsRow({
 
 function SegmentedControl({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-flow-col auto-cols-fr gap-1 rounded-lg border bg-muted p-1">
+    <div className="grid grid-flow-col auto-cols-fr gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-1">
       {children}
     </div>
   );

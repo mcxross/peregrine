@@ -271,42 +271,43 @@ const palettes: Record<string, Palette> = {
 
 const destructive = palettes.red[600];
 const darkDestructive = palettes.red[400];
+const darkPrimary = "oklch(0.76 0.16 166)";
 
 function makeTokens(palette: Palette, neutral: Palette, mode: "light" | "dark"): ThemeTokens {
   const light = mode === "light";
 
   return {
-    background: light ? "oklch(1 0 0)" : neutral[950],
-    foreground: light ? neutral[950] : neutral[50],
-    card: light ? "oklch(1 0 0)" : neutral[900],
-    cardForeground: light ? neutral[950] : neutral[50],
-    popover: light ? "oklch(1 0 0)" : neutral[900],
+    background: light ? "oklch(1 0 0)" : "oklch(0.118 0.003 286)",
+    foreground: light ? neutral[950] : "oklch(0.94 0.004 286)",
+    card: light ? "oklch(1 0 0)" : "oklch(0.165 0.004 286)",
+    cardForeground: light ? neutral[950] : "oklch(0.94 0.004 286)",
+    popover: light ? "oklch(1 0 0)" : "oklch(0.18 0.004 286)",
     popoverForeground: light ? neutral[950] : neutral[50],
-    primary: light ? palette[600] : palette[300],
+    primary: light ? palette[600] : darkPrimary,
     primaryForeground: light ? "oklch(0.985 0 0)" : neutral[950],
-    secondary: light ? neutral[100] : neutral[800],
+    secondary: light ? neutral[100] : "oklch(0.225 0.005 286)",
     secondaryForeground: light ? neutral[900] : neutral[50],
-    muted: light ? neutral[100] : neutral[800],
-    mutedForeground: light ? neutral[500] : neutral[400],
-    accent: light ? palette[100] : palette[800],
-    accentForeground: light ? palette[900] : palette[50],
+    muted: light ? neutral[100] : "oklch(0.225 0.005 286)",
+    mutedForeground: light ? neutral[500] : "oklch(0.68 0.012 286)",
+    accent: light ? palette[100] : "oklch(0.24 0.006 286)",
+    accentForeground: light ? palette[900] : "oklch(0.95 0.004 286)",
     destructive: light ? destructive : darkDestructive,
-    border: light ? neutral[200] : "oklch(1 0 0 / 10%)",
-    input: light ? neutral[200] : "oklch(1 0 0 / 15%)",
-    ring: light ? palette[500] : palette[400],
+    border: light ? neutral[200] : "oklch(1 0 0 / 9%)",
+    input: light ? neutral[200] : "oklch(1 0 0 / 12%)",
+    ring: light ? palette[500] : darkPrimary,
     chart1: palette[600],
     chart2: palette[500],
     chart3: palette[400],
     chart4: neutral[600],
     chart5: neutral[400],
-    sidebar: light ? neutral[50] : neutral[900],
+    sidebar: light ? neutral[50] : "oklch(0.145 0.004 286)",
     sidebarForeground: light ? neutral[950] : neutral[50],
-    sidebarPrimary: light ? palette[600] : palette[300],
+    sidebarPrimary: light ? palette[600] : darkPrimary,
     sidebarPrimaryForeground: light ? "oklch(0.985 0 0)" : neutral[950],
-    sidebarAccent: light ? palette[100] : neutral[800],
+    sidebarAccent: light ? palette[100] : "oklch(0.225 0.005 286)",
     sidebarAccentForeground: light ? palette[900] : neutral[50],
-    sidebarBorder: light ? neutral[200] : "oklch(1 0 0 / 10%)",
-    sidebarRing: light ? palette[500] : palette[400],
+    sidebarBorder: light ? neutral[200] : "oklch(1 0 0 / 9%)",
+    sidebarRing: light ? palette[500] : darkPrimary,
   };
 }
 

@@ -335,7 +335,7 @@ function ObjectOwnershipTreeScreen({
                   aria-pressed={active}
                   className={cn(
                     "grid min-w-0 gap-1 rounded px-2 py-2 text-left transition hover:bg-[var(--app-subtle)]",
-                    active && "bg-[var(--app-subtle)] text-foreground shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--primary)_32%,transparent)]",
+                    active && "border-primary/35 bg-[var(--app-subtle)] text-foreground shadow-none",
                     !active && "text-muted-foreground",
                   )}
                   key={tab.kind}
@@ -346,7 +346,7 @@ function ObjectOwnershipTreeScreen({
                   <span className="flex min-w-0 items-center justify-between gap-2">
                     <TabIcon className="size-3.5 shrink-0" aria-hidden="true" />
                     <span className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                      "rounded px-1.5 py-0.5 text-[10px] font-semibold",
                       active ? tab.activeCountClassName : "bg-[var(--app-subtle)] text-muted-foreground",
                     )}>
                       {tab.count}
@@ -573,7 +573,7 @@ function ObjectTreeItem({
       className={[
         "group relative grid min-h-9 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 py-1.5 text-left transition",
         selected
-          ? "bg-primary/15 text-primary shadow-[inset_3px_0_0_var(--primary)]"
+          ? "border-l-2 border-primary bg-primary/15 text-primary shadow-none"
           : "text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground",
       ].join(" ")}
       onClick={onSelect}
@@ -744,7 +744,7 @@ function CapabilityOverview({ movePackage }: { movePackage: MovePackage | null }
 
   return (
     <div className="grid h-full min-h-0 place-items-center bg-[var(--app-window)] p-6">
-      <div className="w-full max-w-xl rounded-lg border border-[color:var(--app-border)] bg-[var(--app-panel)] p-5">
+      <div className="w-full max-w-xl rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-5">
         <div className="flex items-center gap-3">
           <span className="grid size-10 place-items-center rounded-md bg-amber-500/10 text-amber-200">
             <KeyRound className="size-5" aria-hidden="true" />

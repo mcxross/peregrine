@@ -18,7 +18,7 @@ export function MoveSourceUnavailableNotice({
   const notice = (
     <div
       className={cn(
-        "grid max-w-xl grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-md border border-[color:var(--app-border)] bg-card p-4 text-left shadow-sm",
+        "grid max-w-xl grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-4 text-left shadow-none",
         variant === "inline" && "max-w-[640px] p-3",
       )}
     >

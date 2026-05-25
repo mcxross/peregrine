@@ -59,7 +59,7 @@ function RecentProjectRow({
   onRemove?: () => void;
 }) {
   return (
-    <div className="group grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-md border bg-card text-card-foreground shadow-xs">
+    <div className="group grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] text-card-foreground shadow-none">
       <Button
         type="button"
         onClick={onOpen}
@@ -68,7 +68,7 @@ function RecentProjectRow({
         title={`${project.name} - ${project.packagePath}`}
       >
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] text-muted-foreground">
             <Package className="size-4.5" aria-hidden="true" />
           </div>
           <div className="min-w-0">

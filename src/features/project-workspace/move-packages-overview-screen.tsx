@@ -979,14 +979,14 @@ function AnalyzerResultsMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 text-[11px] font-semibold text-amber-300 outline-none transition hover:border-amber-400/45 hover:bg-amber-500/15 focus-visible:ring-[3px] focus-visible:ring-amber-400/20"
+          className="inline-flex h-7 shrink-0 items-center justify-center rounded border border-amber-500/25 bg-amber-500/10 px-2.5 text-[11px] font-semibold text-amber-300 outline-none transition-colors hover:border-amber-400/45 hover:bg-amber-500/15 focus-visible:ring-[2px] focus-visible:ring-amber-400/20"
           title={`${highlights.length} complex ${highlights.length === 1 ? "function" : "functions"} highlighted`}
           type="button"
         >
           {highlights.length} complex
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 border-[color:var(--app-border)] bg-[var(--app-elevated)] p-1">
+      <DropdownMenuContent align="end" className="w-80 border-[color:var(--app-border)] bg-[var(--popover)] p-1">
         <DropdownMenuLabel className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Scan Results
         </DropdownMenuLabel>
@@ -1005,7 +1005,7 @@ function AnalyzerResultsMenu({
                 Lines {highlight.startLine}-{highlight.endLine}
               </span>
             </span>
-            <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-300">
+            <span className="rounded border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-300">
               {highlight.score}
               {highlight.threshold == null ? "" : ` / ${highlight.threshold}`}
             </span>

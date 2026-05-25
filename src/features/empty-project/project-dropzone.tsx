@@ -18,8 +18,8 @@ export function ProjectDropzone({
 }: ProjectDropzoneProps) {
   return (
     <Card className="mx-auto w-full max-w-[640px] rounded-md p-4 shadow-none">
-      <div className="flex min-h-[248px] flex-col items-center justify-center rounded-md border border-dashed border-muted-foreground/30 bg-[var(--app-surface)] px-8 py-7 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] sm:min-h-[328px]">
-        <div className="flex size-14 shrink-0 items-center justify-center rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+      <div className="flex min-h-[248px] flex-col items-center justify-center rounded-md border border-dashed border-muted-foreground/30 bg-[var(--app-panel)] px-8 py-7 text-center shadow-none sm:min-h-[328px]">
+        <div className="flex size-14 shrink-0 items-center justify-center rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] text-muted-foreground shadow-none">
           <FolderOpen className="size-7" aria-hidden="true" />
         </div>
 

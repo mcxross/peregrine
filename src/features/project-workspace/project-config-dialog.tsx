@@ -349,7 +349,7 @@ function TestsConfigSection({
   onDraftMoveTestScriptPathChange: (path: string) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-[color:var(--app-border)] bg-[var(--app-panel)]">
+    <div className="overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)]">
       <ConfigRow
         description={
           <>
@@ -403,7 +403,7 @@ function CoverageConfigSection({
   onDraftMoveCoverageScriptPathChange: (path: string) => void;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-[color:var(--app-border)] bg-[var(--app-panel)]">
+    <div className="overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)]">
       <ConfigRow
         description="Runs the full coverage flow."
         label="Coverage script"
@@ -448,7 +448,7 @@ function CommandsConfigSection({
   packageTree: PackageTree;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-[color:var(--app-border)] bg-[var(--app-panel)]">
+    <div className="overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)]">
       <ConfigRow label="Package">
         <ReadOnlyValue value={displayMovePackageName(activeMovePackage?.name ?? packageTree.rootName)} />
       </ConfigRow>

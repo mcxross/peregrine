@@ -78,7 +78,7 @@ function getInitialMode(): ThemeMode {
   const storedMode = window.localStorage.getItem(modeStorageKey);
   return storedMode === "light" || storedMode === "dark" || storedMode === "system"
     ? storedMode
-    : "system";
+    : "dark";
 }
 
 function getSystemMode(): "light" | "dark" {
@@ -101,14 +101,14 @@ function applyTheme(theme: AppTheme, mode: "light" | "dark") {
     root.style.setProperty(cssProperty, tokens[tokenName as keyof ThemeTokens]);
   });
 
-  root.style.setProperty("--app-window", "color-mix(in oklch, var(--background) 94%, var(--card))");
-  root.style.setProperty("--app-chrome", "color-mix(in oklch, var(--background) 90%, var(--card))");
-  root.style.setProperty("--app-panel", "color-mix(in oklch, var(--background) 92%, var(--card))");
-  root.style.setProperty("--app-panel-strong", "color-mix(in oklch, var(--background) 86%, var(--card))");
-  root.style.setProperty("--app-surface", "color-mix(in oklch, var(--card) 90%, var(--background))");
-  root.style.setProperty("--app-elevated", "color-mix(in oklch, var(--card) 82%, var(--popover))");
-  root.style.setProperty("--app-subtle", "color-mix(in oklch, var(--muted) 68%, var(--card))");
-  root.style.setProperty("--app-border", "color-mix(in oklch, var(--border) 84%, transparent)");
+  root.style.setProperty("--app-window", "color-mix(in oklch, var(--background) 97%, black 3%)");
+  root.style.setProperty("--app-chrome", "color-mix(in oklch, var(--background) 88%, var(--card))");
+  root.style.setProperty("--app-panel", "color-mix(in oklch, var(--background) 78%, var(--card))");
+  root.style.setProperty("--app-panel-strong", "color-mix(in oklch, var(--background) 66%, var(--card))");
+  root.style.setProperty("--app-surface", "color-mix(in oklch, var(--background) 58%, var(--card))");
+  root.style.setProperty("--app-elevated", "color-mix(in oklch, var(--card) 72%, var(--muted))");
+  root.style.setProperty("--app-subtle", "color-mix(in oklch, var(--muted) 48%, var(--card))");
+  root.style.setProperty("--app-border", "color-mix(in oklch, var(--border) 92%, transparent)");
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

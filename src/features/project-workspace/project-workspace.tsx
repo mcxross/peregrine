@@ -638,7 +638,7 @@ function WorkspaceModeSwitch({
   return (
     <Button
       aria-label={isSecurityMode ? "Open editor workspace" : "Back to security workspace"}
-      className="h-8 shrink-0 gap-1.5 rounded bg-[var(--app-elevated)] px-3 text-xs font-medium text-foreground shadow-sm hover:bg-[var(--app-elevated)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
+      className="h-8 shrink-0 gap-1.5 rounded bg-[var(--app-panel)] px-3 text-xs font-medium text-foreground shadow-none hover:bg-[var(--app-subtle)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
       onClick={onToggleMode}
       title={label}
       type="button"
@@ -672,7 +672,7 @@ function ExploreTabSwitch({
   return (
     <div
       aria-label="Explore sections"
-      className="inline-flex h-10 w-fit shrink-0 justify-self-start overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-1 shadow-sm"
+      className="inline-flex h-10 w-fit shrink-0 justify-self-start overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-1 shadow-none"
     >
       {exploreTabs.map((tab) => {
         const Icon = tab.icon;
@@ -683,7 +683,7 @@ function ExploreTabSwitch({
             aria-pressed={active}
             className={cn(
               "inline-flex h-full min-w-0 items-center justify-center gap-1.5 rounded px-3 text-xs font-medium leading-none text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
-              active && "bg-[var(--app-elevated)] text-foreground shadow-sm",
+              active && "bg-[var(--app-elevated)] text-foreground shadow-none",
             )}
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
@@ -902,7 +902,7 @@ function ProjectSwitcher({
         aria-expanded={isOpen}
         aria-haspopup="menu"
         className={cn(
-          "relative grid h-9 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2.5 pl-3 text-left text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.055),0_0_0_1px_rgba(255,255,255,0.018)] hover:border-primary/35 hover:bg-[var(--app-subtle)] hover:text-foreground",
+          "relative grid h-9 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2.5 pl-3 text-left text-muted-foreground shadow-none hover:border-primary/35 hover:bg-[var(--app-subtle)] hover:text-foreground",
           isOpen && "border-primary/45 bg-[var(--app-subtle)]",
         )}
         disabled={!hasMultiplePackages}
@@ -913,7 +913,7 @@ function ProjectSwitcher({
       >
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-1 left-1 w-px rounded-full bg-primary/50"
+          className="pointer-events-none absolute inset-y-1 left-1 w-px rounded bg-primary/50"
         />
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="min-w-0 truncate text-sm font-semibold leading-5 text-foreground">
@@ -934,7 +934,7 @@ function ProjectSwitcher({
 
       {isOpen && hasMultiplePackages ? (
         <div
-          className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-1 shadow-xl"
+          className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--popover)] p-1 shadow-[0_12px_30px_rgba(0,0,0,0.34)]"
           role="menu"
         >
           {packages.map((movePackage) => {
@@ -1035,7 +1035,7 @@ function MetricBadge({
     <Badge
       variant="secondary"
       className={cn(
-        "min-w-6 rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
+        "min-w-6 rounded px-1.5 py-0.5 text-[11px] font-semibold",
         tone === "success" && "bg-emerald-500/15 text-emerald-400",
         tone === "danger" && "bg-red-500/15 text-red-400",
         tone === "warning" && "bg-amber-500/15 text-amber-400",

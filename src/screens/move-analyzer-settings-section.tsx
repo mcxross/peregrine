@@ -44,7 +44,7 @@ export function MoveAnalyzerSettingsSection({
   return (
     <section className="mb-10">
       <h2 className="mb-3 text-[13px] font-medium text-muted-foreground">Move Analyzer</h2>
-      <div className="-mx-4 overflow-hidden rounded-2xl border border-border/70 bg-card">
+      <div className="-mx-4 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
         <SettingsRow
           label="Source"
           description={moveAnalyzerSourceLabel(effectiveSource)}
@@ -171,7 +171,7 @@ function SettingsRow({
 
 function SegmentedControl({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-flow-col auto-cols-fr gap-1 rounded-lg border bg-muted p-1">
+    <div className="grid grid-flow-col auto-cols-fr gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-1">
       {children}
     </div>
   );
@@ -229,4 +229,3 @@ function ToolSourceStatusRow({
 function moveAnalyzerSourceLabel(source: MoveAnalyzerAdapterSource) {
   return source === "bundledLibrary" ? "Bundled library" : "User installed";
 }
-

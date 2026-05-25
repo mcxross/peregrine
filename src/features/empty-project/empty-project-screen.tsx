@@ -213,7 +213,7 @@ export function EmptyProjectScreen({
   }
 
   return (
-    <div className="grid h-full min-h-0 place-items-center overflow-auto bg-background px-6 py-5">
+    <div className="grid h-full min-h-0 place-items-center overflow-auto bg-[var(--app-window)] px-6 py-5">
       <div className="flex max-h-full w-full max-w-[660px] flex-col items-stretch gap-4">
         <ProjectDropzone
           onCreateProject={() => setIsCreateProjectOpen(true)}
@@ -254,7 +254,7 @@ export function EmptyProjectScreen({
           />
         </Dialog>
         {loadError ? (
-          <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {loadError}
           </p>
         ) : null}
@@ -642,7 +642,7 @@ function PackageLoadSelection({
                 onClick={() => onSelectPackage(movePackage)}
                 type="button"
               >
-                <Card className="h-full min-w-0 gap-0 rounded-md p-4 transition group-hover:border-primary/60 group-hover:bg-[var(--app-subtle)]">
+                <Card className="h-full min-w-0 gap-0 rounded-md p-4 transition-colors group-hover:border-primary/60 group-hover:bg-[var(--app-subtle)]">
                   <div className="flex min-w-0 items-start gap-3">
                     <Package className="mt-0.5 size-5 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
                     <div className="min-w-0">
