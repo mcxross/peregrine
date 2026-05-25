@@ -82,7 +82,7 @@ export function AppShell({
   onCloseSettings,
   onProjectSelected,
 }: AppShellProps) {
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTab>("Overview");
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTab>("Explore");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("security");
   const [activePackageManifestPath, setActivePackageManifestPath] = useState<string | null>(null);
   const [buildRuns, setBuildRuns] = useState<BuildLogRun[]>([]);

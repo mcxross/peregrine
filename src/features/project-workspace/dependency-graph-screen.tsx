@@ -1,9 +1,7 @@
 import React from "react";
-import { Boxes, Network, Workflow } from "lucide-react";
 
 import type {
   MoveCallGraph,
-  MoveCallGraphNode,
   MovePackage,
   MoveProjectGraphs,
   MoveTypeGraphNode,
@@ -39,11 +37,12 @@ const CollapsedTypeGraphPanel = React.lazy(() =>
   })),
 );
 
-type OverviewGraphMode = "calls" | "dependencies" | "types";
+export type ExploreGraphMode = "calls" | "dependencies" | "types";
 
 type DependencyGraphScreenProps = {
   activeMovePackage: MovePackage | null;
   callGraph: MoveCallGraph;
+  graphMode: ExploreGraphMode;
   graph: PackageDependencyGraph;
   isDependencyGraphLoading?: boolean;
   onMoveGraphsLoaded?: (graphs: MoveProjectGraphs) => void;
@@ -57,6 +56,7 @@ export function DependencyGraphScreen({
   activeMovePackage,
   callGraph,
   graph,
+  graphMode,
   isDependencyGraphLoading = false,
   onMoveGraphsLoaded,
   onOpenSourceLocation,
@@ -64,7 +64,6 @@ export function DependencyGraphScreen({
   rootPath,
   typeGraph,
 }: DependencyGraphScreenProps) {
-  const [graphMode, setGraphMode] = React.useState<OverviewGraphMode>("dependencies");
   const [isTypePanelOpen, setIsTypePanelOpen] = React.useState(true);
   const [selectedTypeId, setSelectedTypeId] = React.useState<string | null>(null);
   const [loadedMoveGraphs, setLoadedMoveGraphs] = React.useState<MoveProjectGraphs | null>(null);
@@ -95,13 +94,6 @@ export function DependencyGraphScreen({
 
     return packageTypeCount(activeMovePackage);
   }, [activeMovePackage, activeTypeGraph.nodes, typeGraphReady]);
-  const callCount = React.useMemo(() => {
-    if (callGraphReady) {
-      return selectableCallFunctionCount(activeCallGraph.nodes, activeMovePackage);
-    }
-
-    return packageFunctionCount(activeMovePackage);
-  }, [activeCallGraph.nodes, activeMovePackage, callGraphReady]);
   const navigatorTypeCount = React.useMemo(
     () => (typeGraphReady ? typeNavigatorCount(activeTypeGraph.nodes) : typeCount),
     [activeTypeGraph.nodes, typeCount, typeGraphReady],
@@ -175,31 +167,17 @@ export function DependencyGraphScreen({
     }
   }, [firstTypeId, graphMode, selectedTypeExists, selectedTypeId, typeGraphReady]);
 
-  const selectGraphMode = React.useCallback(
-    (nextMode: OverviewGraphMode) => {
-      setGraphMode(nextMode);
-
-      if (nextMode === "types" && typeGraphReady) {
-        setSelectedTypeId((current) =>
-          current && selectedTypeExists(current) ? current : firstTypeId,
-        );
-      }
-    },
-    [firstTypeId, selectedTypeExists, typeGraphReady],
-  );
+  React.useEffect(() => {
+    if (graphMode === "types" && typeGraphReady) {
+      setSelectedTypeId((current) =>
+        current && selectedTypeExists(current) ? current : firstTypeId,
+      );
+    }
+  }, [firstTypeId, graphMode, selectedTypeExists, typeGraphReady]);
 
   return (
-    <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
-      <div className="row-start-1 flex min-w-0 justify-start px-5 pb-2 pt-2">
-        <OverviewGraphModeSwitch
-          callCount={callCount}
-          mode={graphMode}
-          onModeChange={selectGraphMode}
-          typeCount={typeCount}
-        />
-      </div>
-
-      <div className="row-start-2 min-h-0 px-5 pb-3">
+    <section className="h-full min-h-0 overflow-hidden bg-[var(--app-window)]">
+      <div className="h-full min-h-0 px-5 pb-3">
         {graphMode === "dependencies" && sourceUnavailableMessage ? (
           <MoveSourceUnavailableNotice
             message={sourceUnavailableMessage}
@@ -306,77 +284,6 @@ export function DependencyGraphScreen({
   );
 }
 
-function OverviewGraphModeSwitch({
-  callCount,
-  mode,
-  onModeChange,
-  typeCount,
-}: {
-  callCount: number;
-  mode: OverviewGraphMode;
-  onModeChange: (mode: OverviewGraphMode) => void;
-  typeCount: number;
-}) {
-  return (
-    <div className="grid h-8 shrink-0 grid-cols-3 rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-0.5 shadow-sm">
-      <GraphModeButton
-        active={mode === "dependencies"}
-        icon={Network}
-        label="Dependencies"
-        onClick={() => onModeChange("dependencies")}
-      />
-      <GraphModeButton
-        active={mode === "types"}
-        count={typeCount}
-        icon={Boxes}
-        label="Types"
-        onClick={() => onModeChange("types")}
-      />
-      <GraphModeButton
-        active={mode === "calls"}
-        count={callCount}
-        icon={Workflow}
-        label="Calls"
-        onClick={() => onModeChange("calls")}
-      />
-    </div>
-  );
-}
-
-function GraphModeButton({
-  active,
-  count,
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  count?: number;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      aria-pressed={active}
-      className={cn(
-        "inline-flex h-7 min-w-0 items-center justify-center gap-1.5 rounded px-2.5 text-xs font-medium leading-none text-muted-foreground transition hover:text-foreground",
-        active && "bg-[var(--app-elevated)] text-foreground shadow-sm",
-      )}
-      onClick={onClick}
-      type="button"
-    >
-      <Icon className="size-3.5 shrink-0" aria-hidden="true" />
-      <span>{label}</span>
-      {typeof count === "number" ? (
-        <span className={cn("rounded bg-muted px-1 py-0.5 text-[10px] leading-none", active && "bg-sky-500/15 text-sky-200")}>
-          {count}
-        </span>
-      ) : null}
-    </button>
-  );
-}
-
 function GraphLoadingState({ label = "Loading graph..." }: { label?: string }) {
   return (
     <div className="flex h-full min-h-0 items-center justify-center rounded-md border border-[color:var(--app-border)] bg-card text-sm text-muted-foreground">
@@ -467,20 +374,6 @@ function hasCallGraphPayload(graph: MoveCallGraph, movePackage: MovePackage | nu
 
   return graph.nodes.some((node) => node.packagePath === movePackage.path)
     || graph.unresolvedCalls.some((call) => graph.nodes.some((node) => node.id === call.source && node.packagePath === movePackage.path));
-}
-
-function selectableCallFunctionCount(nodes: MoveCallGraphNode[], movePackage: MovePackage | null) {
-  const packagePath = movePackage?.path ?? null;
-
-  if (packagePath === null) {
-    return nodes.filter((node) => !node.isExternal && !node.id.startsWith("unresolved:call:")).length;
-  }
-
-  return nodes.filter((node) => node.packagePath === packagePath).length;
-}
-
-function packageFunctionCount(movePackage: MovePackage | null) {
-  return movePackage?.modules.reduce((total, module) => total + module.functions.length, 0) ?? 0;
 }
 
 function selectableTypes(nodes: MoveTypeGraphNode[], movePackage: MovePackage | null) {

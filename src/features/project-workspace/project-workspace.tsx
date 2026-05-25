@@ -5,6 +5,7 @@ import {
   Bot,
   Check,
   ChevronDown,
+  FileCode2,
   Gauge,
   GitBranch,
   Link2,
@@ -43,6 +44,7 @@ import type { AuditReportExport } from "@/features/agents/types";
 import { assessmentSidebarItems } from "@/features/project-workspace/package-load-assessment-cards";
 import type { PackageLoadAssessment } from "@/features/project-workspace/package-load-assessment";
 import type { SelectedMoveModule } from "@/features/project-workspace/module-signature-screen";
+import type { ExploreGraphMode } from "@/features/project-workspace/dependency-graph-screen";
 import { findSourceModule } from "@/features/project-workspace/source-paths";
 import type { TypeGraphSourceLocation } from "@/features/project-workspace/type-graph-view";
 import type { SurfaceDetailKind } from "@/features/project-workspace/surface-detail-screen";
@@ -110,6 +112,8 @@ type ProjectWorkspaceProps = {
 export type SourceJumpRequest = TypeGraphSourceLocation & {
   token: number;
 };
+
+type ExploreTab = "code" | "bytecode" | ExploreGraphMode;
 
 type WorkspaceErrorBoundaryProps = {
   children: React.ReactNode;
@@ -189,6 +193,7 @@ export function ProjectWorkspace({
   packageTree,
 }: ProjectWorkspaceProps) {
   const [isRightPanelOpen, setIsRightPanelOpen] = React.useState(true);
+  const [activeExploreTab, setActiveExploreTab] = React.useState<ExploreTab>("code");
   const [selectedModule, setSelectedModule] = React.useState<SelectedMoveModule | null>(null);
   const [activeSurfaceDetail, setActiveSurfaceDetail] = React.useState<SurfaceDetailKind | null>(null);
   const [sourceJumpRequest, setSourceJumpRequest] = React.useState<SourceJumpRequest | null>(null);
@@ -200,7 +205,9 @@ export function ProjectWorkspace({
         ) ?? null;
   const packageName = activeMovePackage?.name || packageTree.rootName || packageTree.movePackages[0]?.name || "savings_personal";
   const isEditorMode = mode === "editor";
-  const hasInspectorColumn = activeWorkspaceTab !== "Bytecode" && activeWorkspaceTab !== "Agents";
+  const hasInspectorColumn =
+    activeWorkspaceTab !== "Agents"
+    && !(activeWorkspaceTab === "Explore" && activeExploreTab === "bytecode");
   const workspaceColumns = isEditorMode
     ? "minmax(0, 1fr)"
     : isLeftPanelOpen
@@ -241,10 +248,14 @@ export function ProjectWorkspace({
   }, [activeMovePackage]);
 
   React.useEffect(() => {
-    if (activeWorkspaceTab === "Overview" || activeWorkspaceTab === "Execution" || activeWorkspaceTab === "Bytecode" || activeWorkspaceTab === "Agents") {
+    if (
+      activeWorkspaceTab === "Agents"
+      || activeWorkspaceTab === "Execution"
+      || (activeWorkspaceTab === "Explore" && activeExploreTab !== "code")
+    ) {
       setIsRightPanelOpen(false);
     }
-  }, [activeWorkspaceTab]);
+  }, [activeExploreTab, activeWorkspaceTab]);
 
   React.useEffect(() => {
     const onError = (event: ErrorEvent) => {
@@ -322,6 +333,7 @@ export function ProjectWorkspace({
         line: location.line,
         token: Date.now(),
       });
+      setActiveExploreTab("code");
       onWorkspaceTabChange("Explore");
     },
     [activePackageManifestPath, onActivePackageManifestPathChange, onWorkspaceTabChange, packageTree.movePackages],
@@ -368,6 +380,7 @@ export function ProjectWorkspace({
           <React.Suspense fallback={<WorkspacePanelLoadingState />}>
             <WorkspaceMainPanel
               activeWorkspaceTab={activeWorkspaceTab}
+              activeExploreTab={activeExploreTab}
               activeSurfaceDetail={activeSurfaceDetail}
               activeMovePackage={activeMovePackage}
               isDependencyGraphLoading={isDependencyGraphLoading}
@@ -379,6 +392,7 @@ export function ProjectWorkspace({
               onAuditReportExportReady={onAuditReportExportReady}
               onCommandLog={onCommandLog}
               onProjectSelected={onProjectSelected}
+              onExploreTabChange={setActiveExploreTab}
               onClearSelectedModule={() => setSelectedModule(null)}
               onOpenSourceLocation={openSourceLocation}
               onSelectModule={(movePackage, moveModule) => {
@@ -428,6 +442,7 @@ function WorkspacePanelLoadingState() {
 
 function WorkspaceMainPanel({
   activeWorkspaceTab,
+  activeExploreTab,
   activeSurfaceDetail,
   activeMovePackage,
   isDependencyGraphLoading,
@@ -435,6 +450,7 @@ function WorkspaceMainPanel({
   network,
   onClearSelectedModule,
   onAuditReportExportReady,
+  onExploreTabChange,
   onOpenSourceLocation,
   onSelectModule,
   packageTree,
@@ -445,6 +461,7 @@ function WorkspaceMainPanel({
   onCommandLog,
 }: {
   activeWorkspaceTab: WorkspaceTab;
+  activeExploreTab: ExploreTab;
   activeSurfaceDetail: SurfaceDetailKind | null;
   activeMovePackage: MovePackage | null;
   isDependencyGraphLoading: boolean;
@@ -453,6 +470,7 @@ function WorkspaceMainPanel({
   onClearSelectedModule: () => void;
   onAuditReportExportReady?: (report: AuditReportExport | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
+  onExploreTabChange: (tab: ExploreTab) => void;
   onOpenSourceLocation: (location: TypeGraphSourceLocation) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
   onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
@@ -474,19 +492,6 @@ function WorkspaceMainPanel({
 
   if (activeSurfaceDetail) {
     return <SurfaceDetailScreen detail={activeSurfaceDetail} movePackage={activeMovePackage} />;
-  }
-
-  if (activeWorkspaceTab === "Explore") {
-    return (
-      <MovePackagesOverviewScreen
-        activeMovePackage={activeMovePackage}
-        packageTree={packageTree}
-        onClearSelectedModule={onClearSelectedModule}
-        onSelectModule={onSelectModule}
-        selectedModule={selectedModule}
-        sourceJumpRequest={sourceJumpRequest}
-      />
-    );
   }
 
   if (activeWorkspaceTab === "Execution") {
@@ -512,34 +517,143 @@ function WorkspaceMainPanel({
     );
   }
 
-  if (activeWorkspaceTab === "Bytecode") {
-    return (
-      <BytecodeViewScreen
-        activeMovePackage={activeMovePackage}
-        packageTree={packageTree}
-      />
-    );
-  }
-
   return (
-    <DependencyGraphScreen
+    <ExploreMainPanel
+      activeExploreTab={activeExploreTab}
       activeMovePackage={activeMovePackage}
-      callGraph={packageTree.callGraph}
-      graph={packageTree.dependencyGraph}
       isDependencyGraphLoading={isDependencyGraphLoading}
-      onMoveGraphsLoaded={(graphs) =>
-        onProjectSelected({
-          ...packageTree,
-          callGraph: graphs.callGraph,
-          typeGraph: graphs.typeGraph,
-          stateAccessGraph: graphs.stateAccessGraph,
-        })
-      }
+      onClearSelectedModule={onClearSelectedModule}
+      onExploreTabChange={onExploreTabChange}
       onOpenSourceLocation={onOpenSourceLocation}
+      onProjectSelected={onProjectSelected}
+      onSelectModule={onSelectModule}
       packageName={packageName}
-      rootPath={packageTree.rootPath}
-      typeGraph={packageTree.typeGraph}
+      packageTree={packageTree}
+      selectedModule={selectedModule}
+      sourceJumpRequest={sourceJumpRequest}
     />
+  );
+}
+
+function ExploreMainPanel({
+  activeExploreTab,
+  activeMovePackage,
+  isDependencyGraphLoading,
+  onClearSelectedModule,
+  onExploreTabChange,
+  onOpenSourceLocation,
+  onProjectSelected,
+  onSelectModule,
+  packageName,
+  packageTree,
+  selectedModule,
+  sourceJumpRequest,
+}: {
+  activeExploreTab: ExploreTab;
+  activeMovePackage: MovePackage | null;
+  isDependencyGraphLoading: boolean;
+  onClearSelectedModule: () => void;
+  onExploreTabChange: (tab: ExploreTab) => void;
+  onOpenSourceLocation: (location: TypeGraphSourceLocation) => void;
+  onProjectSelected: (packageTree: PackageTree) => void;
+  onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
+  packageName: string;
+  packageTree: PackageTree;
+  selectedModule: SelectedMoveModule | null;
+  sourceJumpRequest: SourceJumpRequest | null;
+}) {
+  return (
+    <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
+      <div className="row-start-1 flex min-w-0 justify-start px-5 pb-2 pt-2">
+        <ExploreTabSwitch activeTab={activeExploreTab} onTabChange={onExploreTabChange} />
+      </div>
+
+      <div className="row-start-2 min-h-0 overflow-hidden">
+        {activeExploreTab === "code" ? (
+          <MovePackagesOverviewScreen
+            activeMovePackage={activeMovePackage}
+            packageTree={packageTree}
+            onClearSelectedModule={onClearSelectedModule}
+            onSelectModule={onSelectModule}
+            selectedModule={selectedModule}
+            sourceJumpRequest={sourceJumpRequest}
+          />
+        ) : activeExploreTab === "bytecode" ? (
+          <BytecodeViewScreen
+            activeMovePackage={activeMovePackage}
+            packageTree={packageTree}
+          />
+        ) : (
+          <DependencyGraphScreen
+            activeMovePackage={activeMovePackage}
+            callGraph={packageTree.callGraph}
+            graph={packageTree.dependencyGraph}
+            graphMode={activeExploreTab}
+            isDependencyGraphLoading={isDependencyGraphLoading}
+            onMoveGraphsLoaded={(graphs) =>
+              onProjectSelected({
+                ...packageTree,
+                callGraph: graphs.callGraph,
+                typeGraph: graphs.typeGraph,
+                stateAccessGraph: graphs.stateAccessGraph,
+              })
+            }
+            onOpenSourceLocation={onOpenSourceLocation}
+            packageName={packageName}
+            rootPath={packageTree.rootPath}
+            typeGraph={packageTree.typeGraph}
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+const exploreTabs: Array<{
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  id: ExploreTab;
+  label: string;
+}> = [
+  { id: "code", icon: FileCode2, label: "Code" },
+  { id: "bytecode", icon: Binary, label: "Bytecode" },
+  { id: "dependencies", icon: Network, label: "Dependency" },
+  { id: "calls", icon: Workflow, label: "Call" },
+  { id: "types", icon: Boxes, label: "Type" },
+];
+
+function ExploreTabSwitch({
+  activeTab,
+  onTabChange,
+}: {
+  activeTab: ExploreTab;
+  onTabChange: (tab: ExploreTab) => void;
+}) {
+  return (
+    <div
+      aria-label="Explore sections"
+      className="grid h-10 shrink-0 grid-cols-5 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-1 shadow-sm"
+    >
+      {exploreTabs.map((tab) => {
+        const Icon = tab.icon;
+        const active = tab.id === activeTab;
+
+        return (
+          <button
+            aria-pressed={active}
+            className={cn(
+              "inline-flex h-full min-w-0 items-center justify-center gap-1.5 rounded px-2.5 text-xs font-medium leading-none text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+              active && "bg-[var(--app-elevated)] text-foreground shadow-sm",
+            )}
+            key={tab.id}
+            onClick={() => onTabChange(tab.id)}
+            type="button"
+          >
+            <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+            <span className="truncate">{tab.label}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -576,10 +690,10 @@ function SecuritySidebar({
         />
         <SidebarSection title="Security Workspace">
           <SidebarItem
-            active={activeWorkspaceTab === "Overview" && !activeSurfaceDetail}
-            icon={GitBranch}
-            label="Overview"
-            onClick={() => onWorkspaceTabChange("Overview")}
+            active={activeWorkspaceTab === "Agents" && !activeSurfaceDetail}
+            icon={Bot}
+            label="Agents"
+            onClick={() => onWorkspaceTabChange("Agents")}
           />
           <SidebarItem
             active={activeWorkspaceTab === "Explore" && !activeSurfaceDetail}
@@ -592,18 +706,6 @@ function SecuritySidebar({
             icon={Workflow}
             label="Execution"
             onClick={() => onWorkspaceTabChange("Execution")}
-          />
-          <SidebarItem
-            active={activeWorkspaceTab === "Agents" && !activeSurfaceDetail}
-            icon={Bot}
-            label="Agents"
-            onClick={() => onWorkspaceTabChange("Agents")}
-          />
-          <SidebarItem
-            active={activeWorkspaceTab === "Bytecode" && !activeSurfaceDetail}
-            icon={Binary}
-            label="Bytecode"
-            onClick={() => onWorkspaceTabChange("Bytecode")}
           />
         </SidebarSection>
 
