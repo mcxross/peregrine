@@ -1,15 +1,14 @@
 import React from "react";
 import type {
-  AgentRole,
   FindingCandidate,
   SecurityEvidenceItem,
   ToolCapsule,
   ToolRunSummary,
 } from "@peregrine/agent-runtime";
-import { routeTools, type ToolRouteDecision } from "@peregrine/harness-control";
+import type { ToolRouteDecision } from "@peregrine/harness-control";
 import {
   Activity,
-  AlertTriangle,
+  ArrowLeft,
   BarChart3,
   Binary,
   Bot,
@@ -29,20 +28,11 @@ import {
   Square,
   Terminal,
   Workflow,
-  Wrench,
   X,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,7 +58,6 @@ import {
   loadAgentStudioStateFromProjectMetadata,
   saveAgentStudioState,
 } from "@/features/agents/agent-workflow-store";
-import { AgentWorkflowCanvas } from "@/features/agents/agent-workflow-canvas";
 import {
   loadProviderModelOptions,
   modelProviderAdapters,
@@ -90,37 +79,18 @@ import {
   type MovePackage,
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
-import {
-  createAgentToolRuntimeState,
-  resolveAgentTools,
-  type AgentToolProjectContext,
-} from "@/features/agents/tools";
+import type { AgentToolProjectContext } from "@/features/agents/tools";
 import type { AgentRunStreamEvent } from "@/features/agents/agent-runner";
 import { cn } from "@/lib/utils";
 
 type AgentCategory = "Core" | "Analysis" | "Action" | "Output" | "Custom";
 type AgentFilter = "all" | AgentCategory;
-type MainTab = "agents" | "runs" | "activity" | "details";
-type InspectorTab = "overview" | "tools" | "permissions" | "runs";
+type MainTab = "agents" | "details";
+type InspectorTab = "overview" | "tools" | "permissions";
 
 type AgentUiMetadata = {
   capabilities: string[];
   category: AgentCategory;
-};
-
-type RecommendedWorkflow = {
-  description: string;
-  id: string;
-  steps: number;
-  title: string;
-};
-
-type ActivityRow = {
-  agent: string;
-  event: string;
-  level: AgentExecutionLog["level"];
-  timestamp: string;
-  tool: string;
 };
 
 type RunSnapshot = {
@@ -168,11 +138,6 @@ type AgentRunDetail = {
   workflowName: string;
 };
 
-type HarnessRoutePreview = {
-  capsules: ToolCapsule[];
-  decisions: ToolRouteDecision[];
-};
-
 const AGENT_FILTERS: Array<{ label: string; value: AgentFilter }> = [
   { label: "Primary", value: "Core" },
   { label: "Specialists", value: "Analysis" },
@@ -180,15 +145,6 @@ const AGENT_FILTERS: Array<{ label: string; value: AgentFilter }> = [
   { label: "Reports", value: "Output" },
   { label: "Custom", value: "Custom" },
   { label: "All", value: "all" },
-];
-
-const RECOMMENDED_WORKFLOWS: RecommendedWorkflow[] = [
-  {
-    id: "full-package-audit",
-    title: "Full Audit Workflow",
-    description: "Evidence-gated audit run from immutable session through report and trace export.",
-    steps: 21,
-  },
 ];
 
 const AUDIT_PHASES = [
@@ -284,11 +240,6 @@ const TOOL_FAMILY_LABELS: Record<string, string> = {
   "rust.validation": "Validation",
 };
 
-const PACKAGE_INTENT_TOOL_IDS = new Set([
-  "rust.index.package",
-  "rust.index.package_overview",
-]);
-
 export function AgentsScreen({
   activeMovePackage,
   onAuditReportExportReady,
@@ -318,7 +269,6 @@ export function AgentsScreen({
   const [activeMainTab, setActiveMainTab] = React.useState<MainTab>("agents");
   const [agentFilter, setAgentFilter] = React.useState<AgentFilter>("Core");
   const [inspectorTab, setInspectorTab] = React.useState<InspectorTab>("overview");
-  const [activeRunName, setActiveRunName] = React.useState("");
   const [runDetailsByAgentId, setRunDetailsByAgentId] = React.useState<Record<string, AgentRunDetail>>({});
   const activeRunControllerRef = React.useRef<AbortController | null>(null);
   const [isProjectStateLoaded, setIsProjectStateLoaded] = React.useState(false);
@@ -339,15 +289,6 @@ export function AgentsScreen({
     workflow: selectedWorkflow,
   });
   const selectedRunDetail = runDetailsByAgentId[selectedAgent.id];
-  const selectedHarnessPreview = React.useMemo(
-    () =>
-      createHarnessRoutePreview({
-        agent: selectedAgent,
-        projectContext,
-        workflow: selectedWorkflow,
-      }),
-    [projectContext, selectedAgent, selectedWorkflow],
-  );
 
   React.useEffect(() => {
     let cancelled = false;
@@ -443,103 +384,57 @@ export function AgentsScreen({
       )}
     >
       <main className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden border-r border-[color:var(--app-border)]">
-        <PageHeader
-          agentFilter={agentFilter}
-          isRunInProgress={isRunInProgress}
-          onCreateAgent={createAgent}
-          onFilterChange={setAgentFilter}
-          onRunWorkflow={() => void runWorkflow()}
-          onStopRun={stopWorkflowRun}
-        />
+        {activeMainTab === "details" ? null : (
+          <PageHeader
+            agentFilter={agentFilter}
+            isRunInProgress={isRunInProgress}
+            onCreateAgent={createAgent}
+            onFilterChange={setAgentFilter}
+            onRunWorkflow={() => void runWorkflow()}
+            onStopRun={stopWorkflowRun}
+          />
+        )}
 
         <ScrollArea className="min-h-0 min-w-0 overflow-hidden">
-          <div className="min-w-0 space-y-4 p-4 pb-6">
-            {activeMainTab !== "details" ? (
-              <>
-                <SummaryCards
+          <div
+            className={cn(
+              "min-w-0 overflow-hidden",
+              activeMainTab === "details"
+                ? "flex h-full min-h-full bg-[var(--app-window)]"
+                : "flex h-full min-h-full bg-[var(--app-window)]",
+            )}
+          >
+            {activeMainTab === "details" ? (
+              <AgentDetailRouteScreen
+                agent={selectedAgent}
+                isRunInProgress={isRunInProgress}
+                onBack={() => setActiveMainTab("agents")}
+                onRunWorkflow={() => void runWorkflow()}
+                onStopRun={stopWorkflowRun}
+                run={selectedRunDetail}
+                workflow={selectedWorkflow}
+              />
+            ) : (
+              <section className="grid min-h-[560px] flex-1 grid-rows-[minmax(240px,1fr)_minmax(240px,1fr)] animate-in fade-in slide-in-from-left-3 duration-150">
+                <AuditSummarySection
                   lastRunLabel={lastRunLabel(state.logs)}
                 />
 
-                <RecommendedWorkflows
-                  disabled={isRunInProgress}
-                  onRun={(workflow) => void runRecommendedWorkflow(workflow)}
-                  workflows={RECOMMENDED_WORKFLOWS}
-                />
-              </>
-            ) : null}
-
-            <Tabs
-              className="min-h-0 min-w-0 gap-3"
-              onValueChange={(value) => setActiveMainTab(value as MainTab)}
-              value={activeMainTab}
-            >
-              <div className="flex items-center justify-between border-b border-[color:var(--app-border)]">
-                <TabsList className="h-9 rounded-none p-0" variant="line">
-                  <TabsTrigger className="h-9 px-3 text-xs" value="agents">
-                    Agents
-                  </TabsTrigger>
-                  <TabsTrigger className="h-9 px-3 text-xs" value="runs">
-                    Runs
-                  </TabsTrigger>
-                  <TabsTrigger className="h-9 px-3 text-xs" value="activity">
-                    Activity
-                  </TabsTrigger>
-                  <TabsTrigger className="h-9 px-3 text-xs" value="details">
-                    Details
-                  </TabsTrigger>
-                </TabsList>
-                <div className="hidden items-center gap-2 text-[11px] text-muted-foreground md:flex">
-                  <CircleDot className="size-3 text-emerald-300" />
-                  Orchestrated audit surface
-                </div>
-              </div>
-
-              <TabsContent className="mt-0" value="agents">
                 <AgentsTable
                   agents={visibleAgents}
+                  className="min-h-0"
+                  isRunInProgress={isRunInProgress}
                   logs={state.logs}
                   onDeleteAgent={deleteAgent}
                   onDuplicateAgent={duplicateSelectedAgent}
                   onOpenAgentDetails={openAgentDetails}
+                  onRunAgent={runAgentFromList}
+                  onStopRun={stopWorkflowRun}
                   onSelectAgent={selectAgent}
                   selectedAgentId={selectedAgent.id}
                 />
-              </TabsContent>
-
-              <TabsContent className="mt-0" value="runs">
-                <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-                  <RunStatusCard
-                    activeAgent={selectedAgent.name}
-                    onOpenDetails={() => openAgentDetails(selectedAgent)}
-                    run={selectedRunSnapshot}
-                    workflowName={activeRunName || selectedWorkflow.name}
-                  />
-                  <WorkflowPreviewCard
-                    onRunNode={runNode}
-                    onWorkflowChange={updateWorkflow}
-                    workflow={selectedWorkflow}
-                  />
-                </div>
-              </TabsContent>
-
-              <TabsContent className="mt-0" value="activity">
-                <ActivityTable
-                  rows={activityRows(state.logs, state.agents)}
-                />
-              </TabsContent>
-
-              <TabsContent className="mt-0" value="details">
-                <AgentDetailScreen
-                  agent={selectedAgent}
-                  isRunInProgress={isRunInProgress}
-                  onRunWorkflow={() => void runWorkflow()}
-                  onStopRun={stopWorkflowRun}
-                  plannedRoute={selectedHarnessPreview}
-                  run={selectedRunDetail}
-                  workflow={selectedWorkflow}
-                />
-              </TabsContent>
-            </Tabs>
+              </section>
+            )}
           </div>
         </ScrollArea>
       </main>
@@ -551,7 +446,6 @@ export function AgentsScreen({
         logs={state.logs}
         onOpenDetails={() => openAgentDetails(selectedAgent)}
         run={selectedRunSnapshot}
-        onRunWorkflow={() => void runWorkflow()}
         onTabChange={setInspectorTab}
         onToggleOpen={() => setIsInspectorOpen((current) => !current)}
         onUpdateAgent={(patch) => updateAgent(selectedAgent.id, patch)}
@@ -627,8 +521,8 @@ export function AgentsScreen({
 
   function openAgentDetails(agent: AgentDefinition) {
     setActiveMainTab("details");
-    setInspectorTab("runs");
-    setIsInspectorOpen(true);
+    setInspectorTab("overview");
+    setIsInspectorOpen(false);
     setState((current) => ({
       ...current,
       selectedAgentId: agent.id,
@@ -656,43 +550,6 @@ export function AgentsScreen({
     }));
   }
 
-  function updateWorkflow(workflow: AgentWorkflow) {
-    setState((current) => ({
-      ...current,
-      workflows: current.workflows.map((candidate) =>
-        candidate.id === workflow.id ? workflow : candidate,
-      ),
-    }));
-  }
-
-  function runNode(nodeId: string) {
-    const workflow = {
-      ...selectedWorkflow,
-      nodes: selectedWorkflow.nodes.map((node) =>
-        node.id === nodeId
-          ? { ...node, data: { ...node.data, status: "completed" as const } }
-          : node,
-      ),
-    };
-
-    setState((current) => ({
-      ...current,
-      workflows: current.workflows.map((candidate) =>
-        candidate.id === workflow.id ? workflow : candidate,
-      ),
-      logs: [
-        ...current.logs,
-        createExecutionLog({
-          agentId: selectedAgent.id,
-          workflowId: selectedWorkflow.id,
-          nodeId,
-          level: "trace",
-          message: `Node completed: ${nodeId}`,
-        }),
-      ].slice(-120),
-    }));
-  }
-
   async function runWorkflow() {
     if (selectedAgent.tools.includes("rust.audit.run_full")) {
       await runFullAuditWorkflowFor(selectedAgent, selectedWorkflow, selectedWorkflow.name);
@@ -702,19 +559,17 @@ export function AgentsScreen({
     await runWorkflowFor(selectedAgent, selectedWorkflow, selectedWorkflow.name);
   }
 
-  async function runRecommendedWorkflow(recommendedWorkflow: RecommendedWorkflow) {
-    const orchestrator =
-      state.agents.find((agent) => agent.id === "agent-orchestrator") ?? selectedAgent;
-    const orchestratorWorkflow =
-      state.workflows.find((workflow) => workflow.id === orchestrator.workflowId)
+  async function runAgentFromList(agent: AgentDefinition) {
+    const workflow =
+      state.workflows.find((candidate) => candidate.id === agent.workflowId)
       ?? selectedWorkflow;
 
-    if (recommendedWorkflow.id === "full-package-audit") {
-      await runFullAuditWorkflowFor(orchestrator, orchestratorWorkflow, recommendedWorkflow.title);
+    if (agent.tools.includes("rust.audit.run_full")) {
+      await runFullAuditWorkflowFor(agent, workflow, workflow.name);
       return;
     }
 
-    await runWorkflowFor(orchestrator, orchestratorWorkflow, recommendedWorkflow.title);
+    await runWorkflowFor(agent, workflow, workflow.name);
   }
 
   function startRunDetail(
@@ -727,9 +582,8 @@ export function AgentsScreen({
     const timestamp = Date.now();
 
     setActiveMainTab("details");
-    setInspectorTab("runs");
-    setIsInspectorOpen(true);
-    setActiveRunName(displayName);
+    setInspectorTab("overview");
+    setIsInspectorOpen(false);
     setRunDetailsByAgentId((current) => ({
       ...current,
       [runAgent.id]: {
@@ -1399,11 +1253,7 @@ function PageHeader({
 }) {
   return (
     <header className="border-b border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 py-3">
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-normal">Audit Harness</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
           <label className="relative">
             <span className="sr-only">Filter agents</span>
             <select
@@ -1438,9 +1288,34 @@ function PageHeader({
             <Play className="size-3.5" />
             Run Workflow
           </Button>
-        </div>
       </div>
     </header>
+  );
+}
+
+function AuditSummarySection({
+  lastRunLabel,
+}: {
+  lastRunLabel: string;
+}) {
+  return (
+    <section className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden border-b border-[color:var(--app-border)] bg-[var(--app-panel)]">
+      <div className="flex min-w-0 items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+            <Workflow className="size-3.5" aria-hidden="true" />
+            Audit Summary
+          </div>
+        </div>
+        <span className="hidden items-center gap-2 text-[11px] text-muted-foreground sm:flex">
+          <CircleDot className="size-3 text-emerald-300" />
+          Orchestrated audit surface
+        </span>
+      </div>
+      <div className="min-h-0 overflow-auto p-3">
+        <SummaryCards lastRunLabel={lastRunLabel} />
+      </div>
+    </section>
   );
 }
 
@@ -1460,110 +1335,66 @@ function SummaryCards({
     <section className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-2">
       {cards.map((card) => (
         <div
-          className="grid min-h-16 grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 py-2.5"
+          className="rounded border border-[color:var(--app-border)] bg-black/10 px-2 py-1.5"
           key={card.label}
         >
-          <span className="grid size-8 place-items-center rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] text-muted-foreground">
-            <card.icon className="size-3.5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <card.icon className="size-3 shrink-0" aria-hidden="true" />
+            <span className="truncate">
               {card.label}
             </span>
-            <span className="mt-0.5 block truncate text-sm font-semibold text-foreground">
-              {card.value}
-            </span>
-          </span>
+          </div>
+          <div className="mt-1 truncate font-mono text-xs font-semibold text-foreground">
+            {card.value}
+          </div>
         </div>
       ))}
     </section>
   );
 }
 
-function RecommendedWorkflows({
-  disabled,
-  onRun,
-  workflows,
-}: {
-  disabled: boolean;
-  onRun: (workflow: RecommendedWorkflow) => void;
-  workflows: RecommendedWorkflow[];
-}) {
-  const primaryWorkflow = workflows[0];
-
-  if (!primaryWorkflow) {
-    return null;
-  }
-
-  return (
-    <section className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-3">
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <div className="min-w-0">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h2 className="min-w-0 truncate text-sm font-semibold">{primaryWorkflow.title}</h2>
-            <Badge className="rounded px-1.5 py-0.5 text-[10px]" variant="secondary">
-              {primaryWorkflow.steps} stages
-            </Badge>
-          </div>
-          <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
-            {primaryWorkflow.description}
-          </p>
-        </div>
-        <Button
-          className="h-9 gap-1.5 text-xs"
-          disabled={disabled}
-          onClick={() => onRun(primaryWorkflow)}
-          type="button"
-        >
-          <Play className="size-3.5" />
-          Run Full Audit
-        </Button>
-      </div>
-      <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,92px),1fr))] gap-1.5">
-        {AUDIT_PHASES.map((phase, index) => (
-          <div
-            className="grid min-h-11 min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-1.5"
-            key={phase}
-          >
-            <span className="grid size-5 place-items-center rounded border border-[color:var(--app-border)] text-[10px] font-semibold tabular-nums text-muted-foreground">
-              {index + 1}
-            </span>
-            <span className="min-w-0 truncate text-[11px] font-medium text-muted-foreground">
-              {phase}
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function AgentsTable({
   agents,
+  className,
+  isRunInProgress,
   logs,
   onDeleteAgent,
   onDuplicateAgent,
   onOpenAgentDetails,
+  onRunAgent,
   onSelectAgent,
+  onStopRun,
   selectedAgentId,
 }: {
   agents: AgentDefinition[];
+  className?: string;
+  isRunInProgress: boolean;
   logs: AgentExecutionLog[];
   onDeleteAgent: (agent: AgentDefinition) => void;
   onDuplicateAgent: (agent: AgentDefinition) => void;
   onOpenAgentDetails: (agent: AgentDefinition) => void;
+  onRunAgent: (agent: AgentDefinition) => void;
   onSelectAgent: (agent: AgentDefinition) => void;
+  onStopRun: () => void;
   selectedAgentId: string;
 }) {
   return (
-    <section className="overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
-      <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5">
-        <h2 className="text-sm font-semibold">Audit Agents</h2>
+    <section
+      className={cn(
+        "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]",
+        className,
+      )}
+    >
+      <div className="flex min-w-0 items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3">
+        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+          <Bot className="size-3.5" aria-hidden="true" />
+          Audit Agents
+        </div>
         <span className="text-[11px] text-muted-foreground">{agents.length} shown</span>
       </div>
-      <div className="overflow-x-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         <div className="min-w-[860px]">
-          <div className="grid grid-cols-[36px_minmax(250px,1.7fr)_112px_96px_92px_74px_36px] items-center gap-3 border-b border-[color:var(--app-border)] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="sticky top-0 z-10 grid grid-cols-[36px_minmax(250px,1.7fr)_112px_96px_92px_74px_36px_36px] items-center gap-3 border-b border-[color:var(--app-border)] bg-[var(--app-window)] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             <span />
             <span>Agent</span>
             <span>Category</span>
@@ -1571,17 +1402,21 @@ function AgentsTable({
             <span>Last Run</span>
             <span>Tools</span>
             <span />
+            <span />
           </div>
           {agents.length ? (
             agents.map((agent) => (
               <AgentRow
                 agent={agent}
+                isRunInProgress={isRunInProgress}
                 key={agent.id}
                 lastRun={agentLastRunLabel(logs, agent)}
                 onDeleteAgent={onDeleteAgent}
                 onDuplicateAgent={onDuplicateAgent}
                 onOpenAgentDetails={onOpenAgentDetails}
+                onRunAgent={onRunAgent}
                 onSelectAgent={onSelectAgent}
+                onStopRun={onStopRun}
                 selected={selectedAgentId === agent.id}
               />
             ))
@@ -1598,37 +1433,53 @@ function AgentsTable({
 
 function AgentRow({
   agent,
+  isRunInProgress,
   lastRun,
   onDeleteAgent,
   onDuplicateAgent,
   onOpenAgentDetails,
+  onRunAgent,
   onSelectAgent,
+  onStopRun,
   selected,
 }: {
   agent: AgentDefinition;
+  isRunInProgress: boolean;
   lastRun: string;
   onDeleteAgent: (agent: AgentDefinition) => void;
   onDuplicateAgent: (agent: AgentDefinition) => void;
   onOpenAgentDetails: (agent: AgentDefinition) => void;
+  onRunAgent: (agent: AgentDefinition) => void;
   onSelectAgent: (agent: AgentDefinition) => void;
+  onStopRun: () => void;
   selected: boolean;
 }) {
   const metadata = agentMetadata(agent);
+  const isAgentRunning = agent.status === "running";
+  const openDetailsFromKeyboard = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    onOpenAgentDetails(agent);
+  };
 
   return (
     <div
+      aria-label={`Open details for ${agent.name}`}
       className={cn(
-        "grid grid-cols-[minmax(0,1fr)_36px] items-center border-b border-[color:var(--app-border)] text-xs transition last:border-b-0",
+        "grid cursor-pointer grid-cols-[minmax(0,1fr)_36px_36px] items-center border-b border-[color:var(--app-border)] text-xs transition last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
         selected
-          ? "border-l-2 border-l-primary bg-[var(--app-subtle)]"
-          : "border-l-2 border-l-transparent hover:bg-[var(--app-subtle)]",
+          ? "bg-[var(--app-subtle)] text-foreground"
+          : "hover:bg-[var(--app-subtle)] hover:text-foreground",
       )}
+      onClick={() => onOpenAgentDetails(agent)}
+      onKeyDown={openDetailsFromKeyboard}
+      role="button"
+      tabIndex={0}
     >
-      <button
-        className="grid min-h-[52px] w-full grid-cols-[36px_minmax(250px,1.7fr)_112px_96px_92px_74px] items-center gap-3 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        onClick={() => onOpenAgentDetails(agent)}
-        type="button"
-      >
+      <div className="grid min-h-12 w-full grid-cols-[36px_minmax(250px,1.7fr)_112px_96px_92px_74px] items-center gap-3 px-3 py-2 text-left">
         <AgentIcon agent={agent} />
         <div className="min-w-0">
           <div className="truncate font-semibold text-foreground">{agent.name}</div>
@@ -1640,8 +1491,25 @@ function AgentRow({
         <StatusBadge status={agent.status} />
         <span className="text-[11px] text-muted-foreground">{lastRun}</span>
         <span className="tabular-nums text-[11px] text-muted-foreground">{agent.tools.length}</span>
-      </button>
-      <div className="flex justify-end pr-3">
+      </div>
+      <div
+        className="flex justify-end"
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
+        <AgentRunButton
+          agentName={agent.name}
+          disabled={isRunInProgress && !isAgentRunning}
+          isRunning={isAgentRunning}
+          onRun={() => onRunAgent(agent)}
+          onStop={onStopRun}
+        />
+      </div>
+      <div
+        className="flex justify-end pr-3"
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -1684,30 +1552,127 @@ function AgentRow({
   );
 }
 
-function AgentDetailScreen({
+function AgentRunButton({
+  agentName,
+  disabled,
+  isRunning,
+  onRun,
+  onStop,
+}: {
+  agentName: string;
+  disabled: boolean;
+  isRunning: boolean;
+  onRun: () => void;
+  onStop: () => void;
+}) {
+  return (
+    <Button
+      aria-label={isRunning ? `Stop ${agentName}` : `Run ${agentName}`}
+      className={cn(
+        "size-7",
+        isRunning
+          ? "border-amber-400/40 bg-amber-400/10 text-amber-200 hover:bg-amber-400/15 hover:text-amber-100"
+          : "text-muted-foreground hover:text-foreground",
+      )}
+      disabled={disabled}
+      onClick={isRunning ? onStop : onRun}
+      size="icon-xs"
+      title={isRunning ? "Stop agent" : "Run agent"}
+      type="button"
+      variant={isRunning ? "outline" : "ghost"}
+    >
+      {isRunning ? <Square className="size-3.5" /> : <Play className="size-3.5" />}
+    </Button>
+  );
+}
+
+function AgentDetailRouteScreen({
   agent,
   isRunInProgress,
+  onBack,
   onRunWorkflow,
   onStopRun,
-  plannedRoute,
   run,
   workflow,
 }: {
   agent: AgentDefinition;
   isRunInProgress: boolean;
+  onBack: () => void;
   onRunWorkflow: () => void;
   onStopRun: () => void;
-  plannedRoute: HarnessRoutePreview;
   run?: AgentRunDetail;
   workflow: AgentWorkflow;
 }) {
+  const agentIsRunning = agent.status === "running" || run?.status === "running";
+
+  return (
+    <section className="grid h-full min-h-[560px] min-w-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)] animate-in fade-in slide-in-from-right-3 duration-200">
+      <header className="flex min-w-0 items-center border-b border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 py-2">
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <Button
+              aria-label="Back to agents"
+              className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+              onClick={onBack}
+              size="icon-xs"
+              title="Back to agents"
+              type="button"
+              variant="ghost"
+            >
+              <ArrowLeft className="size-3.5" />
+            </Button>
+            <Bot className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="truncate text-sm font-semibold">Agents</span>
+            <ChevronRight className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="truncate text-sm text-muted-foreground">{agent.name}</span>
+          </div>
+          {agentIsRunning ? (
+            <Button
+              className="h-8 shrink-0 gap-1.5 text-xs"
+              onClick={onStopRun}
+              type="button"
+              variant="outline"
+            >
+              <Square className="size-3.5" />
+              Stop
+            </Button>
+          ) : (
+            <Button
+              className="h-8 shrink-0 gap-1.5 text-xs"
+              disabled={isRunInProgress}
+              onClick={onRunWorkflow}
+              type="button"
+            >
+              <Play className="size-3.5" />
+              Run
+            </Button>
+          )}
+        </div>
+      </header>
+
+      <AgentDetailScreen
+        agent={agent}
+        run={run}
+        workflow={workflow}
+      />
+    </section>
+  );
+}
+
+function AgentDetailScreen({
+  agent,
+  run,
+  workflow,
+}: {
+  agent: AgentDefinition;
+  run?: AgentRunDetail;
+  workflow: AgentWorkflow;
+}) {
+  const [outputView, setOutputView] = React.useState<"markdown" | "raw">("markdown");
   const provider = providerById(agent.provider.providerId);
   const agentIsRunning = agent.status === "running" || run?.status === "running";
   const responseText = run?.responseText.trim();
   const reasoningText = run?.reasoningText.trim();
-  const routeCapsules = run?.toolCapsules.length ? run.toolCapsules : plannedRoute.capsules;
-  const routeDecisions = run?.routeDecisions.length ? run.routeDecisions : plannedRoute.decisions;
-  const skippedToolCount = routeDecisions.filter((decision) => !decision.selected).length;
   const duration = run
     ? durationLabel((run.completedAt ?? Date.now()) - run.startedAt)
     : "Not run";
@@ -1716,225 +1681,415 @@ function AgentDetailScreen({
     : "Model Response";
 
   return (
-    <section className="min-w-0 space-y-3">
-      <div className="grid gap-3 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-        <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3">
-          <AgentIcon agent={agent} />
-          <div className="min-w-0">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h2 className="min-w-0 truncate text-base font-semibold">{agent.name}</h2>
-              <StatusBadge status={agent.status} />
-              {run ? <RunDetailStatusBadge status={run.status} /> : null}
-            </div>
-            <p className="mt-1 min-w-0 text-xs leading-5 text-muted-foreground">
-              {agent.description}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          {agentIsRunning ? (
-            <Button className="h-8 gap-1.5 text-xs" onClick={onStopRun} type="button" variant="outline">
-              <Square className="size-3.5" />
-              Stop
-            </Button>
-          ) : null}
-          <Button
-            className="h-8 gap-1.5 text-xs"
-            disabled={isRunInProgress}
-            onClick={onRunWorkflow}
-            type="button"
-          >
-            <Play className="size-3.5" />
-            Run
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,160px),1fr))] gap-2">
+    <section className="grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
+      <div className="grid shrink-0 grid-cols-2 gap-2 border-b border-[color:var(--app-border)] bg-[var(--app-panel)] p-3 sm:grid-cols-3 xl:grid-cols-6">
         <MetricTile label="Workflow" value={run?.displayName ?? workflow.name} />
         <MetricTile label="Provider" value={provider.label} />
         <MetricTile label="Model" value={agent.provider.modelId || "No model"} />
         <MetricTile label="Duration" value={duration} />
-        <MetricTile label="Routed" value={String(routeCapsules.length)} />
-        <MetricTile label="Skipped" value={String(skippedToolCount)} />
-        <MetricTile label="Evidence" value={String(run?.evidence.length ?? 0)} />
         <MetricTile label="Findings" value={String(run?.findingCandidates.length ?? 0)} />
+        <MetricTile label="Evidence" value={String(run?.evidence.length ?? 0)} />
       </div>
 
-      <AuditResultsPanel
-        evidence={run?.evidence ?? []}
-        findingCandidates={run?.findingCandidates ?? []}
-      />
+      <section className="grid min-h-0 min-w-0 overflow-auto md:grid-cols-2 md:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] md:overflow-hidden">
+        <FindingsPanel
+          className="border-b border-[color:var(--app-border)] md:border-r"
+          findingCandidates={run?.findingCandidates ?? []}
+        />
 
-      <HarnessCorrelationPanel
-        capsules={routeCapsules}
-        decisions={routeDecisions}
-        evidence={run?.evidence ?? []}
-        findingCandidates={run?.findingCandidates ?? []}
-        toolRuns={run?.toolRuns ?? []}
-      />
+        <EvidencePanel
+          className="border-b border-[color:var(--app-border)]"
+          evidence={run?.evidence ?? []}
+        />
 
-      <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)]">
-        <section className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
-          <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5">
-            <div className="flex min-w-0 items-center gap-2">
-              <MessageSquareText className="size-4 text-muted-foreground" />
-              <h3 className="truncate text-sm font-semibold">{responseTitle}</h3>
+        <AgentResponsePanel
+          agentIsRunning={agentIsRunning}
+          className="md:col-span-2"
+          events={run?.events ?? []}
+          outputView={outputView}
+          reasoningText={reasoningText}
+          responseText={responseText}
+          responseTitle={responseTitle}
+          setOutputView={setOutputView}
+        />
+      </section>
+    </section>
+  );
+}
+
+function AgentResponsePanel({
+  agentIsRunning,
+  className,
+  events,
+  outputView,
+  reasoningText,
+  responseText,
+  responseTitle,
+  setOutputView,
+}: {
+  agentIsRunning: boolean;
+  className?: string;
+  events: AgentRunDetailEvent[];
+  outputView: "markdown" | "raw";
+  reasoningText?: string;
+  responseText?: string;
+  responseTitle: string;
+  setOutputView: React.Dispatch<React.SetStateAction<"markdown" | "raw">>;
+}) {
+  const outputText = React.useMemo(
+    () => composeAuditOutputText(responseText, events),
+    [events, responseText],
+  );
+
+  return (
+    <section className={cn(
+      "grid min-h-[260px] min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)] md:min-h-0",
+      className,
+    )}>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <MessageSquareText className="size-4 text-muted-foreground" />
+          <h3 className="truncate text-sm font-semibold">{responseTitle}</h3>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {outputText ? (
+            <div className="flex rounded border border-[color:var(--app-border)] bg-black/10 p-0.5">
+              <button
+                className={cn(
+                  "rounded px-2 py-1 text-[11px] font-medium transition",
+                  outputView === "markdown"
+                    ? "bg-[var(--app-subtle)] text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setOutputView("markdown")}
+                type="button"
+              >
+                Markdown
+              </button>
+              <button
+                className={cn(
+                  "rounded px-2 py-1 text-[11px] font-medium transition",
+                  outputView === "raw"
+                    ? "bg-[var(--app-subtle)] text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setOutputView("raw")}
+                type="button"
+              >
+                Raw
+              </button>
             </div>
-            {agentIsRunning ? (
-              <span className="shrink-0 text-[11px] text-sky-300">Streaming</span>
-            ) : null}
-          </header>
-          <div className="grid min-h-[320px] content-start gap-3 p-3">
-            {responseText ? (
-              <pre className="min-h-[240px] whitespace-pre-wrap break-words rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-3 text-xs leading-5 text-foreground">
-                {responseText}
-              </pre>
-            ) : (
-              <div className="grid min-h-[240px] place-items-center rounded-md border border-dashed border-[color:var(--app-border)] bg-[var(--app-elevated)] p-6 text-center text-xs leading-5 text-muted-foreground">
-                {agentIsRunning
-                  ? "Waiting for streamed model text."
-                  : "No model response has been captured for this agent."}
-              </div>
-            )}
-
-            {reasoningText ? (
-              <section className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-3">
-                <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  <Terminal className="size-3.5" />
-                  Reasoning Stream
-                </div>
-                <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-4 text-muted-foreground">
-                  {reasoningText}
-                </pre>
-              </section>
-            ) : null}
+          ) : null}
+          {agentIsRunning ? (
+            <span className="text-[11px] text-sky-300">Streaming</span>
+          ) : null}
+        </div>
+      </header>
+      <div className="min-h-0 overflow-auto p-3">
+        {outputText ? (
+          outputView === "markdown" ? (
+            <MarkdownAuditOutput text={outputText} />
+          ) : (
+            <pre className="whitespace-pre-wrap break-words rounded border border-[color:var(--app-border)] bg-black/10 p-3 text-xs leading-5 text-foreground">
+              {outputText}
+            </pre>
+          )
+        ) : (
+          <div className="grid min-h-full place-items-center rounded border border-dashed border-[color:var(--app-border)] bg-black/10 p-6 text-center text-xs leading-5 text-muted-foreground">
+            {agentIsRunning
+              ? "Waiting for streamed model text."
+              : "Run this agent to stream its audit response here."}
           </div>
-        </section>
+        )}
 
-        <section className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
-          <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5">
-            <div className="flex min-w-0 items-center gap-2">
-              <Terminal className="size-4 text-muted-foreground" />
-              <h3 className="truncate text-sm font-semibold">Run Activity</h3>
+        {reasoningText ? (
+          <section className="rounded border border-[color:var(--app-border)] bg-black/10 p-3">
+            <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <Terminal className="size-3.5" />
+              Reasoning Stream
             </div>
-            <span className="shrink-0 text-[11px] text-muted-foreground">
-              {run?.events.length ?? 0} events
-            </span>
-          </header>
-          <div className="max-h-[520px] overflow-auto p-3">
-            {run?.events.length ? (
-              <div className="grid gap-2">
-                {run.events.map((event) => (
-                  <div
-                    className="grid min-w-0 grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-2"
-                    key={event.id}
-                  >
-                    <RunDetailEventIcon event={event} />
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 items-center justify-between gap-2">
-                        <span className={cn("min-w-0 truncate text-xs font-semibold", logLevelClass(event.level))}>
-                          {event.title}
-                        </span>
-                        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                          {timeLabel(event.timestamp)}
-                        </span>
-                      </div>
-                      <p className="mt-1 whitespace-pre-wrap break-words text-[11px] leading-4 text-muted-foreground">
-                        {event.message}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid min-h-[260px] place-items-center rounded-md border border-dashed border-[color:var(--app-border)] bg-[var(--app-elevated)] p-6 text-center text-xs leading-5 text-muted-foreground">
-                Open or run this agent to see runtime activity.
-              </div>
-            )}
-          </div>
-        </section>
+            <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-4 text-muted-foreground">
+              {reasoningText}
+            </pre>
+          </section>
+        ) : null}
       </div>
     </section>
   );
 }
 
-function AuditResultsPanel({
-  evidence,
+type MarkdownAuditBlock =
+  | { kind: "bullet"; text: string }
+  | { kind: "code"; language: string; text: string }
+  | { kind: "heading"; level: number; text: string }
+  | { kind: "ordered"; marker: string; text: string }
+  | { kind: "paragraph"; text: string };
+
+function composeAuditOutputText(
+  responseText: string | undefined,
+  events: AgentRunDetailEvent[],
+) {
+  const response = responseText?.trim() ?? "";
+  const activity = formatRunActivityTranscript(events);
+
+  if (response && activity) {
+    return `${response}\n\n## Run Activity\n${activity}`;
+  }
+
+  if (response) {
+    return response;
+  }
+
+  if (activity) {
+    return `## Run Activity\n${activity}`;
+  }
+
+  return "";
+}
+
+function formatRunActivityTranscript(events: AgentRunDetailEvent[]) {
+  return events
+    .filter((event) => event.kind !== "reasoning")
+    .map((event) => {
+      const message = event.message
+        .replace(/\s+/g, " ")
+        .trim();
+      const suffix = message ? `: ${message}` : "";
+
+      return `- ${timeLabel(event.timestamp)} ${event.title}${suffix}`;
+    })
+    .join("\n");
+}
+
+function MarkdownAuditOutput({ text }: { text: string }) {
+  const blocks = React.useMemo(() => parseAuditMarkdown(text), [text]);
+
+  return (
+    <article className="space-y-2 rounded border border-[color:var(--app-border)] bg-black/10 p-3 text-xs leading-5 text-foreground">
+      {blocks.map((block, index) => {
+        if (block.kind === "heading") {
+          const headingClass =
+            block.level === 1
+              ? "mt-2 text-base"
+              : block.level === 2
+                ? "mt-3 text-sm"
+                : "mt-2 text-xs";
+
+          return (
+            <h4
+              className={cn("font-semibold leading-6 text-foreground first:mt-0", headingClass)}
+              key={`${block.kind}-${index}`}
+            >
+              {renderAuditMarkdownInline(block.text)}
+            </h4>
+          );
+        }
+
+        if (block.kind === "code") {
+          return (
+            <pre
+              className="overflow-auto rounded border border-[color:var(--app-border)] bg-[var(--app-window)] p-2 text-[11px] leading-4 text-muted-foreground"
+              key={`${block.kind}-${index}`}
+            >
+              {block.text}
+            </pre>
+          );
+        }
+
+        if (block.kind === "bullet" || block.kind === "ordered") {
+          return (
+            <div
+              className="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-1 text-muted-foreground"
+              key={`${block.kind}-${index}`}
+            >
+              <span className="text-right text-muted-foreground/80">
+                {block.kind === "bullet" ? "-" : block.marker}
+              </span>
+              <span className="min-w-0 break-words">{renderAuditMarkdownInline(block.text)}</span>
+            </div>
+          );
+        }
+
+        return (
+          <p className="break-words text-muted-foreground" key={`${block.kind}-${index}`}>
+            {renderAuditMarkdownInline(block.text)}
+          </p>
+        );
+      })}
+    </article>
+  );
+}
+
+function parseAuditMarkdown(text: string): MarkdownAuditBlock[] {
+  const blocks: MarkdownAuditBlock[] = [];
+  const paragraph: string[] = [];
+  const code: string[] = [];
+  let codeLanguage = "";
+  let inCodeBlock = false;
+
+  const flushParagraph = () => {
+    if (!paragraph.length) {
+      return;
+    }
+    blocks.push({ kind: "paragraph", text: paragraph.join(" ") });
+    paragraph.length = 0;
+  };
+
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    const codeFence = trimmed.match(/^```(\w+)?/);
+
+    if (codeFence) {
+      if (inCodeBlock) {
+        blocks.push({ kind: "code", language: codeLanguage, text: code.join("\n") });
+        code.length = 0;
+        codeLanguage = "";
+        inCodeBlock = false;
+      } else {
+        flushParagraph();
+        codeLanguage = codeFence[1] ?? "";
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      code.push(line);
+      continue;
+    }
+
+    if (!trimmed) {
+      flushParagraph();
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      blocks.push({ kind: "heading", level: heading[1].length, text: heading[2] });
+      continue;
+    }
+
+    const bullet = trimmed.match(/^[-*]\s+(.+)$/);
+    if (bullet) {
+      flushParagraph();
+      blocks.push({ kind: "bullet", text: bullet[1] });
+      continue;
+    }
+
+    const ordered = trimmed.match(/^(\d+\.)\s+(.+)$/);
+    if (ordered) {
+      flushParagraph();
+      blocks.push({ kind: "ordered", marker: ordered[1], text: ordered[2] });
+      continue;
+    }
+
+    paragraph.push(trimmed);
+  }
+
+  if (inCodeBlock) {
+    blocks.push({ kind: "code", language: codeLanguage, text: code.join("\n") });
+  }
+  flushParagraph();
+
+  return blocks;
+}
+
+function renderAuditMarkdownInline(text: string) {
+  return text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).map((part, index) => {
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code
+          className="rounded bg-background/60 px-1 py-0.5 text-[0.92em] text-foreground"
+          key={`${part}-${index}`}
+        >
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+
+    return part;
+  });
+}
+
+function FindingsPanel({
+  className,
   findingCandidates,
 }: {
-  evidence: SecurityEvidenceItem[];
+  className?: string;
   findingCandidates: FindingCandidate[];
 }) {
   return (
-    <section className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
-      <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5">
+    <section className={cn(
+      "grid min-h-[260px] min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)] md:min-h-0",
+      className,
+    )}>
+      <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3">
         <div className="flex min-w-0 items-center gap-2">
           <ShieldCheck className="size-4 text-muted-foreground" />
-          <h3 className="truncate text-sm font-semibold">Evidence & Findings</h3>
+          <h3 className="truncate text-sm font-semibold">Findings</h3>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span>{evidence.length} evidence</span>
-          <span className="text-muted-foreground/50">/</span>
-          <span>{findingCandidates.length} findings</span>
-        </div>
+        <span className="shrink-0 text-[11px] text-muted-foreground">
+          {findingCandidates.length} findings
+        </span>
       </header>
 
-      <div className="grid min-w-0 gap-3 p-3 xl:grid-cols-2">
-        <ResultColumn
-          count={evidence.length}
-          emptyLabel="No evidence packets have been reduced for this run."
-          title="Evidence Cards"
-        >
-          {evidence.slice(0, 12).map((item) => (
-            <EvidenceDetailCard item={item} key={item.id} />
-          ))}
-        </ResultColumn>
-
-        <ResultColumn
-          count={findingCandidates.length}
-          emptyLabel="No finding candidates were emitted by this run."
-          title="Finding Cards"
-        >
+      <div className="min-h-0 overflow-auto p-3">
+        {findingCandidates.length ? (
+          <div className="grid content-start gap-2">
           {findingCandidates.slice(0, 12).map((finding) => (
             <FindingDetailCard finding={finding} key={finding.id} />
           ))}
-        </ResultColumn>
+          </div>
+        ) : (
+          <div className="grid min-h-full place-items-center rounded border border-dashed border-[color:var(--app-border)] px-3 py-4 text-center text-[11px] leading-4 text-muted-foreground">
+            No finding candidates were emitted by this run.
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
-function ResultColumn({
-  children,
-  count,
-  emptyLabel,
-  title,
+function EvidencePanel({
+  className,
+  evidence,
 }: {
-  children: React.ReactNode;
-  count: number;
-  emptyLabel: string;
-  title: string;
+  className?: string;
+  evidence: SecurityEvidenceItem[];
 }) {
-  const hasContent = React.Children.count(children) > 0;
-
   return (
-    <section className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-2.5">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h4 className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {title}
-        </h4>
-        <Badge className="rounded px-1.5 py-0.5 text-[10px]" variant="secondary">
-          {count}
-        </Badge>
-      </div>
-      {hasContent ? (
-        <div className="grid max-h-[440px] gap-2 overflow-auto pr-1">{children}</div>
-      ) : (
-        <div className="grid min-h-28 place-items-center rounded-md border border-dashed border-[color:var(--app-border)] px-3 py-4 text-center text-[11px] leading-4 text-muted-foreground">
-          {emptyLabel}
+    <section className={cn(
+      "grid min-h-[260px] min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)] md:min-h-0",
+      className,
+    )}>
+      <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <FileText className="size-4 text-muted-foreground" />
+          <h3 className="truncate text-sm font-semibold">Evidence</h3>
         </div>
-      )}
+        <span className="shrink-0 text-[11px] text-muted-foreground">
+          {evidence.length} evidence
+        </span>
+      </header>
+
+      <div className="min-h-0 overflow-auto p-3">
+        {evidence.length ? (
+          <div className="grid content-start gap-2">
+          {evidence.slice(0, 12).map((item) => (
+            <EvidenceDetailCard item={item} key={item.id} />
+          ))}
+          </div>
+        ) : (
+          <div className="grid min-h-full place-items-center rounded border border-dashed border-[color:var(--app-border)] px-3 py-4 text-center text-[11px] leading-4 text-muted-foreground">
+            No evidence packets have been reduced for this run.
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -1943,7 +2098,7 @@ function EvidenceDetailCard({ item }: { item: SecurityEvidenceItem }) {
   const title = evidenceCardTitle(item);
 
   return (
-    <details className="group rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2 py-2">
+    <details className="group rounded border border-[color:var(--app-border)] bg-[var(--app-window)] px-2 py-2">
       <summary className="grid min-h-10 cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-start gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
         <span className="min-w-0">
           <span className="flex min-w-0 items-center gap-2">
@@ -1982,7 +2137,7 @@ function FindingDetailCard({ finding }: { finding: FindingCandidate }) {
   const confirmed = finding.status === "confirmed";
 
   return (
-    <details className="group rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-2 py-2">
+    <details className="group rounded border border-[color:var(--app-border)] bg-[var(--app-window)] px-2 py-2">
       <summary className="grid min-h-10 cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-start gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
         <span className="min-w-0">
           <span className="flex min-w-0 items-center gap-2">
@@ -2167,243 +2322,12 @@ function DetailPair({
   );
 }
 
-function HarnessCorrelationPanel({
-  capsules,
-  decisions,
-  evidence,
-  findingCandidates,
-  toolRuns,
-}: {
-  capsules: ToolCapsule[];
-  decisions: ToolRouteDecision[];
-  evidence: SecurityEvidenceItem[];
-  findingCandidates: FindingCandidate[];
-  toolRuns: ToolRunSummary[];
-}) {
-  const selectedCount = decisions.filter((decision) => decision.selected).length;
-  const skippedCount = decisions.length - selectedCount;
-  const categories = categoryCounts(capsules);
-  const latestRuns = toolRuns.slice(-5).reverse();
-  const intentCapsules = capsules.filter((capsule) => PACKAGE_INTENT_TOOL_IDS.has(capsule.id));
-  const intentRuns = toolRuns.filter((toolRun) => PACKAGE_INTENT_TOOL_IDS.has(toolRun.toolId));
-
-  return (
-    <section className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
-      <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5">
-        <div className="flex min-w-0 items-center gap-2">
-          <Network className="size-4 text-muted-foreground" />
-          <h3 className="truncate text-sm font-semibold">Harness Correlation</h3>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span>{selectedCount} routed</span>
-          <span className="text-muted-foreground/50">/</span>
-          <span>{skippedCount} skipped</span>
-        </div>
-      </header>
-
-      <div className="grid gap-3 p-3 xl:grid-cols-4">
-        <HarnessColumn
-          emptyLabel="Intent discovery tools are not routed for this agent."
-          icon={<FileText className="size-3.5" />}
-          title="Package Intent"
-        >
-          {intentCapsules.length || intentRuns.length ? (
-            <div className="grid gap-2">
-              <div className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Intent Gate
-                </div>
-                <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
-                  {intentRuns.some((run) => run.status === "succeeded")
-                    ? "Package intent evidence has started to land."
-                    : "Run index and overview before specialized checks."}
-                </p>
-              </div>
-              <div className="grid gap-1.5">
-                {(intentRuns.length ? intentRuns : intentCapsules).slice(0, 4).map((item) => {
-                  const id = "toolId" in item ? item.toolId : item.id;
-                  const status = "status" in item ? item.status : "routed";
-
-                  return (
-                    <div
-                      className="grid min-w-0 gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2"
-                      key={`${id}-${status}`}
-                    >
-                      <span className="min-w-0 truncate font-mono text-[11px] text-foreground" title={id}>
-                        {"callableName" in item ? item.callableName ?? id : id}
-                      </span>
-                      <span className="min-w-0 truncate text-[10px] text-muted-foreground">
-                        {status}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-        </HarnessColumn>
-
-        <HarnessColumn
-          emptyLabel="No active capsules routed."
-          icon={<Wrench className="size-3.5" />}
-          title="Tool Router"
-        >
-          {capsules.length ? (
-            <div className="grid gap-2">
-              <div className="flex flex-wrap gap-1.5">
-                {categories.map(([category, count]) => (
-                  <Badge className="rounded px-2 py-1 text-[10px]" key={category} variant="secondary">
-                    {category}: {count}
-                  </Badge>
-                ))}
-              </div>
-              <div className="grid gap-1.5">
-                {capsules.slice(0, 6).map((capsule) => (
-                  <div
-                    className="grid min-w-0 gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2"
-                    key={capsule.id}
-                  >
-                    <div className="flex min-w-0 items-center justify-between gap-2">
-                      <span
-                        className="min-w-0 truncate font-mono text-[11px] text-foreground"
-                        title={capsule.callableName ?? capsule.id}
-                      >
-                        {capsule.callableName ?? capsule.id}
-                      </span>
-                      <Badge className="rounded px-1.5 py-0.5 text-[10px]" variant="secondary">
-                        {capsule.risk}
-                      </Badge>
-                    </div>
-                    <p className="min-w-0 truncate font-mono text-[10px] text-muted-foreground" title={capsule.id}>
-                      {capsule.id}
-                    </p>
-                    <p className="min-w-0 truncate text-[11px] text-muted-foreground">
-                      {capsule.category}
-                      {capsule.outputBudgetTokens ? ` - ${capsule.outputBudgetTokens} token cap` : ""}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </HarnessColumn>
-
-        <HarnessColumn
-          emptyLabel="No reduced evidence captured."
-          icon={<Terminal className="size-3.5" />}
-          title="Evidence Compiler"
-        >
-          {evidence.length ? (
-            <div className="grid gap-1.5">
-              {evidence.slice(0, 6).map((item) => (
-                <div
-                  className="grid min-w-0 gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2"
-                  key={item.id}
-                >
-                  <div className="flex min-w-0 items-center justify-between gap-2">
-                    <span className="min-w-0 truncate text-[11px] font-semibold">{item.kind}</span>
-                    <span className={cn("shrink-0 text-[10px] font-semibold", confidenceClass(item.confidence))}>
-                      {item.confidence}
-                    </span>
-                  </div>
-                  <p className="line-clamp-2 min-w-0 text-[11px] leading-4 text-muted-foreground">
-                    {item.claim}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </HarnessColumn>
-
-        <HarnessColumn
-          emptyLabel="No finding candidates emitted."
-          icon={<ShieldCheck className="size-3.5" />}
-          title="Finding Engine"
-        >
-          {findingCandidates.length ? (
-            <div className="grid gap-1.5">
-              {findingCandidates.slice(0, 6).map((finding) => (
-                <div
-                  className="grid min-w-0 gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2"
-                  key={finding.id}
-                >
-                  <div className="flex min-w-0 items-center justify-between gap-2">
-                    <span className="min-w-0 truncate text-[11px] font-semibold" title={finding.title}>
-                      {finding.title}
-                    </span>
-                    <SeverityBadge severity={finding.severity} />
-                  </div>
-                  <p className="min-w-0 truncate text-[11px] text-muted-foreground">
-                    {finding.status} - {finding.confidence}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : latestRuns.length ? (
-            <div className="grid gap-1.5">
-              {latestRuns.map((toolRun) => (
-                <div
-                  className="grid min-w-0 gap-1 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2"
-                  key={toolRun.id}
-                >
-                  <div className="flex min-w-0 items-center justify-between gap-2">
-                    <span className="min-w-0 truncate font-mono text-[11px]" title={toolRun.toolId}>
-                      {toolRun.toolId}
-                    </span>
-                    <span className="shrink-0 text-[10px] text-muted-foreground">
-                      {toolRun.status}
-                    </span>
-                  </div>
-                  <p className="line-clamp-2 min-w-0 text-[11px] leading-4 text-muted-foreground">
-                    {toolRun.summary}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </HarnessColumn>
-      </div>
-    </section>
-  );
-}
-
-function HarnessColumn({
-  children,
-  emptyLabel,
-  icon,
-  title,
-}: {
-  children: React.ReactNode;
-  emptyLabel: string;
-  icon: React.ReactNode;
-  title: string;
-}) {
-  const hasContent = React.Children.count(children) > 0;
-
-  return (
-    <section className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-2.5">
-      <div className="mb-2 flex min-w-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {icon}
-        <span className="truncate">{title}</span>
-      </div>
-      {hasContent ? (
-        children
-      ) : (
-        <div className="grid min-h-24 place-items-center rounded-md border border-dashed border-[color:var(--app-border)] px-3 py-4 text-center text-[11px] leading-4 text-muted-foreground">
-          {emptyLabel}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function AgentInspector({
   activeTab,
   agent,
   isOpen,
   logs,
   onOpenDetails,
-  onRunWorkflow,
   onTabChange,
   onToggleOpen,
   onUpdateAgent,
@@ -2415,7 +2339,6 @@ function AgentInspector({
   isOpen: boolean;
   logs: AgentExecutionLog[];
   onOpenDetails: () => void;
-  onRunWorkflow: () => void;
   onTabChange: (tab: InspectorTab) => void;
   onToggleOpen: () => void;
   onUpdateAgent: (patch: Partial<AgentDefinition>) => void;
@@ -2542,7 +2465,7 @@ function AgentInspector({
         value={activeTab}
       >
         <div className="border-b border-[color:var(--app-border)] px-4 py-3">
-          <TabsList className="grid h-8 w-full min-w-0 grid-cols-[repeat(4,minmax(0,1fr))] overflow-hidden rounded-md bg-[var(--app-surface)] p-0.5">
+          <TabsList className="grid h-8 w-full min-w-0 grid-cols-[repeat(3,minmax(0,1fr))] overflow-hidden rounded-md bg-[var(--app-surface)] p-0.5">
             <TabsTrigger className="h-full min-w-0 flex-none overflow-hidden text-ellipsis px-1 text-[11px]" value="overview">
               Overview
             </TabsTrigger>
@@ -2551,9 +2474,6 @@ function AgentInspector({
             </TabsTrigger>
             <TabsTrigger className="h-full min-w-0 flex-none overflow-hidden text-ellipsis px-1 text-[11px]" value="permissions">
               Access
-            </TabsTrigger>
-            <TabsTrigger className="h-full min-w-0 flex-none overflow-hidden text-ellipsis px-1 text-[11px]" value="runs">
-              Runs
             </TabsTrigger>
           </TabsList>
         </div>
@@ -2768,207 +2688,10 @@ function AgentInspector({
               <PermissionsList />
             </TabsContent>
 
-            <TabsContent className="mt-0 min-w-0 space-y-4" value="runs">
-              <RunStatusCard
-                activeAgent={agent.name}
-                compact
-                onOpenDetails={onOpenDetails}
-                run={run}
-                workflowName={workflow.name}
-              />
-              <Button className="h-8 w-full gap-1.5 text-xs" onClick={onRunWorkflow} type="button">
-                <Play className="size-3.5" />
-                Run Agent Workflow
-              </Button>
-            </TabsContent>
           </div>
         </ScrollArea>
       </Tabs>
     </aside>
-  );
-}
-
-function RunStatusCard({
-  activeAgent,
-  compact = false,
-  onOpenDetails,
-  run,
-  workflowName,
-}: {
-  activeAgent: string;
-  compact?: boolean;
-  onOpenDetails?: () => void;
-  run: RunSnapshot;
-  workflowName: string;
-}) {
-  return (
-    <section className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-2">
-            <h3 className="truncate text-sm font-semibold">{workflowName}</h3>
-            <RunStatusBadge status={run.status} />
-          </div>
-          <div className="mt-2 grid gap-1 text-[11px] text-muted-foreground">
-            <span>Active Agent: {activeAgent}</span>
-            <span>Active Tool: {run.activeTool}</span>
-          </div>
-        </div>
-        <Button
-          className="h-7 px-2 text-[11px]"
-          disabled={!onOpenDetails}
-          onClick={onOpenDetails}
-          type="button"
-          variant="outline"
-        >
-          Open Run
-        </Button>
-      </div>
-
-      <div className="mt-4 grid gap-2">
-        {run.steps.map((step) => (
-          <div className="grid grid-cols-[18px_minmax(0,1fr)] items-center gap-2 text-xs" key={step.label}>
-            <ProgressGlyph state={step.state} />
-            <span className={cn("min-w-0 truncate", step.state === "pending" && "text-muted-foreground")}>
-              {step.label}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className={cn("mt-4 grid gap-2", compact ? "grid-cols-2" : "grid-cols-4")}>
-        {[
-          ["Events", String(run.steps.filter((step) => step.state !== "pending").length)],
-          ["Issues", String(run.issueCount)],
-          ["Warnings", String(run.warningCount)],
-          ["Evidence", String(run.evidenceArtifacts.length)],
-        ].map(([label, value]) => (
-          <div
-            className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-2"
-            key={label}
-          >
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {label}
-            </div>
-            <div className="mt-0.5 text-sm font-semibold tabular-nums">{value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-3 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] p-2">
-        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Evidence produced
-        </div>
-        {run.evidenceArtifacts.length ? (
-          <div className="flex flex-wrap gap-1.5">
-            {run.evidenceArtifacts.map((item) => (
-              <Badge className="max-w-full rounded px-2 py-1 text-[10px]" key={item} variant="secondary">
-                {item}
-              </Badge>
-            ))}
-          </div>
-        ) : (
-          <p className="text-[11px] leading-4 text-muted-foreground">
-            No evidence artifacts recorded for this workflow run.
-          </p>
-        )}
-        {run.latestError ? (
-          <p className="mt-2 rounded border border-red-500/20 bg-red-500/10 p-2 text-[11px] leading-4 text-red-200">
-            {run.latestError}
-          </p>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function WorkflowPreviewCard({
-  onRunNode,
-  onWorkflowChange,
-  workflow,
-}: {
-  onRunNode: (nodeId: string) => void;
-  onWorkflowChange: (workflow: AgentWorkflow) => void;
-  workflow: AgentWorkflow;
-}) {
-  return (
-    <section className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] p-3">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold">Workflow Preview</h3>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button className="h-7 px-2 text-[11px]" type="button" variant="outline">
-              Open Editor
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="h-[min(760px,calc(100vh-3rem))] max-w-[min(1180px,calc(100vw-3rem))] grid-rows-[auto_minmax(0,1fr)] p-0">
-            <DialogHeader className="border-b border-[color:var(--app-border)] px-4 py-3">
-              <DialogTitle className="text-sm">{workflow.name}</DialogTitle>
-              <DialogDescription className="text-xs">
-                Selected agent workflow graph.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="min-h-0">
-              <AgentWorkflowCanvas
-                onRunNode={onRunNode}
-                onWorkflowChange={onWorkflowChange}
-                workflow={workflow}
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {workflow.nodes.map((node, index) => (
-          <React.Fragment key={node.id}>
-            <span className="rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2 py-1.5 text-[11px] text-foreground">
-              {node.data.label}
-            </span>
-            {index < workflow.nodes.length - 1 ? (
-              <ChevronRight className="size-3.5 text-muted-foreground" />
-            ) : null}
-          </React.Fragment>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ActivityTable({ rows }: { rows: ActivityRow[] }) {
-  return (
-    <section className="overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
-      <div className="overflow-x-auto">
-        <div className="min-w-[760px]">
-          <div className="grid grid-cols-[84px_190px_86px_minmax(0,1fr)_220px] gap-3 border-b border-[color:var(--app-border)] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <span>Time</span>
-            <span>Agent</span>
-            <span>Level</span>
-            <span>Event</span>
-            <span>Tool Used</span>
-          </div>
-          {rows.length ? (
-            rows.map((row, index) => (
-              <div
-                className="grid grid-cols-[84px_190px_86px_minmax(0,1fr)_220px] gap-3 border-b border-[color:var(--app-border)] px-3 py-2 text-xs last:border-b-0 hover:bg-[var(--app-subtle)]"
-                key={`${row.timestamp}-${row.agent}-${index}`}
-              >
-                <span className="tabular-nums text-muted-foreground">{row.timestamp}</span>
-                <span className="truncate font-medium">{row.agent}</span>
-                <span className={cn("truncate font-semibold uppercase", logLevelClass(row.level))}>
-                  {row.level}
-                </span>
-                <span className="truncate text-muted-foreground">{row.event}</span>
-                <span className="truncate font-mono text-[11px] text-muted-foreground">{row.tool}</span>
-              </div>
-            ))
-          ) : (
-            <div className="px-4 py-8 text-center text-xs text-muted-foreground">
-              No agent activity recorded yet.
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -3149,11 +2872,11 @@ function MetricTile({
   value: string;
 }) {
   return (
-    <div className="min-w-0 rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)] px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="min-w-0 rounded border border-[color:var(--app-border)] bg-black/10 px-2 py-1.5">
+      <div className="text-[10px] text-muted-foreground">
         {label}
       </div>
-      <div className="mt-1 truncate text-xs font-semibold" title={value}>
+      <div className="mt-1 truncate font-mono text-xs font-semibold text-foreground" title={value}>
         {value}
       </div>
     </div>
@@ -3176,44 +2899,6 @@ function PermissionValue({ value }: { value: string }) {
   );
 }
 
-function RunDetailStatusBadge({ status }: { status: AgentRunDetailStatus }) {
-  return (
-    <Badge
-      className={cn(
-        "rounded px-1.5 py-0.5 text-[10px]",
-        status === "idle" && "bg-muted text-muted-foreground",
-        status === "running" && "bg-sky-500/15 text-sky-300",
-        status === "completed" && "bg-emerald-500/15 text-emerald-300",
-        status === "blocked" && "bg-red-500/15 text-red-300",
-        status === "stopped" && "bg-amber-500/15 text-amber-300",
-      )}
-      variant="secondary"
-    >
-      {detailStatusLabel(status)}
-    </Badge>
-  );
-}
-
-function RunDetailEventIcon({ event }: { event: AgentRunDetailEvent }) {
-  const iconClass = cn(
-    "size-3.5",
-    event.level === "error" && "text-red-300",
-    event.level === "warning" && "text-amber-300",
-    event.level === "trace" && "text-sky-300",
-    event.level === "info" && "text-emerald-300",
-  );
-
-  return (
-    <span className="mt-0.5 grid size-6 place-items-center rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
-      {event.kind === "tool" ? <Wrench className={iconClass} /> : null}
-      {event.kind === "model" || event.kind === "reasoning" ? <MessageSquareText className={iconClass} /> : null}
-      {event.kind === "error" ? <AlertTriangle className={iconClass} /> : null}
-      {event.kind === "status" ? <CheckCircle2 className={iconClass} /> : null}
-      {event.kind === "trace" ? <Terminal className={iconClass} /> : null}
-    </span>
-  );
-}
-
 function permissionTitle(value: string) {
   if (value === "Allow") {
     return "Allowed";
@@ -3228,28 +2913,12 @@ function permissionTitle(value: string) {
   return value;
 }
 
-function ProgressGlyph({ state }: { state: string }) {
-  if (state === "done") {
-    return <CheckCircle2 className="size-3.5 text-emerald-300" />;
-  }
-
-  if (state === "active") {
-    return <CircleDot className="size-3.5 text-sky-300" />;
-  }
-
-  if (state === "blocked") {
-    return <X className="size-3.5 text-red-300" />;
-  }
-
-  return <span className="ml-0.5 size-2.5 rounded-full border border-muted-foreground/45" />;
-}
-
 function AgentIcon({ agent }: { agent: AgentDefinition }) {
   const Icon = agentIcon(agent);
 
   return (
-    <span className="grid size-8 place-items-center rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] text-muted-foreground">
-      <Icon className="size-4" />
+    <span className="grid size-7 place-items-center rounded text-muted-foreground">
+      <Icon className="size-3.5" aria-hidden="true" />
     </span>
   );
 }
@@ -3278,42 +2947,6 @@ function StatusBadge({ status }: { status: AgentStatus }) {
       variant="secondary"
     >
       {display}
-    </Badge>
-  );
-}
-
-function RunStatusBadge({ status }: { status: RunSnapshot["status"] }) {
-  return (
-    <Badge
-      className={cn(
-        "rounded px-1.5 py-0.5 text-[10px]",
-        status === "Idle" && "bg-muted text-muted-foreground",
-        status === "Running" && "bg-sky-500/15 text-sky-300",
-        status === "Completed" && "bg-emerald-500/15 text-emerald-300",
-        status === "Blocked" && "bg-red-500/15 text-red-300",
-        status === "Stopped" && "bg-amber-500/15 text-amber-300",
-      )}
-      variant="secondary"
-    >
-      {status}
-    </Badge>
-  );
-}
-
-function SeverityBadge({ severity }: { severity: FindingCandidate["severity"] }) {
-  return (
-    <Badge
-      className={cn(
-        "rounded px-1.5 py-0.5 text-[10px]",
-        severity === "critical" && "bg-red-500/20 text-red-200",
-        severity === "high" && "bg-red-500/15 text-red-300",
-        severity === "medium" && "bg-amber-500/15 text-amber-300",
-        severity === "low" && "bg-sky-500/15 text-sky-300",
-        severity === "info" && "bg-muted text-muted-foreground",
-      )}
-      variant="secondary"
-    >
-      {severity}
     </Badge>
   );
 }
@@ -3478,25 +3111,6 @@ function groupTools(tools: string[]): Array<[string, string[]]> {
   return Array.from(groups.entries());
 }
 
-function activityRows(logs: AgentExecutionLog[], agents: AgentDefinition[]): ActivityRow[] {
-  return logs.slice(-12).reverse().map((log) => {
-    const agent = agents.find((candidate) => candidate.id === log.agentId);
-    const tool = inferToolFromMessage(log.message) ?? "none";
-
-    return {
-      timestamp: new Date(log.timestamp).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }),
-      agent: agent?.name ?? "Agent",
-      event: compactEvent(log.message),
-      level: log.level,
-      tool,
-    };
-  });
-}
-
 function inferToolFromMessage(message: string) {
   return message.match(/rust\.[a-z_.]+/)?.[0];
 }
@@ -3626,77 +3240,6 @@ function extractEvidenceArtifacts(logs: AgentExecutionLog[]) {
   return Array.from(artifacts);
 }
 
-function createHarnessRoutePreview({
-  agent,
-  projectContext,
-  workflow,
-}: {
-  agent: AgentDefinition;
-  projectContext: AgentToolProjectContext | null;
-  workflow: AgentWorkflow;
-}): HarnessRoutePreview {
-  const toolState = createAgentToolRuntimeState(
-    projectContext ?? {
-      rootPath: "",
-      packagePath: ".",
-      packageName: workflow.name,
-      manifestPath: "",
-      packageTree: null,
-    },
-  );
-  const routePlan = routeTools(resolveAgentTools(toolState, agent.tools), {
-    activeToolIds: agent.tools,
-    objective: agent.description || workflow.description,
-    role: agentRoleForHarnessPreview(agent, workflow),
-  });
-
-  return {
-    capsules: routePlan.capsules,
-    decisions: routePlan.decisions,
-  };
-}
-
-function agentRoleForHarnessPreview(
-  agent: AgentDefinition,
-  workflow: AgentWorkflow,
-): AgentRole {
-  const text = `${agent.name} ${agent.description} ${workflow.name} ${workflow.description}`.toLowerCase();
-
-  if (text.includes("test")) {
-    return "testGeneration";
-  }
-  if (text.includes("fuzz")) {
-    return "fuzzCampaign";
-  }
-  if (text.includes("formal") || text.includes("spec")) {
-    return "formalSpec";
-  }
-  if (text.includes("patch")) {
-    return "patch";
-  }
-  if (text.includes("document") || text.includes("report")) {
-    return "report";
-  }
-  if (text.includes("triage")) {
-    return "triage";
-  }
-  if (text.includes("ci")) {
-    return "ci";
-  }
-
-  return "securityReview";
-}
-
-function categoryCounts(capsules: ToolCapsule[]) {
-  const counts = new Map<string, number>();
-
-  for (const capsule of capsules) {
-    counts.set(capsule.category, (counts.get(capsule.category) ?? 0) + 1);
-  }
-
-  return Array.from(counts.entries());
-}
-
 function mergeById<T extends { id: string }>(existing: T[], incoming: T[]) {
   const merged = new Map(existing.map((item) => [item.id, item] as const));
 
@@ -3776,23 +3319,6 @@ function createRunDetailEvent(
   };
 }
 
-function detailStatusLabel(status: AgentRunDetailStatus) {
-  if (status === "running") {
-    return "Running";
-  }
-  if (status === "completed") {
-    return "Completed";
-  }
-  if (status === "blocked") {
-    return "Blocked";
-  }
-  if (status === "stopped") {
-    return "Stopped";
-  }
-
-  return "Idle";
-}
-
 function displayStreamToolName(toolName: string) {
   return toolName.replace(/_/g, ".");
 }
@@ -3858,20 +3384,6 @@ function durationLabel(durationMs: number) {
   const remainingSeconds = seconds % 60;
 
   return remainingSeconds ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
-}
-
-function logLevelClass(level: AgentExecutionLog["level"]) {
-  if (level === "error") {
-    return "text-red-300";
-  }
-  if (level === "warning") {
-    return "text-amber-300";
-  }
-  if (level === "trace") {
-    return "text-sky-300";
-  }
-
-  return "text-emerald-300";
 }
 
 function latestAgentReport(logs: AgentExecutionLog[]) {

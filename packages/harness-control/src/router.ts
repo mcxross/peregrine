@@ -180,6 +180,7 @@ function stageForManifest(manifest: ToolManifest): ToolRouteStage {
   switch (manifest.category) {
     case "index":
     case "knowledge":
+    case "workspace":
     case "staticAnalysis":
       return 1;
     case "context":
@@ -201,6 +202,7 @@ function stageForManifest(manifest: ToolManifest): ToolRouteStage {
 }
 
 function inferCategory(toolId: string) {
+  if (toolId.startsWith("cc.") || toolId.startsWith("workspace.")) return "workspace";
   if (toolId.includes(".index.") || toolId.startsWith("index.")) return "index";
   if (toolId.includes(".knowledge.")) return "knowledge";
   if (toolId.includes(".static.")) return "staticAnalysis";
@@ -218,6 +220,7 @@ function inferCategory(toolId: string) {
 }
 
 function inferReducerId(toolId: string) {
+  if (toolId.startsWith("cc.") || toolId.startsWith("workspace.")) return "workspace";
   if (toolId.includes(".static.")) return "staticAnalysis";
   if (toolId.includes(".graph.")) return "graph";
   if (toolId.includes(".bytecode.")) return "bytecode";

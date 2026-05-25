@@ -112,6 +112,16 @@ function expandIntentDiscoveryTools(
     new Set([
       "rust.index.package",
       "rust.index.package_overview",
+      "workspace.permissions.describe",
+      "cc.tools.list",
+      "cc.glob",
+      "cc.grep",
+      "cc.read",
+      "cc.task.create",
+      "cc.task.list",
+      "cc.task.get",
+      "cc.task.update",
+      "cc.todo.write",
       ...activeToolIds,
     ]),
   );

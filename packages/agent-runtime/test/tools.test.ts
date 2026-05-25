@@ -114,7 +114,7 @@ describe("agent runtime tools", () => {
     const instructions = buildAgentInstructions(packet);
 
     expect(instructions).toContain("Sui/Move security knowledge pack");
-    expect(instructions).toContain("contract-hero/sui-pilot");
+    expect(instructions).toContain("bundled docs");
     expect(instructions).toContain("public fun` is programmable-transaction-block composable");
     expect(instructions).toContain("absence of `entry` is not by itself a safety boundary");
   });

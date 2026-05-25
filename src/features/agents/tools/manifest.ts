@@ -49,6 +49,7 @@ export function attachDefaultToolManifest(
 }
 
 function categoryForTool(toolId: string) {
+  if (toolId.startsWith("cc.") || toolId.startsWith("workspace.")) return "workspace";
   if (toolId.includes(".index.") || toolId.startsWith("index.")) return "index";
   if (toolId.includes(".knowledge.")) return "knowledge";
   if (toolId.includes(".static.")) return "staticAnalysis";
@@ -66,6 +67,7 @@ function categoryForTool(toolId: string) {
 }
 
 function reducerForTool(toolId: string) {
+  if (toolId.startsWith("cc.") || toolId.startsWith("workspace.")) return "workspace";
   if (toolId.includes(".static.")) return "staticAnalysis";
   if (toolId.includes(".graph.")) return "graph";
   if (toolId.includes(".bytecode.")) return "bytecode";
@@ -143,6 +145,11 @@ function whenToUse(toolId: string, category: string) {
       "Use when a Sui/Move language, framework, object model, prover, or security-review rule needs exact local documentation context.",
     ];
   }
+  if (category === "workspace") {
+    return [
+      "Use for bounded workspace file search/read/edit operations, task tracking, policy inspection, or approval-gated network fetches.",
+    ];
+  }
   if (category === "staticAnalysis") {
     return ["Use for deterministic source-level findings, diagnostics, and precise locations."];
   }
@@ -204,6 +211,13 @@ function whenNotToUse(toolId: string, category: string) {
       "Do not use as vulnerability proof; local documentation explains semantics, while source, graph, bytecode, and test evidence prove findings.",
     ];
   }
+  if (category === "workspace") {
+    return [
+      ...generic,
+      "Do not use write/edit/network tools when the run has not been explicitly allowed to modify files or access the network.",
+      "Do not use workspace search/read results as vulnerability proof without graph, static, bytecode, or dynamic evidence.",
+    ];
+  }
 
   if (category === "patch") {
     return [
@@ -216,6 +230,7 @@ function whenNotToUse(toolId: string, category: string) {
 }
 
 function expectedLatencyMs(toolId: string) {
+  if (toolId === "cc.web.fetch") return 8_000;
   if (toolId.includes(".fuzz")) return 30_000;
   if (toolId.includes("assert_property")) return 45_000;
   if (toolId.includes(".validation.run_suite")) return 60_000;
@@ -228,6 +243,8 @@ function expectedLatencyMs(toolId: string) {
 }
 
 function outputBudgetTokens(toolId: string) {
+  if (toolId === "cc.read" || toolId === "cc.web.fetch") return 1_200;
+  if (toolId.startsWith("cc.") || toolId.startsWith("workspace.")) return 800;
   if (toolId.includes(".bytecode.")) return 900;
   if (toolId.includes(".audit.")) return 1_200;
   if (toolId.includes(".knowledge.sui_move.read")) return 1_500;

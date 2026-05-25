@@ -125,7 +125,11 @@ pub(crate) async fn save_text_file(
     include_highlighted_html: Option<bool>,
 ) -> Result<FilePreview, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let file_path = resolve_package_child_path(&root_path, &relative_path)?;
+        let file_path = resolve_package_child_write_path(&root_path, &relative_path)?;
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|error| format!("Could not create {}: {error}", parent.display()))?;
+        }
         fs::write(&file_path, contents)
             .map_err(|error| format!("Could not write {}: {error}", file_path.display()))?;
         build_file_preview(
@@ -375,6 +379,63 @@ pub(crate) fn resolve_package_child_path(
     Ok(canonical_file_path)
 }
 
+fn resolve_package_child_write_path(
+    root_path: &str,
+    relative_path: &str,
+) -> Result<PathBuf, String> {
+    let root = PathBuf::from(root_path)
+        .canonicalize()
+        .map_err(|error| format!("Could not read package directory {root_path}: {error}"))?;
+    let relative = Path::new(relative_path.trim_end_matches('/'));
+
+    if relative.as_os_str().is_empty()
+        || relative.is_absolute()
+        || relative.components().any(|component| {
+            matches!(
+                component,
+                std::path::Component::ParentDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
+        })
+    {
+        return Err("Selected file is outside of the package directory.".to_string());
+    }
+
+    let file_path = root.join(relative);
+    let Some(parent) = file_path.parent() else {
+        return Err("Selected file has no parent directory.".to_string());
+    };
+    let existing_parent = nearest_existing_parent(parent)?;
+    let canonical_parent = existing_parent
+        .canonicalize()
+        .map_err(|error| format!("Could not resolve {}: {error}", existing_parent.display()))?;
+
+    if !canonical_parent.starts_with(&root) {
+        return Err("Selected file is outside of the package directory.".to_string());
+    }
+
+    Ok(file_path)
+}
+
+fn nearest_existing_parent(path: &Path) -> Result<PathBuf, String> {
+    let mut candidate = path;
+
+    loop {
+        if candidate.exists() {
+            return Ok(candidate.to_path_buf());
+        }
+
+        let Some(parent) = candidate.parent() else {
+            return Err(format!(
+                "Could not resolve parent directory for {}.",
+                path.display()
+            ));
+        };
+        candidate = parent;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -431,6 +492,35 @@ mod tests {
 
         assert_eq!(source, "module 0x1::example { fun demo() {} }\n");
         assert_eq!(highlighted_html, "");
+    }
+
+    #[test]
+    fn resolve_write_path_allows_new_nested_file_under_root() {
+        let directory = tempdir().expect("tempdir");
+        let path = resolve_package_child_write_path(
+            &directory.path().to_string_lossy(),
+            "tests/security/pgr_001.move",
+        )
+        .expect("write path");
+
+        assert_eq!(
+            path,
+            directory
+                .path()
+                .canonicalize()
+                .expect("canonical tempdir")
+                .join("tests/security/pgr_001.move")
+        );
+    }
+
+    #[test]
+    fn resolve_write_path_rejects_parent_traversal() {
+        let directory = tempdir().expect("tempdir");
+        let error =
+            resolve_package_child_write_path(&directory.path().to_string_lossy(), "../escape.move")
+                .expect_err("parent traversal should fail");
+
+        assert!(error.contains("outside of the package directory"));
     }
 
     #[test]
