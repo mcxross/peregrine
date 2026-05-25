@@ -934,7 +934,6 @@ export function AppShell({
         isLeftPanelOpen={isLeftPanelOpen}
         layout={layout}
         hasWorkspace={!isSettings && Boolean(packageTree)}
-        mode={workspaceMode}
         network={network}
         auditReportExportAvailable={Boolean(latestAuditReportExport)}
         isExportingAuditReport={isExportingAuditReport}
@@ -945,7 +944,6 @@ export function AppShell({
         onNetworkChange={setNetwork}
         onOpenProjectConfig={() => setIsProjectConfigOpen(true)}
         onTestPackage={runTests}
-        onToggleMode={() => setWorkspaceMode((mode) => mode === "security" ? "editor" : "security")}
         onToggleLeftPanel={() => setIsLeftPanelOpen((isOpen) => !isOpen)}
         testActionState={{
           disabled: !activeMovePackage,
@@ -990,6 +988,7 @@ export function AppShell({
               mode={workspaceMode}
               network={network}
               onNetworkChange={setNetwork}
+              onToggleMode={() => setWorkspaceMode((mode) => mode === "security" ? "editor" : "security")}
               onAuditReportExportReady={setLatestAuditReportExport}
               onFormalVerificationTargetChange={setFormalVerificationTarget}
               onActivePackageManifestPathChange={setActivePackageManifestPath}

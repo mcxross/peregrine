@@ -1,10 +1,12 @@
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import React, { type CSSProperties } from "react";
+import { ArrowLeft } from "lucide-react";
 
 import {
   displayMovePackageName,
   type PackageTree,
 } from "@/features/empty-project/filesystem-tree";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type FileTreeModel = ReturnType<typeof useFileTree>["model"];
@@ -13,10 +15,12 @@ type ProjectFileTreeProps = {
   packageTree: PackageTree;
   selectedPath: string | null;
   side?: "left" | "right";
+  onBackToSecurity?: () => void;
   onSelectPath: (path: string | null) => void;
 };
 
 export function ProjectFileTree({
+  onBackToSecurity,
   packageTree,
   selectedPath,
   side = "left",
@@ -30,12 +34,29 @@ export function ProjectFileTree({
       )}
     >
       <header className="min-w-0 border-b px-4 py-3">
-        <h2 className="truncate text-sm font-semibold">
-          {displayMovePackageName(packageTree.rootName)}
-        </h2>
-        <p className="mt-1 truncate text-xs text-muted-foreground">
-          {packageTree.rootPath}
-        </p>
+        <div className="flex min-w-0 items-start gap-2">
+          {onBackToSecurity ? (
+            <Button
+              aria-label="Back to security workspace"
+              className="-ml-1 mt-0.5 size-8 shrink-0 text-muted-foreground hover:bg-[var(--app-subtle)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
+              onClick={onBackToSecurity}
+              size="icon-sm"
+              title="Security"
+              type="button"
+              variant="ghost"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+            </Button>
+          ) : null}
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold leading-6">
+              {displayMovePackageName(packageTree.rootName)}
+            </h2>
+            <p className="truncate text-xs leading-5 text-muted-foreground">
+              {packageTree.rootPath}
+            </p>
+          </div>
+        </div>
       </header>
       <ProjectFileTreeBody
         key={packageTree.rootPath}

@@ -22,6 +22,7 @@ import { findModuleByPath } from "@/features/project-workspace/source-paths";
 
 type ProjectSourceEditorWorkspaceProps = {
   activeMovePackage: MovePackage | null;
+  onBackToSecurity?: () => void;
   onClearSelectedModule: () => void;
   onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
   packageTree: PackageTree;
@@ -29,6 +30,7 @@ type ProjectSourceEditorWorkspaceProps = {
 
 export function ProjectSourceEditorWorkspace({
   activeMovePackage,
+  onBackToSecurity,
   onClearSelectedModule,
   onSelectModule,
   packageTree,
@@ -259,6 +261,7 @@ export function ProjectSourceEditorWorkspace({
       style={{ gridTemplateColumns: "280px minmax(0,1fr)" }}
     >
       <ProjectFileTree
+        onBackToSecurity={onBackToSecurity}
         packageTree={packageTree}
         selectedPath={selectedPath}
         onSelectPath={(path) => {

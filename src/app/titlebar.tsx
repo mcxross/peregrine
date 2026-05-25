@@ -2,7 +2,6 @@ import React from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Bug,
-  Code2,
   FlaskConical,
   Gauge,
   Hammer,
@@ -11,7 +10,6 @@ import {
   PanelLeftOpen,
   Play,
   Share,
-  ShieldCheck,
   SquareFunction,
 } from "lucide-react";
 
@@ -24,7 +22,7 @@ import {
 } from "@/layout/window-chrome";
 import { SuiNetworkSelector } from "@/app/sui-network-selector";
 import type { SuiNetworkSelection } from "@/app/sui-network";
-import type { WorkspaceMode, WorkspaceTab } from "@/app/workspace-types";
+import type { WorkspaceTab } from "@/app/workspace-types";
 
 type TitlebarProps = {
   activeWorkspaceTab?: WorkspaceTab;
@@ -37,7 +35,6 @@ type TitlebarProps = {
   isExportingAuditReport?: boolean;
   layout: LayoutSettings;
   hasWorkspace?: boolean;
-  mode?: WorkspaceMode;
   network: SuiNetworkSelection;
   onBuildPackage?: () => void;
   onCheckCoverage?: () => void;
@@ -47,7 +44,6 @@ type TitlebarProps = {
   onNetworkChange: (network: SuiNetworkSelection) => void;
   onOpenProjectConfig?: () => void;
   onTestPackage?: () => void;
-  onToggleMode?: () => void;
   onToggleLeftPanel?: () => void;
   showNetworkSelector?: boolean;
   testActionState?: WorkspaceActionState;
@@ -64,7 +60,6 @@ export function Titlebar({
   isExportingAuditReport = false,
   layout,
   hasWorkspace = true,
-  mode = "security",
   network,
   onBuildPackage,
   onCheckCoverage,
@@ -74,7 +69,6 @@ export function Titlebar({
   onNetworkChange,
   onOpenProjectConfig,
   onTestPackage,
-  onToggleMode,
   onToggleLeftPanel,
   showNetworkSelector = true,
   testActionState,
@@ -179,11 +173,6 @@ export function Titlebar({
 
       {hasWorkspace ? (
         <div className="flex h-full items-center justify-end gap-4 pr-5" onPointerDown={(event) => event.stopPropagation()}>
-          <TitlebarAction
-            icon={mode === "security" ? Code2 : ShieldCheck}
-            label={mode === "security" ? "Editor" : "Security"}
-            onClick={onToggleMode}
-          />
           <TitlebarAction
             disabled={!auditReportExportAvailable || isExportingAuditReport}
             icon={Share}

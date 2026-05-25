@@ -32,6 +32,7 @@ type WorkspaceProps = {
   mode: WorkspaceMode;
   network: SuiNetworkSelection;
   onNetworkChange: (network: SuiNetworkSelection) => void;
+  onToggleMode: () => void;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
   onAuditReportExportReady?: (report: AuditReportExport | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
@@ -52,6 +53,7 @@ export function Workspace({
   mode,
   network,
   onNetworkChange,
+  onToggleMode,
   onActivePackageManifestPathChange,
   onAuditReportExportReady,
   onCommandLog,
@@ -73,6 +75,7 @@ export function Workspace({
           loadAssessment={loadAssessment}
           mode={mode}
           network={network}
+          onToggleMode={onToggleMode}
           onActivePackageManifestPathChange={onActivePackageManifestPathChange}
           onAuditReportExportReady={onAuditReportExportReady}
           onCommandLog={onCommandLog}

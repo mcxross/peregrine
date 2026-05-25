@@ -5,6 +5,7 @@ import {
   Bot,
   Check,
   ChevronDown,
+  Code2,
   FileCode2,
   Gauge,
   GitBranch,
@@ -14,6 +15,7 @@ import {
   PanelRightClose,
   ScanEye,
   ShieldAlert,
+  ShieldCheck,
   Workflow,
 } from "lucide-react";
 
@@ -105,6 +107,7 @@ type ProjectWorkspaceProps = {
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onFormalVerificationTargetChange: (target: FormalVerificationTarget | null) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
+  onToggleMode: () => void;
   onWorkspaceTabChange: (tab: WorkspaceTab) => void;
   packageTree: PackageTree;
 };
@@ -189,6 +192,7 @@ export function ProjectWorkspace({
   onCommandLog,
   onFormalVerificationTargetChange,
   onProjectSelected,
+  onToggleMode,
   onWorkspaceTabChange,
   packageTree,
 }: ProjectWorkspaceProps) {
@@ -392,6 +396,7 @@ export function ProjectWorkspace({
               onAuditReportExportReady={onAuditReportExportReady}
               onCommandLog={onCommandLog}
               onProjectSelected={onProjectSelected}
+              onToggleMode={onToggleMode}
               onExploreTabChange={setActiveExploreTab}
               onClearSelectedModule={() => setSelectedModule(null)}
               onOpenSourceLocation={openSourceLocation}
@@ -453,6 +458,7 @@ function WorkspaceMainPanel({
   onExploreTabChange,
   onOpenSourceLocation,
   onSelectModule,
+  onToggleMode,
   packageTree,
   packageName,
   selectedModule,
@@ -474,6 +480,7 @@ function WorkspaceMainPanel({
   onOpenSourceLocation: (location: TypeGraphSourceLocation) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
   onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
+  onToggleMode: () => void;
   packageTree: PackageTree;
   packageName: string;
   selectedModule: SelectedMoveModule | null;
@@ -483,6 +490,7 @@ function WorkspaceMainPanel({
     return (
       <ProjectSourceEditorWorkspace
         activeMovePackage={activeMovePackage}
+        onBackToSecurity={onToggleMode}
         onClearSelectedModule={onClearSelectedModule}
         onSelectModule={onSelectModule}
         packageTree={packageTree}
@@ -527,6 +535,7 @@ function WorkspaceMainPanel({
       onOpenSourceLocation={onOpenSourceLocation}
       onProjectSelected={onProjectSelected}
       onSelectModule={onSelectModule}
+      onToggleMode={onToggleMode}
       packageName={packageName}
       packageTree={packageTree}
       selectedModule={selectedModule}
@@ -544,6 +553,7 @@ function ExploreMainPanel({
   onOpenSourceLocation,
   onProjectSelected,
   onSelectModule,
+  onToggleMode,
   packageName,
   packageTree,
   selectedModule,
@@ -557,6 +567,7 @@ function ExploreMainPanel({
   onOpenSourceLocation: (location: TypeGraphSourceLocation) => void;
   onProjectSelected: (packageTree: PackageTree) => void;
   onSelectModule: (movePackage: MovePackage, moveModule: MoveModule) => void;
+  onToggleMode: () => void;
   packageName: string;
   packageTree: PackageTree;
   selectedModule: SelectedMoveModule | null;
@@ -564,8 +575,9 @@ function ExploreMainPanel({
 }) {
   return (
     <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
-      <div className="row-start-1 flex min-w-0 justify-start px-5 pb-2 pt-2">
+      <div className="row-start-1 grid min-w-0 grid-cols-[1fr_auto] items-center gap-3 px-5 pb-2 pt-2">
         <ExploreTabSwitch activeTab={activeExploreTab} onTabChange={onExploreTabChange} />
+        <WorkspaceModeSwitch mode="security" onToggleMode={onToggleMode} />
       </div>
 
       <div className="row-start-2 min-h-0 overflow-hidden">
@@ -609,6 +621,32 @@ function ExploreMainPanel({
   );
 }
 
+function WorkspaceModeSwitch({
+  mode,
+  onToggleMode,
+}: {
+  mode: WorkspaceMode;
+  onToggleMode: () => void;
+}) {
+  const isSecurityMode = mode === "security";
+  const Icon = isSecurityMode ? Code2 : ShieldCheck;
+  const label = isSecurityMode ? "Editor" : "Security";
+
+  return (
+    <Button
+      aria-label={isSecurityMode ? "Open editor workspace" : "Back to security workspace"}
+      className="h-8 shrink-0 gap-1.5 rounded bg-[var(--app-elevated)] px-3 text-xs font-medium text-foreground shadow-sm hover:bg-[var(--app-elevated)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
+      onClick={onToggleMode}
+      title={label}
+      type="button"
+      variant="ghost"
+    >
+      <Icon className="size-3.5" aria-hidden="true" />
+      <span>{label}</span>
+    </Button>
+  );
+}
+
 const exploreTabs: Array<{
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   id: ExploreTab;
@@ -631,7 +669,7 @@ function ExploreTabSwitch({
   return (
     <div
       aria-label="Explore sections"
-      className="grid h-10 shrink-0 grid-cols-5 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-1 shadow-sm"
+      className="inline-flex h-10 w-fit shrink-0 justify-self-start overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-1 shadow-sm"
     >
       {exploreTabs.map((tab) => {
         const Icon = tab.icon;
@@ -641,7 +679,7 @@ function ExploreTabSwitch({
           <button
             aria-pressed={active}
             className={cn(
-              "inline-flex h-full min-w-0 items-center justify-center gap-1.5 rounded px-2.5 text-xs font-medium leading-none text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+              "inline-flex h-full min-w-0 items-center justify-center gap-1.5 rounded px-3 text-xs font-medium leading-none text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
               active && "bg-[var(--app-elevated)] text-foreground shadow-sm",
             )}
             key={tab.id}
