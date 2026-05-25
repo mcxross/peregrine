@@ -1,0 +1,7 @@
+[package]
+name = "peregrine-terminal"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+portable-pty = { workspace = true }

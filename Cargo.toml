@@ -17,6 +17,7 @@ members = [
   "crates/peregrine-plugins",
   "crates/peregrine-scanner",
   "crates/peregrine-static-analysis",
+  "crates/peregrine-terminal",
   "crates/peregrine-types",
 ]
 resolver = "2"
@@ -65,8 +66,10 @@ peregrine-project-loader = { path = "crates/peregrine-project-loader" }
 peregrine-plugins = { path = "crates/peregrine-plugins" }
 peregrine-scanner = { path = "crates/peregrine-scanner" }
 peregrine-static-analysis = { path = "crates/peregrine-static-analysis" }
+peregrine-terminal = { path = "crates/peregrine-terminal" }
 peregrine-types = { path = "crates/peregrine-types" }
 pulldown-cmark = "0.12"
+portable-pty = "0.9"
 reqwest = { version = "0.13.2", default-features = false, features = ["rustls"] }
 regex = "1"
 rusqlite = { version = "0.37", features = ["bundled"] }

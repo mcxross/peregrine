@@ -5,3 +5,4 @@ pub(crate) mod metadata;
 pub(crate) mod move_analyzer;
 pub(crate) mod plugins;
 pub(crate) mod sui;
+pub(crate) mod terminal;

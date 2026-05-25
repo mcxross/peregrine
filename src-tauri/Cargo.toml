@@ -34,6 +34,7 @@ peregrine-move-model = { workspace = true }
 peregrine-project-loader = { workspace = true }
 peregrine-plugins = { workspace = true }
 peregrine-static-analysis = { workspace = true }
+peregrine-terminal = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

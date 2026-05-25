@@ -16,6 +16,7 @@ import {
   ScanEye,
   ShieldAlert,
   ShieldCheck,
+  SquareTerminal,
   Workflow,
 } from "lucide-react";
 
@@ -89,6 +90,11 @@ const ProjectSourceEditorWorkspace = React.lazy(() =>
 const SurfaceDetailScreen = React.lazy(() =>
   import("@/features/project-workspace/surface-detail-screen").then((module) => ({
     default: module.SurfaceDetailScreen,
+  })),
+);
+const TerminalDock = React.lazy(() =>
+  import("@/features/terminal/terminal-dock").then((module) => ({
+    default: module.TerminalDock,
   })),
 );
 
@@ -201,6 +207,8 @@ export function ProjectWorkspace({
   const [selectedModule, setSelectedModule] = React.useState<SelectedMoveModule | null>(null);
   const [activeSurfaceDetail, setActiveSurfaceDetail] = React.useState<SurfaceDetailKind | null>(null);
   const [sourceJumpRequest, setSourceJumpRequest] = React.useState<SourceJumpRequest | null>(null);
+  const [isTerminalOpen, setIsTerminalOpen] = React.useState(false);
+  const [terminalHeight, setTerminalHeight] = React.useState(280);
   const activeMovePackage =
     packageTree.movePackages.length === 1
       ? packageTree.movePackages[0]
@@ -224,6 +232,9 @@ export function ProjectWorkspace({
     : hasInspectorColumn
       ? `minmax(0, 1fr) ${isRightPanelOpen ? "clamp(360px, 24vw, 400px)" : "44px"}`
       : "minmax(0, 1fr)";
+  const workspaceMainRows = isTerminalOpen
+    ? `minmax(0, 1fr) ${terminalHeight}px ${workspaceStatusBarHeight}px`
+    : `minmax(0, 1fr) ${workspaceStatusBarHeight}px`;
 
   React.useEffect(() => {
     setSelectedModule(null);
@@ -379,7 +390,7 @@ export function ProjectWorkspace({
 
       <main
         className="relative grid min-h-0 overflow-hidden border-r border-[color:var(--app-border)] bg-[var(--app-window)]"
-        style={{ gridTemplateRows: `minmax(0, 1fr) ${workspaceStatusBarHeight}px` }}
+        style={{ gridTemplateRows: workspaceMainRows }}
       >
         <WorkspaceErrorBoundary
           resetKey={`${mode}:${packageTree.rootPath}:${activeWorkspaceTab}:${activePackageManifestPath ?? ""}:${sourceJumpRequest?.token ?? "no-source-jump"}`}
@@ -412,13 +423,39 @@ export function ProjectWorkspace({
           </React.Suspense>
         </WorkspaceErrorBoundary>
         <BuildLogSheet
-          bottomInset={workspaceStatusBarHeight}
+          bottomInset={workspaceStatusBarHeight + (isTerminalOpen ? terminalHeight : 0)}
           isOpen={buildLogSheet.isOpen}
           onClose={buildLogSheet.onClose}
           onRerun={buildLogSheet.onRerun}
           runs={buildLogSheet.runs}
         />
-        <footer className="flex items-center justify-end overflow-hidden border-t border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 text-[11px] leading-5 text-muted-foreground">
+        {isTerminalOpen ? (
+          <React.Suspense fallback={<TerminalDockLoadingState />}>
+            <TerminalDock
+              cwd={packageTree.rootPath}
+              height={terminalHeight}
+              key={packageTree.rootPath}
+              onClose={() => setIsTerminalOpen(false)}
+              onHeightChange={setTerminalHeight}
+            />
+          </React.Suspense>
+        ) : null}
+        <footer className="flex items-center justify-between gap-3 overflow-hidden border-t border-[color:var(--app-border)] bg-[var(--app-chrome)] px-3 text-[11px] leading-5 text-muted-foreground">
+          <Button
+            aria-label={isTerminalOpen ? "Hide terminal" : "Show terminal"}
+            aria-pressed={isTerminalOpen}
+            className={cn(
+              "size-7 shrink-0 text-muted-foreground hover:text-foreground",
+              isTerminalOpen && "bg-[var(--app-subtle)] text-foreground",
+            )}
+            onClick={() => setIsTerminalOpen((open) => !open)}
+            size="icon-xs"
+            title="Terminal"
+            type="button"
+            variant="ghost"
+          >
+            <SquareTerminal className="size-3.5" aria-hidden="true" />
+          </Button>
           <LastScannedStatus scannedAt={lastScannedAt} />
         </footer>
       </main>
@@ -444,6 +481,14 @@ function WorkspacePanelLoadingState() {
   return (
     <div className="grid h-full min-h-0 place-items-center bg-[var(--app-window)] px-6 text-sm text-muted-foreground">
       Loading view...
+    </div>
+  );
+}
+
+function TerminalDockLoadingState() {
+  return (
+    <div className="grid min-h-0 place-items-center border-t border-[color:var(--app-border)] bg-[var(--app-window)] px-4 text-xs text-muted-foreground">
+      Loading terminal...
     </div>
   );
 }

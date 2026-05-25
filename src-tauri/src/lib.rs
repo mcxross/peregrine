@@ -43,6 +43,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(IndexerCommandState::default())
         .manage(MoveAnalyzerCommandState::default())
+        .manage(peregrine_terminal::TerminalManager::default())
         .invoke_handler(tauri::generate_handler![
             commands::indexer::greet,
             commands::indexer::index_package,
@@ -117,7 +118,11 @@ pub fn run() {
             commands::sui::remove_sui_key,
             commands::sui::export_sui_private_key,
             commands::metadata::load_project_metadata,
-            commands::metadata::save_project_metadata
+            commands::metadata::save_project_metadata,
+            commands::terminal::terminal_start,
+            commands::terminal::terminal_write,
+            commands::terminal::terminal_resize,
+            commands::terminal::terminal_stop
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

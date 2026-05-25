@@ -22,6 +22,7 @@ export * from "./project/sui-network";
 export * from "./tauri/app-events";
 export * from "./tauri/export";
 export * from "./tauri/window";
+export * from "./terminal/terminal-client";
 export * from "./type-graph/graph-model";
 export * from "./type-graph/model";
 export * from "./workspace/workspace-types";
