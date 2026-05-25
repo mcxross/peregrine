@@ -209,9 +209,12 @@ export function ProjectWorkspace({
         ) ?? null;
   const packageName = activeMovePackage?.name || packageTree.rootName || packageTree.movePackages[0]?.name || "savings_personal";
   const isEditorMode = mode === "editor";
+  const isExploreCodeTab = activeWorkspaceTab === "Explore" && activeExploreTab === "code";
+  const isExploreBytecodeTab = activeWorkspaceTab === "Explore" && activeExploreTab === "bytecode";
   const hasInspectorColumn =
     activeWorkspaceTab !== "Agents"
-    && !(activeWorkspaceTab === "Explore" && activeExploreTab === "bytecode");
+    && !isExploreCodeTab
+    && !isExploreBytecodeTab;
   const workspaceColumns = isEditorMode
     ? "minmax(0, 1fr)"
     : isLeftPanelOpen
@@ -575,7 +578,7 @@ function ExploreMainPanel({
 }) {
   return (
     <section className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
-      <div className="row-start-1 grid min-w-0 grid-cols-[1fr_auto] items-center gap-3 px-5 pb-2 pt-2">
+      <div className="row-start-1 grid min-w-0 grid-cols-[1fr_auto] items-center gap-3 border-b border-[color:var(--app-border)] px-5 pb-2 pt-2">
         <ExploreTabSwitch activeTab={activeExploreTab} onTabChange={onExploreTabChange} />
         <WorkspaceModeSwitch mode="security" onToggleMode={onToggleMode} />
       </div>

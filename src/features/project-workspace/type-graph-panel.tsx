@@ -167,53 +167,38 @@ export function TypeGraphPanel({
     [onSelectedTypeIdChange],
   );
 
-  const totalTypes = filteredGroups.reduce((total, group) => total + group.count, 0);
-
   return (
     <aside
       className={cn(
-        "grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)]",
+        "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-transparent",
         className,
       )}
     >
-      <header className="flex min-w-0 items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5">
-        <div className="flex min-w-0 items-center gap-2">
-          <Boxes className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold leading-5">Type Graph</h2>
-            <p className="truncate text-[11px] leading-4 text-muted-foreground">
-              {displayMovePackageName(movePackage?.name ?? packageName)}
-            </p>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <CountPill value={totalTypes} />
-          {onCollapse ? (
-            <button
-              aria-label="Collapse type navigator"
-              className="grid size-7 place-items-center rounded-md text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground"
-              onClick={onCollapse}
-              title="Collapse navigator"
-              type="button"
-            >
-              <ChevronLeft className="size-4" aria-hidden="true" />
-            </button>
-          ) : null}
-        </div>
-      </header>
-
-      <label className="mx-2 my-2 grid h-8 min-w-0 grid-cols-[18px_minmax(0,1fr)] items-center gap-1.5 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2">
-        <Search className="size-3.5 text-muted-foreground" aria-hidden="true" />
-        <input
-          className="min-w-0 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="type, module, ability:key, kind:capability"
-          value={query}
-        />
-      </label>
+      <div className="mx-5 mb-2 mt-4 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+        <label className="grid h-8 min-w-0 grid-cols-[18px_minmax(0,1fr)] items-center gap-1.5 rounded-md border border-[color:var(--app-border)] bg-[var(--app-elevated)] px-2">
+          <Search className="size-3.5 text-muted-foreground" aria-hidden="true" />
+          <input
+            className="min-w-0 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="type, module, ability:key, kind:capability"
+            value={query}
+          />
+        </label>
+        {onCollapse ? (
+          <button
+            aria-label="Collapse type navigator"
+            className="grid size-8 place-items-center rounded-md text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground active:scale-95"
+            onClick={onCollapse}
+            title="Collapse navigator"
+            type="button"
+          >
+            <ChevronLeft className="size-4" aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
 
       <ScrollArea className="min-h-0">
-        <div className="space-y-1 px-2 py-2">
+        <div className="space-y-1 px-5 py-2">
           {filteredGroups.length ? (
             filteredGroups.map((group) => (
               <TypeGroup
@@ -245,7 +230,7 @@ export function CollapsedTypeGraphPanel({
   return (
     <aside
       className={cn(
-        "flex min-h-0 items-center gap-2 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-1.5 lg:flex-col",
+        "flex min-h-0 items-center gap-2 overflow-hidden bg-transparent p-1.5 lg:flex-col",
         className,
       )}
     >

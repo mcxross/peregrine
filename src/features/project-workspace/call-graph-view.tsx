@@ -147,7 +147,7 @@ const MAX_CALL_NODES = 120;
 const MAX_CALL_EDGES = 180;
 
 export function CallGraphView({
-  className = "h-72 rounded-md border",
+  className = "h-72",
   graph,
   movePackage,
   onOpenSourceLocation,
@@ -311,7 +311,7 @@ export function CallGraphView({
     <div
       className={cn(
         className,
-        "relative overflow-hidden border-[color:var(--app-border)] bg-[var(--app-surface)]",
+        "relative overflow-hidden",
         isFullscreen && "fixed bottom-3 left-3 right-3 top-[calc(58px+0.75rem)] z-[90] rounded-lg border bg-[var(--app-window)] shadow-2xl shadow-black/60",
       )}
     >

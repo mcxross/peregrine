@@ -177,7 +177,7 @@ export function DependencyGraphScreen({
 
   return (
     <section className="h-full min-h-0 overflow-hidden bg-[var(--app-window)]">
-      <div className="h-full min-h-0 px-5 pb-3">
+      <div className="h-full min-h-0">
         {graphMode === "dependencies" && sourceUnavailableMessage ? (
           <MoveSourceUnavailableNotice
             message={sourceUnavailableMessage}
@@ -256,7 +256,7 @@ export function DependencyGraphScreen({
           <div className="h-full min-h-0 animate-in fade-in slide-in-from-right-2 duration-150">
             <React.Suspense fallback={<GraphLoadingState label="Loading call graph..." />}>
               <CallGraphView
-                className="h-full rounded-md border"
+                className="h-full"
                 graph={activeCallGraph}
                 movePackage={activeMovePackage}
                 onOpenSourceLocation={onOpenSourceLocation}
@@ -271,7 +271,7 @@ export function DependencyGraphScreen({
                 <GraphLoadingState label="Loading dependency graph..." />
               ) : (
                 <DependencyGraphView
-                  className="h-full rounded-md border"
+                  className="h-full"
                   graph={graph}
                   packageName={packageName}
                 />

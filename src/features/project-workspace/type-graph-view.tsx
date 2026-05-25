@@ -374,14 +374,14 @@ export function TypeGraphView({
     <section
       className={cn(
         className,
-        "grid min-h-0 gap-3 overflow-hidden",
+        "grid min-h-0 gap-3 overflow-hidden animate-in fade-in slide-in-from-right-3 duration-200",
         isFullscreen && "fixed bottom-3 left-3 right-3 top-[calc(58px+0.75rem)] z-[90] rounded-lg border border-[color:var(--app-border)] bg-[var(--app-window)] p-3 shadow-2xl shadow-black/60",
         isInspectorOpen
           ? "grid-rows-[minmax(0,1fr)_minmax(18rem,34vh)] lg:grid-cols-[minmax(0,1fr)_minmax(18rem,21rem)] lg:grid-rows-1"
           : "grid-cols-[minmax(0,1fr)_2.75rem]",
       )}
     >
-      <div className="grid min-h-0 grid-rows-[40px_minmax(0,1fr)] overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-surface)]">
+      <div className="grid min-h-0 grid-rows-[2.5rem_minmax(0,1fr)] overflow-hidden">
         <TypeGraphLensTabs activeLens={lens} onLensChange={setLens} />
         <div className="type-graph-canvas relative min-h-0 bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.18)_1px,transparent_0)] [background-size:18px_18px]">
           <ReactFlow
@@ -503,29 +503,27 @@ function TypeGraphLensTabs({
   onLensChange: (lens: TypeGraphLens) => void;
 }) {
   return (
-    <header className="min-w-0 overflow-x-auto border-b border-[color:var(--app-border)] bg-[color-mix(in_oklch,var(--app-chrome)_82%,transparent)] backdrop-blur-sm">
-      <div className="grid min-w-[35rem] grid-cols-5">
+    <header className="h-10 min-w-0 overflow-x-auto border-b border-[color:var(--app-border)] bg-[color-mix(in_oklch,var(--app-chrome)_82%,transparent)] backdrop-blur-sm">
+      <div className="grid h-full min-w-[35rem] grid-cols-5">
         {TYPE_GRAPH_LENSES.map((lens) => (
           <button
             aria-pressed={activeLens === lens.id}
             className={cn(
-              "relative grid min-w-0 content-center gap-0.5 border-r border-[color:var(--app-border)] px-2 pb-1 pt-1.5 text-center transition hover:bg-[var(--app-subtle)]",
+              "relative grid h-full min-w-0 content-center gap-0.5 border-r border-[color:var(--app-border)] px-2 text-center transition hover:bg-[var(--app-subtle)]",
               activeLens === lens.id
                 ? "bg-sky-500/10 text-sky-100 after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-sky-400/70"
                 : "text-muted-foreground",
             )}
             key={lens.id}
             onClick={() => onLensChange(lens.id)}
+            title={lens.caption}
             type="button"
           >
             <span className={cn(
-              "truncate text-[11px] font-semibold leading-3.5",
+              "truncate text-[11px] font-semibold leading-4",
               activeLens === lens.id ? "text-sky-50" : "text-foreground/85",
             )}>
               {lens.label}
-            </span>
-            <span className="truncate text-[9px] leading-3 text-muted-foreground/80">
-              {lens.caption}
             </span>
           </button>
         ))}
@@ -692,7 +690,7 @@ function TypeGraphInspector({
 
   if (!node) {
     return (
-      <aside className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-md border border-[color:var(--app-border)] bg-background/92">
+      <aside className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-transparent animate-in fade-in slide-in-from-right-3 duration-200">
         <TypeInspectorColumnHeader onCollapse={onCollapse} />
         <div className="grid place-items-center px-4 text-center text-xs text-muted-foreground">
           Select a Move type to inspect storage shape, authority, generics, and external dependency links.
@@ -707,7 +705,7 @@ function TypeGraphInspector({
   const securityNotes = typeGraphModel.nodeSecurityNotes(node, renderGraph.edgeEvidence);
 
   return (
-    <aside className="grid min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] overflow-hidden rounded-md border border-[color:var(--app-border)] bg-background/92">
+    <aside className="grid min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] overflow-hidden bg-transparent animate-in fade-in slide-in-from-right-3 duration-200">
       <TypeInspectorColumnHeader onCollapse={onCollapse} />
       <header className="border-b border-[color:var(--app-border)] px-3 py-3">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
@@ -836,7 +834,7 @@ function TypeGraphEdgeInspector({
   const baseType = edge.edge.fieldName ? typeGraphModel.compactEdgeEndpoint(edge.edge.target ?? edge.target) : targetLabel;
 
   return (
-    <aside className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-md border border-[color:var(--app-border)] bg-background/92 text-xs">
+    <aside className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden bg-transparent text-xs animate-in fade-in slide-in-from-right-3 duration-200">
       <TypeInspectorColumnHeader onCollapse={onCollapse} title={isFieldEvidence ? "Field evidence" : "Edge evidence"} />
       <div className="min-h-0 overflow-auto p-3">
         <h3 className="text-sm font-semibold text-foreground">
@@ -931,7 +929,7 @@ function TypeInspectorColumnHeader({
       </span>
       <button
         aria-label="Collapse type details"
-        className="grid size-7 place-items-center rounded text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground"
+        className="grid size-7 place-items-center rounded text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground active:scale-95"
         onClick={onCollapse}
         title="Collapse details"
         type="button"
@@ -950,10 +948,10 @@ function CollapsedTypeGraphInspector({
   selectedLabel: string | null;
 }) {
   return (
-    <aside className="flex min-h-0 flex-col items-center gap-2 overflow-hidden rounded-md border border-[color:var(--app-border)] bg-[var(--app-panel)] p-1.5">
+    <aside className="flex min-h-0 flex-col items-center gap-2 overflow-hidden bg-transparent p-1.5 animate-in fade-in slide-in-from-right-3 duration-200">
       <button
         aria-label="Show type details"
-        className="grid size-8 place-items-center rounded text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground"
+        className="grid size-8 place-items-center rounded text-muted-foreground transition hover:bg-[var(--app-subtle)] hover:text-foreground active:scale-95"
         onClick={onExpand}
         title="Show details"
         type="button"

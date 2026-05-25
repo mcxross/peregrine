@@ -77,7 +77,7 @@ const EXPORT_PILL_HEIGHT = 44;
 const EXPORT_PILL_GAP = 12;
 
 export function DependencyGraphView({
-  className = "h-72 rounded-md border",
+  className = "h-72",
   graph,
   packageName = "",
 }: DependencyGraphViewProps) {
@@ -178,7 +178,7 @@ export function DependencyGraphView({
     <div
       className={[
         className,
-        "relative overflow-hidden border-[color:var(--app-border)] bg-[var(--app-surface)]",
+        "relative overflow-hidden",
         isFullscreen
           ? "fixed bottom-3 left-3 right-3 top-[calc(58px+0.75rem)] z-[90] rounded-lg border bg-[var(--app-window)] shadow-2xl shadow-black/60"
           : "",
