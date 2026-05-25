@@ -1,6 +1,26 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
+import {
+  normalizePackageTree,
+  type MovePackageInsightsReport,
+  type PackageTreeWire,
+} from "@/features/empty-project/move-package-insights";
+
+export type {
+  EvidenceSource,
+  FormalProverSpecFinding,
+  MovePackageInsightsReport,
+  MovePackageScannerReport,
+  MovyInvariantFinding,
+  ObjectScanReport,
+  ScannerConfidence,
+  ScannerDiagnostic,
+  ScannerEvidence,
+  TestsScanReport,
+  UnitTestFinding,
+} from "@/features/empty-project/move-package-insights";
+
 export type PackageTree = {
   activePackageManifestPath?: string | null;
   rootPath: string;
@@ -140,6 +160,7 @@ export type MovePackage = {
   hasSourceFiles: boolean;
   hasSourceModules: boolean;
   sourceFileCount: number;
+  insights?: MovePackageInsightsReport;
   surface: MovePackageSurface;
   modules: MoveModule[];
 };
@@ -929,11 +950,15 @@ export type FilePreview =
     };
 
 export async function loadPackageTree(rootPath: string): Promise<PackageTree> {
-  return invoke<PackageTree>("load_package_tree", { rootPath });
+  return normalizePackageTree(
+    await invoke<PackageTreeWire>("load_package_tree", { rootPath }),
+  );
 }
 
 export async function loadPackageTreeDetails(rootPath: string): Promise<PackageTree> {
-  return invoke<PackageTree>("load_package_tree_details", { rootPath });
+  return normalizePackageTree(
+    await invoke<PackageTreeWire>("load_package_tree_details", { rootPath }),
+  );
 }
 
 export async function loadMoveGraphs(
@@ -967,10 +992,12 @@ export async function createMoveProject(
   parentPath: string,
   projectName: string,
 ): Promise<PackageTree> {
-  return invoke<PackageTree>("create_move_project", {
-    parentPath,
-    projectName,
-  });
+  return normalizePackageTree(
+    await invoke<PackageTreeWire>("create_move_project", {
+      parentPath,
+      projectName,
+    }),
+  );
 }
 
 export async function importMovePackageById(
@@ -980,13 +1007,15 @@ export async function importMovePackageById(
   saveRootPath: string | null,
   generateBuildable: boolean,
 ): Promise<PackageTree> {
-  return invoke<PackageTree>("import_move_package_by_id", {
-    generateBuildable,
-    graphQlUrl,
-    networkId,
-    packageId,
-    saveRootPath,
-  });
+  return normalizePackageTree(
+    await invoke<PackageTreeWire>("import_move_package_by_id", {
+      generateBuildable,
+      graphQlUrl,
+      networkId,
+      packageId,
+      saveRootPath,
+    }),
+  );
 }
 
 export async function moveProjectPathExists(
