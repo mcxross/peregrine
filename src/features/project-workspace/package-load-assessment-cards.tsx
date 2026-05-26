@@ -9,6 +9,7 @@ import {
   Loader2,
   ShieldAlert,
   Target,
+  XCircle,
 } from "lucide-react";
 import type React from "react";
 
@@ -55,6 +56,7 @@ export function PackageLoadAssessmentCards({
             className={cn(
               "grid h-[82px] min-w-0 grid-rows-[18px_24px_16px] gap-1 overflow-hidden rounded-md px-3 py-2.5 shadow-none",
               step.state === "muted" && "opacity-45",
+              step.state === "skipped" && "opacity-60",
               step.state === "running" && "border-primary/45",
               step.state === "success" && "border-emerald-500/30",
               step.state === "attention" && "border-amber-500/35",
@@ -80,14 +82,16 @@ export function PackageLoadAssessmentCards({
 
             <div className="flex min-w-0 items-center gap-1.5">
               <StepStateIcon state={step.state} />
-              <p
-                className={cn(
-                  "min-w-0 truncate text-sm font-semibold leading-6",
-                  valueToneClass(step.state),
-                )}
-              >
-                {step.value}
-              </p>
+              {visibleStepValue(step) ? (
+                <p
+                  className={cn(
+                    "min-w-0 truncate text-sm font-semibold leading-6",
+                    valueToneClass(step.state),
+                  )}
+                >
+                  {visibleStepValue(step)}
+                </p>
+              ) : null}
             </div>
 
             <p
@@ -122,7 +126,7 @@ function StepStateIcon({ state }: { state: PackageLoadAssessmentState }) {
   } else if (state === "success") {
     icon = <CheckCircle2 className="size-3.5 text-emerald-400" aria-hidden="true" />;
   } else if (state === "error") {
-    icon = <AlertTriangle className="size-3.5 text-red-400" aria-hidden="true" />;
+    icon = <XCircle className="size-3.5 text-red-400" aria-hidden="true" />;
   } else if (state === "attention") {
     icon = <AlertTriangle className="size-3.5 text-amber-400" aria-hidden="true" />;
   } else {
@@ -136,6 +140,18 @@ function StepStateIcon({ state }: { state: PackageLoadAssessmentState }) {
   );
 }
 
+function visibleStepValue(step: PackageLoadAssessmentStep) {
+  if (step.state === "skipped") {
+    return "Skipped";
+  }
+
+  if (step.state === "attention") {
+    return "Review";
+  }
+
+  return null;
+}
+
 function valueToneClass(state: PackageLoadAssessmentState) {
   switch (state) {
     case "success":
@@ -146,6 +162,7 @@ function valueToneClass(state: PackageLoadAssessmentState) {
       return "text-primary";
     case "attention":
       return "text-amber-400";
+    case "skipped":
     case "idle":
     case "muted":
       return "text-foreground";
@@ -154,11 +171,11 @@ function valueToneClass(state: PackageLoadAssessmentState) {
 
 function sidebarBadge(step: PackageLoadAssessmentStep) {
   if (step.state === "success") {
-    return "Pass";
+    return "check";
   }
 
   if (step.state === "error") {
-    return "Fail";
+    return "x";
   }
 
   if (step.state === "attention") {
@@ -166,10 +183,14 @@ function sidebarBadge(step: PackageLoadAssessmentStep) {
   }
 
   if (step.state === "running") {
-    return "Run";
+    return "spinner";
   }
 
-  return step.value;
+  if (step.state === "idle") {
+    return "circle";
+  }
+
+  return step.state === "skipped" ? "Skipped" : undefined;
 }
 
 function sidebarTone(state: PackageLoadAssessmentState) {
@@ -182,6 +203,8 @@ function sidebarTone(state: PackageLoadAssessmentState) {
       return "warning";
     case "attention":
       return "warning";
+    case "skipped":
+      return "muted";
     case "idle":
     case "muted":
       return "muted";
@@ -203,7 +226,7 @@ function defaultSidebarAssessmentSteps(): PackageLoadAssessmentStep[] {
       output: null,
       startedAt: null,
       state: command.enabled ? "idle" : "muted",
-      value: command.enabled ? "Queued" : "Locked",
+      value: command.enabled ? "Pending" : "Skipped",
     };
   });
 }

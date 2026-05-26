@@ -3,7 +3,6 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { Titlebar } from "@/app/titlebar";
 import { Workspace } from "@/app/workspace";
-import { Button } from "@/components/ui/button";
 import {
   createPackageLoadAssessment,
   buildMovePackage,
@@ -15,6 +14,7 @@ import {
   loadProjectMetadata,
   projectMoveCoverageScriptPath,
   projectMoveTestScriptPath,
+  runPackageLoadAssessment,
   projectPackageConfigKey,
   runFormalVerification,
   runMovyFuzz,
@@ -55,26 +55,11 @@ const SettingsScreen = React.lazy(() =>
   })),
 );
 
-const BUILD_FRESHNESS_WINDOW_MS = 3 * 60 * 1000;
-const LAUNCH_BUILD_STATUS_MESSAGES = [
-  "Preparing Sui environment...",
-  "Compiling Move packages...",
-  "Building project...",
-];
-
 type AppShellProps = {
   packageTree: PackageTree | null;
   screen: "workspace" | "settings";
   onCloseSettings: () => void;
   onProjectSelected: (packageTree: PackageTree) => void;
-};
-
-type LaunchBuildState = {
-  key: string;
-  message: string;
-  packageName: string;
-  runId: number;
-  state: "running" | "success" | "error";
 };
 
 export function AppShell({
@@ -96,8 +81,9 @@ export function AppShell({
   const [formalVerificationTarget, setFormalVerificationTarget] =
     useState<FormalVerificationTarget | null>(null);
   const [lastScannedAt, setLastScannedAt] = useState<number | null>(null);
-  const [launchBuild, setLaunchBuild] = useState<LaunchBuildState | null>(null);
   const [network, setNetwork] = useState<SuiNetworkSelection>(defaultSuiNetworkSelection);
+  const [packageLoadAssessment, setPackageLoadAssessment] =
+    useState<PackageLoadAssessment | null>(null);
   const {
     launchIndex,
     resetLaunchIndex,
@@ -106,9 +92,8 @@ export function AppShell({
   } = useLaunchIndexer();
   const currentCommandLogIdRef = useRef<number | null>(null);
   const detailHydratedRootRef = useRef<string | null>(null);
-  const launchBuildKeysRef = useRef<Set<string>>(new Set());
-  const launchBuildMessageIndexRef = useRef(0);
   const latestPackageTreeRef = useRef<PackageTree | null>(packageTree);
+  const packageValidationKeysRef = useRef<Set<string>>(new Set());
   const layout = defaultLayoutSettings;
   const isSettings = screen === "settings";
   const activeMovePackage = useMemo(
@@ -116,13 +101,13 @@ export function AppShell({
     [activePackageManifestPath, packageTree],
   );
   const loadAssessment = useMemo(
-    () => createVisibleLoadAssessment(packageTree, activeMovePackage, buildRuns),
-    [activeMovePackage, buildRuns, packageTree],
+    () => createVisibleLoadAssessment(packageTree, activeMovePackage, buildRuns, packageLoadAssessment),
+    [activeMovePackage, buildRuns, packageLoadAssessment, packageTree],
   );
   const isBuildRunning = buildRuns.some((run) => run.state === "running");
   const isCommandRunning = isBuildRunning;
   const isDependencyGraphLoading = Boolean(
-    packageTree && (!packageTree.isDetailed || (launchBuild && launchBuild.state !== "error")),
+    packageTree && !packageTree.isDetailed,
   );
   const handleProjectSelected = useCallback(
     (nextPackageTree: PackageTree) => {
@@ -143,7 +128,7 @@ export function AppShell({
     setLatestAuditReportExport(null);
     setFormalVerificationTarget(null);
     setIsBuildSheetOpen(false);
-    setLaunchBuild(null);
+    setPackageLoadAssessment(null);
     setLastScannedAt(packageTree ? Date.now() : null);
   }, [packageTree?.rootPath, packageTree?.activePackageManifestPath, resetLaunchIndex]);
 
@@ -250,190 +235,55 @@ export function AppShell({
     }
 
     let isCancelled = false;
-    const launchBuildKey = projectBuildRuntimeKey(packageTree, activeMovePackage);
-    const packageMetadataKey = projectPackageConfigKey(activeMovePackage);
+    const validationKey = projectBuildRuntimeKey(packageTree, activeMovePackage);
 
-    if (launchBuildKeysRef.current.has(launchBuildKey)) {
+    if (packageValidationKeysRef.current.has(validationKey)) {
       return;
     }
 
-    launchBuildKeysRef.current.add(launchBuildKey);
+    packageValidationKeysRef.current.add(validationKey);
+    const handleValidationProjectSelected = (nextPackageTree: PackageTree) => {
+      handleProjectSelected(nextPackageTree);
 
-    void loadProjectMetadata(packageTree.rootPath)
+      const nextActivePackage =
+        resolveActiveMovePackage(nextPackageTree, activeMovePackage.manifestPath)
+        ?? activeMovePackage;
+
+      startLaunchIndex(nextPackageTree, nextActivePackage);
+    };
+
+    void runPackageLoadAssessment({
+      isCurrent: () => {
+        const latestPackageTree = latestPackageTreeRef.current;
+
+        return !isCancelled
+          && latestPackageTree?.rootPath === packageTree.rootPath
+          && packageValidationKeysRef.current.has(validationKey);
+      },
+      movePackage: activeMovePackage,
+      onAssessmentChange: setPackageLoadAssessment,
+      onCommandLog: showCommandLog,
+      onProjectSelected: handleValidationProjectSelected,
+      packageTree,
+    })
       .catch((error) => {
-        console.warn("Could not load project metadata; running launch build.", error);
-        return defaultProjectMetadata();
+        console.error("Could not run package validation pipeline.", error);
       })
-      .then((metadata) => {
-        if (isCancelled) {
-          launchBuildKeysRef.current.delete(launchBuildKey);
-          return;
-        }
-
-        const lastSuccessfulBuildAt =
-          metadata.builds[packageMetadataKey]?.lastSuccessfulBuildAt ?? null;
-
-        if (lastSuccessfulBuildAt && Date.now() - lastSuccessfulBuildAt < BUILD_FRESHNESS_WINDOW_MS) {
-          launchBuildKeysRef.current.delete(launchBuildKey);
-          startLaunchIndex(packageTree, activeMovePackage);
-          return;
-        }
-
-        launchBuildMessageIndexRef.current = 0;
-
-        const startedAt = new Date();
-        const runId = startedAt.getTime();
-        const workingDirectory = packagePathLabel(activeMovePackage, packageTree);
-        const nextRun: BuildLogRun = {
-          canRerun: false,
-          command: "sui move build",
-          error: null,
-          finishedAt: null,
-          id: runId,
-          metadata: [{ label: "Trigger", value: "Project launch" }],
-          output: null,
-          packageName: activeMovePackage.name,
-          packagePath: activeMovePackage.path || ".",
-          runningText: LAUNCH_BUILD_STATUS_MESSAGES[0],
-          startedAt,
-          state: "running",
-          title: "Launch build",
-          workingDirectory,
-        };
-
-        currentCommandLogIdRef.current = nextRun.id;
-        setBuildRuns((current) => upsertLogRun(current, nextRun));
-        setLaunchBuild({
-          key: launchBuildKey,
-          message: LAUNCH_BUILD_STATUS_MESSAGES[0],
-          packageName: activeMovePackage.name,
-          runId,
-          state: "running",
-        });
-
-        const messageTimer = window.setInterval(() => {
-          launchBuildMessageIndexRef.current =
-            (launchBuildMessageIndexRef.current + 1) % LAUNCH_BUILD_STATUS_MESSAGES.length;
-          const message = LAUNCH_BUILD_STATUS_MESSAGES[launchBuildMessageIndexRef.current];
-
-          setLaunchBuild((current) =>
-            current?.key === launchBuildKey && current.state === "running"
-              ? { ...current, message }
-              : current,
-          );
-          setBuildRuns((current) =>
-            updateLogRun(current, runId, (run) =>
-              run.state === "running" ? { ...run, runningText: message } : run,
-            ),
-          );
-        }, 2_800);
-
-        void buildMovePackage(packageTree, activeMovePackage.path, {
-          streamId: runId,
-          onOutput: (output) => {
-            setBuildRuns((current) =>
-              updateLogRun(current, runId, (run) =>
-                run.state === "running" ? { ...run, output } : run,
-              ),
-            );
-          },
-        })
-          .then(async (output) => {
-            const state = output.status === 0 ? "success" : "error";
-
-            if (state === "success") {
-              await rememberSuccessfulLaunchBuild(packageTree.rootPath, packageMetadataKey, Date.now());
-            }
-
-            setBuildRuns((current) =>
-              updateLogRun(current, runId, (run) => ({
-                ...run,
-                finishedAt: new Date(),
-                output,
-                state,
-              })),
-            );
-
-            setLaunchBuild((current) =>
-              current?.key === launchBuildKey
-                ? {
-                    ...current,
-                    message: state === "success" ? "Project build completed." : "Project build failed.",
-                    state,
-                  }
-                : current,
-            );
-
-            if (latestPackageTreeRef.current?.rootPath === packageTree.rootPath) {
-              startLaunchIndex(packageTree, activeMovePackage);
-            }
-
-            if (state === "success" && latestPackageTreeRef.current?.rootPath === packageTree.rootPath) {
-              try {
-                const rescannedPackageTree = await loadPackageTree(packageTree.rootPath);
-                const latestPackageTree = latestPackageTreeRef.current;
-
-                if (!latestPackageTree || latestPackageTree.rootPath !== packageTree.rootPath) {
-                  return;
-                }
-
-                const activePackageManifestPath =
-                  rescannedPackageTree.movePackages.some(
-                    (movePackage) => movePackage.manifestPath === activeMovePackage.manifestPath,
-                  )
-                    ? activeMovePackage.manifestPath
-                    : rescannedPackageTree.movePackages[0]?.manifestPath ?? null;
-
-                handleProjectSelected({
-                  ...rescannedPackageTree,
-                  activePackageManifestPath,
-                });
-              } catch (error) {
-                console.error("Could not rescan package after launch build.", error);
-              }
-            }
-          })
-          .catch((error) => {
-            setBuildRuns((current) =>
-              updateLogRun(current, runId, (run) => ({
-                ...run,
-                error: getBuildErrorMessage(error),
-                finishedAt: new Date(),
-                state: "error",
-              })),
-            );
-            setLaunchBuild((current) =>
-              current?.key === launchBuildKey
-                ? { ...current, message: "Project build failed.", state: "error" }
-                : current,
-            );
-
-            if (latestPackageTreeRef.current?.rootPath === packageTree.rootPath) {
-              startLaunchIndex(packageTree, activeMovePackage);
-            }
-          })
-          .finally(() => {
-            window.clearInterval(messageTimer);
-            launchBuildKeysRef.current.delete(launchBuildKey);
-          });
+      .finally(() => {
+        packageValidationKeysRef.current.delete(validationKey);
       });
 
     return () => {
       isCancelled = true;
     };
-  }, [activeMovePackage, handleProjectSelected, packageTree, startLaunchIndex]);
-
-  useEffect(() => {
-    if (!launchBuild || launchBuild.state === "running") {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setLaunchBuild((current) => current?.key === launchBuild.key ? null : current);
-    }, launchBuild.state === "success" ? 3_500 : 7_000);
-
-    return () => window.clearTimeout(timer);
-  }, [launchBuild]);
+  }, [
+    activeMovePackage?.manifestPath,
+    activeMovePackage?.path,
+    handleProjectSelected,
+    packageTree?.rootPath,
+    showCommandLog,
+    startLaunchIndex,
+  ]);
 
   useEffect(() => {
     if (!launchIndex || launchIndex.state === "running") {
@@ -1014,14 +864,7 @@ export function AppShell({
       ) : null}
 
       <LaunchStatusToasts
-        buildState={launchBuild}
         indexState={launchIndex}
-        onOpenLogs={() => {
-          if (launchBuild) {
-            currentCommandLogIdRef.current = launchBuild.runId;
-            setIsBuildSheetOpen(true);
-          }
-        }}
       />
     </main>
   );
@@ -1036,34 +879,16 @@ function PanelLoadingState({ label }: { label: string }) {
 }
 
 function LaunchStatusToasts({
-  buildState,
   indexState,
-  onOpenLogs,
 }: {
-  buildState: LaunchBuildState | null;
   indexState: LaunchIndexState | null;
-  onOpenLogs: () => void;
 }) {
-  if (!buildState && !indexState) {
+  if (!indexState) {
     return null;
   }
 
   return (
     <div className="pointer-events-none fixed bottom-4 right-4 z-[120] flex max-w-[22rem] flex-col gap-2">
-      {buildState ? (
-        <LaunchStatusToastCard
-          action={
-            buildState.state === "error" ? (
-              <Button className="h-7 shrink-0 px-2 text-xs" onClick={onOpenLogs} type="button" variant="outline">
-                Logs
-              </Button>
-            ) : null
-          }
-          message={buildState.message}
-          packageName={buildState.packageName}
-          state={buildState.state}
-        />
-      ) : null}
       {indexState ? (
         <LaunchStatusToastCard
           message={indexState.message}
@@ -1139,7 +964,7 @@ function packagePathLabel(movePackage: MovePackage, packageTree: PackageTree) {
 }
 
 function projectBuildRuntimeKey(packageTree: PackageTree, movePackage: MovePackage) {
-  return `${packageTree.rootPath}::${projectPackageConfigKey(movePackage)}`;
+  return `${packageTree.rootPath}::${movePackage.manifestPath || projectPackageConfigKey(movePackage)}`;
 }
 
 async function rememberSuccessfulLaunchBuild(
@@ -1168,6 +993,7 @@ function createVisibleLoadAssessment(
   packageTree: PackageTree | null,
   activeMovePackage: MovePackage | null,
   buildRuns: BuildLogRun[],
+  packageLoadAssessment: PackageLoadAssessment | null,
 ): PackageLoadAssessment | null {
   if (!packageTree || !activeMovePackage) {
     return null;
@@ -1182,12 +1008,15 @@ function createVisibleLoadAssessment(
         && run.packageName === activeMovePackage.name
         && run.packagePath === packagePath,
     ) ?? null;
-  const assessment = applyProjectLoadReportAssessment(
-    createPackageLoadAssessment({
+  const baseAssessment = packageLoadAssessment?.key === projectBuildRuntimeKey(packageTree, activeMovePackage)
+    ? packageLoadAssessment
+    : createPackageLoadAssessment({
       movePackage: activeMovePackage,
       packageTree,
       startedAt: latestBuildRun?.startedAt ?? new Date(),
-    }),
+    });
+  const assessment = applyProjectLoadReportAssessment(
+    baseAssessment,
     packageTree,
     activeMovePackage,
   );
@@ -1395,7 +1224,7 @@ function buildAssessmentDisplay(run: BuildLogRun): {
     return {
       detail: run.runningText ?? "Build running",
       state: "running",
-      value: "Run",
+      value: "Running",
     };
   }
 

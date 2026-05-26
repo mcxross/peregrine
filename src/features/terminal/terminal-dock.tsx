@@ -45,6 +45,7 @@ type TerminalTab = {
 };
 
 type TerminalSessionKind = "terminal" | "codex" | "claude";
+type TerminalSize = { cols: number; rows: number };
 
 const MIN_TERMINAL_HEIGHT = 180;
 const MAX_TERMINAL_HEIGHT = 560;
@@ -72,11 +73,54 @@ export function TerminalDock({
   onHeightChange,
 }: TerminalDockProps) {
   const nextTabIndexRef = React.useRef(2);
+  const pendingHeightRef = React.useRef(height);
+  const heightFrameRef = React.useRef<number | null>(null);
   const initialTab = React.useMemo(() => createTerminalTab(1), []);
   const [tabs, setTabs] = React.useState<TerminalTab[]>([initialTab]);
   const [activeTabId, setActiveTabId] = React.useState(initialTab.id);
   const [selectedSessionKind, setSelectedSessionKind] =
     React.useState<TerminalSessionKind>("terminal");
+
+  React.useEffect(() => {
+    pendingHeightRef.current = height;
+  }, [height]);
+
+  React.useEffect(() => {
+    return () => {
+      if (heightFrameRef.current != null) {
+        window.cancelAnimationFrame(heightFrameRef.current);
+      }
+    };
+  }, []);
+
+  const scheduleHeightChange = React.useCallback(
+    (nextHeight: number) => {
+      if (pendingHeightRef.current === nextHeight) {
+        return;
+      }
+
+      pendingHeightRef.current = nextHeight;
+
+      if (heightFrameRef.current != null) {
+        return;
+      }
+
+      heightFrameRef.current = window.requestAnimationFrame(() => {
+        heightFrameRef.current = null;
+        onHeightChange(pendingHeightRef.current);
+      });
+    },
+    [onHeightChange],
+  );
+
+  const flushHeightChange = React.useCallback(() => {
+    if (heightFrameRef.current != null) {
+      window.cancelAnimationFrame(heightFrameRef.current);
+      heightFrameRef.current = null;
+    }
+
+    onHeightChange(pendingHeightRef.current);
+  }, [onHeightChange]);
 
   const addTab = React.useCallback((kind: TerminalSessionKind = selectedSessionKind) => {
     const tab = createTerminalTab(nextTabIndexRef.current, kind);
@@ -128,21 +172,28 @@ export function TerminalDock({
       event.preventDefault();
       const startY = event.clientY;
       const startHeight = height;
+      const previousCursor = document.body.style.cursor;
+      const previousUserSelect = document.body.style.userSelect;
+      document.body.style.cursor = "row-resize";
+      document.body.style.userSelect = "none";
 
       const onPointerMove = (moveEvent: PointerEvent) => {
         const nextHeight = clampTerminalHeight(startHeight + startY - moveEvent.clientY);
-        onHeightChange(nextHeight);
+        scheduleHeightChange(nextHeight);
       };
 
       const onPointerUp = () => {
         window.removeEventListener("pointermove", onPointerMove);
         window.removeEventListener("pointerup", onPointerUp);
+        document.body.style.cursor = previousCursor;
+        document.body.style.userSelect = previousUserSelect;
+        flushHeightChange();
       };
 
       window.addEventListener("pointermove", onPointerMove);
       window.addEventListener("pointerup", onPointerUp, { once: true });
     },
-    [height, onHeightChange],
+    [flushHeightChange, height, scheduleHeightChange],
   );
 
   return (
@@ -219,7 +270,7 @@ export function TerminalDock({
   );
 }
 
-function TerminalPane({
+const TerminalPane = React.memo(function TerminalPane({
   active,
   cwd,
   tab,
@@ -232,8 +283,11 @@ function TerminalPane({
   const terminalRef = React.useRef<Terminal | null>(null);
   const fitAddonRef = React.useRef<FitAddon | null>(null);
   const sessionIdRef = React.useRef<string | null>(null);
-  const outputQueueRef = React.useRef("");
+  const lastResizeRef = React.useRef<TerminalSize | null>(null);
+  const outputQueueRef = React.useRef<string[]>([]);
   const outputFrameRef = React.useRef<number | null>(null);
+  const fitFrameRef = React.useRef<number | null>(null);
+  const fitFocusRef = React.useRef(false);
   const resizeTimerRef = React.useRef<number | null>(null);
   const activeRef = React.useRef(active);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -244,24 +298,61 @@ function TerminalPane({
     activeRef.current = active;
   }, [active]);
 
-  React.useEffect(() => {
+  const fitAndResize = React.useCallback((focus = false) => {
     const terminal = terminalRef.current;
     const fitAddon = fitAddonRef.current;
-    const sessionId = sessionIdRef.current;
 
-    if (!active || !terminal || !fitAddon) {
+    if (!activeRef.current || !terminal || !fitAddon) {
       return;
     }
 
-    terminal.focus();
     fitAddon.fit();
 
+    if (focus) {
+      terminal.focus();
+    }
+
+    const sessionId = sessionIdRef.current;
+
     if (sessionId) {
-      void resizeTerminal(sessionId, terminal.cols, terminal.rows).catch((error) => {
+      const nextSize = { cols: terminal.cols, rows: terminal.rows };
+
+      if (!shouldResizeTerminal(lastResizeRef.current, nextSize)) {
+        return;
+      }
+
+      lastResizeRef.current = nextSize;
+      void resizeTerminal(sessionId, nextSize.cols, nextSize.rows).catch((error) => {
         console.warn("Could not resize terminal.", error);
       });
     }
-  }, [active]);
+  }, []);
+
+  const scheduleFitAndResize = React.useCallback(
+    (focus = false) => {
+      if (focus) {
+        fitFocusRef.current = true;
+      }
+
+      if (fitFrameRef.current != null) {
+        return;
+      }
+
+      fitFrameRef.current = window.requestAnimationFrame(() => {
+        fitFrameRef.current = null;
+        const shouldFocus = fitFocusRef.current;
+        fitFocusRef.current = false;
+        fitAndResize(shouldFocus);
+      });
+    },
+    [fitAndResize],
+  );
+
+  React.useEffect(() => {
+    if (active) {
+      scheduleFitAndResize(true);
+    }
+  }, [active, scheduleFitAndResize]);
 
   React.useEffect(() => {
     const container = containerRef.current;
@@ -337,16 +428,16 @@ function TerminalPane({
       outputFrameRef.current = null;
       const output = outputQueueRef.current;
 
-      if (!output) {
+      if (output.length === 0) {
         return;
       }
 
-      outputQueueRef.current = "";
-      terminal.write(output);
+      outputQueueRef.current = [];
+      terminal.write(output.join(""));
     };
 
     const scheduleOutputFlush = (data: string) => {
-      outputQueueRef.current += data;
+      outputQueueRef.current.push(data);
 
       if (outputFrameRef.current != null) {
         return;
@@ -355,22 +446,7 @@ function TerminalPane({
       outputFrameRef.current = window.requestAnimationFrame(flushOutput);
     };
 
-    const fitAndResize = () => {
-      if (disposed || !activeRef.current) {
-        return;
-      }
-
-      fitAddon.fit();
-      const sessionId = sessionIdRef.current;
-
-      if (sessionId) {
-        void resizeTerminal(sessionId, terminal.cols, terminal.rows).catch((error) => {
-          console.warn("Could not resize terminal.", error);
-        });
-      }
-    };
-
-    window.setTimeout(fitAndResize, 0);
+    scheduleFitAndResize(false);
 
     const resizeObserver = new ResizeObserver(() => {
       if (!activeRef.current) {
@@ -383,7 +459,9 @@ function TerminalPane({
 
       resizeTimerRef.current = window.setTimeout(() => {
         resizeTimerRef.current = null;
-        fitAndResize();
+        if (!disposed) {
+          scheduleFitAndResize(false);
+        }
       }, 40);
     });
     resizeObserver.observe(container);
@@ -443,13 +521,8 @@ function TerminalPane({
         }
 
         sessionIdRef.current = response.sessionId;
-        window.setTimeout(() => {
-          if (!disposed && activeRef.current) {
-            fitAddon.fit();
-            void resizeTerminal(response.sessionId, terminal.cols, terminal.rows);
-            terminal.focus();
-          }
-        }, 0);
+        lastResizeRef.current = null;
+        scheduleFitAndResize(true);
       })
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
@@ -472,6 +545,13 @@ function TerminalPane({
         outputFrameRef.current = null;
       }
 
+      if (fitFrameRef.current != null) {
+        window.cancelAnimationFrame(fitFrameRef.current);
+        fitFrameRef.current = null;
+      }
+
+      outputQueueRef.current = [];
+      lastResizeRef.current = null;
       resizeObserver.disconnect();
       inputSubscription.dispose();
       unlistenOutput?.();
@@ -486,7 +566,7 @@ function TerminalPane({
         });
       }
     };
-  }, [cwd, sessionKind]);
+  }, [cwd, scheduleFitAndResize, sessionKind]);
 
   return (
     <div
@@ -504,7 +584,7 @@ function TerminalPane({
       ) : null}
     </div>
   );
-}
+});
 
 function AgentSessionPicker({
   onSelect,
@@ -709,6 +789,10 @@ function sessionKindCommand(kind: TerminalSessionKind) {
     case "claude":
       return "claude";
   }
+}
+
+function shouldResizeTerminal(previousSize: TerminalSize | null, nextSize: TerminalSize) {
+  return !previousSize || previousSize.cols !== nextSize.cols || previousSize.rows !== nextSize.rows;
 }
 
 function clampTerminalHeight(height: number) {

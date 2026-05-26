@@ -10,7 +10,14 @@ import {
 } from "../src/project/recent-project-store";
 import {
   defaultProjectMetadata,
+  projectMoveCoverageScriptPath,
+  projectMoveTestScriptPath,
+  projectPackageConfigKey,
+  type ProjectMetadata,
 } from "../src/project/filesystem-tree";
+import {
+  createPackageLoadAssessment,
+} from "../src/project/package-load-assessment";
 import {
   normalizePackageTree,
   type PackageTreeWire,
@@ -95,6 +102,46 @@ describe("desktop runtime project models", () => {
 
     expect(tree.movePackages[0].surface.entryFunctionCount).toBe(0);
     expect(tree.movePackages[0].insights?.scannerReport.tests.unitTestCount).toBe(0);
+  });
+
+  test("initializes auto validation workflow steps as pending", () => {
+    const tree = normalizePackageTree(packageTreeWire());
+    const assessment = createPackageLoadAssessment({
+      movePackage: tree.movePackages[0],
+      packageTree: tree,
+    });
+    const workflowSteps = assessment.steps.filter((step) => step.id !== "risk");
+
+    expect(workflowSteps.map((step) => step.id)).toEqual([
+      "build",
+      "tests",
+      "coverage",
+      "fuzzing",
+      "formal",
+    ]);
+    expect(workflowSteps.every((step) => step.enabled)).toBe(true);
+    expect(workflowSteps.every((step) => step.state === "idle")).toBe(true);
+    expect(workflowSteps.every((step) => step.value === "Pending")).toBe(true);
+  });
+
+  test("resolves configured project command scripts by package key", () => {
+    const tree = normalizePackageTree(packageTreeWire());
+    const movePackage = tree.movePackages[0];
+    const packageKey = projectPackageConfigKey(movePackage);
+    const metadata: ProjectMetadata = {
+      ...defaultProjectMetadata(),
+      packageConfigs: {
+        [packageKey]: {
+          commands: {
+            moveCoverageScriptPath: "scripts/coverage.sh",
+            moveTestScriptPath: "scripts/test.sh",
+          },
+        },
+      },
+    };
+
+    expect(projectMoveTestScriptPath(metadata, movePackage)).toBe("scripts/test.sh");
+    expect(projectMoveCoverageScriptPath(metadata, movePackage)).toBe("scripts/coverage.sh");
   });
 
   test("derives and restores recent project package identity", () => {

@@ -75,6 +75,7 @@ export function BuildLogSheet({
     return null;
   }
 
+  const sheetBottomInset = isOpen ? bottomInset : 0;
   const isRunning = runs.some((run) => run.state === "running");
   const statusLabel = buildStatusLabel(latestRun);
   const statusTone = latestRun.state === "success" ? "success" : latestRun.state === "error" ? "error" : "running";
@@ -84,15 +85,15 @@ export function BuildLogSheet({
       aria-label="Command logs"
       aria-hidden={!isOpen}
       className={cn(
-        "absolute inset-x-0 z-40 grid grid-rows-[auto_minmax(0,1fr)] border-x-0 border-b-0 border-t border-[color:var(--app-border)] bg-[var(--app-panel)] shadow-[0_-12px_28px_rgba(0,0,0,0.26)] transition-transform duration-200",
+        "absolute inset-x-0 z-40 grid transform-gpu grid-rows-[auto_minmax(0,1fr)] border-x-0 border-b-0 border-t border-[color:var(--app-border)] bg-[var(--app-panel)] shadow-[0_-12px_28px_rgba(0,0,0,0.26)] will-change-transform",
+        isOpen && !isResizing && "motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out motion-reduce:transition-none",
         isResizing && "transition-none",
         isOpen
           ? "pointer-events-auto translate-y-0"
-          : "pointer-events-none translate-y-[calc(100%+var(--build-sheet-bottom-inset))]",
+          : "pointer-events-none translate-y-full transition-none",
       )}
       style={{
-        "--build-sheet-bottom-inset": `${bottomInset}px`,
-        bottom: bottomInset,
+        bottom: sheetBottomInset,
         height,
       } as React.CSSProperties}
     >

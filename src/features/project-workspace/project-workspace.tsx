@@ -5,11 +5,13 @@ import {
   Bot,
   Check,
   ChevronDown,
+  Circle,
   Code2,
   FileCode2,
   Gauge,
   GitBranch,
   Link2,
+  Loader2,
   Network,
   PanelLeftOpen,
   PanelRightClose,
@@ -18,6 +20,7 @@ import {
   ShieldCheck,
   SquareTerminal,
   Workflow,
+  XCircle,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -1064,9 +1067,29 @@ function SidebarItem({
     >
       <Icon className="size-3.5 shrink-0" aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      {badge ? <MetricBadge tone={tone}>{badge === "check" ? <Check className="size-3" /> : badge}</MetricBadge> : null}
+      {badge ? <MetricBadge tone={tone}>{metricBadgeContent(badge)}</MetricBadge> : null}
     </Button>
   );
+}
+
+function metricBadgeContent(badge: string) {
+  if (badge === "check") {
+    return <Check className="size-3" aria-hidden="true" />;
+  }
+
+  if (badge === "x") {
+    return <XCircle className="size-3" aria-hidden="true" />;
+  }
+
+  if (badge === "spinner") {
+    return <Loader2 className="size-3 animate-spin" aria-hidden="true" />;
+  }
+
+  if (badge === "circle") {
+    return <Circle className="size-3" aria-hidden="true" />;
+  }
+
+  return badge;
 }
 
 function MetricBadge({

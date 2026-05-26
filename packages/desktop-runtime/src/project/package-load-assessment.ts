@@ -1,6 +1,15 @@
 import {
   buildMovePackage,
+  defaultProjectMetadata,
+  loadFilePreview,
   loadPackageTree,
+  loadProjectMetadata,
+  projectMoveCoverageScriptPath,
+  projectMoveTestScriptPath,
+  runFormalVerification,
+  runMovyFuzz,
+  runSecurityCommand,
+  runSecurityScript,
   type CommandOutput,
   type MovePackage,
   type PackageTree,
@@ -24,6 +33,7 @@ export type PackageLoadAssessmentState =
   | "success"
   | "attention"
   | "error"
+  | "skipped"
   | "muted";
 
 export type PackageLoadAssessmentCommand = {
@@ -90,31 +100,27 @@ export const packageLoadAssessmentCommands: PackageLoadAssessmentCommand[] = [
   },
   {
     command: "sui move test",
-    enabled: false,
+    enabled: true,
     id: "tests",
     label: "Tests",
-    mutedCaption: "Not enabled",
   },
   {
     command: "sui move test --coverage",
-    enabled: false,
+    enabled: true,
     id: "coverage",
     label: "Coverage",
-    mutedCaption: "Not enabled",
   },
   {
-    command: "sui move test --rand-num-iters 256",
-    enabled: false,
+    command: "movy fuzz public-functions",
+    enabled: true,
     id: "fuzzing",
     label: "Fuzzing",
-    mutedCaption: "Not enabled",
   },
   {
-    command: "sui-prover",
-    enabled: false,
+    command: "bundled sui-prover --path <package> --modules <module>",
+    enabled: true,
     id: "formal",
     label: "Formal",
-    mutedCaption: "Not enabled",
   },
   {
     command: null,
@@ -130,6 +136,10 @@ const packageLoadAssessmentRunners: Partial<Record<
   PackageLoadAssessmentCommandRunner
 >> = {
   build: runBuildAssessment,
+  coverage: runCoverageAssessment,
+  formal: runFormalAssessment,
+  fuzzing: runFuzzAssessment,
+  tests: runTestsAssessment,
 };
 
 export function packageLoadAssessmentKey(
@@ -341,6 +351,409 @@ async function runBuildAssessment({
   return assessment;
 }
 
+async function runTestsAssessment(context: PackageLoadAssessmentCommandRunnerContext) {
+  const metadata = await loadProjectMetadata(context.packageTree.rootPath).catch((error) => {
+    console.warn("Could not load project metadata; running default Move tests.", error);
+    return defaultProjectMetadata();
+  });
+  const testScriptPath = await existingProjectScriptPath({
+    label: "test",
+    movePackage: context.movePackage,
+    packageTree: context.packageTree,
+    scriptPath: projectMoveTestScriptPath(metadata, context.movePackage),
+  });
+
+  return runCommandAssessment(context, {
+    command: testScriptPath ? `bash ${testScriptPath}` : "sui move test",
+    metadata: testScriptPath
+      ? [
+          { label: "Mode", value: "Project script" },
+          { label: "Default", value: "sui move test" },
+        ]
+      : undefined,
+    runningText: "Running Move tests...",
+    run: (logRun, onOutput) =>
+      testScriptPath
+        ? runSecurityScript(context.packageTree, context.movePackage.path, testScriptPath, {
+            onOutput,
+            streamId: logRun.id,
+          })
+        : runSecurityCommand(context.packageTree, context.movePackage.path, "move-test", {
+            onOutput,
+            streamId: logRun.id,
+          }),
+    summary: (output) =>
+      output.status === 0
+        ? "Move tests passed."
+        : output.status == null
+          ? "Move tests failed."
+          : `Move tests failed ${output.status}.`,
+  });
+}
+
+async function runCoverageAssessment(context: PackageLoadAssessmentCommandRunnerContext) {
+  const metadata = await loadProjectMetadata(context.packageTree.rootPath).catch((error) => {
+    console.warn("Could not load project metadata; running default Move coverage.", error);
+    return defaultProjectMetadata();
+  });
+  const coverageScriptPath = await existingProjectScriptPath({
+    label: "coverage",
+    movePackage: context.movePackage,
+    packageTree: context.packageTree,
+    scriptPath: projectMoveCoverageScriptPath(metadata, context.movePackage),
+  });
+  const testScriptPath = coverageScriptPath
+    ? null
+    : await existingProjectScriptPath({
+        label: "test coverage fallback",
+        movePackage: context.movePackage,
+        packageTree: context.packageTree,
+        scriptPath: projectMoveTestScriptPath(metadata, context.movePackage),
+      });
+  const scriptPath = coverageScriptPath ?? testScriptPath;
+  const scriptArgs = coverageScriptPath ? [] : testScriptPath ? ["--coverage"] : [];
+  const command = scriptPath
+    ? `bash ${scriptPath}${scriptArgs.length ? ` ${scriptArgs.join(" ")}` : ""}`
+    : "sui move test --coverage";
+
+  let assessment = await runCommandAssessment(context, {
+    command,
+    metadata: scriptPath
+      ? [
+          { label: "Mode", value: coverageScriptPath ? "Project coverage script" : "Project test script" },
+          { label: "Default", value: "sui move test --coverage" },
+          ...(scriptArgs.length ? [{ label: "Args", value: scriptArgs.join(" ") }] : []),
+        ]
+      : undefined,
+    runningText: "Running tests with coverage...",
+    run: (logRun, onOutput) =>
+      scriptPath
+        ? runSecurityScript(context.packageTree, context.movePackage.path, scriptPath, {
+            args: scriptArgs,
+            onOutput,
+            streamId: logRun.id,
+          })
+        : runSecurityCommand(context.packageTree, context.movePackage.path, "move-coverage", {
+            onOutput,
+            streamId: logRun.id,
+          }),
+    summary: (output) =>
+      output.status === 0
+        ? "Coverage test run passed."
+        : output.status == null
+          ? "Coverage test run failed."
+          : `Coverage test run failed ${output.status}.`,
+  });
+
+  const coverageStep = assessment.steps.find((step) => step.id === "coverage");
+
+  if (scriptPath || coverageStep?.state !== "success") {
+    return assessment;
+  }
+
+  const summaryCommand: PackageLoadAssessmentCommand = {
+    ...context.command,
+    command: "sui move coverage summary",
+    label: "Coverage summary",
+  };
+  const summaryContext = {
+    ...context,
+    assessment,
+    command: summaryCommand,
+  };
+
+  assessment = await runCommandAssessment(summaryContext, {
+    command: "sui move coverage summary",
+    preserveStepStart: true,
+    runningText: "Reading coverage summary...",
+    run: (logRun, onOutput) =>
+      runSecurityCommand(context.packageTree, context.movePackage.path, "move-coverage-summary", {
+        onOutput,
+        streamId: logRun.id,
+      }),
+    summary: (output) =>
+      output.status === 0
+        ? "Coverage summary completed."
+        : output.status == null
+          ? "Coverage summary failed."
+          : `Coverage summary failed ${output.status}.`,
+  });
+
+  return assessment;
+}
+
+async function existingProjectScriptPath({
+  label,
+  movePackage,
+  packageTree,
+  scriptPath,
+}: {
+  label: string;
+  movePackage: MovePackage;
+  packageTree: PackageTree;
+  scriptPath: string | null;
+}) {
+  const trimmedScriptPath = scriptPath?.trim();
+
+  if (!trimmedScriptPath) {
+    return null;
+  }
+
+  try {
+    await loadFilePreview(
+      packageTree,
+      packageRelativeScriptPath(movePackage.path, trimmedScriptPath),
+      { includeHighlightedHtml: false },
+    );
+
+    return trimmedScriptPath;
+  } catch (error) {
+    console.warn(
+      `Configured ${label} script ${trimmedScriptPath} was not found; falling back to the default command.`,
+      error,
+    );
+    return null;
+  }
+}
+
+function packageRelativeScriptPath(packagePath: string, scriptPath: string) {
+  const normalizedScriptPath = scriptPath.replace(/^\/+/, "");
+  const normalizedPackagePath = packagePath === "."
+    ? ""
+    : packagePath.replace(/^\/+|\/+$/g, "");
+
+  return normalizedPackagePath
+    ? `${normalizedPackagePath}/${normalizedScriptPath}`
+    : normalizedScriptPath;
+}
+
+async function runFuzzAssessment(context: PackageLoadAssessmentCommandRunnerContext) {
+  return runCommandAssessment(context, {
+    command: "movy fuzz public-functions",
+    metadata: [{ label: "Scope", value: "Public functions only" }],
+    runningText: "Deploying package into Movy's executor...",
+    run: (logRun, onOutput) =>
+      runMovyFuzz(context.packageTree, context.movePackage.path, {
+        onOutput,
+        streamId: logRun.id,
+      }),
+    summary: (output) =>
+      output.status === 0
+        ? "Movy fuzzing passed."
+        : output.status == null
+          ? "Movy fuzzing failed."
+          : `Movy fuzzing failed ${output.status}.`,
+  });
+}
+
+async function runFormalAssessment(context: PackageLoadAssessmentCommandRunnerContext) {
+  if (context.movePackage.modules.length === 0) {
+    const finishedAt = new Date();
+    const detail = "No parseable Move modules were found for the active package.";
+    const assessment = updateAssessmentStep(context.assessment, "formal", {
+      caption: "No formal targets",
+      detail,
+      finishedAt,
+      state: "skipped",
+      value: "Skipped",
+    });
+
+    publishAssessment(assessment, context.onAssessmentChange, context.isCurrent);
+    return assessment;
+  }
+
+  return runCommandAssessment(context, {
+    command: "bundled sui-prover --path <package> --modules <module>",
+    metadata: [
+      { label: "Mode", value: "Bundled Sui Prover" },
+      { label: "Modules", value: String(context.movePackage.modules.length) },
+      { label: "Timeout", value: "45 seconds per module" },
+    ],
+    runningText: "Running bundled Sui Prover...",
+    run: async (logRun, onOutput) => {
+      const aggregateOutput: CommandOutput = {
+        status: 0,
+        stderr: "",
+        stdout: "",
+      };
+
+      for (const moveModule of context.movePackage.modules) {
+        const output = await runFormalVerification(
+          context.packageTree,
+          context.movePackage.path,
+          moveModule.filePath,
+          moveModule.name,
+          {
+            onOutput: (partialOutput) => {
+              onOutput({
+                status: partialOutput.status,
+                stderr: aggregateOutput.stderr + partialOutput.stderr,
+                stdout: aggregateOutput.stdout + partialOutput.stdout,
+              });
+            },
+            streamId: logRun.id,
+            timeoutSeconds: 45,
+          },
+        );
+
+        aggregateOutput.stdout += output.stdout;
+        aggregateOutput.stderr += output.stderr;
+
+        if (output.status !== 0) {
+          aggregateOutput.status = output.status ?? 1;
+        }
+      }
+
+      return aggregateOutput;
+    },
+    summary: (output) =>
+      output.status === 0
+        ? "Formal verification passed."
+        : output.status == null
+          ? "Formal verification failed."
+          : `Formal verification failed ${output.status}.`,
+  });
+}
+
+type RunAssessmentOptions = {
+  command: string;
+  metadata?: { label: string; value: string }[];
+  preserveStepStart?: boolean;
+  runningText: string;
+  run: (
+    logRun: BuildLogRun,
+    onOutput: (output: CommandOutput) => void,
+  ) => Promise<CommandOutput>;
+  summary: (output: CommandOutput) => string;
+};
+
+async function runCommandAssessment(
+  context: PackageLoadAssessmentCommandRunnerContext,
+  options: RunAssessmentOptions,
+) {
+  const startedAt = new Date();
+  const logRun = assessmentLogRun({
+    assessment: context.assessment,
+    command: {
+      ...context.command,
+      command: options.command,
+    },
+    movePackage: context.movePackage,
+    packageTree: context.packageTree,
+    startedAt,
+    state: "running",
+  });
+  let assessment = updateAssessmentStep(context.assessment, context.command.id, {
+    caption: options.command,
+    command: options.command,
+    detail: options.runningText,
+    startedAt: options.preserveStepStart
+      ? context.assessment.steps.find((step) => step.id === context.command.id)?.startedAt ?? startedAt
+      : startedAt,
+    state: "running",
+    value: "Running",
+  });
+
+  publishAssessment(assessment, context.onAssessmentChange, context.isCurrent);
+  publishLog(
+    {
+      ...logRun,
+      metadata: [
+        { label: "Step", value: context.command.label },
+        { label: "Mode", value: "Package load" },
+        ...(options.metadata ?? []),
+      ],
+      runningText: options.runningText,
+    },
+    context.onCommandLog,
+    context.isCurrent,
+    { open: false, reset: context.command.id === "build" },
+  );
+
+  try {
+    const output = await options.run(logRun, (streamedOutput) => {
+      publishLog(
+        {
+          ...logRun,
+          metadata: [
+            { label: "Step", value: context.command.label },
+            { label: "Mode", value: "Package load" },
+            ...(options.metadata ?? []),
+          ],
+          output: streamedOutput,
+          runningText: options.runningText,
+        },
+        context.onCommandLog,
+        context.isCurrent,
+        { open: false },
+      );
+    });
+    const finishedAt = new Date();
+    const succeeded = output.status === 0;
+    const summary = options.summary(output);
+
+    assessment = updateAssessmentStep(assessment, context.command.id, {
+      caption: succeeded ? "Command completed" : "Command failed",
+      detail: summary,
+      finishedAt,
+      output,
+      state: succeeded ? "success" : "error",
+      value: succeeded ? "Pass" : "Fail",
+    });
+    publishAssessment(assessment, context.onAssessmentChange, context.isCurrent);
+    publishLog(
+      {
+        ...logRun,
+        finishedAt,
+        metadata: [
+          { label: "Step", value: context.command.label },
+          { label: "Mode", value: "Package load" },
+          ...(options.metadata ?? []),
+          { label: "Summary", value: summary },
+        ],
+        output,
+        state: succeeded ? "success" : "error",
+      },
+      context.onCommandLog,
+      context.isCurrent,
+      { open: !succeeded },
+    );
+
+    return assessment;
+  } catch (error) {
+    const finishedAt = new Date();
+    const message = getLoadAssessmentErrorMessage(error);
+
+    assessment = updateAssessmentStep(assessment, context.command.id, {
+      caption: "Command failed",
+      detail: message,
+      finishedAt,
+      state: "error",
+      value: "Fail",
+    });
+    publishAssessment(assessment, context.onAssessmentChange, context.isCurrent);
+    publishLog(
+      {
+        ...logRun,
+        error: message,
+        finishedAt,
+        metadata: [
+          { label: "Step", value: context.command.label },
+          { label: "Mode", value: "Package load" },
+          ...(options.metadata ?? []),
+          { label: "Summary", value: "Command failed before it could complete" },
+        ],
+        state: "error",
+      },
+      context.onCommandLog,
+      context.isCurrent,
+      { open: true },
+    );
+
+    return assessment;
+  }
+}
+
 function createAssessmentStep(command: PackageLoadAssessmentCommand): PackageLoadAssessmentStep {
   const isRisk = command.id === "risk";
 
@@ -357,7 +770,7 @@ function createAssessmentStep(command: PackageLoadAssessmentCommand): PackageLoa
     output: null,
     startedAt: null,
     state: command.enabled ? "idle" : "muted",
-    value: command.enabled ? "Queued" : isRisk ? "Pending" : "Locked",
+    value: command.enabled ? "Pending" : isRisk ? "Pending" : "Skipped",
   };
 }
 
