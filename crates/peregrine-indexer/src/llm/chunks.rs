@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::core::{estimate_tokens, ChunkId, ContextLevel, PackageId};
+use crate::core::{ChunkId, ContextLevel, PackageId, estimate_tokens};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]

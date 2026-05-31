@@ -2,12 +2,12 @@ use std::{collections::BTreeSet, path::Path};
 
 use crate::model::{AnalysisContext, AnalysisDiagnostic, AnalysisReport, Finding, RuleMetric};
 use peregrine_plugins::{
-    PluginManifestInput, PluginRuntime, PLUGIN_MANIFEST_EXPORT, PLUGIN_SCHEMA_VERSION,
+    PLUGIN_MANIFEST_EXPORT, PLUGIN_SCHEMA_VERSION, PluginManifestInput, PluginRuntime,
 };
 
 use super::{
-    resolve_plugin_path, PluginActiveRuleConfig, PluginAnalyzeInput, PluginAnalyzeOutput,
-    PluginManifest,
+    PluginActiveRuleConfig, PluginAnalyzeInput, PluginAnalyzeOutput, PluginManifest,
+    resolve_plugin_path,
 };
 
 const ANALYZE_EXPORT: &str = "peregrine_analyze";

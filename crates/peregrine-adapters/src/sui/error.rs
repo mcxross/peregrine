@@ -28,7 +28,9 @@ impl fmt::Display for SuiAdapterError {
             Self::CommandParse(error) => {
                 write!(formatter, "Could not parse bundled Sui command: {error}")
             }
-            Self::Runtime(error) => write!(formatter, "Could not start bundled Sui runtime: {error}"),
+            Self::Runtime(error) => {
+                write!(formatter, "Could not start bundled Sui runtime: {error}")
+            }
             Self::InvalidExecutionSource { expected, actual } => write!(
                 formatter,
                 "Cannot execute {actual:?} Sui command with the {expected:?} runner."

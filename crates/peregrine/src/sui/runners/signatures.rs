@@ -1,13 +1,13 @@
 use crate::{
-    output::{elapsed_ms, CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, EXIT_SUCCESS},
+    output::{CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, EXIT_SUCCESS, elapsed_ms},
     sui::{
         args::SignaturesArgs,
-        project::{require_package_source_modules, CliContext},
+        project::{CliContext, require_package_source_modules},
     },
 };
 use peregrine_move_model::{MoveFunctionSignature, MoveModule};
-use peregrine_static_analysis::{discover_move_project_fast, MovePackage};
-use serde_json::{json, Value};
+use peregrine_static_analysis::{MovePackage, discover_move_project_fast};
+use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
     ffi::OsStr,

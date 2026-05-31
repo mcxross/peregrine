@@ -70,7 +70,12 @@ pub fn summarize_index_layers(counts: IndexLayerCounts) -> Vec<IndexLayerSummary
             ready_status(counts.file_count + counts.summary_artifact_count),
             counts.file_count + counts.summary_artifact_count,
             &["files", "summary_artifacts", "address_mappings"],
-            &["Move.toml", "package_summaries", "address_mapping", "root_package_metadata"],
+            &[
+                "Move.toml",
+                "package_summaries",
+                "address_mapping",
+                "root_package_metadata",
+            ],
             &["get_package_overview", "get_summary_artifact_pointer"],
             "Proves which compiler artifacts backed the map without duplicating raw artifacts.",
         ),
@@ -88,7 +93,9 @@ pub fn summarize_index_layers(counts: IndexLayerCounts) -> Vec<IndexLayerSummary
             "summary_card",
             "Materialize root summaries and directly relevant dependency summaries into compact cards.",
             summary_card_status(&counts),
-            counts.root_card_count + counts.direct_dependency_card_count + counts.expanded_summary_count,
+            counts.root_card_count
+                + counts.direct_dependency_card_count
+                + counts.expanded_summary_count,
             &["summary_artifacts", "modules", "types", "functions"],
             &["package_summaries"],
             &["materialize_summary_module", "materialize_summary_symbol"],
@@ -111,7 +118,11 @@ pub fn summarize_index_layers(counts: IndexLayerCounts) -> Vec<IndexLayerSummary
             counts.type_count + counts.field_count,
             &["types", "fields", "edges", "semantic_tags"],
             &["package_summaries", "bytecode_modules"],
-            &["get_type_context", "get_function_field_reads", "get_function_field_writes"],
+            &[
+                "get_type_context",
+                "get_function_field_reads",
+                "get_function_field_writes",
+            ],
             "Supports object, capability, state, and field-access reasoning from neutral facts.",
         ),
         layer(
@@ -121,7 +132,11 @@ pub fn summarize_index_layers(counts: IndexLayerCounts) -> Vec<IndexLayerSummary
             counts.operation_count,
             &["operations", "basic_blocks", "semantic_tags"],
             &["bytecode_modules", "debug_info", "source_maps"],
-            &["get_function_operations", "get_operations_by_tag", "get_function_body"],
+            &[
+                "get_function_operations",
+                "get_operations_by_tag",
+                "get_function_body",
+            ],
             "Provides ordered body evidence without claiming whether behavior is secure.",
         ),
         layer(
@@ -131,7 +146,11 @@ pub fn summarize_index_layers(counts: IndexLayerCounts) -> Vec<IndexLayerSummary
             counts.edge_count,
             &["edges"],
             &["package_summaries", "bytecode_modules", "source_maps"],
-            &["get_function_callees", "get_reachable_callees", "get_call_graph"],
+            &[
+                "get_function_callees",
+                "get_reachable_callees",
+                "get_call_graph",
+            ],
             "Connects functions, types, operations, and dependencies for bounded graph expansion.",
         ),
         layer(
@@ -189,11 +208,7 @@ fn layer(
 }
 
 fn ready_status(count: usize) -> &'static str {
-    if count > 0 {
-        "ready"
-    } else {
-        "empty"
-    }
+    if count > 0 { "ready" } else { "empty" }
 }
 
 fn summary_card_status(counts: &IndexLayerCounts) -> &'static str {
@@ -209,11 +224,7 @@ fn summary_card_status(counts: &IndexLayerCounts) -> &'static str {
 }
 
 fn operation_status(count: usize) -> &'static str {
-    if count > 0 {
-        "ready"
-    } else {
-        "summary_only"
-    }
+    if count > 0 { "ready" } else { "summary_only" }
 }
 
 fn diagnostic_status(count: usize) -> &'static str {
@@ -225,9 +236,5 @@ fn diagnostic_status(count: usize) -> &'static str {
 }
 
 fn context_cache_status(count: usize) -> &'static str {
-    if count > 0 {
-        "ready"
-    } else {
-        "empty_cache"
-    }
+    if count > 0 { "ready" } else { "empty_cache" }
 }

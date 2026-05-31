@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::core::{logical_id, FieldInfo, SourceSpan, TypeDef, TypeKind};
+use crate::core::{FieldInfo, SourceSpan, TypeDef, TypeKind, logical_id};
 
 pub fn type_def_from_shape(
     package_id: &str,

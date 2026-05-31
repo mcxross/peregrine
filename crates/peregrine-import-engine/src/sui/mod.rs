@@ -1,9 +1,9 @@
 use move_binary_format::file_format::CompiledModule;
 use peregrine_bytecode::{
-    decompile_package_bytecode_modules, DecompiledMoveModule, MoveModuleBytecodeInput,
+    DecompiledMoveModule, MoveModuleBytecodeInput, decompile_package_bytecode_modules,
 };
 use peregrine_package_resolution::sui::{
-    fetch_move_package_from_graphql, normalize_sui_package_id, FetchedMovePackage,
+    FetchedMovePackage, fetch_move_package_from_graphql, normalize_sui_package_id,
 };
 use regex::{Regex, RegexBuilder};
 use serde::Serialize;
@@ -1270,10 +1270,12 @@ mod tests {
         assert!(source.contains("fun friend_only"));
         assert!(manifest.contains("name = \"pkg_0\""));
         assert!(manifest.contains("pkg_0 = \"0x0\""));
-        assert!(artifact
-            .raw_root
-            .join("pkg_0/bytecode_modules/a.mv")
-            .is_file());
+        assert!(
+            artifact
+                .raw_root
+                .join("pkg_0/bytecode_modules/a.mv")
+                .is_file()
+        );
     }
 
     #[test]
@@ -1298,18 +1300,24 @@ mod tests {
         let source =
             fs::read_to_string(artifact.project_root.join("sources/a.move")).expect("source");
         assert!(source.contains("module pkg_0::a"));
-        assert!(artifact
-            .project_root
-            .join("bytecode_modules/a.mv")
-            .is_file());
-        assert!(artifact
-            .project_root
-            .join("build/pkg_0/bytecode_modules/a.mv")
-            .is_file());
-        assert!(artifact
-            .project_root
-            .join("build/pkg_0/sources/a.move")
-            .is_file());
+        assert!(
+            artifact
+                .project_root
+                .join("bytecode_modules/a.mv")
+                .is_file()
+        );
+        assert!(
+            artifact
+                .project_root
+                .join("build/pkg_0/bytecode_modules/a.mv")
+                .is_file()
+        );
+        assert!(
+            artifact
+                .project_root
+                .join("build/pkg_0/sources/a.move")
+                .is_file()
+        );
         assert!(artifact.raw_root.join("pkg_0").is_dir());
         assert!(!artifact.raw_root.join("raw").exists());
         assert!(!artifact.buildable_root.exists());

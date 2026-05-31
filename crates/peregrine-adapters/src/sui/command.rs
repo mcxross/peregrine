@@ -1,4 +1,4 @@
-use super::{bundled, SuiAdapterError, SuiAdapterSource};
+use super::{SuiAdapterError, SuiAdapterSource, bundled};
 use std::{
     ffi::OsString,
     path::{Path, PathBuf},

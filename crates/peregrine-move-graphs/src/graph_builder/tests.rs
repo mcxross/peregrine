@@ -67,11 +67,13 @@ module demo::main {
         .id
         .clone();
 
-    assert!(project
-        .call_graph
-        .edges
-        .iter()
-        .any(|edge| edge.source == run_id && edge.target == local_id && edge.is_resolved));
+    assert!(
+        project
+            .call_graph
+            .edges
+            .iter()
+            .any(|edge| edge.source == run_id && edge.target == local_id && edge.is_resolved)
+    );
     assert!(
         project
             .call_graph
@@ -82,11 +84,13 @@ module demo::main {
             .sum::<usize>()
             == 2
     );
-    assert!(project
-        .call_graph
-        .unresolved_calls
-        .iter()
-        .any(|call| call.raw_target == "sui::transfer::share_object"));
+    assert!(
+        project
+            .call_graph
+            .unresolved_calls
+            .iter()
+            .any(|call| call.raw_target == "sui::transfer::share_object")
+    );
 }
 
 #[test]
@@ -112,28 +116,36 @@ module demo::main {
 
     let project = discover_move_project_model(temp.path());
 
-    assert!(project
-        .call_graph
-        .edges
-        .iter()
-        .any(|edge| edge.call_kind == "method" && edge.raw_target == ".value" && edge.is_resolved));
-    assert!(project
-        .call_graph
-        .unresolved_calls
-        .iter()
-        .any(|call| call.raw_target == ".unknown"));
+    assert!(
+        project
+            .call_graph
+            .edges
+            .iter()
+            .any(|edge| edge.call_kind == "method"
+                && edge.raw_target == ".value"
+                && edge.is_resolved)
+    );
+    assert!(
+        project
+            .call_graph
+            .unresolved_calls
+            .iter()
+            .any(|call| call.raw_target == ".unknown")
+    );
     let node_ids = project
         .call_graph
         .nodes
         .iter()
         .map(|node| node.id.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    assert!(project
-        .call_graph
-        .edges
-        .iter()
-        .all(|edge| node_ids.contains(edge.source.as_str())
-            && node_ids.contains(edge.target.as_str())));
+    assert!(
+        project
+            .call_graph
+            .edges
+            .iter()
+            .all(|edge| node_ids.contains(edge.source.as_str())
+                && node_ids.contains(edge.target.as_str()))
+    );
 }
 
 #[test]
@@ -174,11 +186,13 @@ module demo::main {
         .id
         .clone();
 
-    assert!(!project
-        .call_graph
-        .edges
-        .iter()
-        .any(|edge| edge.target == local_share_object_id));
+    assert!(
+        !project
+            .call_graph
+            .edges
+            .iter()
+            .any(|edge| edge.target == local_share_object_id)
+    );
     assert!(project.call_graph.edges.iter().any(|edge| {
         edge.raw_target == "sui::transfer::share_object" && edge.is_external && !edge.is_resolved
     }));
@@ -263,11 +277,13 @@ module demo::main {
     assert_eq!(coin_node.type_parameters[0].name, "T");
     assert!(coin_node.type_parameters[0].is_phantom);
 
-    assert!(project
-        .type_graph
-        .edges
-        .iter()
-        .any(|edge| edge.relationship == "field" && edge.field_name.as_deref() == Some("coin")));
+    assert!(
+        project
+            .type_graph
+            .edges
+            .iter()
+            .any(|edge| edge.relationship == "field" && edge.field_name.as_deref() == Some("coin"))
+    );
     let receipt_coin_edge = project
         .type_graph
         .edges
@@ -292,31 +308,41 @@ module demo::main {
             && edge.type_expression.as_deref() == Some("u64")
             && edge.declaring_field_name.as_deref() == Some("coin")
     }));
-    assert!(project
-        .type_graph
-        .edges
-        .iter()
-        .any(|edge| edge.relationship == "return"));
-    assert!(project
-        .type_graph
-        .edges
-        .iter()
-        .any(|edge| edge.relationship == "construction"));
-    assert!(project
-        .type_graph
-        .edges
-        .iter()
-        .any(|edge| edge.relationship == "destructuring"));
-    assert!(project
-        .type_graph
-        .edges
-        .iter()
-        .any(|edge| edge.relationship == "annotation"));
-    assert!(project
-        .type_graph
-        .edges
-        .iter()
-        .any(|edge| edge.relationship == "genericArgument"));
+    assert!(
+        project
+            .type_graph
+            .edges
+            .iter()
+            .any(|edge| edge.relationship == "return")
+    );
+    assert!(
+        project
+            .type_graph
+            .edges
+            .iter()
+            .any(|edge| edge.relationship == "construction")
+    );
+    assert!(
+        project
+            .type_graph
+            .edges
+            .iter()
+            .any(|edge| edge.relationship == "destructuring")
+    );
+    assert!(
+        project
+            .type_graph
+            .edges
+            .iter()
+            .any(|edge| edge.relationship == "annotation")
+    );
+    assert!(
+        project
+            .type_graph
+            .edges
+            .iter()
+            .any(|edge| edge.relationship == "genericArgument")
+    );
 }
 
 #[test]
@@ -393,11 +419,13 @@ module demo::main {
 
     let project = discover_move_project_model(temp.path());
 
-    assert!(project
-        .type_graph
-        .nodes
-        .iter()
-        .any(|node| node.is_external && node.qualified_name == "external::asset::Coin"));
+    assert!(
+        project
+            .type_graph
+            .nodes
+            .iter()
+            .any(|node| node.is_external && node.qualified_name == "external::asset::Coin")
+    );
     let summary_abilities = |qualified_name: &str| {
         project
             .type_graph
@@ -428,11 +456,13 @@ module demo::main {
             .collect::<Vec<_>>(),
         ["K", "V"]
     );
-    assert!(project
-        .type_graph
-        .edges
-        .iter()
-        .any(|edge| edge.relationship == "field" && edge.field_name.as_deref() == Some("item")));
+    assert!(
+        project
+            .type_graph
+            .edges
+            .iter()
+            .any(|edge| edge.relationship == "field" && edge.field_name.as_deref() == Some("item"))
+    );
     assert!(project.type_graph.edges.iter().any(|edge| {
         edge.relationship == "field"
             && edge.field_name.as_deref() == Some("item")

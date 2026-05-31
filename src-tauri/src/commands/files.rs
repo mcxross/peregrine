@@ -1,13 +1,13 @@
-use crate::file_preview::{build_file_preview, FilePreview};
+use crate::file_preview::{FilePreview, build_file_preview};
 use crate::validated_move_project_name;
-use base64::{engine::general_purpose, Engine};
-use peregrine_bytecode::{load_package_bytecode, MoveBytecodePackageView};
+use base64::{Engine, engine::general_purpose};
+use peregrine_bytecode::{MoveBytecodePackageView, load_package_bytecode};
 use peregrine_move_graphs::{
-    discover_move_project_graphs, discover_move_project_graphs_for_package,
-    discover_move_state_access_graph_for_function, MoveProjectGraphs, MoveStateAccessGraph,
+    MoveProjectGraphs, MoveStateAccessGraph, discover_move_project_graphs,
+    discover_move_project_graphs_for_package, discover_move_state_access_graph_for_function,
 };
-use peregrine_move_model::{build_move_package, MovePackageModel};
-use peregrine_project_loader::{load_project, LoadedProject, ProjectLoadMode, ProjectLoadOptions};
+use peregrine_move_model::{MovePackageModel, build_move_package};
+use peregrine_project_loader::{LoadedProject, ProjectLoadMode, ProjectLoadOptions, load_project};
 use peregrine_static_analysis::{
     AnalysisConfig, AnalysisEngine, AnalysisEngineOptions, AnalysisReport,
 };
@@ -356,7 +356,11 @@ fn move_source_unavailable_message(package: &MovePackageModel) -> String {
         "Move package `{}` ({path}) contains {} Move source {}, but no parseable Move modules were found. The source may be commented out or invalid. Dependency graph, call graph, type graph, and bytecode views require parseable source modules.",
         package.name,
         package.source_file_count,
-        if package.source_file_count == 1 { "file" } else { "files" }
+        if package.source_file_count == 1 {
+            "file"
+        } else {
+            "files"
+        }
     )
 }
 

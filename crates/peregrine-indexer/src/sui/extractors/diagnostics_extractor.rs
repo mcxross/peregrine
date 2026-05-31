@@ -1,4 +1,4 @@
-use crate::core::{stable_id, Diagnostic, DiagnosticSeverity, SourceSpan};
+use crate::core::{Diagnostic, DiagnosticSeverity, SourceSpan, stable_id};
 
 pub fn diagnostic(
     package_id: impl AsRef<str>,

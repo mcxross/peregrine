@@ -1,4 +1,4 @@
 pub use peregrine_helper_protocol::{
-    resolve_external_helper_executable, resolve_helper_executable, BUNDLED_SUI_HELPER_ARG,
-    FORMAL_VERIFICATION_HELPER_ARG, MOVE_ANALYZER_HELPER_ARG, MOVY_FUZZ_HELPER_ARG,
+    BUNDLED_SUI_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG, MOVE_ANALYZER_HELPER_ARG,
+    MOVY_FUZZ_HELPER_ARG, resolve_external_helper_executable, resolve_helper_executable,
 };

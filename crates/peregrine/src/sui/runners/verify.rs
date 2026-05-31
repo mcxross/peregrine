@@ -3,7 +3,7 @@ use crate::{
     output::{CliDiagnostic, CliStep},
     sui::{
         args::VerifyArgs,
-        project::{formal_targets, CliContext, FormalTarget},
+        project::{CliContext, FormalTarget, formal_targets},
         runners::process::{command_step, run_peregrine_child},
     },
 };
@@ -11,9 +11,9 @@ use peregrine_adapters::sui::{
     SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiFormalVerificationOptions,
 };
 use peregrine_dynamic_analysis::sui::formal_verification::{
-    formal_verification_manifest, FormalVerificationOptions,
+    FormalVerificationOptions, formal_verification_manifest,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{collections::BTreeMap, ffi::OsString, time::Instant};
 
 pub fn run_verify(context: &CliContext, args: &VerifyArgs) -> Vec<CliStep> {

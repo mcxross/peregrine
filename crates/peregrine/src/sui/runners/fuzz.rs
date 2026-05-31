@@ -7,7 +7,7 @@ use crate::{
         runners::process::{command_step, run_peregrine_child},
     },
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{collections::BTreeMap, ffi::OsString, time::Instant};
 
 pub fn run_fuzz(context: &CliContext, args: &FuzzArgs) -> CliStep {

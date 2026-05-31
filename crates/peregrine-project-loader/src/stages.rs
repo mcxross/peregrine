@@ -6,8 +6,8 @@ use crate::{
     tree_paths::collect_project_paths,
 };
 use peregrine_static_analysis::{
-    discover_move_project_fast, discover_move_project_shallow, AnalysisConfig, AnalysisEngine,
-    AnalysisEngineOptions, MovePackage,
+    AnalysisConfig, AnalysisEngine, AnalysisEngineOptions, MovePackage, discover_move_project_fast,
+    discover_move_project_shallow,
 };
 use std::time::Instant;
 

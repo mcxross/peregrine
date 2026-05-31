@@ -1,8 +1,8 @@
 use super::{
-    bundled, system, SuiAdapterEnvironment, SuiAdapterError, SuiAdapterSettings, SuiAdapterSource,
+    SuiAdapterEnvironment, SuiAdapterError, SuiAdapterSettings, SuiAdapterSource,
     SuiAdapterSourceStatus, SuiAdapterStatus, SuiCommandKind, SuiExecutionTarget,
     SuiFormalVerificationCommand, SuiFormalVerificationOptions, SuiMoveNewCommand,
-    SuiPackageCommand,
+    SuiPackageCommand, bundled, system,
 };
 
 pub struct SuiAdapter {

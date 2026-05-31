@@ -1,8 +1,9 @@
 use super::{
-    relative_path, MoveFunctionSignature, MoveModule, MoveStructField, MoveStructSignature,
+    MoveFunctionSignature, MoveModule, MoveStructField, MoveStructSignature, relative_path,
 };
 use move_command_line_common::files::FileHash;
 use move_compiler::{
+    Flags,
     editions::Flavor,
     parser::{
         ast::{
@@ -13,7 +14,6 @@ use move_compiler::{
         syntax::parse_file_string,
     },
     shared::{CompilationEnv, PackageConfig},
-    Flags,
 };
 use std::{
     collections::BTreeMap,

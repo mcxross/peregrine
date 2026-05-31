@@ -1,8 +1,8 @@
 use crate::{
     helper_args::resolve_helper_executable,
     output::{
-        command_details, elapsed_ms, CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep,
-        EXIT_WORKFLOW_FAILED,
+        CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, EXIT_WORKFLOW_FAILED,
+        command_details, elapsed_ms,
     },
 };
 use serde_json::Value;

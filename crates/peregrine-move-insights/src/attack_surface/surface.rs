@@ -1,7 +1,7 @@
 use peregrine_move_model::{MoveModule, MovePackageModel};
 use std::path::PathBuf;
 
-use crate::scanner_report::{package_scanner_report_for_package, MovePackageScannerReport};
+use crate::scanner_report::{MovePackageScannerReport, package_scanner_report_for_package};
 
 use super::{
     admin::admin_control_findings,

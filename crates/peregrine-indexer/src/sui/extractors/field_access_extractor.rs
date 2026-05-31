@@ -1,4 +1,4 @@
-use crate::core::{stable_id, Edge, EdgeType, OperationId, PackageId, SourceSpan};
+use crate::core::{Edge, EdgeType, OperationId, PackageId, SourceSpan, stable_id};
 
 pub fn field_access_edge(
     package_id: &PackageId,

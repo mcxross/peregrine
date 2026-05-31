@@ -6,5 +6,5 @@ mod summaries;
 mod tests;
 
 pub(crate) use builder::{
-    build_move_graphs, build_move_state_access_graph, MoveStateAccessGraphTarget,
+    MoveStateAccessGraphTarget, build_move_graphs, build_move_state_access_graph,
 };

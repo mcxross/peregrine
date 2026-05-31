@@ -1,4 +1,4 @@
-use crate::core::{logical_id, PackageInfo, PackageRole, PackageStatus};
+use crate::core::{PackageInfo, PackageRole, PackageStatus, logical_id};
 use crate::sui::model::LoadedPackage;
 
 pub fn package_info(package: &LoadedPackage, indexed_at: i64) -> PackageInfo {

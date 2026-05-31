@@ -1,8 +1,8 @@
 use crate::{
-    output::{elapsed_ms, CliDiagnostic, CliStatus, CliStep, EXIT_SUCCESS},
+    output::{CliDiagnostic, CliStatus, CliStep, EXIT_SUCCESS, elapsed_ms},
     sui::{
         args::GraphOutputArgs,
-        project::{resolve_output_path, CliContext},
+        project::{CliContext, resolve_output_path},
     },
 };
 use serde_json::Value;

@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::{
     core::{
-        is_neutral_tag, stable_id, Diagnostic, DiagnosticSeverity, EdgeType, MaterializedStatus,
-        OperationKind, SourcePrecision, SourceSpan,
+        Diagnostic, DiagnosticSeverity, EdgeType, MaterializedStatus, OperationKind,
+        SourcePrecision, SourceSpan, is_neutral_tag, stable_id,
     },
     incremental::{InvalidationPlan, PackageFingerprints},
     sui::{index_layers::summarize_program_layers, model::ProgramIndex},

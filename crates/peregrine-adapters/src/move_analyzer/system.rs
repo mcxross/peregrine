@@ -148,11 +148,7 @@ fn common_user_move_analyzer_candidates(binary_name: &str) -> Vec<PathBuf> {
 }
 
 fn home_env_key() -> &'static str {
-    if cfg!(windows) {
-        "USERPROFILE"
-    } else {
-        "HOME"
-    }
+    if cfg!(windows) { "USERPROFILE" } else { "HOME" }
 }
 
 fn executable_candidates(directory: &Path, binary_name: &str) -> Vec<PathBuf> {

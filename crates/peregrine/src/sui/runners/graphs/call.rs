@@ -1,6 +1,6 @@
 use super::{
-    common::{graph_step, requested_modules, DIM, EDGE, FUNCTION, HEADER, KIND, MODULE, RESET},
-    dot::{dot_edge_attrs, dot_id, dot_label, DotEdgeStyle},
+    common::{DIM, EDGE, FUNCTION, HEADER, KIND, MODULE, RESET, graph_step, requested_modules},
+    dot::{DotEdgeStyle, dot_edge_attrs, dot_id, dot_label},
     project::{module_matches, selected_source_package},
 };
 use crate::{
@@ -8,8 +8,8 @@ use crate::{
     sui::{args::CallGraphArgs, project::CliContext},
 };
 use peregrine_move_graphs::{
-    discover_move_project_graphs_for_package, MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode,
-    MoveUnresolvedCall,
+    MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode, MoveUnresolvedCall,
+    discover_move_project_graphs_for_package,
 };
 use serde_json::json;
 use std::{

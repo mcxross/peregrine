@@ -6,14 +6,14 @@ use std::{
 };
 
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::{
     core::{
-        estimate_tokens, is_neutral_tag, logical_id, stable_id, AddressMapping, Diagnostic,
-        DiagnosticSeverity, Edge, EdgeType, FieldInfo, FunctionInfo, FunctionParameter,
-        FunctionVisibility, MaterializedStatus, ModuleInfo, PackageInfo, PackageRole,
-        PackageStatus, SemanticTag, SourceSpan, SummaryArtifact, TypeDef, TypeKind,
+        AddressMapping, Diagnostic, DiagnosticSeverity, Edge, EdgeType, FieldInfo, FunctionInfo,
+        FunctionParameter, FunctionVisibility, MaterializedStatus, ModuleInfo, PackageInfo,
+        PackageRole, PackageStatus, SemanticTag, SourceSpan, SummaryArtifact, TypeDef, TypeKind,
+        estimate_tokens, is_neutral_tag, logical_id, stable_id,
     },
     storage::sqlite::{SqliteIndexReader, SqliteIndexWriter},
     sui::model::{

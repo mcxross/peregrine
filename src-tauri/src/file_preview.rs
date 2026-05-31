@@ -1,11 +1,11 @@
-use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
-use pulldown_cmark::{html, CowStr, Event, Options, Parser};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
+use pulldown_cmark::{CowStr, Event, Options, Parser, html};
 use serde::Serialize;
 use std::{fs, path::Path, sync::OnceLock};
 use syntect::{
     easy::HighlightLines,
     highlighting::{Style, Theme, ThemeSet},
-    html::{styled_line_to_highlighted_html, IncludeBackground},
+    html::{IncludeBackground, styled_line_to_highlighted_html},
     parsing::SyntaxSet,
     util::LinesWithEndings,
 };

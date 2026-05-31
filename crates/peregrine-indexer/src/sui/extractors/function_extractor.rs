@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::core::{logical_id, FunctionInfo, FunctionParameter, FunctionVisibility, SourceSpan};
+use crate::core::{FunctionInfo, FunctionParameter, FunctionVisibility, SourceSpan, logical_id};
 use crate::sui::extractors::type_extractor::type_value_to_string;
 
 pub fn function_from_shape(

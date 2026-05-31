@@ -1,6 +1,6 @@
 use super::framing;
 use crate::{
-    helper_args::{resolve_helper_executable, MOVE_ANALYZER_HELPER_ARG},
+    helper_args::{MOVE_ANALYZER_HELPER_ARG, resolve_helper_executable},
     state::{MoveAnalyzerCommandState, MoveAnalyzerSession},
 };
 use peregrine_adapters::move_analyzer::{MoveAnalyzerExecutionTarget, MoveAnalyzerServerCommand};
@@ -306,63 +306,65 @@ fn spawn_exit_watcher(
     child: Arc<Mutex<Child>>,
     stderr_tail: Arc<Mutex<String>>,
 ) {
-    thread::spawn(move || loop {
-        let status = {
-            let mut child = match child.lock() {
-                Ok(child) => child,
-                Err(_) => {
+    thread::spawn(move || {
+        loop {
+            let status = {
+                let mut child = match child.lock() {
+                    Ok(child) => child,
+                    Err(_) => {
+                        let _ = app.emit(
+                            MOVE_ANALYZER_EXIT_EVENT,
+                            MoveAnalyzerExitEvent {
+                                session_id: session_id.clone(),
+                                status: None,
+                                error: Some("Move Analyzer process state is poisoned.".to_string()),
+                            },
+                        );
+                        break;
+                    }
+                };
+
+                match child.try_wait() {
+                    Ok(Some(status)) => Some(Ok(status.code())),
+                    Ok(None) => None,
+                    Err(error) => Some(Err(error.to_string())),
+                }
+            };
+
+            match status {
+                Some(Ok(status)) => {
+                    let state = app.state::<MoveAnalyzerCommandState>();
+                    if let Ok(mut sessions) = state.sessions.lock() {
+                        sessions.remove(&session_id);
+                    }
+                    let stderr = stderr_tail
+                        .lock()
+                        .ok()
+                        .map(|tail| tail.trim().to_string())
+                        .filter(|tail| !tail.is_empty());
+                    let _ = app.emit(
+                        MOVE_ANALYZER_EXIT_EVENT,
+                        MoveAnalyzerExitEvent {
+                            session_id: session_id.clone(),
+                            status,
+                            error: stderr,
+                        },
+                    );
+                    break;
+                }
+                Some(Err(error)) => {
                     let _ = app.emit(
                         MOVE_ANALYZER_EXIT_EVENT,
                         MoveAnalyzerExitEvent {
                             session_id: session_id.clone(),
                             status: None,
-                            error: Some("Move Analyzer process state is poisoned.".to_string()),
+                            error: Some(error),
                         },
                     );
                     break;
                 }
-            };
-
-            match child.try_wait() {
-                Ok(Some(status)) => Some(Ok(status.code())),
-                Ok(None) => None,
-                Err(error) => Some(Err(error.to_string())),
+                None => thread::sleep(Duration::from_millis(400)),
             }
-        };
-
-        match status {
-            Some(Ok(status)) => {
-                let state = app.state::<MoveAnalyzerCommandState>();
-                if let Ok(mut sessions) = state.sessions.lock() {
-                    sessions.remove(&session_id);
-                }
-                let stderr = stderr_tail
-                    .lock()
-                    .ok()
-                    .map(|tail| tail.trim().to_string())
-                    .filter(|tail| !tail.is_empty());
-                let _ = app.emit(
-                    MOVE_ANALYZER_EXIT_EVENT,
-                    MoveAnalyzerExitEvent {
-                        session_id: session_id.clone(),
-                        status,
-                        error: stderr,
-                    },
-                );
-                break;
-            }
-            Some(Err(error)) => {
-                let _ = app.emit(
-                    MOVE_ANALYZER_EXIT_EVENT,
-                    MoveAnalyzerExitEvent {
-                        session_id: session_id.clone(),
-                        status: None,
-                        error: Some(error),
-                    },
-                );
-                break;
-            }
-            None => thread::sleep(Duration::from_millis(400)),
         }
     });
 }

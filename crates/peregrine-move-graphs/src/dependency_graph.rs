@@ -1,5 +1,5 @@
 use super::{PackageDependencyEdge, PackageDependencyGraph, PackageDependencyNode};
-use peregrine_move_model::{relative_path, root_package_name, MovePackageModel};
+use peregrine_move_model::{MovePackageModel, relative_path, root_package_name};
 use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet, VecDeque},

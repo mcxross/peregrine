@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
-use crate::core::{hash_file, hash_str, BuildMetadata, IndexerResult};
+use crate::core::{BuildMetadata, IndexerResult, hash_file, hash_str};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]

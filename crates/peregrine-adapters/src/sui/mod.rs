@@ -22,8 +22,8 @@ pub use command::{
 pub use environment::SuiAdapterEnvironment;
 pub use error::SuiAdapterError;
 pub use formal::{
-    SuiFormalVerificationCommand, SuiFormalVerificationOptions,
-    DEFAULT_FORMAL_VERIFICATION_TIMEOUT_SECONDS,
+    DEFAULT_FORMAL_VERIFICATION_TIMEOUT_SECONDS, SuiFormalVerificationCommand,
+    SuiFormalVerificationOptions,
 };
 pub use keys::{
     SuiAddNetworkEnvRequest, SuiExportPrivateKeyRequest, SuiExportPrivateKeyResponse,

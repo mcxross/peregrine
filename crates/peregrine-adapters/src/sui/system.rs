@@ -136,11 +136,7 @@ fn common_user_sui_candidates(binary_name: &str) -> Vec<PathBuf> {
 }
 
 fn home_env_key() -> &'static str {
-    if cfg!(windows) {
-        "USERPROFILE"
-    } else {
-        "HOME"
-    }
+    if cfg!(windows) { "USERPROFILE" } else { "HOME" }
 }
 
 fn executable_candidates(directory: &Path, binary_name: &str) -> Vec<PathBuf> {
@@ -174,11 +170,7 @@ fn executable_candidates(directory: &Path, binary_name: &str) -> Vec<PathBuf> {
 }
 
 fn sui_binary_name() -> &'static str {
-    if cfg!(windows) {
-        "sui.exe"
-    } else {
-        "sui"
-    }
+    if cfg!(windows) { "sui.exe" } else { "sui" }
 }
 
 fn display_path(path: &Path) -> String {

@@ -1,8 +1,8 @@
 use crate::{
     output::CliDiagnostic,
-    sui::project::{require_package_source_modules, CliContext},
+    sui::project::{CliContext, require_package_source_modules},
 };
-use peregrine_static_analysis::{discover_move_project_fast, MovePackage};
+use peregrine_static_analysis::{MovePackage, discover_move_project_fast};
 use std::{
     ffi::OsStr,
     path::{Component, Path},

@@ -1,10 +1,10 @@
 use peregrine_move_graphs::{
+    MoveCallGraph, MoveProjectModel, MoveStateAccessGraph, MoveTypeGraph, PackageDependencyGraph,
     discover_move_project_model, discover_move_project_model_fast,
-    discover_move_project_model_shallow, MoveCallGraph, MoveProjectModel, MoveStateAccessGraph,
-    MoveTypeGraph, PackageDependencyGraph,
+    discover_move_project_model_shallow,
 };
 use peregrine_move_insights::report::{
-    package_insights_report_for_package, MovePackageInsightsReport,
+    MovePackageInsightsReport, package_insights_report_for_package,
 };
 use peregrine_move_model::{MoveModule, MovePackageModel};
 use serde::Serialize;
@@ -145,10 +145,12 @@ native fun native_noop();
             .expect("configure function");
         assert_eq!(configure.visibility, "public(package)");
         assert!(!configure.is_transaction_callable);
-        assert!(configure
-            .body
-            .as_deref()
-            .is_some_and(|body| body.contains("assert!")));
+        assert!(
+            configure
+                .body
+                .as_deref()
+                .is_some_and(|body| body.contains("assert!"))
+        );
 
         let friend_only = module
             .functions
@@ -544,10 +546,12 @@ module lifecycle::vault {
             .expect("receipt lifecycle map");
 
         assert!(receipt.stages.iter().any(|stage| stage.kind == "wrapped"));
-        assert!(receipt
-            .risks
-            .iter()
-            .any(|risk| risk.kind == "longLivedReceiptOrPosition"));
+        assert!(
+            receipt
+                .risks
+                .iter()
+                .any(|risk| risk.kind == "longLivedReceiptOrPosition")
+        );
 
         let admin_cap = surface
             .object_lifecycle_maps
@@ -556,10 +560,12 @@ module lifecycle::vault {
             .expect("admin cap lifecycle map");
 
         assert!(admin_cap.is_capability_like);
-        assert!(admin_cap
-            .risks
-            .iter()
-            .any(|risk| risk.kind == "privilegedObjectLeak"));
+        assert!(
+            admin_cap
+                .risks
+                .iter()
+                .any(|risk| risk.kind == "privilegedObjectLeak")
+        );
     }
 
     #[test]
@@ -725,10 +731,12 @@ module savings_personal::savings_personal {
         assert!(receipt_stages.contains(&"mutated"));
         assert!(receipt_stages.contains(&"transferred"));
         assert!(!receipt_stages.contains(&"deleted"));
-        assert!(receipt
-            .touched_by
-            .iter()
-            .any(|function| function.qualified_name == "savings_personal::register_account"));
+        assert!(
+            receipt
+                .touched_by
+                .iter()
+                .any(|function| function.qualified_name == "savings_personal::register_account")
+        );
         assert!(!receipt.touched_by.iter().any(|function| {
             function.qualified_name == "savings_personal::emergency_withdraw_from_bucket"
         }));
@@ -753,10 +761,12 @@ module savings_personal::savings_personal {
                     .iter()
                     .any(|item| item.contains("returned to transaction caller"))
         }));
-        assert!(!receipt
-            .touched_by
-            .iter()
-            .any(|function| { function.qualified_name == "savings_personal::get_bucket_info" }));
+        assert!(
+            !receipt
+                .touched_by
+                .iter()
+                .any(|function| { function.qualified_name == "savings_personal::get_bucket_info" })
+        );
 
         let receipt_ownership = surface
             .object_ownership_findings

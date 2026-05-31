@@ -1,17 +1,17 @@
 use super::{
-    common::{graph_step, DIM, EDGE, FUNCTION, HEADER, KIND, MODULE, RESET},
-    dot::{dot_edge_attrs, dot_id, dot_label, DotEdgeStyle},
+    common::{DIM, EDGE, FUNCTION, HEADER, KIND, MODULE, RESET, graph_step},
+    dot::{DotEdgeStyle, dot_edge_attrs, dot_id, dot_label},
     project::{module_matches, selected_source_package},
 };
 use crate::{
-    output::{elapsed_ms, CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep},
+    output::{CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, elapsed_ms},
     sui::{args::CfgArgs, project::CliContext, runners::run_build},
 };
 use peregrine_bytecode::{
-    load_package_bytecode, MoveBytecodeControlFlowView, MoveBytecodeFunctionView,
-    MoveBytecodeModuleView,
+    MoveBytecodeControlFlowView, MoveBytecodeFunctionView, MoveBytecodeModuleView,
+    load_package_bytecode,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{collections::BTreeMap, time::Instant};
 
 struct CfgTarget<'a> {
@@ -56,7 +56,7 @@ pub fn run_cfg(context: &CliContext, args: &CfgArgs) -> CliStep {
     let bytecode = match load_package_bytecode(&context.package_root, &package.name) {
         Ok(bytecode) => bytecode,
         Err(error) => {
-            return CliStep::failed("cfg", started_at, CliDiagnostic::error("cfg", error))
+            return CliStep::failed("cfg", started_at, CliDiagnostic::error("cfg", error));
         }
     };
     let targets = selected_cfg_targets(&bytecode.modules, args);

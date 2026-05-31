@@ -1,15 +1,15 @@
 use crate::{
     output::{
-        elapsed_ms, CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, EXIT_SUCCESS,
-        EXIT_WORKFLOW_FAILED,
+        CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, EXIT_SUCCESS,
+        EXIT_WORKFLOW_FAILED, elapsed_ms,
     },
     sui::{args::ImportPackageArgs, project::resolve_output_path},
 };
 use peregrine_import_engine::sui::{
-    default_import_root, BuildVerification, BuildableImportArtifact, BuildableImportRequest,
-    EngineDiagnostic, EngineDiagnosticSeverity, ImportEngine, ImportEngineConfig,
+    BuildVerification, BuildableImportArtifact, BuildableImportRequest, EngineDiagnostic,
+    EngineDiagnosticSeverity, ImportEngine, ImportEngineConfig, default_import_root,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::Path, time::Instant};
 
 pub fn run_import_package(workspace_root: &Path, args: &ImportPackageArgs) -> CliStep {

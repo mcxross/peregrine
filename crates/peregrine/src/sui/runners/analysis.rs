@@ -1,7 +1,7 @@
 use crate::{
     output::{
-        elapsed_ms, CliDiagnostic, CliDiagnosticSeverity, CliSpan, CliStatus, CliStep,
-        EXIT_SUCCESS, EXIT_WORKFLOW_FAILED,
+        CliDiagnostic, CliDiagnosticSeverity, CliSpan, CliStatus, CliStep, EXIT_SUCCESS,
+        EXIT_WORKFLOW_FAILED, elapsed_ms,
     },
     sui::{args::AnalyzeArgs, project::CliContext},
 };
@@ -9,7 +9,7 @@ use peregrine_static_analysis::{
     AnalysisConfig, AnalysisDiagnostic, AnalysisEngine, AnalysisEngineOptions, Finding, RuleMetric,
     Severity,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{collections::BTreeMap, time::Instant};
 
 pub fn run_analyze(context: &CliContext, args: &AnalyzeArgs) -> CliStep {

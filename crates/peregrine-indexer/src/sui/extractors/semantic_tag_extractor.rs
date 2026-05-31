@@ -1,5 +1,5 @@
 use crate::core::{
-    is_neutral_tag, stable_id, FunctionInfo, FunctionVisibility, SemanticTag, SourceSpan, TypeDef,
+    FunctionInfo, FunctionVisibility, SemanticTag, SourceSpan, TypeDef, is_neutral_tag, stable_id,
 };
 
 pub fn function_tags(function: &FunctionInfo) -> Vec<&'static str> {

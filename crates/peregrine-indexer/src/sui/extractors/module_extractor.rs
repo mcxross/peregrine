@@ -1,4 +1,4 @@
-use crate::core::{logical_id, MaterializedStatus, ModuleInfo, SourceSpan, SummaryArtifact};
+use crate::core::{MaterializedStatus, ModuleInfo, SourceSpan, SummaryArtifact, logical_id};
 
 pub fn module_info(
     package_id: &str,

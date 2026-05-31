@@ -1,6 +1,6 @@
 use crate::{
     helper_args::BUNDLED_SUI_HELPER_ARG,
-    output::{elapsed_ms, CliDiagnostic, CliStatus, CliStep, EXIT_WORKFLOW_FAILED},
+    output::{CliDiagnostic, CliStatus, CliStep, EXIT_WORKFLOW_FAILED, elapsed_ms},
     sui::{
         args::NewPackageArgs,
         runners::process::{command_step, run_peregrine_child_in},

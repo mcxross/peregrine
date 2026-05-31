@@ -6,7 +6,7 @@ mod tree_paths;
 mod tests;
 
 pub use pipeline::{
-    load_project, LoadedProject, PackageLoadCapabilities, ProjectLoadDiagnostic, ProjectLoadMode,
+    LoadedProject, PackageLoadCapabilities, ProjectLoadDiagnostic, ProjectLoadMode,
     ProjectLoadOptions, ProjectLoadPipeline, ProjectLoadReport, ProjectLoadStageReport,
-    ProjectLoadStageStatus,
+    ProjectLoadStageStatus, load_project,
 };

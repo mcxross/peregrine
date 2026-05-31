@@ -28,14 +28,18 @@ fn wasm_plugin_findings_are_merged() {
 
     let report = Analyzer::new().analyze_package(package.path(), config);
 
-    assert!(report
-        .loaded_plugins
-        .iter()
-        .any(|plugin| plugin == "fixture-plugin"));
-    assert!(report
-        .findings
-        .iter()
-        .any(|finding| finding.rule_id == "FixtureRule"));
+    assert!(
+        report
+            .loaded_plugins
+            .iter()
+            .any(|plugin| plugin == "fixture-plugin")
+    );
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == "FixtureRule")
+    );
 }
 
 #[test]
@@ -59,14 +63,18 @@ fn native_plugin_findings_are_merged() {
 
     let report = Analyzer::new().analyze_package(package.path(), config);
 
-    assert!(report
-        .loaded_plugins
-        .iter()
-        .any(|plugin| plugin == "native-fixture-plugin"));
-    assert!(report
-        .findings
-        .iter()
-        .any(|finding| finding.rule_id == "native_fixture"));
+    assert!(
+        report
+            .loaded_plugins
+            .iter()
+            .any(|plugin| plugin == "native-fixture-plugin")
+    );
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == "native_fixture")
+    );
 }
 
 #[test]
@@ -77,10 +85,12 @@ fn plugin_failures_are_reported_as_diagnostics() {
 
     let report = Analyzer::new().analyze_package(package.path(), config);
 
-    assert!(report
-        .diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.source.contains("missing.wasm")));
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.source.contains("missing.wasm"))
+    );
 }
 
 #[test]
@@ -102,10 +112,12 @@ fn registry_installs_and_disables_wasm_plugins() {
         .set_plugin_enabled("fixture-plugin", false)
         .expect("disable");
 
-    assert!(registry
-        .enabled_plugin_paths()
-        .expect("enabled after disable")
-        .is_empty());
+    assert!(
+        registry
+            .enabled_plugin_paths()
+            .expect("enabled after disable")
+            .is_empty()
+    );
 }
 
 #[test]
@@ -128,10 +140,12 @@ fn registry_installs_and_disables_native_plugins() {
         .set_plugin_enabled("native-fixture-plugin", false)
         .expect("disable");
 
-    assert!(registry
-        .enabled_plugin_paths()
-        .expect("enabled after disable")
-        .is_empty());
+    assert!(
+        registry
+            .enabled_plugin_paths()
+            .expect("enabled after disable")
+            .is_empty()
+    );
 }
 
 fn move_package() -> TempDir {

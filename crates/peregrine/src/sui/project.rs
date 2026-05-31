@@ -3,7 +3,7 @@ use crate::{
     sui::args::{BytecodeArgs, VerifyArgs},
 };
 use peregrine_move_model::MoveModule;
-use peregrine_static_analysis::{discover_move_project_fast, MovePackage};
+use peregrine_static_analysis::{MovePackage, discover_move_project_fast};
 use std::{
     ffi::OsStr,
     path::{Component, Path, PathBuf},
@@ -259,7 +259,11 @@ pub fn move_source_unavailable_message(package: &MovePackage) -> String {
         "Move package `{}` ({path}) contains {} Move source {}, but no parseable Move modules were found. The source may be commented out or invalid. Call graph, type graph, bytecode, CFG, signatures, and verification require parseable source modules.",
         package.name,
         package.source_file_count,
-        if package.source_file_count == 1 { "file" } else { "files" }
+        if package.source_file_count == 1 {
+            "file"
+        } else {
+            "files"
+        }
     )
 }
 
@@ -475,9 +479,11 @@ mod tests {
 
         assert_eq!(error.code.as_deref(), Some("NoMoveSources"));
         assert_eq!(error.file.as_deref(), Some("Move.toml"));
-        assert!(error
-            .message
-            .contains("no Move source files under sources/"));
+        assert!(
+            error
+                .message
+                .contains("no Move source files under sources/")
+        );
     }
 
     #[test]

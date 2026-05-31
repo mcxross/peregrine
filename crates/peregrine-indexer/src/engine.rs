@@ -5,17 +5,18 @@ use std::{
 
 use crate::{
     config::IndexerConfig,
-    core::{hash_str, ContextBudget, IndexerResult, MoveIndexerAdapter, Operation},
-    incremental::{compare_fingerprints, fingerprint_package, IncrementalCache},
+    core::{ContextBudget, IndexerResult, MoveIndexerAdapter, Operation, hash_str},
+    incremental::{IncrementalCache, compare_fingerprints, fingerprint_package},
     storage::sqlite::{SqliteIndexReader, SqliteIndexWriter},
     sui::{
+        SuiIndexerAdapter,
         index_health::harden_program_index,
         index_layers::summarize_program_layers,
         model::{
             ContextPack, FunctionContext, GraphView, IndexReport, MaterializedSummaryContext,
             ModuleContext, ModuleSummaryCard, PackageOverview, SymbolResult, TypeContext,
         },
-        package_loader, SuiIndexerAdapter,
+        package_loader,
     },
 };
 

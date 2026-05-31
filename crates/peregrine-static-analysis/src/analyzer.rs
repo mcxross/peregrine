@@ -70,10 +70,12 @@ public fun flags(flag: bool) {
 
         let report = Analyzer::new().analyze_package(temp.path(), AnalysisConfig::default());
 
-        assert!(report
-            .loaded_rulesets
-            .iter()
-            .any(|ruleset| ruleset == "bool_judgement"));
+        assert!(
+            report
+                .loaded_rulesets
+                .iter()
+                .any(|ruleset| ruleset == "bool_judgement")
+        );
         assert!(report.findings.iter().any(|finding| {
             finding.ruleset_id == "bool_judgement" && finding.rule_id == "bool_judgement"
         }));

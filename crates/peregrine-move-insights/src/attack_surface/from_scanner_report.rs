@@ -7,7 +7,7 @@ use peregrine_scanner::sui::objects::{
 use std::collections::HashSet;
 
 use crate::object_lifecycle::{
-    object_lifecycle_risks, ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleStage,
+    ObjectLifecycleFunctionRef, ObjectLifecycleMap, ObjectLifecycleStage, object_lifecycle_risks,
 };
 
 use super::types::{CapabilityFinding, ObjectOwnershipFinding};

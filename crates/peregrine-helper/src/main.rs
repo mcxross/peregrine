@@ -1,7 +1,7 @@
 use peregrine_helper_protocol::{
-    parse_helper_request, HelperRequest, HelperResponse, BUNDLED_SUI_HELPER_ARG,
-    BYTECODE_VIEWER_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG, JSON_PROTOCOL_HELPER_ARG,
-    MOVE_ANALYZER_HELPER_ARG, MOVY_FUZZ_HELPER_ARG,
+    BUNDLED_SUI_HELPER_ARG, BYTECODE_VIEWER_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG,
+    HelperRequest, HelperResponse, JSON_PROTOCOL_HELPER_ARG, MOVE_ANALYZER_HELPER_ARG,
+    MOVY_FUZZ_HELPER_ARG, parse_helper_request,
 };
 use std::io::{self, Read};
 
@@ -255,10 +255,12 @@ mod tests {
 
         assert!(!response.ok);
         assert_eq!(response.status, Some(2));
-        assert!(response
-            .error
-            .as_deref()
-            .unwrap_or_default()
-            .contains("Invalid helper request JSON"));
+        assert!(
+            response
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("Invalid helper request JSON")
+        );
     }
 }

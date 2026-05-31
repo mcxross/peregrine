@@ -1,15 +1,15 @@
 use std::{fs, path::Path};
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::{
     core::{
-        estimate_tokens, hash_str, stable_id, ContextBudget, Diagnostic, FunctionInfo,
-        FunctionParameter, FunctionVisibility, ModuleInfo, Operation, OperationKind, SemanticTag,
-        SourceSpan, TypeDef, TypeKind,
+        ContextBudget, Diagnostic, FunctionInfo, FunctionParameter, FunctionVisibility, ModuleInfo,
+        Operation, OperationKind, SemanticTag, SourceSpan, TypeDef, TypeKind, estimate_tokens,
+        hash_str, stable_id,
     },
     sui::{
-        index_layers::{summarize_index_layers, IndexLayerCounts},
+        index_layers::{IndexLayerCounts, summarize_index_layers},
         model::{
             ContextPack, FunctionContext, FunctionEvidenceSummary, FunctionOutline,
             FunctionSymbolCard, GraphView, ModuleContext, ModuleSummaryCard,

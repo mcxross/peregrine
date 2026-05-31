@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context};
+use anyhow::{Context, anyhow, bail};
 use bip32::DerivationPath;
 use fastcrypto::encoding::{Encoding, Hex};
 use serde::{Deserialize, Serialize};
@@ -1159,10 +1159,12 @@ mod tests {
             })
             .await
             .expect("renamed");
-        assert!(renamed
-            .accounts
-            .iter()
-            .any(|a| a.alias.as_deref() == Some("renamed_key")));
+        assert!(
+            renamed
+                .accounts
+                .iter()
+                .any(|a| a.alias.as_deref() == Some("renamed_key"))
+        );
 
         let active = manager
             .set_active_address(SuiSetActiveAddressRequest {

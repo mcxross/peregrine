@@ -3,9 +3,9 @@ use serde::Serialize;
 use std::path::PathBuf;
 
 use crate::{
-    attack_surface::{package_surface_from_scanner_report, MovePackageSurface},
+    attack_surface::{MovePackageSurface, package_surface_from_scanner_report},
     scanner_report::{
-        package_scanner_report, package_scanner_report_for_package, MovePackageScannerReport,
+        MovePackageScannerReport, package_scanner_report, package_scanner_report_for_package,
     },
 };
 
@@ -56,7 +56,7 @@ pub fn package_insights_report_from_scanner_report(
 mod tests {
     use std::fs;
 
-    use peregrine_move_model::{parse_module_declarations, MovePackageModel};
+    use peregrine_move_model::{MovePackageModel, parse_module_declarations};
     use tempfile::tempdir;
 
     use super::*;

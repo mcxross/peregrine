@@ -11,7 +11,7 @@ use walkdir::WalkDir;
 
 use crate::{
     core::{
-        hash_file, logical_id, FunctionId, OperationId, SourceMapper, SourcePrecision, SourceSpan,
+        FunctionId, OperationId, SourceMapper, SourcePrecision, SourceSpan, hash_file, logical_id,
     },
     sui::model::{ProgramIndex, SourceFileRecord},
 };

@@ -1,4 +1,4 @@
-use movy::sui::fuzz::{fuzz_local_package, LocalPackageFuzzArgs, LocalPackageFuzzResult};
+use movy::sui::fuzz::{LocalPackageFuzzArgs, LocalPackageFuzzResult, fuzz_local_package};
 use serde::Serialize;
 use std::{
     any::Any,

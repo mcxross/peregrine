@@ -450,10 +450,12 @@ fun complicated() {
 
         let outcome = FunctionComplexityRule.analyze(&context, &config);
 
-        assert!(outcome
-            .findings
-            .iter()
-            .any(|finding| finding.rule_id == FUNCTION_RULE_ID));
+        assert!(
+            outcome
+                .findings
+                .iter()
+                .any(|finding| finding.rule_id == FUNCTION_RULE_ID)
+        );
     }
 
     #[test]
@@ -474,10 +476,12 @@ fun complicated() {
 
         let outcome = ModuleComplexityRule.analyze(&context, &config);
 
-        assert!(outcome
-            .findings
-            .iter()
-            .any(|finding| finding.rule_id == MODULE_RULE_ID));
+        assert!(
+            outcome
+                .findings
+                .iter()
+                .any(|finding| finding.rule_id == MODULE_RULE_ID)
+        );
     }
 
     #[test]
@@ -525,10 +529,12 @@ entry_threshold = 2
 
         let outcome = FunctionComplexityRule.analyze(&context, &rule_config);
 
-        assert!(outcome
-            .findings
-            .iter()
-            .any(|finding| finding.rule_id == FUNCTION_RULE_ID));
+        assert!(
+            outcome
+                .findings
+                .iter()
+                .any(|finding| finding.rule_id == FUNCTION_RULE_ID)
+        );
     }
 
     fn test_function(name: &str, body: &str) -> ParsedFunction {

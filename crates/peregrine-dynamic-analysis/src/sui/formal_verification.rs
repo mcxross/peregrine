@@ -7,7 +7,7 @@ use std::{
     thread,
 };
 use sui_prover::{
-    prove::{execute, BuildConfig, GeneralConfig, DEFAULT_EXECUTION_TIMEOUT_SECONDS},
+    prove::{BuildConfig, DEFAULT_EXECUTION_TIMEOUT_SECONDS, GeneralConfig, execute},
     remote_config::RemoteConfig,
 };
 

@@ -689,14 +689,20 @@ public enum State has drop { On, Off }
         let declarations = collect_file_declarations(&file);
 
         assert_eq!(declarations.len(), 3);
-        assert!(declarations
-            .iter()
-            .any(|item| { item.name == "FEE" && item.kind == DeclaredItemKind::Const }));
-        assert!(declarations
-            .iter()
-            .any(|item| { item.name == "Vault" && item.kind == DeclaredItemKind::Struct }));
-        assert!(declarations
-            .iter()
-            .any(|item| { item.name == "State" && item.kind == DeclaredItemKind::Enum }));
+        assert!(
+            declarations
+                .iter()
+                .any(|item| { item.name == "FEE" && item.kind == DeclaredItemKind::Const })
+        );
+        assert!(
+            declarations
+                .iter()
+                .any(|item| { item.name == "Vault" && item.kind == DeclaredItemKind::Struct })
+        );
+        assert!(
+            declarations
+                .iter()
+                .any(|item| { item.name == "State" && item.kind == DeclaredItemKind::Enum })
+        );
     }
 }

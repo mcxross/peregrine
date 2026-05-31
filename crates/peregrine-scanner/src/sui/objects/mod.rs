@@ -9,7 +9,7 @@ use crate::{
         EvidenceSource, PackageScanner, ScanInput, ScannerConfidence, ScannerDiagnostic,
         ScannerOutput, SourceMode,
     },
-    sui::facts::{load_bytecode_package_facts, BytecodeFunctionFact, BytecodePackageFacts},
+    sui::facts::{BytecodeFunctionFact, BytecodePackageFacts, load_bytecode_package_facts},
 };
 
 pub const OBJECT_SCANNER_ID: &str = "sui.objects";
@@ -2070,7 +2070,7 @@ fn capability_like_name(name: &str) -> bool {
 mod tests {
     use std::path::Path;
 
-    use peregrine_move_model::{parse_module_declarations, MovePackageModel};
+    use peregrine_move_model::{MovePackageModel, parse_module_declarations};
 
     use super::*;
     use crate::core::{ScanInput, SourceMode};
@@ -2128,14 +2128,18 @@ mod tests {
             .iter()
             .find(|map| map.qualified_name == "main::KeyObject")
             .expect("bytecode-backed key object");
-        assert!(lifecycle
-            .stages
-            .iter()
-            .any(|stage| stage.kind == ObjectLifecycleStageKind::Created));
-        assert!(report
-            .diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.message.contains("compiled bytecode")));
+        assert!(
+            lifecycle
+                .stages
+                .iter()
+                .any(|stage| stage.kind == ObjectLifecycleStageKind::Created)
+        );
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.message.contains("compiled bytecode"))
+        );
     }
 
     #[test]
@@ -2207,14 +2211,18 @@ module demo::objects {
         };
         let report = scan_objects(&input);
 
-        assert!(report
-            .diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.message.contains("no compiled bytecode")));
-        assert!(report
-            .lifecycle_maps
-            .iter()
-            .any(|map| map.qualified_name == "objects::OwnedObject"));
+        assert!(
+            report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.message.contains("no compiled bytecode"))
+        );
+        assert!(
+            report
+                .lifecycle_maps
+                .iter()
+                .any(|map| map.qualified_name == "objects::OwnedObject")
+        );
     }
 
     #[test]
@@ -2232,13 +2240,15 @@ module demo::wrap {
             finding.qualified_name == "wrap::Wrapper"
                 && finding.ownership_kind == ObjectClassification::Wrapped
         }));
-        assert!(report
-            .lifecycle_maps
-            .iter()
-            .find(|map| map.qualified_name == "wrap::Inner")
-            .expect("inner lifecycle")
-            .stages
-            .iter()
-            .any(|stage| stage.kind == ObjectLifecycleStageKind::Wrapped));
+        assert!(
+            report
+                .lifecycle_maps
+                .iter()
+                .find(|map| map.qualified_name == "wrap::Inner")
+                .expect("inner lifecycle")
+                .stages
+                .iter()
+                .any(|stage| stage.kind == ObjectLifecycleStageKind::Wrapped)
+        );
     }
 }

@@ -4,10 +4,10 @@ use std::{
 };
 
 use peregrine_indexer::{
+    IndexerConfig, SuiMoveIndexer,
     core::{ContextBudget, ContextLevel, OperationKind},
     storage::sqlite::SqliteIndexReader,
     sui::model::IndexReport,
-    IndexerConfig, SuiMoveIndexer,
 };
 use rusqlite::Connection;
 use tempfile::tempdir;
@@ -144,10 +144,12 @@ fn function_context_is_compact_and_neutral() {
         .expect("function context");
 
     assert!(context.estimated_tokens <= context.budget_tokens);
-    assert!(context
-        .card
-        .top_tags
-        .contains(&"public_entry_detected".to_string()));
+    assert!(
+        context
+            .card
+            .top_tags
+            .contains(&"public_entry_detected".to_string())
+    );
     let serialized = serde_json::to_string(&context).expect("json");
     assert!(!serialized.contains("vulnerable"));
     assert!(!serialized.contains("missing_authorization"));
@@ -184,22 +186,30 @@ fn source_spans_and_required_query_paths_are_available() {
     assert!(!context.source_excerpts.is_empty());
     assert!(context.estimated_tokens <= context.budget_tokens);
 
-    assert!(indexer
-        .get_function_operations(&db_path, &deposit.id, &budget)
-        .expect("operations")
-        .is_empty());
-    assert!(indexer
-        .get_function_field_reads(&db_path, &deposit.id)
-        .expect("field reads")
-        .is_empty());
-    assert!(indexer
-        .get_reachable_callees(&db_path, &deposit.id, 2, &budget)
-        .expect("reachable callees")
-        .is_empty());
-    assert!(!indexer
-        .get_public_entry_functions(&db_path, &report.package_id)
-        .expect("entry functions")
-        .is_empty());
+    assert!(
+        indexer
+            .get_function_operations(&db_path, &deposit.id, &budget)
+            .expect("operations")
+            .is_empty()
+    );
+    assert!(
+        indexer
+            .get_function_field_reads(&db_path, &deposit.id)
+            .expect("field reads")
+            .is_empty()
+    );
+    assert!(
+        indexer
+            .get_reachable_callees(&db_path, &deposit.id, 2, &budget)
+            .expect("reachable callees")
+            .is_empty()
+    );
+    assert!(
+        !indexer
+            .get_public_entry_functions(&db_path, &report.package_id)
+            .expect("entry functions")
+            .is_empty()
+    );
 }
 
 #[test]
@@ -229,25 +239,35 @@ fn bytecode_full_mode_extracts_operations_edges_and_source_maps() {
 
     assert!(operations.iter().any(|op| op.kind == OperationKind::Call));
     assert!(operations.iter().any(|op| op.kind == OperationKind::Assert));
-    assert!(operations
-        .iter()
-        .any(|op| op.kind == OperationKind::ReadField));
-    assert!(operations
-        .iter()
-        .any(|op| op.kind == OperationKind::WriteField));
+    assert!(
+        operations
+            .iter()
+            .any(|op| op.kind == OperationKind::ReadField)
+    );
+    assert!(
+        operations
+            .iter()
+            .any(|op| op.kind == OperationKind::WriteField)
+    );
     assert!(operations.iter().any(|op| op.kind == OperationKind::Add));
-    assert!(context
-        .card
-        .top_tags
-        .contains(&"public_function_detected".to_string()));
-    assert!(context
-        .card
-        .top_tags
-        .contains(&"tx_context_parameter_detected".to_string()));
-    assert!(context
-        .card
-        .top_tags
-        .contains(&"mutable_reference_parameter_detected".to_string()));
+    assert!(
+        context
+            .card
+            .top_tags
+            .contains(&"public_function_detected".to_string())
+    );
+    assert!(
+        context
+            .card
+            .top_tags
+            .contains(&"tx_context_parameter_detected".to_string())
+    );
+    assert!(
+        context
+            .card
+            .top_tags
+            .contains(&"mutable_reference_parameter_detected".to_string())
+    );
     assert!(!context.field_reads.is_empty());
     assert!(!context.field_writes.is_empty());
     assert!(!context.source_excerpts.is_empty());
@@ -286,9 +306,11 @@ fn bytecode_call_graph_and_operation_order_are_bytecode_backed() {
         .get_reachable_callees(&db_path, &wrapper.id, 2, &budget)
         .expect("reachable callees");
     assert!(reachable.contains(&send.id));
-    assert!(reachable
-        .iter()
-        .any(|callee| callee.contains("::transfer::public_transfer")));
+    assert!(
+        reachable
+            .iter()
+            .any(|callee| callee.contains("::transfer::public_transfer"))
+    );
 
     let transfer_ops = indexer
         .get_operations_by_tag(
@@ -298,10 +320,11 @@ fn bytecode_call_graph_and_operation_order_are_bytecode_backed() {
             &budget,
         )
         .expect("transfer operations");
-    assert!(transfer_ops.iter().any(|op| op
-        .target
-        .as_deref()
-        .is_some_and(|target| target.contains("::transfer::public_transfer"))));
+    assert!(transfer_ops.iter().any(|op| {
+        op.target
+            .as_deref()
+            .is_some_and(|target| target.contains("::transfer::public_transfer"))
+    }));
 
     let transfer_then_assert = find_function(&db_path, &report.package_id, "transfer_then_assert");
     let operations = indexer
@@ -381,14 +404,18 @@ fn index_health_reports_freshness_coverage_and_integrity() {
     assert_eq!(health["readiness"], "compiler_backed");
     assert_eq!(health["freshness"], "first_index");
     assert_eq!(report.index_layers.len(), 9);
-    assert!(report
-        .index_layers
-        .iter()
-        .any(|layer| layer.name == "artifact_pointer" && layer.status == "ready"));
-    assert!(report
-        .index_layers
-        .iter()
-        .any(|layer| layer.name == "operation" && layer.status == "ready"));
+    assert!(
+        report
+            .index_layers
+            .iter()
+            .any(|layer| layer.name == "artifact_pointer" && layer.status == "ready")
+    );
+    assert!(
+        report
+            .index_layers
+            .iter()
+            .any(|layer| layer.name == "operation" && layer.status == "ready")
+    );
     assert_eq!(
         report
             .index_layers
@@ -508,10 +535,12 @@ fn compact_context_trimming_preserves_high_signal_operations() {
     assert!(context.trimmed);
     assert!(!context.trim_reasons.is_empty());
     assert!(context.estimated_tokens <= context.budget_tokens);
-    assert!(context
-        .operations
-        .iter()
-        .any(|op| op.kind == OperationKind::Assert));
+    assert!(
+        context
+            .operations
+            .iter()
+            .any(|op| op.kind == OperationKind::Assert)
+    );
     assert!(context.operations.iter().any(|op| {
         op.kind == OperationKind::Call
             && op
@@ -541,11 +570,13 @@ fn generated_summary_shapes_normalize_types_tags_and_dependency_cards() {
         .get_type_context(&db_path, &vault.id)
         .expect("type context");
     assert_eq!(type_context.type_def.abilities, vec!["key", "store"]);
-    assert!(type_context
-        .type_def
-        .fields
-        .iter()
-        .any(|field| field.name == "id" && field.type_name == "sui::object::UID"));
+    assert!(
+        type_context
+            .type_def
+            .fields
+            .iter()
+            .any(|field| field.name == "id" && field.type_name == "sui::object::UID")
+    );
 
     let key_types = indexer
         .get_functions_by_tag(
@@ -555,24 +586,30 @@ fn generated_summary_shapes_normalize_types_tags_and_dependency_cards() {
             &ContextBudget::default(),
         )
         .expect("functions by tag");
-    assert!(key_types
-        .iter()
-        .any(|function| function.full_name.ends_with("deposit")));
+    assert!(
+        key_types
+            .iter()
+            .any(|function| function.full_name.ends_with("deposit"))
+    );
 
     let deposit = find_function(&db_path, &report.package_id, "deposit");
     let deposit_context = indexer
         .get_function_context(&db_path, &deposit.id, &ContextBudget::default())
         .expect("deposit context");
-    assert!(deposit_context
-        .outline
-        .params
-        .iter()
-        .any(|param| param.type_name == "&mut bytecode_fixture::vault::Vault"));
-    assert!(deposit_context
-        .outline
-        .params
-        .iter()
-        .any(|param| param.type_name == "&mut sui::tx_context::TxContext"));
+    assert!(
+        deposit_context
+            .outline
+            .params
+            .iter()
+            .any(|param| param.type_name == "&mut bytecode_fixture::vault::Vault")
+    );
+    assert!(
+        deposit_context
+            .outline
+            .params
+            .iter()
+            .any(|param| param.type_name == "&mut sui::tx_context::TxContext")
+    );
 
     let connection = Connection::open(db_path).expect("db");
     let direct_dependency_cards: i64 = connection
@@ -672,10 +709,12 @@ fn context_levels_source_budget_and_call_depth_limits_are_enforced() {
             },
         )
         .expect("level3");
-    assert!(level3
-        .reachable_callees
-        .iter()
-        .any(|callee| callee.contains("::transfer::public_transfer")));
+    assert!(
+        level3
+            .reachable_callees
+            .iter()
+            .any(|callee| callee.contains("::transfer::public_transfer"))
+    );
 
     let shallow = indexer
         .get_reachable_callees(
@@ -690,9 +729,11 @@ fn context_levels_source_budget_and_call_depth_limits_are_enforced() {
         )
         .expect("shallow callees");
     assert!(shallow.contains(&send.id));
-    assert!(!shallow
-        .iter()
-        .any(|callee| callee.contains("::transfer::public_transfer")));
+    assert!(
+        !shallow
+            .iter()
+            .any(|callee| callee.contains("::transfer::public_transfer"))
+    );
 
     let graph = indexer
         .get_call_graph(
@@ -707,9 +748,11 @@ fn context_levels_source_budget_and_call_depth_limits_are_enforced() {
         )
         .expect("graph");
     assert!(graph.trimmed);
-    assert!(graph
-        .trim_reasons
-        .contains(&"call_depth_limited".to_string()));
+    assert!(
+        graph
+            .trim_reasons
+            .contains(&"call_depth_limited".to_string())
+    );
 
     let deposit = find_function(&db_path, &report.package_id, "deposit");
     let excerpt_context = indexer
@@ -725,10 +768,12 @@ fn context_levels_source_budget_and_call_depth_limits_are_enforced() {
             },
         )
         .expect("excerpt context");
-    assert!(excerpt_context
-        .source_excerpts
-        .iter()
-        .all(|excerpt| { excerpt.end_line.saturating_sub(excerpt.start_line) < 2 }));
+    assert!(
+        excerpt_context
+            .source_excerpts
+            .iter()
+            .all(|excerpt| { excerpt.end_line.saturating_sub(excerpt.start_line) < 2 })
+    );
 }
 
 #[test]
@@ -811,11 +856,13 @@ fn simple_module_fixture_indexes_struct_fields_and_functions() {
         .indexer
         .get_function_context(&fixture.db_path, &value.id, &ContextBudget::default())
         .expect("context");
-    assert!(context
-        .outline
-        .params
-        .iter()
-        .any(|param| param.type_name == "&simple_module::main::Counter"));
+    assert!(
+        context
+            .outline
+            .params
+            .iter()
+            .any(|param| param.type_name == "&simple_module::main::Counter")
+    );
 }
 
 #[test]
@@ -839,18 +886,24 @@ fn entry_function_fixture_indexes_entry_and_mutable_reference_tags() {
             },
         )
         .expect("entry context");
-    assert!(context
-        .card
-        .top_tags
-        .contains(&"public_entry_detected".to_string()));
-    assert!(context
-        .card
-        .top_tags
-        .contains(&"mutable_reference_parameter_detected".to_string()));
-    assert!(context
-        .card
-        .top_tags
-        .contains(&"tx_context_parameter_detected".to_string()));
+    assert!(
+        context
+            .card
+            .top_tags
+            .contains(&"public_entry_detected".to_string())
+    );
+    assert!(
+        context
+            .card
+            .top_tags
+            .contains(&"mutable_reference_parameter_detected".to_string())
+    );
+    assert!(
+        context
+            .card
+            .top_tags
+            .contains(&"tx_context_parameter_detected".to_string())
+    );
 }
 
 #[test]
@@ -889,22 +942,30 @@ fn field_read_write_fixture_extracts_operations_and_edges() {
         .indexer
         .get_function_operations(&fixture.db_path, &add.id, &budget)
         .expect("operations");
-    assert!(operations
-        .iter()
-        .any(|op| op.kind == OperationKind::ReadField));
-    assert!(operations
-        .iter()
-        .any(|op| op.kind == OperationKind::WriteField));
-    assert!(!fixture
-        .indexer
-        .get_function_field_reads(&fixture.db_path, &add.id)
-        .expect("field reads")
-        .is_empty());
-    assert!(!fixture
-        .indexer
-        .get_function_field_writes(&fixture.db_path, &add.id)
-        .expect("field writes")
-        .is_empty());
+    assert!(
+        operations
+            .iter()
+            .any(|op| op.kind == OperationKind::ReadField)
+    );
+    assert!(
+        operations
+            .iter()
+            .any(|op| op.kind == OperationKind::WriteField)
+    );
+    assert!(
+        !fixture
+            .indexer
+            .get_function_field_reads(&fixture.db_path, &add.id)
+            .expect("field reads")
+            .is_empty()
+    );
+    assert!(
+        !fixture
+            .indexer
+            .get_function_field_writes(&fixture.db_path, &add.id)
+            .expect("field writes")
+            .is_empty()
+    );
 }
 
 #[test]
@@ -969,9 +1030,11 @@ fn transfer_call_wrapper_fixture_reaches_inner_transfer_call() {
         )
         .expect("reachable");
     assert!(reachable.contains(&send_inner.id));
-    assert!(reachable
-        .iter()
-        .any(|callee| callee.contains("::transfer::public_transfer")));
+    assert!(
+        reachable
+            .iter()
+            .any(|callee| callee.contains("::transfer::public_transfer"))
+    );
 }
 
 #[test]
@@ -1028,11 +1091,13 @@ fn clock_usage_fixture_indexes_clock_type_and_api_tag() {
         .indexer
         .get_function_context(&fixture.db_path, &now.id, &ContextBudget::default())
         .expect("context");
-    assert!(context
-        .outline
-        .params
-        .iter()
-        .any(|param| param.type_name == "&sui::clock::Clock"));
+    assert!(
+        context
+            .outline
+            .params
+            .iter()
+            .any(|param| param.type_name == "&sui::clock::Clock")
+    );
     let clock_ops = fixture
         .indexer
         .get_operations_by_tag(
@@ -1053,10 +1118,12 @@ fn tx_context_usage_fixture_tags_parameter_and_call() {
         .indexer
         .get_function_context(&fixture.db_path, &sender.id, &ContextBudget::default())
         .expect("context");
-    assert!(context
-        .card
-        .top_tags
-        .contains(&"tx_context_parameter_detected".to_string()));
+    assert!(
+        context
+            .card
+            .top_tags
+            .contains(&"tx_context_parameter_detected".to_string())
+    );
     let tx_ops = fixture
         .indexer
         .get_operations_by_tag(
@@ -1077,10 +1144,12 @@ fn generic_function_fixture_indexes_type_params_and_constraints() {
         .indexer
         .get_function_context(&fixture.db_path, &wrap.id, &ContextBudget::default())
         .expect("context");
-    assert!(context
-        .card
-        .top_tags
-        .contains(&"generic_function_detected".to_string()));
+    assert!(
+        context
+            .card
+            .top_tags
+            .contains(&"generic_function_detected".to_string())
+    );
     let function = Connection::open(&fixture.db_path)
         .expect("db")
         .query_row(
@@ -1101,10 +1170,12 @@ fn friend_function_fixture_indexes_friend_visibility_and_edge() {
         .get_function_context(&fixture.db_path, &friend_only.id, &ContextBudget::default())
         .expect("context");
     assert_eq!(context.card.visibility, "PublicFriend");
-    assert!(context
-        .card
-        .top_tags
-        .contains(&"friend_function_detected".to_string()));
+    assert!(
+        context
+            .card
+            .top_tags
+            .contains(&"friend_function_detected".to_string())
+    );
     let friend_edges: i64 = Connection::open(&fixture.db_path)
         .expect("db")
         .query_row(
@@ -1143,9 +1214,11 @@ fn operation_order_complex_fixture_extracts_blocks_branch_abort_and_add() {
             },
         )
         .expect("operations");
-    assert!(operations
-        .iter()
-        .any(|op| op.kind == OperationKind::BranchIf));
+    assert!(
+        operations
+            .iter()
+            .any(|op| op.kind == OperationKind::BranchIf)
+    );
     assert!(operations.iter().any(|op| op.kind == OperationKind::Abort));
     assert!(operations.iter().any(|op| op.kind == OperationKind::Add));
     let connection = Connection::open(&fixture.db_path).expect("db");
@@ -1176,18 +1249,22 @@ fn pack_unpack_fixture_extracts_pack_and_unpack_operations() {
         max_operations: 128,
         ..ContextBudget::default()
     };
-    assert!(fixture
-        .indexer
-        .get_function_operations(&fixture.db_path, &make.id, &budget)
-        .expect("make ops")
-        .iter()
-        .any(|op| op.kind == OperationKind::Pack));
-    assert!(fixture
-        .indexer
-        .get_function_operations(&fixture.db_path, &destroy.id, &budget)
-        .expect("destroy ops")
-        .iter()
-        .any(|op| op.kind == OperationKind::Unpack));
+    assert!(
+        fixture
+            .indexer
+            .get_function_operations(&fixture.db_path, &make.id, &budget)
+            .expect("make ops")
+            .iter()
+            .any(|op| op.kind == OperationKind::Pack)
+    );
+    assert!(
+        fixture
+            .indexer
+            .get_function_operations(&fixture.db_path, &destroy.id, &budget)
+            .expect("destroy ops")
+            .iter()
+            .any(|op| op.kind == OperationKind::Unpack)
+    );
 }
 
 #[test]
@@ -1257,10 +1334,12 @@ fn large_function_budget_fixture_trims_context_and_keeps_assert() {
         .expect("context");
     assert!(context.trimmed);
     assert!(context.estimated_tokens <= context.budget_tokens);
-    assert!(context
-        .operations
-        .iter()
-        .any(|op| op.kind == OperationKind::Assert));
+    assert!(
+        context
+            .operations
+            .iter()
+            .any(|op| op.kind == OperationKind::Assert)
+    );
 }
 
 #[test]
@@ -1368,10 +1447,12 @@ fn source_excerpt_budget_fixture_bounds_excerpts_and_requires_explicit_full_sour
             },
         )
         .expect("bounded context");
-    assert!(bounded
-        .source_excerpts
-        .iter()
-        .all(|excerpt| excerpt.end_line.saturating_sub(excerpt.start_line) < 3));
+    assert!(
+        bounded
+            .source_excerpts
+            .iter()
+            .all(|excerpt| excerpt.end_line.saturating_sub(excerpt.start_line) < 3)
+    );
     let without_source = fixture
         .indexer
         .get_function_context(
@@ -1434,9 +1515,11 @@ fn call_graph_budget_fixture_enforces_depth_and_callee_limits() {
         )
         .expect("graph view");
     assert!(graph.trimmed);
-    assert!(graph
-        .trim_reasons
-        .contains(&"call_depth_limited".to_string()));
+    assert!(
+        graph
+            .trim_reasons
+            .contains(&"call_depth_limited".to_string())
+    );
 }
 
 const REQUIRED_FIXTURES: &[&str] = &[

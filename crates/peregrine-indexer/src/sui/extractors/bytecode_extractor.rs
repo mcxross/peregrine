@@ -8,8 +8,8 @@ use walkdir::WalkDir;
 
 use crate::{
     core::{
-        logical_id, stable_id, BasicBlock, Edge, EdgeType, LocalInfo, Operation, OperationKind,
-        SemanticTag, SourceSpan,
+        BasicBlock, Edge, EdgeType, LocalInfo, Operation, OperationKind, SemanticTag, SourceSpan,
+        logical_id, stable_id,
     },
     sui::{model::ProgramIndex, source_map::SourceMapIndex},
 };

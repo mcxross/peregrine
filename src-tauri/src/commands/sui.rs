@@ -1,6 +1,6 @@
 use crate::helper_args::{
-    resolve_helper_executable, BUNDLED_SUI_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG,
-    MOVY_FUZZ_HELPER_ARG,
+    BUNDLED_SUI_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG, MOVY_FUZZ_HELPER_ARG,
+    resolve_helper_executable,
 };
 use crate::{commands::files, validated_move_project_name};
 use peregrine_adapters::sui::{
@@ -13,11 +13,11 @@ use peregrine_adapters::sui::{
     SuiSetActiveAddressRequest, SuiSetActiveNetworkEnvRequest,
 };
 use peregrine_dynamic_analysis::sui::formal_verification::{
-    formal_verification_manifest, FormalVerificationOptions,
+    FormalVerificationOptions, formal_verification_manifest,
 };
 use peregrine_import_engine::sui::{
-    default_import_root, BuildVerification, BuildableImportRequest, ImportEngine,
-    ImportEngineConfig,
+    BuildVerification, BuildableImportRequest, ImportEngine, ImportEngineConfig,
+    default_import_root,
 };
 use serde::{Deserialize, Serialize};
 use std::{

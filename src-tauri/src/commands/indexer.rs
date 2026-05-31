@@ -1,12 +1,12 @@
 use crate::state::IndexerCommandState;
 use peregrine_indexer::{
+    IndexerConfig, SuiMoveIndexer,
     core::{ContextBudget, Diagnostic as IndexDiagnostic, Operation as IndexOperation},
     sui::model::{
         ContextPack, FunctionContext, GraphView, IndexReport, ModuleContext, ModuleSummaryCard,
         PackageOverview, SymbolResult, TypeContext,
     },
     tauri::events as index_events,
-    IndexerConfig, SuiMoveIndexer,
 };
 use serde::Serialize;
 use std::path::PathBuf;

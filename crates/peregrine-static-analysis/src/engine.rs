@@ -6,10 +6,10 @@ use std::{
 use crate::{
     parser::parse_package,
     plugins::{
-        plugin_manifest_rulesets, plugin_rule_config_value, resolve_plugin_path,
         AnalysisPluginHost, AnalyzerPluginRegistry, PluginActiveRuleConfig, PluginManifest,
+        plugin_manifest_rulesets, plugin_rule_config_value, resolve_plugin_path,
     },
-    sui::{rules::complexity::ComplexityRuleSetProvider, SuiRuleSetProvider},
+    sui::{SuiRuleSetProvider, rules::complexity::ComplexityRuleSetProvider},
 };
 use peregrine_types::analysis::{
     AnalysisConfig, AnalysisContext, AnalysisDiagnostic, AnalysisReport, AnalysisRuleCatalog,
@@ -483,18 +483,24 @@ mod tests {
             AnalysisEngineOptions::without_global_plugins(),
         );
 
-        assert!(catalog
-            .rulesets
-            .iter()
-            .any(|ruleset| ruleset.id == "complexity"));
-        assert!(catalog
-            .rulesets
-            .iter()
-            .any(|ruleset| ruleset.id == "bool_judgement"));
-        assert!(catalog
-            .rulesets
-            .iter()
-            .any(|ruleset| ruleset.id == "unchecked_return"));
+        assert!(
+            catalog
+                .rulesets
+                .iter()
+                .any(|ruleset| ruleset.id == "complexity")
+        );
+        assert!(
+            catalog
+                .rulesets
+                .iter()
+                .any(|ruleset| ruleset.id == "bool_judgement")
+        );
+        assert!(
+            catalog
+                .rulesets
+                .iter()
+                .any(|ruleset| ruleset.id == "unchecked_return")
+        );
     }
 
     #[test]
@@ -522,10 +528,12 @@ active = false
             AnalysisEngineOptions::without_global_plugins(),
         );
 
-        assert!(!report
-            .findings
-            .iter()
-            .any(|finding| finding.rule_id == "bool_judgement"));
+        assert!(
+            !report
+                .findings
+                .iter()
+                .any(|finding| finding.rule_id == "bool_judgement")
+        );
     }
 
     #[test]

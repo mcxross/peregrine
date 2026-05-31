@@ -1,6 +1,6 @@
 use move_binary_format::file_format::{CompiledModule, SignatureToken};
 
-use crate::core::{logical_id, LocalInfo, PackageId, SourceSpan};
+use crate::core::{LocalInfo, PackageId, SourceSpan, logical_id};
 
 pub fn lower_locals(
     module: &CompiledModule,

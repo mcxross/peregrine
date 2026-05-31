@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use peregrine_move_model::{parse_module_declarations, MoveFunctionSignature, MoveModule};
+use peregrine_move_model::{MoveFunctionSignature, MoveModule, parse_module_declarations};
 use serde::Serialize;
 use walkdir::{DirEntry, WalkDir};
 
@@ -1328,7 +1328,7 @@ mod unit_tests {
     use std::{fs, path::Path};
 
     use peregrine_move_model::{
-        parse_module_declarations, MoveFunctionSignature, MoveModule, MovePackageModel,
+        MoveFunctionSignature, MoveModule, MovePackageModel, parse_module_declarations,
     };
     use tempfile::tempdir;
 
@@ -1475,14 +1475,18 @@ fun metadata_only() { abort 1 }
 
         assert!(report.has_unit_tests);
         assert_eq!(report.unit_test_count, 2);
-        assert!(report
-            .unit_tests
-            .iter()
-            .any(|finding| finding.function_name == "fuzz_value" && finding.is_random_test));
-        assert!(report
-            .unit_tests
-            .iter()
-            .any(|finding| finding.function_name == "aborts" && finding.expected_failure));
+        assert!(
+            report
+                .unit_tests
+                .iter()
+                .any(|finding| finding.function_name == "fuzz_value" && finding.is_random_test)
+        );
+        assert!(
+            report
+                .unit_tests
+                .iter()
+                .any(|finding| finding.function_name == "aborts" && finding.expected_failure)
+        );
     }
 
     #[test]
@@ -1551,11 +1555,13 @@ public fun movy_post_increment(movy: &mut context::MovyContext, n: u64) {
 
         assert!(report.has_movy_invariant_tests);
         assert_eq!(report.movy_invariant_test_count, 3);
-        assert!(report
-            .movy_invariant_tests
-            .iter()
-            .any(|finding| finding.hook_kind == MovyHookKind::FunctionPost
-                && finding.target_function.as_deref() == Some("increment")));
+        assert!(
+            report
+                .movy_invariant_tests
+                .iter()
+                .any(|finding| finding.hook_kind == MovyHookKind::FunctionPost
+                    && finding.target_function.as_deref() == Some("increment"))
+        );
     }
 
     #[test]
@@ -1596,10 +1602,12 @@ fun withdraw_summary(x: u64): u64 {
 
         assert!(report.has_formal_prover_specs);
         assert!(report.formal_prover_spec_count >= 3);
-        assert!(report
-            .formal_prover_specs
-            .iter()
-            .any(|finding| finding.function_name.as_deref() == Some("withdraw_spec")));
+        assert!(
+            report
+                .formal_prover_specs
+                .iter()
+                .any(|finding| finding.function_name.as_deref() == Some("withdraw_spec"))
+        );
     }
 
     #[test]
@@ -1627,10 +1635,12 @@ module demo::broken {
 
         assert!(report.has_formal_prover_specs);
         assert!(report.formal_prover_spec_count >= 2);
-        assert!(report
-            .formal_prover_specs
-            .iter()
-            .any(|finding| finding.confidence == ScannerConfidence::Medium));
+        assert!(
+            report
+                .formal_prover_specs
+                .iter()
+                .any(|finding| finding.confidence == ScannerConfidence::Medium)
+        );
     }
 
     #[test]

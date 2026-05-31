@@ -1,7 +1,7 @@
 use super::{
-    bundled, system, MoveAnalyzerAdapterEnvironment, MoveAnalyzerAdapterError,
-    MoveAnalyzerAdapterSettings, MoveAnalyzerAdapterSource, MoveAnalyzerAdapterSourceStatus,
-    MoveAnalyzerAdapterStatus, MoveAnalyzerExecutionTarget, MoveAnalyzerServerCommand,
+    MoveAnalyzerAdapterEnvironment, MoveAnalyzerAdapterError, MoveAnalyzerAdapterSettings,
+    MoveAnalyzerAdapterSource, MoveAnalyzerAdapterSourceStatus, MoveAnalyzerAdapterStatus,
+    MoveAnalyzerExecutionTarget, MoveAnalyzerServerCommand, bundled, system,
 };
 
 pub struct MoveAnalyzerAdapter {

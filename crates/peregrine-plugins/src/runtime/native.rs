@@ -102,7 +102,7 @@ fn read_native_plugin_output(
 #[cfg(test)]
 mod tests {
     use crate::{
-        PluginManifestInput, PluginRuntime, PLUGIN_MANIFEST_EXPORT, PLUGIN_SCHEMA_VERSION,
+        PLUGIN_MANIFEST_EXPORT, PLUGIN_SCHEMA_VERSION, PluginManifestInput, PluginRuntime,
     };
     use serde_json::Value;
     use std::{fs, path::PathBuf, process::Command};

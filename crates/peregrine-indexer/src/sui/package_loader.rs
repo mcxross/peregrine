@@ -9,7 +9,7 @@ use serde_json::json;
 use walkdir::WalkDir;
 
 use crate::{
-    core::{hash_file, hash_str, stable_id, Diagnostic, DiagnosticSeverity, SourceSpan},
+    core::{Diagnostic, DiagnosticSeverity, SourceSpan, hash_file, hash_str, stable_id},
     sui::model::{CompiledPackage, LoadedPackage, SummaryArtifacts},
 };
 

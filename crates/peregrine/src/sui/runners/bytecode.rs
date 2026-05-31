@@ -3,7 +3,7 @@ use crate::{
     output::{CliDiagnostic, CliStep},
     sui::{
         args::BytecodeArgs,
-        project::{bytecode_target, CliContext},
+        project::{CliContext, bytecode_target},
         runners::process::{command_step, run_peregrine_child, run_peregrine_child_interactive},
     },
 };

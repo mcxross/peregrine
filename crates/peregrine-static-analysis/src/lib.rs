@@ -50,6 +50,6 @@ pub use plugins::{
     PluginRuleSetManifest,
 };
 pub use project::{
-    discover_move_project, discover_move_project_fast, discover_move_project_shallow, MovePackage,
-    MoveProject,
+    MovePackage, MoveProject, discover_move_project, discover_move_project_fast,
+    discover_move_project_shallow,
 };

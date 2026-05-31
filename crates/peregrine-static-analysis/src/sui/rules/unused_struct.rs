@@ -3,8 +3,8 @@ use peregrine_types::analysis::{
 };
 
 use super::common::{
-    collect_declarations, finding, name_referenced_outside_declaration, rule_metadata,
-    DeclaredItemKind,
+    DeclaredItemKind, collect_declarations, finding, name_referenced_outside_declaration,
+    rule_metadata,
 };
 
 pub const RULE_ID: &str = "unused_struct";

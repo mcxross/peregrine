@@ -458,7 +458,10 @@ mod tests {
             json!(ToolActionClass::ToolExecution),
             json!("toolExecution")
         );
-        assert_eq!(json!(AuditFixState::PartiallyFixed), json!("partiallyFixed"));
+        assert_eq!(
+            json!(AuditFixState::PartiallyFixed),
+            json!("partiallyFixed")
+        );
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use crate::core::{logical_id, Operation, OperationKind, PackageId, SourceSpan};
+use crate::core::{Operation, OperationKind, PackageId, SourceSpan, logical_id};
 
 pub fn source_body_operations(
     package_id: &PackageId,

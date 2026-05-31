@@ -6,9 +6,9 @@ use peregrine_types::analysis::{
 };
 
 use super::common::{
-    all_functions, call_name_at, find_matching_token, finding, function_has_return_value,
+    Token, all_functions, call_name_at, find_matching_token, finding, function_has_return_value,
     function_target, is_function_declaration, qualified_call_module, rule_metadata,
-    sanitize_source, token_line_span, tokenize, Token,
+    sanitize_source, token_line_span, tokenize,
 };
 
 pub const RULE_ID: &str = "unchecked_return";

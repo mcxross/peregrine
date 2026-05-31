@@ -1,5 +1,5 @@
 use crate::{
-    load_project, ProjectLoadMode, ProjectLoadOptions, ProjectLoadReport, ProjectLoadStageStatus,
+    ProjectLoadMode, ProjectLoadOptions, ProjectLoadReport, ProjectLoadStageStatus, load_project,
 };
 use std::fs;
 use tempfile::tempdir;

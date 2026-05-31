@@ -1,6 +1,6 @@
 use tauri::{
-    menu::{AboutMetadata, Menu, MenuItemBuilder, PredefinedMenuItem, Submenu},
     Emitter,
+    menu::{AboutMetadata, Menu, MenuItemBuilder, PredefinedMenuItem, Submenu},
 };
 
 const OPEN_SETTINGS_MENU_ID: &str = "open-settings";

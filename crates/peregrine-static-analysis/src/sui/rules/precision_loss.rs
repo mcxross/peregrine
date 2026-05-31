@@ -3,8 +3,8 @@ use peregrine_types::analysis::{
 };
 
 use super::common::{
-    all_functions, finding, function_target, rule_metadata, sanitize_source, token_line_span,
-    token_range_contains, token_range_contains_call, tokenize, Token,
+    Token, all_functions, finding, function_target, rule_metadata, sanitize_source,
+    token_line_span, token_range_contains, token_range_contains_call, tokenize,
 };
 
 pub const RULE_ID: &str = "precision_loss";

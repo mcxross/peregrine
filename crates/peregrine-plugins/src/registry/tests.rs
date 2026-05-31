@@ -31,10 +31,12 @@ fn registry_filters_enabled_plugins_by_kind() {
             .len(),
         1
     );
-    assert!(registry
-        .enabled_plugin_paths_for_kind(&PluginKind::dynamic_analysis())
-        .expect("enabled dynamic")
-        .is_empty());
+    assert!(
+        registry
+            .enabled_plugin_paths_for_kind(&PluginKind::dynamic_analysis())
+            .expect("enabled dynamic")
+            .is_empty()
+    );
 }
 
 #[test]

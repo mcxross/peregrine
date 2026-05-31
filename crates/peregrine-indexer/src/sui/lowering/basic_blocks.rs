@@ -1,6 +1,6 @@
 use move_binary_format::file_format::{Bytecode, CodeOffset};
 
-use crate::core::{logical_id, BasicBlock, SourceSpan};
+use crate::core::{BasicBlock, SourceSpan, logical_id};
 
 pub fn lower_basic_blocks(
     package_id: &str,

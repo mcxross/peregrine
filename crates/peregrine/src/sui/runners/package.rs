@@ -38,7 +38,7 @@ pub fn run_coverage(context: &CliContext) -> Vec<CliStep> {
 fn run_sui_step(context: &CliContext, name: &str, kind: SuiCommandKind) -> CliStep {
     let started_at = Instant::now();
     let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
-    let command = match adapter.package_command_for(kind) {
+    let command = match adapter.package_command_for(kind, None, false) {
         Ok(command) => command,
         Err(error) => {
             return CliStep::failed(

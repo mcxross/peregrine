@@ -3,8 +3,9 @@ use peregrine_types::analysis::{
 };
 
 use super::common::{
-    all_functions, finding, function_local_types, function_target, primitive_type_after_cast,
-    rule_metadata, sanitize_source, token_is_identifier, token_line_span, tokenize, Token,
+    Token, all_functions, finding, function_local_types, function_target,
+    primitive_type_after_cast, rule_metadata, sanitize_source, token_is_identifier,
+    token_line_span, tokenize,
 };
 
 pub const RULE_ID: &str = "type_conversion";

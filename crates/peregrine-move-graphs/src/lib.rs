@@ -5,9 +5,9 @@ mod state_access_graph;
 mod type_graph;
 
 use dependency_graph::{build_package_dependency_graph, resolve_summary_relative_path};
-use graph_builder::{build_move_graphs, build_move_state_access_graph, MoveStateAccessGraphTarget};
+use graph_builder::{MoveStateAccessGraphTarget, build_move_graphs, build_move_state_access_graph};
 use peregrine_move_model::{
-    build_move_package, discover_move_packages, root_package_name, MovePackageModel,
+    MovePackageModel, build_move_package, discover_move_packages, root_package_name,
 };
 use serde::Serialize;
 use std::path::Path;
