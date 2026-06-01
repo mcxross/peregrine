@@ -1,4 +1,5 @@
 mod cloud_requirements;
+pub mod codex_compat;
 mod config_requirements;
 pub mod config_toml;
 mod constraint;
