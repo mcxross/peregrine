@@ -1,0 +1,22 @@
+[package]
+name = "peregrine-tui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "peregrine-tui"
+path = "src/main.rs"
+
+[dependencies]
+crossterm-keybind = { workspace = true }
+peregrine-config = { workspace = true }
+peregrine-utils-home-dir = { workspace = true }
+ratatui = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
