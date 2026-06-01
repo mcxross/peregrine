@@ -12,11 +12,25 @@ name = "peregrine-tui"
 path = "src/main.rs"
 
 [dependencies]
+clap = { workspace = true }
+crossterm = { workspace = true }
 crossterm-keybind = { workspace = true }
+move-cli = { workspace = true }
+move-package-alt-compilation = { workspace = true }
+peregrine-adapters = { workspace = true }
+peregrine-bytecode = { workspace = true }
 peregrine-config = { workspace = true }
+peregrine-dynamic-analysis = { workspace = true }
+peregrine-helper-protocol = { workspace = true }
+peregrine-import-engine = { workspace = true }
+peregrine-move-graphs = { workspace = true }
+peregrine-move-model = { workspace = true }
+peregrine-static-analysis = { workspace = true }
 peregrine-utils-home-dir = { workspace = true }
 ratatui = { workspace = true }
 serde = { workspace = true }
-
-[dev-dependencies]
+serde_json = { workspace = true }
+sui-package-alt = { workspace = true }
 tempfile = { workspace = true }
+tokio = { workspace = true }
+toml = { workspace = true }

@@ -311,7 +311,7 @@ async fn integration_creates_and_checks_session_file() -> anyhow::Result<()> {
     let output = cmd.output().unwrap();
     assert!(
         output.status.success(),
-        "peregrine-cli exec failed: {}",
+        "peregrine-tui cli exec failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
 
@@ -432,7 +432,7 @@ async fn integration_creates_and_checks_session_file() -> anyhow::Result<()> {
         .env("OPENAI_API_KEY", "dummy");
 
     let output2 = cmd2.output().unwrap();
-    assert!(output2.status.success(), "resume peregrine-cli run failed");
+    assert!(output2.status.success(), "resume peregrine-tui cli run failed");
     assert_eq!(resp_mock.requests().len(), 2);
 
     // Find the new session file containing the resumed marker.

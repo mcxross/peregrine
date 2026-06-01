@@ -73,8 +73,8 @@ function measureAssets(): PerformanceReport["frontend"] {
 
 function measureCli(): CliMeasurement[] {
   const binary = resolveExistingPath([
-    join(root, "target", "release", "peregrine-cli"),
-    join(root, "target", "debug", "peregrine-cli"),
+    join(root, "target", "release", "peregrine-tui"),
+    join(root, "target", "debug", "peregrine-tui"),
   ]);
 
   if (!binary) {
@@ -125,10 +125,10 @@ function measureCommand(command: string, commandArgs: string[]): CliMeasurement 
 function measureBinaries(): BinaryMeasurement[] {
   return [
     join(root, "target", "release", "peregrine"),
-    join(root, "target", "release", "peregrine-cli"),
+    join(root, "target", "release", "peregrine-tui"),
     join(root, "target", "release", "peregrine-helper"),
     join(root, "target", "debug", "peregrine"),
-    join(root, "target", "debug", "peregrine-cli"),
+    join(root, "target", "debug", "peregrine-tui"),
     join(root, "target", "debug", "peregrine-helper"),
   ]
     .filter((file) => existsSync(file))
@@ -186,7 +186,7 @@ function printReport(report: PerformanceReport) {
   console.log("");
   console.log("CLI startup");
   if (report.cli.length === 0) {
-    console.log("  target/{debug,release}/peregrine-cli not found; run cargo build -p peregrine-cli first.");
+    console.log("  target/{debug,release}/peregrine-tui not found; run cargo build -p peregrine-tui first.");
   } else {
     for (const measurement of report.cli) {
       console.log(

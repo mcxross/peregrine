@@ -16979,29 +16979,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "peregrine-cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "crossterm 0.25.0",
- "move-cli",
- "move-package-alt-compilation",
- "peregrine-adapters",
- "peregrine-bytecode",
- "peregrine-dynamic-analysis",
- "peregrine-helper-protocol",
- "peregrine-import-engine",
- "peregrine-move-graphs",
- "peregrine-move-model",
- "peregrine-static-analysis",
- "serde",
- "serde_json",
- "sui-package-alt",
- "tempfile",
- "tokio",
-]
-
-[[package]]
 name = "peregrine-client"
 version = "0.1.0"
 dependencies = [
@@ -17450,12 +17427,28 @@ dependencies = [
 name = "peregrine-tui"
 version = "0.1.0"
 dependencies = [
+ "clap",
+ "crossterm 0.25.0",
  "crossterm-keybind",
+ "move-cli",
+ "move-package-alt-compilation",
+ "peregrine-adapters",
+ "peregrine-bytecode",
  "peregrine-config",
+ "peregrine-dynamic-analysis",
+ "peregrine-helper-protocol",
+ "peregrine-import-engine",
+ "peregrine-move-graphs",
+ "peregrine-move-model",
+ "peregrine-static-analysis",
  "peregrine-utils-home-dir",
  "ratatui",
  "serde",
+ "serde_json",
+ "sui-package-alt",
  "tempfile",
+ "tokio",
+ "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]
