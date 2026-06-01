@@ -101,6 +101,14 @@ pub enum KeyBindEvent {
     #[keybindings["m"]]
     WorkbenchToggleEditorMode,
 
+    /// Cycle to the previous color theme.
+    #[keybindings["["]]
+    WorkbenchPreviousTheme,
+
+    /// Cycle to the next color theme.
+    #[keybindings["]"]]
+    WorkbenchNextTheme,
+
     /// Select the code tab from workbench navigation.
     #[keybindings["1"]]
     WorkbenchSelectCodeTab,
@@ -154,7 +162,7 @@ pub fn default_hint() -> String {
 pub fn workbench_hint() -> String {
     let format = DisplayFormat::Abbreviation;
     format!(
-        "{}: hjkl move, {} explorer, {} tabs, {} code, {} input, {} inspector, 1-5 tabs, {} mode, {} cancel",
+        "{}: hjkl move, {} explorer, {} tabs, {} code, {} input, {} inspector, 1-5 tabs, {} mode, {}/{} theme, {} cancel",
         KeyBindEvent::BeginWorkbenchNavigation.key_bindings_display_with_format(&format),
         KeyBindEvent::WorkbenchFocusExplorer.key_bindings_display_with_format(&format),
         KeyBindEvent::WorkbenchFocusTabs.key_bindings_display_with_format(&format),
@@ -162,6 +170,8 @@ pub fn workbench_hint() -> String {
         KeyBindEvent::WorkbenchFocusInput.key_bindings_display_with_format(&format),
         KeyBindEvent::WorkbenchFocusInspector.key_bindings_display_with_format(&format),
         KeyBindEvent::WorkbenchToggleEditorMode.key_bindings_display_with_format(&format),
+        KeyBindEvent::WorkbenchPreviousTheme.key_bindings_display_with_format(&format),
+        KeyBindEvent::WorkbenchNextTheme.key_bindings_display_with_format(&format),
         KeyBindEvent::WorkbenchCancel.key_bindings_display_with_format(&format),
     )
 }
@@ -177,5 +187,6 @@ mod tests {
         assert!(toml.contains("quit"));
         assert!(toml.contains("begin_workbench_navigation"));
         assert!(toml.contains("workbench_focus_code_editor"));
+        assert!(toml.contains("workbench_next_theme"));
     }
 }

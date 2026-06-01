@@ -5,16 +5,19 @@ mod navigation;
 mod output;
 pub mod sui;
 pub mod tabs;
+pub mod theme;
 mod workflow;
 
 use crate::navigation::{Navigation, NavigationCommand, NavigationIntent};
 use crate::tabs::TabNav;
+use crate::theme::{Theme, ThemeName, ThemePalette};
 use clap::Parser;
 use peregrine_config::CONFIG_TOML_FILE;
 use peregrine_config::config_toml::ConfigToml;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout, Position, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 use ratatui::{DefaultTerminal, Frame};
 use std::cmp::Ordering;
@@ -371,6 +374,7 @@ pub struct App {
     active_tab: WorkbenchTab,
     editor_mode: EditorMode,
     vim_state: VimState,
+    theme: Theme,
     navigation: Navigation,
     explorer: Explorer,
     editor: EditorBuffer,
@@ -382,10 +386,19 @@ pub struct App {
 impl App {
     pub fn from_current_dir() -> io::Result<Self> {
         let cwd = std::env::current_dir()?;
-        Self::new(cwd, configured_editor_mode())
+        let settings = configured_tui_settings();
+        Self::new_with_theme(cwd, settings.editor_mode, settings.theme)
     }
 
     pub fn new(root: impl AsRef<Path>, editor_mode: EditorMode) -> io::Result<Self> {
+        Self::new_with_theme(root, editor_mode, Theme::default())
+    }
+
+    pub fn new_with_theme(
+        root: impl AsRef<Path>,
+        editor_mode: EditorMode,
+        theme: Theme,
+    ) -> io::Result<Self> {
         keybinds::init_default_keybindings()?;
         Ok(Self {
             mode: AppMode::default(),
@@ -393,6 +406,7 @@ impl App {
             active_tab: WorkbenchTab::Code,
             editor_mode,
             vim_state: VimState::Normal,
+            theme,
             navigation: Navigation::default(),
             explorer: Explorer::new(root)?,
             editor: EditorBuffer::new_empty(),
@@ -451,6 +465,8 @@ impl App {
                 self.status = String::from(navigation::WORKBENCH_UNBOUND);
             }
             NavigationCommand::ToggleEditorMode => self.toggle_editor_mode(),
+            NavigationCommand::PreviousTheme => self.previous_theme(),
+            NavigationCommand::NextTheme => self.next_theme(),
             NavigationCommand::Focus(pane) => self.focus = pane,
             NavigationCommand::FocusCodeEditor => self.focus_code_editor(),
             NavigationCommand::FocusNext => self.focus = navigation::next_focus(self.focus),
@@ -611,6 +627,16 @@ impl App {
         self.status = format!("Editor mode: {}", self.editor_mode_label());
     }
 
+    fn previous_theme(&mut self) {
+        self.theme.prev();
+        self.status = format!("Theme: {}", self.theme);
+    }
+
+    fn next_theme(&mut self) {
+        self.theme.next();
+        self.status = format!("Theme: {}", self.theme);
+    }
+
     fn editor_mode_label(&self) -> &'static str {
         match self.editor_mode {
             EditorMode::Standard => "standard",
@@ -660,7 +686,88 @@ impl App {
         }
     }
 
+    fn palette(&self) -> ThemePalette {
+        self.theme.palette()
+    }
+
+    fn style_fg(&self, color: Color) -> Style {
+        Style::default().fg(color).bg(self.palette().bg)
+    }
+
+    fn base_style(&self) -> Style {
+        let palette = self.palette();
+        Style::default().fg(palette.fg).bg(palette.bg)
+    }
+
+    fn muted_style(&self) -> Style {
+        self.style_fg(self.palette().muted)
+    }
+
+    fn border_style(&self, focused: bool) -> Style {
+        let palette = self.palette();
+        self.style_fg(if focused {
+            palette.accent
+        } else {
+            palette.graph.edge
+        })
+    }
+
+    fn title_style(&self, focused: bool) -> Style {
+        let palette = self.palette();
+        self.style_fg(if focused { palette.accent } else { palette.fg })
+            .add_modifier(if focused {
+                Modifier::BOLD
+            } else {
+                Modifier::empty()
+            })
+    }
+
+    fn selection_style(&self) -> Style {
+        let palette = self.palette();
+        Style::default()
+            .fg(palette.fg)
+            .bg(palette.selection)
+            .add_modifier(Modifier::BOLD)
+    }
+
+    fn panel_block(&self, title: impl Into<String>, focused: bool) -> Block<'static> {
+        let title = focused_title(&title.into(), focused);
+        Block::default()
+            .borders(Borders::ALL)
+            .title(title)
+            .style(self.base_style())
+            .border_style(self.border_style(focused))
+            .title_style(self.title_style(focused))
+    }
+
+    fn placeholder_style(&self, tab: WorkbenchTab) -> Style {
+        let palette = self.palette();
+        let color = match tab {
+            WorkbenchTab::Code => palette.syntax.text,
+            WorkbenchTab::Bytecode => palette.syntax.operator,
+            WorkbenchTab::Cfg => palette.graph.control_flow,
+            WorkbenchTab::CallGraph => palette.graph.call_edge,
+            WorkbenchTab::TypeGraph => palette.graph.node,
+        };
+        self.style_fg(color)
+    }
+
+    fn inspector_line(
+        &self,
+        label: &'static str,
+        value: impl Into<String>,
+        value_style: Style,
+    ) -> Line<'static> {
+        Line::from(vec![
+            Span::styled(format!("{label}: "), self.muted_style()),
+            Span::styled(value.into(), value_style),
+        ])
+    }
+
     pub fn render(&mut self, frame: &mut Frame<'_>) {
+        let area = frame.area();
+        frame.buffer_mut().set_style(area, self.base_style());
+
         let columns = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -668,7 +775,7 @@ impl App {
                 Constraint::Percentage(50),
                 Constraint::Percentage(25),
             ])
-            .split(frame.area());
+            .split(area);
 
         self.render_explorer(frame, columns[0]);
         self.render_center(frame, columns[1]);
@@ -676,6 +783,7 @@ impl App {
     }
 
     fn render_explorer(&self, frame: &mut Frame<'_>, area: Rect) {
+        let palette = self.palette();
         let items = self
             .explorer
             .visible_entries()
@@ -694,21 +802,26 @@ impl App {
                     entry.name,
                     suffix
                 );
-                ListItem::new(label)
+                let color = if entry.is_dir {
+                    palette.accent
+                } else {
+                    palette.fg
+                };
+                ListItem::new(label).style(self.style_fg(color))
             })
             .collect::<Vec<_>>();
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(focused_title("Explorer", self.focus == FocusPane::Explorer));
+        let block = self.panel_block("Explorer", self.focus == FocusPane::Explorer);
         let mut state = ListState::default().with_selected(Some(self.explorer.selected()));
         let list = List::new(items)
             .block(block)
-            .highlight_style(Style::default().fg(Color::Black).bg(Color::White))
+            .style(self.base_style())
+            .highlight_style(self.selection_style())
             .highlight_symbol("> ");
         frame.render_stateful_widget(list, area, &mut state);
     }
 
     fn render_center(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        let palette = self.palette();
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -718,24 +831,22 @@ impl App {
             ])
             .split(area);
 
-        let border_style = if self.focus == FocusPane::Tabs {
-            Style::default().fg(Color::Cyan)
-        } else {
-            Style::default().fg(Color::DarkGray)
-        };
         let tabs = TabNav::new(&WORKBENCH_TAB_LABELS, self.active_tab.index())
-            .style(Style::default().fg(Color::Gray))
-            .highlight_style(Style::default().fg(Color::Cyan))
-            .border_style(border_style)
+            .style(self.muted_style())
+            .highlight_style(self.style_fg(palette.accent).add_modifier(Modifier::BOLD))
+            .border_style(self.border_style(self.focus == FocusPane::Tabs))
             .highlight_bold(true);
         frame.render_widget(tabs, rows[0]);
 
         match self.active_tab {
             WorkbenchTab::Code => self.render_editor(frame, rows[1]),
             tab => {
-                let title = focused_title("View", self.focus == FocusPane::Editor);
-                let paragraph = Paragraph::new(format!("{} view placeholder", tab.title()))
-                    .block(Block::default().borders(Borders::ALL).title(title));
+                let paragraph = Paragraph::new(Line::styled(
+                    format!("{} view placeholder", tab.title()),
+                    self.placeholder_style(tab),
+                ))
+                .style(self.base_style())
+                .block(self.panel_block("View", self.focus == FocusPane::Editor));
                 frame.render_widget(paragraph, rows[1]);
             }
         }
@@ -754,11 +865,8 @@ impl App {
         );
         let text = self.editor.text();
         let paragraph = Paragraph::new(text)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(focused_title(&title, self.focus == FocusPane::Editor)),
-            )
+            .style(self.style_fg(self.palette().syntax.text))
+            .block(self.panel_block(title, self.focus == FocusPane::Editor))
             .scroll((self.editor.scroll as u16, 0));
         frame.render_widget(paragraph, area);
 
@@ -776,11 +884,9 @@ impl App {
 
     fn render_input(&self, frame: &mut Frame<'_>, area: Rect) {
         let title = format!("Input - {}", self.status);
-        let paragraph = Paragraph::new(self.input.text.as_str()).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(focused_title(&title, self.focus == FocusPane::Input)),
-        );
+        let paragraph = Paragraph::new(self.input.text.as_str())
+            .style(self.base_style())
+            .block(self.panel_block(title, self.focus == FocusPane::Input));
         frame.render_widget(paragraph, area);
 
         if self.focus == FocusPane::Input {
@@ -803,19 +909,44 @@ impl App {
             .map(|path| path.display().to_string())
             .unwrap_or_else(|| String::from("<none>"));
         let dirty = if self.editor.dirty { "yes" } else { "no" };
-        let text = [
-            String::from("Inspector placeholder"),
-            format!("selected: {selected_path}"),
-            format!("file: {edited_path}"),
-            format!("app mode: {}", self.app_mode_label()),
-            format!("tab: {}", self.active_tab.title()),
-            format!("dirty: {dirty}"),
-            format!("mode: {}", self.editor_mode_label()),
-        ]
-        .join("\n");
-        let paragraph = Paragraph::new(text).block(Block::default().borders(Borders::ALL).title(
-            focused_title("Inspector", self.focus == FocusPane::Inspector),
-        ));
+        let palette = self.palette();
+        let dirty_style = if self.editor.dirty {
+            self.style_fg(palette.warning)
+        } else {
+            self.style_fg(palette.success)
+        };
+        let lines = vec![
+            Line::styled(
+                "Inspector placeholder",
+                self.style_fg(palette.info).add_modifier(Modifier::BOLD),
+            ),
+            self.inspector_line("selected", selected_path, self.base_style()),
+            self.inspector_line("file", edited_path, self.base_style()),
+            self.inspector_line(
+                "app mode",
+                self.app_mode_label(),
+                self.style_fg(palette.info),
+            ),
+            self.inspector_line(
+                "tab",
+                self.active_tab.title(),
+                self.style_fg(palette.accent),
+            ),
+            self.inspector_line("dirty", dirty, dirty_style),
+            self.inspector_line(
+                "mode",
+                self.editor_mode_label(),
+                self.style_fg(palette.secondary),
+            ),
+            self.inspector_line(
+                "theme",
+                self.theme.to_string(),
+                self.style_fg(palette.accent),
+            ),
+        ];
+        let paragraph = Paragraph::new(lines)
+            .style(self.base_style())
+            .block(self.panel_block("Inspector", self.focus == FocusPane::Inspector));
         frame.render_widget(paragraph, area);
     }
 }
@@ -828,26 +959,70 @@ fn focused_title(title: &str, focused: bool) -> String {
     }
 }
 
-pub fn configured_editor_mode() -> EditorMode {
-    match peregrine_utils_home_dir::find_peregrine_home() {
-        Ok(home) => load_editor_mode_from_home(home.as_path()),
-        Err(_) => EditorMode::Standard,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TuiSettings {
+    pub editor_mode: EditorMode,
+    pub theme: Theme,
+}
+
+impl Default for TuiSettings {
+    fn default() -> Self {
+        Self {
+            editor_mode: EditorMode::Standard,
+            theme: Theme::default(),
+        }
     }
 }
 
-pub fn load_editor_mode_from_home(home: &Path) -> EditorMode {
+pub fn configured_tui_settings() -> TuiSettings {
+    match peregrine_utils_home_dir::find_peregrine_home() {
+        Ok(home) => load_tui_settings_from_home(home.as_path()),
+        Err(_) => TuiSettings::default(),
+    }
+}
+
+pub fn load_tui_settings_from_home(home: &Path) -> TuiSettings {
     let config_path = home.join(CONFIG_TOML_FILE);
     let Ok(contents) = fs::read_to_string(config_path) else {
-        return EditorMode::Standard;
+        return TuiSettings::default();
     };
     let Ok(config) = toml::from_str::<ConfigToml>(&contents) else {
-        return EditorMode::Standard;
+        return TuiSettings::default();
     };
-    if config.tui.is_some_and(|tui| tui.vim_mode_default) {
+
+    let Some(tui) = config.tui.as_ref() else {
+        return TuiSettings::default();
+    };
+
+    let editor_mode = if tui.vim_mode_default {
         EditorMode::Vim
     } else {
         EditorMode::Standard
-    }
+    };
+    let theme = tui
+        .theme
+        .as_deref()
+        .and_then(|name| name.parse::<ThemeName>().ok())
+        .map(Theme::new)
+        .unwrap_or_default();
+
+    TuiSettings { editor_mode, theme }
+}
+
+pub fn configured_editor_mode() -> EditorMode {
+    configured_tui_settings().editor_mode
+}
+
+pub fn load_editor_mode_from_home(home: &Path) -> EditorMode {
+    load_tui_settings_from_home(home).editor_mode
+}
+
+pub fn configured_theme() -> Theme {
+    configured_tui_settings().theme
+}
+
+pub fn load_theme_from_home(home: &Path) -> Theme {
+    load_tui_settings_from_home(home).theme
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1438,6 +1613,33 @@ mod tests {
     }
 
     #[test]
+    fn config_theme_loads_named_theme() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        fs::write(
+            temp.path().join(CONFIG_TOML_FILE),
+            "[tui]\ntheme = \"zero-day\"\n",
+        )
+        .expect("write config");
+
+        assert_eq!(load_theme_from_home(temp.path()).name, ThemeName::ZeroDay);
+    }
+
+    #[test]
+    fn config_invalid_theme_defaults_to_peregrine_night() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        fs::write(
+            temp.path().join(CONFIG_TOML_FILE),
+            "[tui]\ntheme = \"not-a-theme\"\n",
+        )
+        .expect("write config");
+
+        assert_eq!(
+            load_theme_from_home(temp.path()).name,
+            ThemeName::PeregrineNight
+        );
+    }
+
+    #[test]
     fn explorer_sorts_directories_before_files() {
         let temp = tempfile::tempdir().expect("temp dir");
         fs::create_dir(temp.path().join("z_dir")).expect("create dir");
@@ -1622,6 +1824,20 @@ mod tests {
     }
 
     #[test]
+    fn workbench_prefix_cycles_themes() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+
+        let original = app.theme.name;
+        workbench_nav(&mut app, KeyCode::Char(']'));
+        assert_eq!(app.theme.name, original.next());
+        assert!(app.status.contains("Theme:"));
+
+        workbench_nav(&mut app, KeyCode::Char('['));
+        assert_eq!(app.theme.name, original);
+    }
+
+    #[test]
     fn function_keys_are_not_workbench_navigation_shortcuts() {
         let temp = tempfile::tempdir().expect("temp dir");
         let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
@@ -1680,6 +1896,8 @@ mod tests {
         assert!(rendered.contains("Input"));
         assert!(rendered.contains("Inspector placeholder"));
         assert!(rendered.contains("standard"));
+        assert!(rendered.contains("theme:"));
+        assert!(rendered.contains("Peregrine Night"));
     }
 
     fn key(code: KeyCode) -> KeyEvent {

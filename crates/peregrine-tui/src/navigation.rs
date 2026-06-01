@@ -61,6 +61,8 @@ pub enum NavigationCommand {
     CancelWorkbenchNavigation,
     UnboundWorkbenchNavigation,
     ToggleEditorMode,
+    PreviousTheme,
+    NextTheme,
     Focus(FocusPane),
     FocusCodeEditor,
     FocusNext,
@@ -174,6 +176,8 @@ fn workbench_command(key: KeyEvent) -> NavigationCommand {
             KeyBindEvent::WorkbenchFocusInput => NavigationCommand::Focus(FocusPane::Input),
             KeyBindEvent::WorkbenchFocusInspector => NavigationCommand::Focus(FocusPane::Inspector),
             KeyBindEvent::WorkbenchToggleEditorMode => NavigationCommand::ToggleEditorMode,
+            KeyBindEvent::WorkbenchPreviousTheme => NavigationCommand::PreviousTheme,
+            KeyBindEvent::WorkbenchNextTheme => NavigationCommand::NextTheme,
             KeyBindEvent::WorkbenchSelectCodeTab => {
                 NavigationCommand::SelectTab(WorkbenchTab::Code)
             }
