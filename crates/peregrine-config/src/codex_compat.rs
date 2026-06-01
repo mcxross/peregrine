@@ -15,6 +15,7 @@ pub type McpServerDisabledReason = codex_config::McpServerDisabledReason;
 pub type McpServerTransportConfig = codex_config::McpServerTransportConfig;
 pub type OAuthCredentialsStoreMode = codex_config::types::OAuthCredentialsStoreMode;
 pub type RequirementSource = codex_config::RequirementSource;
+pub type ResidencyRequirement = codex_config::ResidencyRequirement;
 
 pub fn config_layer_stack(stack: &crate::ConfigLayerStack) -> ConfigLayerStack {
     let ignore_user_and_project_exec_policy_rules =
