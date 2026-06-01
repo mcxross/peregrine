@@ -9,9 +9,13 @@ pub mod theme;
 mod workflow;
 
 use crate::navigation::{Navigation, NavigationCommand, NavigationIntent};
+use crate::sui::project::{BytecodeTarget, CliContext, bytecode_targets, resolve_context};
 use crate::tabs::TabNav;
 use crate::theme::{Theme, ThemeName, ThemePalette};
 use clap::Parser;
+use move_binary_format::file_format::{CodeOffset, CompiledModule, FunctionDefinitionIndex};
+use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
+use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use peregrine_config::CONFIG_TOML_FILE;
 use peregrine_config::config_toml::ConfigToml;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
@@ -20,8 +24,9 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 use ratatui::{DefaultTerminal, Frame};
+use regex::Regex;
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io;
@@ -378,6 +383,7 @@ pub struct App {
     navigation: Navigation,
     explorer: Explorer,
     editor: EditorBuffer,
+    bytecode: BytecodePane,
     input: CommandInput,
     should_quit: bool,
     status: String,
@@ -410,6 +416,7 @@ impl App {
             navigation: Navigation::default(),
             explorer: Explorer::new(root)?,
             editor: EditorBuffer::new_empty(),
+            bytecode: BytecodePane::default(),
             input: CommandInput::default(),
             should_quit: false,
             status: keybinds::default_hint(),
@@ -467,17 +474,17 @@ impl App {
             NavigationCommand::ToggleEditorMode => self.toggle_editor_mode(),
             NavigationCommand::PreviousTheme => self.previous_theme(),
             NavigationCommand::NextTheme => self.next_theme(),
-            NavigationCommand::Focus(pane) => self.focus = pane,
+            NavigationCommand::Focus(pane) => self.set_focus(pane),
             NavigationCommand::FocusCodeEditor => self.focus_code_editor(),
-            NavigationCommand::FocusNext => self.focus = navigation::next_focus(self.focus),
+            NavigationCommand::FocusNext => self.focus = self.next_focus_pane(),
             NavigationCommand::FocusPrevious => {
-                self.focus = navigation::previous_focus(self.focus);
+                self.focus = self.previous_focus_pane();
             }
             NavigationCommand::MoveFocus(direction) => {
-                self.focus = navigation::move_focus(self.focus, direction);
+                self.set_focus(navigation::move_focus(self.focus, direction));
             }
             NavigationCommand::SelectTab(tab) => {
-                self.active_tab = tab;
+                self.set_active_tab(tab);
                 self.focus = FocusPane::Tabs;
             }
         }
@@ -515,23 +522,75 @@ impl App {
     }
 
     fn handle_editor_key(&mut self, key: KeyEvent) {
-        if self.active_tab != WorkbenchTab::Code {
+        match self.active_tab {
+            WorkbenchTab::Code => {
+                match self.editor_mode {
+                    EditorMode::Standard => self.editor.handle_standard_key(key),
+                    EditorMode::Vim => {
+                        if self.vim_state == VimState::Insert {
+                            if key.code == KeyCode::Esc {
+                                self.vim_state = VimState::Normal;
+                            } else {
+                                self.editor.handle_standard_key(key);
+                            }
+                        } else {
+                            self.handle_vim_normal_key(key);
+                        }
+                    }
+                }
+                if self.editor.dirty {
+                    self.bytecode.invalidate();
+                }
+            }
+            WorkbenchTab::Bytecode => self.handle_bytecode_key(key),
+            _ => {}
+        }
+    }
+
+    fn handle_bytecode_key(&mut self, key: KeyEvent) {
+        if matches!(key.code, KeyCode::Esc | KeyCode::Char('q')) {
+            self.active_tab = WorkbenchTab::Code;
+            self.focus = FocusPane::Editor;
+            self.status = String::from("Closed bytecode viewer");
             return;
         }
 
-        match self.editor_mode {
-            EditorMode::Standard => self.editor.handle_standard_key(key),
-            EditorMode::Vim => {
-                if self.vim_state == VimState::Insert {
-                    if key.code == KeyCode::Esc {
-                        self.vim_state = VimState::Normal;
-                    } else {
-                        self.editor.handle_standard_key(key);
-                    }
+        let mut request = None;
+        let mut show_selector = false;
+        let mut load_bytecode = false;
+
+        match &mut self.bytecode {
+            BytecodePane::Selecting(selector) => {
+                if key.code == KeyCode::Enter {
+                    request = selector.selected_request();
                 } else {
-                    self.handle_vim_normal_key(key);
+                    selector.handle_key(key);
                 }
             }
+            BytecodePane::Ready(session) => {
+                if key.code == KeyCode::Enter {
+                    show_selector = true;
+                } else {
+                    session.handle_key(key);
+                }
+            }
+            BytecodePane::Empty | BytecodePane::Message(_) => {
+                if key.code == KeyCode::Enter {
+                    load_bytecode = true;
+                }
+            }
+        }
+
+        if load_bytecode {
+            self.ensure_bytecode_session();
+        }
+
+        if show_selector {
+            self.show_bytecode_selector();
+        }
+
+        if let Some(request) = request {
+            self.load_bytecode_request(request);
         }
     }
 
@@ -607,15 +666,58 @@ impl App {
         self.active_tab = WorkbenchTab::Code;
     }
 
+    fn set_active_tab(&mut self, tab: WorkbenchTab) {
+        self.active_tab = tab;
+        if tab == WorkbenchTab::Bytecode {
+            self.ensure_bytecode_session();
+        }
+        self.set_focus(self.focus);
+    }
+
+    fn set_focus(&mut self, pane: FocusPane) {
+        self.focus = if pane == FocusPane::Inspector && !self.inspector_visible() {
+            FocusPane::Editor
+        } else {
+            pane
+        };
+    }
+
+    fn next_focus_pane(&self) -> FocusPane {
+        if self.inspector_visible() {
+            return navigation::next_focus(self.focus);
+        }
+
+        let order = hidden_inspector_focus_order();
+        let index = order
+            .iter()
+            .position(|pane| *pane == self.focus)
+            .unwrap_or_default();
+        order[(index + 1) % order.len()]
+    }
+
+    fn previous_focus_pane(&self) -> FocusPane {
+        if self.inspector_visible() {
+            return navigation::previous_focus(self.focus);
+        }
+
+        let order = hidden_inspector_focus_order();
+        let index = order
+            .iter()
+            .position(|pane| *pane == self.focus)
+            .unwrap_or_default();
+        order[(index + order.len() - 1) % order.len()]
+    }
+
     fn next_tab(&mut self) {
         let index = self.active_tab.index();
-        self.active_tab = WorkbenchTab::ALL[(index + 1) % WorkbenchTab::ALL.len()];
+        self.set_active_tab(WorkbenchTab::ALL[(index + 1) % WorkbenchTab::ALL.len()]);
     }
 
     fn previous_tab(&mut self) {
         let index = self.active_tab.index();
-        self.active_tab =
-            WorkbenchTab::ALL[(index + WorkbenchTab::ALL.len() - 1) % WorkbenchTab::ALL.len()];
+        self.set_active_tab(
+            WorkbenchTab::ALL[(index + WorkbenchTab::ALL.len() - 1) % WorkbenchTab::ALL.len()],
+        );
     }
 
     fn toggle_editor_mode(&mut self) {
@@ -662,6 +764,7 @@ impl App {
 
         match self.editor.open_file(&path) {
             Ok(()) => {
+                self.bytecode.invalidate();
                 self.focus = FocusPane::Editor;
                 self.active_tab = WorkbenchTab::Code;
                 self.status = format!("Opened {}", path.display());
@@ -674,14 +777,20 @@ impl App {
 
     fn save_current_file(&mut self) {
         match self.editor.save() {
-            Ok(()) => self.status = String::from("Saved"),
+            Ok(()) => {
+                self.bytecode.invalidate();
+                self.status = String::from("Saved");
+            }
             Err(error) => self.status = format!("Save failed: {error}"),
         }
     }
 
     fn reload_current_file(&mut self) {
         match self.editor.reload() {
-            Ok(()) => self.status = String::from("Reloaded"),
+            Ok(()) => {
+                self.bytecode.invalidate();
+                self.status = String::from("Reloaded");
+            }
             Err(error) => self.status = format!("Reload failed: {error}"),
         }
     }
@@ -767,19 +876,31 @@ impl App {
     pub fn render(&mut self, frame: &mut Frame<'_>) {
         let area = frame.area();
         frame.buffer_mut().set_style(area, self.base_style());
-
-        let columns = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
+        let show_inspector = self.inspector_visible();
+        let constraints = if show_inspector {
+            vec![
                 Constraint::Percentage(25),
                 Constraint::Percentage(50),
                 Constraint::Percentage(25),
-            ])
+            ]
+        } else {
+            vec![Constraint::Percentage(25), Constraint::Percentage(75)]
+        };
+
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(constraints)
             .split(area);
 
         self.render_explorer(frame, columns[0]);
         self.render_center(frame, columns[1]);
-        self.render_inspector(frame, columns[2]);
+        if show_inspector {
+            self.render_inspector(frame, columns[2]);
+        }
+    }
+
+    fn inspector_visible(&self) -> bool {
+        self.active_tab != WorkbenchTab::Bytecode
     }
 
     fn render_explorer(&self, frame: &mut Frame<'_>, area: Rect) {
@@ -840,6 +961,7 @@ impl App {
 
         match self.active_tab {
             WorkbenchTab::Code => self.render_editor(frame, rows[1]),
+            WorkbenchTab::Bytecode => self.render_bytecode(frame, rows[1]),
             tab => {
                 let paragraph = Paragraph::new(Line::styled(
                     format!("{} view placeholder", tab.title()),
@@ -852,6 +974,127 @@ impl App {
         }
 
         self.render_input(frame, rows[2]);
+    }
+
+    fn render_bytecode(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        let palette = self.theme.palette();
+        let focused = self.focus == FocusPane::Editor;
+        let light_theme = self.theme.is_light();
+        let message_style = self.muted_style();
+        let message_block = self.panel_block("Bytecode", focused);
+
+        match &mut self.bytecode {
+            BytecodePane::Ready(session) => {
+                session.render(frame, area, palette, focused, light_theme);
+            }
+            BytecodePane::Selecting(selector) => {
+                selector.render(frame, area, palette, focused);
+            }
+            BytecodePane::Message(message) => {
+                let paragraph = Paragraph::new(message.as_str())
+                    .style(message_style)
+                    .block(message_block);
+                frame.render_widget(paragraph, area);
+            }
+            BytecodePane::Empty => {
+                let paragraph =
+                    Paragraph::new("Bytecode is not loaded. Press Enter to resolve modules.")
+                        .style(message_style)
+                        .block(message_block);
+                frame.render_widget(paragraph, area);
+            }
+        }
+    }
+
+    fn ensure_bytecode_session(&mut self) {
+        let options = match self.current_bytecode_options() {
+            Ok(options) => options,
+            Err(message) => {
+                self.bytecode.set_message(message);
+                return;
+            }
+        };
+
+        if self.bytecode.ready_matches_any(&options) || self.bytecode.selector_matches(&options) {
+            return;
+        }
+
+        match options.targets.as_slice() {
+            [] => self
+                .bytecode
+                .set_message("No Move module matched the requested bytecode target.".to_string()),
+            [target] => {
+                let request = BytecodeRequest::new(options.context, target.clone());
+                self.load_bytecode_request(request);
+            }
+            _ => {
+                self.status = format!("Select a module from {}", options.package_name);
+                self.bytecode = BytecodePane::Selecting(BytecodeSelector::new(options));
+            }
+        }
+    }
+
+    fn load_bytecode_request(&mut self, request: BytecodeRequest) {
+        let status = format!(
+            "Loaded bytecode for {}::{}",
+            request.package_name, request.key.module_name
+        );
+        match BytecodeSession::load(request) {
+            Ok(session) => {
+                self.status = status;
+                self.bytecode = BytecodePane::Ready(session);
+            }
+            Err(message) => {
+                self.status = format!("Bytecode failed: {message}");
+                self.bytecode = BytecodePane::Message(message);
+            }
+        }
+    }
+
+    fn show_bytecode_selector(&mut self) {
+        match self.current_bytecode_options() {
+            Ok(options) if options.targets.is_empty() => self
+                .bytecode
+                .set_message("No Move module matched the requested bytecode target.".to_string()),
+            Ok(options) => {
+                self.status = format!("Select a module from {}", options.package_name);
+                self.bytecode = BytecodePane::Selecting(BytecodeSelector::new(options));
+            }
+            Err(message) => self.bytecode.set_message(message),
+        }
+    }
+
+    fn current_bytecode_options(&self) -> Result<BytecodeOptions, String> {
+        if self.editor.dirty {
+            return Err("Save the current file before opening the bytecode view.".to_string());
+        }
+
+        let project_root = self.explorer.root.clone();
+        let source_hint = self
+            .editor
+            .path
+            .as_ref()
+            .cloned()
+            .or_else(|| self.explorer.selected_path().map(Path::to_path_buf));
+        let package_root = source_hint
+            .as_deref()
+            .and_then(|path| nearest_move_package_root(path, &project_root))
+            .or_else(|| nearest_move_package_root(&project_root, &project_root))
+            .ok_or_else(|| {
+                "Open or select a Move source file inside a package with Move.toml.".to_string()
+            })?;
+        let package_path = relative_path_label(&project_root, &package_root);
+        let context = resolve_context(&project_root, &package_path)
+            .map_err(|error| error.message.to_string())?;
+        let file = source_hint
+            .as_ref()
+            .filter(|path| path.is_file() && path.extension() == Some(OsStr::new("move")))
+            .and_then(|path| path.strip_prefix(&project_root).ok())
+            .map(normalized_path_string);
+        let targets =
+            bytecode_targets(&context, None, file.as_deref()).map_err(|error| error.message)?;
+
+        Ok(BytecodeOptions::new(context, file, targets))
     }
 
     fn render_editor(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -949,6 +1192,706 @@ impl App {
             .block(self.panel_block("Inspector", self.focus == FocusPane::Inspector));
         frame.render_widget(paragraph, area);
     }
+}
+
+#[derive(Debug, Default)]
+enum BytecodePane {
+    #[default]
+    Empty,
+    Selecting(BytecodeSelector),
+    Ready(BytecodeSession),
+    Message(String),
+}
+
+impl BytecodePane {
+    fn invalidate(&mut self) {
+        *self = Self::Empty;
+    }
+
+    fn set_message(&mut self, message: String) {
+        match self {
+            Self::Message(current) if current == &message => {}
+            _ => *self = Self::Message(message),
+        }
+    }
+
+    fn ready_matches_any(&self, options: &BytecodeOptions) -> bool {
+        matches!(self, Self::Ready(session) if options.contains_target_key(&session.key))
+    }
+
+    fn selector_matches(&self, options: &BytecodeOptions) -> bool {
+        matches!(self, Self::Selecting(selector) if selector.matches(options))
+    }
+}
+
+#[derive(Debug)]
+struct BytecodeOptions {
+    context: CliContext,
+    key: BytecodeOptionsKey,
+    package_name: String,
+    targets: Vec<BytecodeTarget>,
+}
+
+impl BytecodeOptions {
+    fn new(context: CliContext, file: Option<String>, mut targets: Vec<BytecodeTarget>) -> Self {
+        targets.sort_by(|left, right| {
+            left.file_path
+                .cmp(&right.file_path)
+                .then_with(|| left.module_name.cmp(&right.module_name))
+        });
+        let package_name = bytecode_package_name(&context);
+
+        Self {
+            key: BytecodeOptionsKey {
+                package_root: context.package_root.clone(),
+                file,
+            },
+            context,
+            package_name,
+            targets,
+        }
+    }
+
+    fn contains_target_key(&self, key: &BytecodeTargetKey) -> bool {
+        self.targets
+            .iter()
+            .any(|target| BytecodeTargetKey::new(&self.context, target) == *key)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BytecodeOptionsKey {
+    package_root: PathBuf,
+    file: Option<String>,
+}
+
+#[derive(Debug)]
+struct BytecodeSelector {
+    context: CliContext,
+    key: BytecodeOptionsKey,
+    package_name: String,
+    targets: Vec<BytecodeTarget>,
+    selected: usize,
+}
+
+impl BytecodeSelector {
+    fn new(options: BytecodeOptions) -> Self {
+        Self {
+            context: options.context,
+            key: options.key,
+            package_name: options.package_name,
+            targets: options.targets,
+            selected: 0,
+        }
+    }
+
+    fn matches(&self, options: &BytecodeOptions) -> bool {
+        self.key == options.key && self.targets == options.targets
+    }
+
+    fn selected_request(&self) -> Option<BytecodeRequest> {
+        self.targets
+            .get(self.selected)
+            .cloned()
+            .map(|target| BytecodeRequest::new(self.context.clone(), target))
+    }
+
+    fn handle_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
+            KeyCode::Down | KeyCode::Char('j') => self.select_next(),
+            KeyCode::PageUp => self.select_previous_page(),
+            KeyCode::PageDown => self.select_next_page(),
+            KeyCode::Home => self.selected = 0,
+            KeyCode::End => {
+                self.selected = self.targets.len().saturating_sub(1);
+            }
+            _ => {}
+        }
+    }
+
+    fn select_previous(&mut self) {
+        self.selected = self.selected.saturating_sub(1);
+    }
+
+    fn select_next(&mut self) {
+        if self.selected + 1 < self.targets.len() {
+            self.selected += 1;
+        }
+    }
+
+    fn select_previous_page(&mut self) {
+        self.selected = self.selected.saturating_sub(PAGE_SIZE);
+    }
+
+    fn select_next_page(&mut self) {
+        self.selected = self
+            .selected
+            .saturating_add(PAGE_SIZE)
+            .min(self.targets.len().saturating_sub(1));
+    }
+
+    fn render(&self, frame: &mut Frame<'_>, area: Rect, palette: ThemePalette, focused: bool) {
+        let base_style = Style::default().fg(palette.fg).bg(palette.bg);
+        let border_style = Style::default()
+            .fg(if focused {
+                palette.accent
+            } else {
+                palette.graph.edge
+            })
+            .bg(palette.bg);
+        let title_style = Style::default()
+            .fg(if focused { palette.accent } else { palette.fg })
+            .bg(palette.bg)
+            .add_modifier(if focused {
+                Modifier::BOLD
+            } else {
+                Modifier::empty()
+            });
+        let items = self
+            .targets
+            .iter()
+            .map(|target| {
+                ListItem::new(Line::from(vec![
+                    Span::styled(
+                        target.module_name.clone(),
+                        Style::default()
+                            .fg(palette.accent)
+                            .bg(palette.bg)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw("  "),
+                    Span::styled(
+                        target.file_path.clone(),
+                        Style::default().fg(palette.muted).bg(palette.bg),
+                    ),
+                ]))
+                .style(base_style)
+            })
+            .collect::<Vec<_>>();
+        let mut state = ListState::default().with_selected(Some(self.selected));
+        let list = List::new(items)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(format!("Select Bytecode Module - {}", self.package_name))
+                    .style(base_style)
+                    .border_style(border_style)
+                    .title_style(title_style),
+            )
+            .style(base_style)
+            .highlight_style(
+                Style::default()
+                    .fg(palette.fg)
+                    .bg(palette.selection)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("> ");
+        frame.render_stateful_widget(list, area, &mut state);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BytecodeTargetKey {
+    package_root: PathBuf,
+    module_name: String,
+    source_path: PathBuf,
+}
+
+impl BytecodeTargetKey {
+    fn new(context: &CliContext, target: &BytecodeTarget) -> Self {
+        Self {
+            package_root: context.package_root.clone(),
+            module_name: target.module_name.clone(),
+            source_path: target.source_path.clone(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct BytecodeRequest {
+    context: CliContext,
+    key: BytecodeTargetKey,
+    package_name: String,
+}
+
+impl BytecodeRequest {
+    fn new(context: CliContext, target: BytecodeTarget) -> Self {
+        let package_name = bytecode_package_name(&context);
+
+        Self {
+            key: BytecodeTargetKey::new(&context, &target),
+            context,
+            package_name,
+        }
+    }
+}
+
+fn bytecode_package_name(context: &CliContext) -> String {
+    if context.package_path == "." {
+        context
+            .package_root
+            .file_name()
+            .and_then(OsStr::to_str)
+            .unwrap_or("package")
+            .to_string()
+    } else {
+        context.package_path.clone()
+    }
+}
+
+#[derive(Debug)]
+struct BytecodeSession {
+    key: BytecodeTargetKey,
+    package_name: String,
+    viewer: OwnedBytecodeView,
+    current_line: u16,
+    current_column: u16,
+}
+
+impl BytecodeSession {
+    fn load(request: BytecodeRequest) -> Result<Self, String> {
+        let install_dir =
+            tempfile::tempdir().map_err(|error| format!("Could not create build dir: {error}"))?;
+        let mut build_config = move_package_alt_compilation::build_config::BuildConfig::default();
+        build_config.install_dir = Some(install_dir.path().to_path_buf());
+        build_config.silence_warnings = true;
+        let env = move_package_alt_compilation::find_env::<sui_package_alt::SuiFlavor>(
+            &request.context.package_root,
+            &build_config,
+        )
+        .map_err(|error| format!("Could not resolve Move package environment: {error:#}"))?;
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .map_err(|error| format!("Could not create bytecode runtime: {error}"))?;
+        let mut writer = Vec::new();
+        let package = runtime
+            .block_on(async {
+                let root_package = build_config
+                    .package_loader(&request.context.package_root, &env)
+                    .load::<sui_package_alt::SuiFlavor>()
+                    .await?;
+                move_package_alt_compilation::build_plan::BuildPlan::create(
+                    &root_package,
+                    &build_config,
+                )?
+                .compile_with_driver(&mut writer, |compiler| {
+                    let (files, units_result) = compiler.build()?;
+                    match units_result {
+                        Ok((units, _warnings)) => Ok((files, units)),
+                        Err(_diagnostics) => Err(io::Error::new(
+                            io::ErrorKind::Other,
+                            "Compilation failed; fix package errors and try again.",
+                        )
+                        .into()),
+                    }
+                })
+            })
+            .map_err(|error| format!("Could not build package bytecode: {error:#}"))?;
+        let compiled_package_name = package.compiled_package_info.package_name.as_str();
+        let unit = package
+            .get_module_by_name(compiled_package_name, &request.key.module_name)
+            .ok()
+            .ok_or_else(|| {
+                format!(
+                    "Built package `{compiled_package_name}` but could not find module `{}`.",
+                    request.key.module_name
+                )
+            })?;
+        let viewer = OwnedBytecodeView::new(
+            &unit.unit.module,
+            unit.unit.source_map.clone(),
+            &request.key.source_path,
+        )?;
+
+        Ok(Self {
+            key: request.key,
+            package_name: compiled_package_name.to_string(),
+            viewer,
+            current_line: 0,
+            current_column: 0,
+        })
+    }
+
+    fn handle_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Up => self.move_line_up(1),
+            KeyCode::Down => self.move_line_down(1),
+            KeyCode::PageUp => self.move_line_up(PAGE_SIZE as u16),
+            KeyCode::PageDown => self.move_line_down(PAGE_SIZE as u16),
+            KeyCode::Left => self.current_column = self.current_column.saturating_sub(1),
+            KeyCode::Right => {
+                self.current_column = self
+                    .viewer
+                    .bound_column(self.current_line, self.current_column.saturating_add(1));
+            }
+            KeyCode::Home => self.current_column = 0,
+            KeyCode::End => {
+                self.current_column = self.viewer.bound_column(self.current_line, u16::MAX);
+            }
+            _ => {}
+        }
+    }
+
+    fn move_line_up(&mut self, amount: u16) {
+        self.current_line = self.current_line.saturating_sub(amount);
+        self.current_column = self
+            .viewer
+            .bound_column(self.current_line, self.current_column);
+    }
+
+    fn move_line_down(&mut self, amount: u16) {
+        self.current_line = self
+            .viewer
+            .bound_line(self.current_line.saturating_add(amount));
+        self.current_column = self
+            .viewer
+            .bound_column(self.current_line, self.current_column);
+    }
+
+    fn render(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        palette: ThemePalette,
+        focused: bool,
+        light_theme: bool,
+    ) {
+        let panes = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+            .split(area);
+        let inner_height = panes[0].height.saturating_sub(2);
+        let scroll = if inner_height == 0 {
+            0
+        } else {
+            self.current_line.saturating_sub(inner_height / 2)
+        };
+        let base_style = Style::default().fg(palette.fg).bg(palette.bg);
+        let border_style = Style::default()
+            .fg(if focused {
+                palette.accent
+            } else {
+                palette.graph.edge
+            })
+            .bg(palette.bg);
+        let title_style = Style::default()
+            .fg(if focused { palette.accent } else { palette.fg })
+            .bg(palette.bg)
+            .add_modifier(if focused {
+                Modifier::BOLD
+            } else {
+                Modifier::empty()
+            });
+        let selected_style = Style::default()
+            .fg(palette.fg)
+            .bg(palette.selection)
+            .add_modifier(Modifier::BOLD);
+        let bytecode_lines =
+            self.viewer
+                .bytecode_lines(scroll, inner_height, self.current_line, selected_style);
+        let source_lines =
+            self.viewer
+                .source_lines(self.current_line, self.current_column, palette, light_theme);
+
+        let bytecode = Paragraph::new(bytecode_lines)
+            .style(base_style)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(format!(
+                        "Bytecode - {}::{}",
+                        self.package_name, self.key.module_name
+                    ))
+                    .style(base_style)
+                    .border_style(border_style)
+                    .title_style(title_style),
+            )
+            .scroll((scroll, 0));
+        frame.render_widget(bytecode, panes[0]);
+
+        let source = Paragraph::new(source_lines).style(base_style).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Source Code")
+                .style(base_style)
+                .border_style(border_style)
+                .title_style(title_style),
+        );
+        frame.render_widget(source, panes[1]);
+
+        if focused && inner_height > 0 {
+            let y = self
+                .current_line
+                .saturating_sub(scroll)
+                .min(inner_height - 1);
+            let x = self.current_column.min(panes[0].width.saturating_sub(2));
+            frame.set_cursor_position(Position::new(panes[0].x + 1 + x, panes[0].y + 1 + y));
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct OwnedBytecodeView {
+    bytecode_lines: Vec<String>,
+    line_map: HashMap<usize, BytecodeLineInfo>,
+    source_code: String,
+    source_map: SourceMap,
+}
+
+impl OwnedBytecodeView {
+    fn new(
+        module: &CompiledModule,
+        source_map: SourceMap,
+        source_path: &Path,
+    ) -> Result<Self, String> {
+        let source_code = fs::read_to_string(source_path)
+            .map_err(|error| format!("Could not read {}: {error}", source_path.display()))?;
+        if !source_map.check(&source_code) {
+            return Err(format!(
+                "Source map for {} is out of sync with the source file.",
+                source_path.display()
+            ));
+        }
+        let source_mapping = SourceMapping::new(source_map.clone(), module);
+        let options = DisassemblerOptions {
+            print_code: true,
+            print_basic_blocks: true,
+            ..Default::default()
+        };
+        let disassembled = Disassembler::new(source_mapping, options)
+            .disassemble()
+            .map_err(|error| format!("Could not disassemble module bytecode: {error}"))?;
+        let bytecode_lines = disassembled
+            .lines()
+            .map(|line| line.replace('\t', "    "))
+            .collect::<Vec<_>>();
+        let line_map = build_bytecode_line_map(module, &bytecode_lines)?;
+
+        Ok(Self {
+            bytecode_lines,
+            line_map,
+            source_code,
+            source_map,
+        })
+    }
+
+    fn bytecode_lines(
+        &self,
+        scroll: u16,
+        height: u16,
+        current_line: u16,
+        selected_style: Style,
+    ) -> Vec<Line<'static>> {
+        self.bytecode_lines
+            .iter()
+            .skip(scroll as usize)
+            .take(height as usize)
+            .enumerate()
+            .map(|(visible_index, line)| {
+                let line_index = scroll as usize + visible_index;
+                if line_index == current_line as usize {
+                    Line::styled(line.clone(), selected_style)
+                } else {
+                    Line::from(line.clone())
+                }
+            })
+            .collect()
+    }
+
+    fn source_lines(
+        &self,
+        line_number: u16,
+        _column_number: u16,
+        palette: ThemePalette,
+        light_theme: bool,
+    ) -> Vec<Line<'static>> {
+        let base_style = Style::default().fg(palette.syntax.text).bg(palette.bg);
+        let highlight_style = Style::default()
+            .fg(if light_theme { palette.bg } else { palette.fg })
+            .bg(palette.warning)
+            .add_modifier(Modifier::BOLD);
+        let Some(info) = self.line_map.get(&(line_number as usize)) else {
+            return self
+                .source_code
+                .lines()
+                .map(|line| Line::styled(line.to_string(), base_style))
+                .collect();
+        };
+        let Ok(location) = self
+            .source_map
+            .get_code_location(info.function_index, info.code_offset)
+        else {
+            return vec![Line::styled(
+                "No source location is available for this bytecode offset.",
+                Style::default().fg(palette.muted).bg(palette.bg),
+            )];
+        };
+        let start = location.start() as usize;
+        let end = location.end() as usize;
+        let source_len = self.source_code.len();
+        let context_start = start.saturating_sub(1000);
+        let context_end = end.saturating_add(1000).min(source_len);
+
+        styled_text_segments([
+            (&self.source_code[context_start..start], base_style),
+            (&self.source_code[start..end], highlight_style),
+            (&self.source_code[end..context_end], base_style),
+        ])
+    }
+
+    fn bound_line(&self, line_number: u16) -> u16 {
+        let last = self.bytecode_lines.len().saturating_sub(1) as u16;
+        line_number.min(last)
+    }
+
+    fn bound_column(&self, line_number: u16, column_number: u16) -> u16 {
+        let line = self
+            .bytecode_lines
+            .get(line_number as usize)
+            .map(String::as_str)
+            .unwrap_or_default();
+        column_number.min(char_len(line) as u16)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BytecodeLineInfo {
+    function_index: FunctionDefinitionIndex,
+    code_offset: CodeOffset,
+}
+
+fn build_bytecode_line_map(
+    module: &CompiledModule,
+    lines: &[String],
+) -> Result<HashMap<usize, BytecodeLineInfo>, String> {
+    let offset_regex =
+        Regex::new(r"^(\d+):.*").map_err(|error| format!("Invalid offset regex: {error}"))?;
+    let function_regex =
+        Regex::new(r"^(?:public(?:\(\w+\))?|native|entry)?\s*(\w+)\s*(?:<.*>)?\s*\(.*\).*\{")
+            .map_err(|error| format!("Invalid function regex: {error}"))?;
+    let function_def_for_name = module
+        .function_defs()
+        .iter()
+        .enumerate()
+        .map(|(index, definition)| {
+            (
+                module
+                    .identifier_at(module.function_handle_at(definition.function).name)
+                    .to_string(),
+                FunctionDefinitionIndex(index as u16),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    let mut current_function = None;
+    let mut line_map = HashMap::new();
+
+    for (line_index, line) in lines.iter().map(|line| line.trim()).enumerate() {
+        if let Some(capture) = function_regex.captures(line) {
+            current_function = capture
+                .get(1)
+                .and_then(|name| function_def_for_name.get(name.as_str()).copied());
+        }
+
+        let Some(function_index) = current_function else {
+            continue;
+        };
+        let Some(offset) = offset_regex
+            .captures(line)
+            .and_then(|capture| capture.get(1))
+            .and_then(|offset| offset.as_str().parse::<CodeOffset>().ok())
+        else {
+            continue;
+        };
+        line_map.insert(
+            line_index,
+            BytecodeLineInfo {
+                function_index,
+                code_offset: offset,
+            },
+        );
+    }
+
+    Ok(line_map)
+}
+
+fn styled_text_segments<const N: usize>(segments: [(&str, Style); N]) -> Vec<Line<'static>> {
+    let mut lines = vec![Vec::new()];
+    for (text, style) in segments {
+        append_styled_text(&mut lines, text, style);
+    }
+    lines.into_iter().map(Line::from).collect()
+}
+
+fn append_styled_text(lines: &mut Vec<Vec<Span<'static>>>, text: &str, style: Style) {
+    for (index, part) in text.split('\n').enumerate() {
+        if index > 0 {
+            lines.push(Vec::new());
+        }
+        if !part.is_empty() {
+            lines
+                .last_mut()
+                .expect("styled text has at least one line")
+                .push(Span::styled(part.to_string(), style));
+        }
+    }
+}
+
+fn nearest_move_package_root(path: &Path, project_root: &Path) -> Option<PathBuf> {
+    let project_root = project_root.canonicalize().ok()?;
+    let mut current = if path.is_dir() {
+        path.to_path_buf()
+    } else {
+        path.parent()?.to_path_buf()
+    }
+    .canonicalize()
+    .ok()?;
+
+    loop {
+        if current.join("Move.toml").is_file() {
+            return Some(current);
+        }
+        if current == project_root || !current.pop() {
+            return None;
+        }
+        if !current.starts_with(&project_root) {
+            return None;
+        }
+    }
+}
+
+fn relative_path_label(root: &Path, path: &Path) -> String {
+    let relative = path.strip_prefix(root).unwrap_or(path);
+
+    if relative.as_os_str().is_empty() {
+        ".".to_string()
+    } else {
+        normalized_path_string(relative)
+    }
+}
+
+fn normalized_path_string(path: impl AsRef<Path>) -> String {
+    path.as_ref()
+        .components()
+        .filter_map(|component| match component {
+            std::path::Component::Normal(value) => Some(value.to_string_lossy().into_owned()),
+            std::path::Component::CurDir => None,
+            other => Some(other.as_os_str().to_string_lossy().into_owned()),
+        })
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+fn hidden_inspector_focus_order() -> &'static [FocusPane] {
+    const WITHOUT_INSPECTOR: [FocusPane; 4] = [
+        FocusPane::Explorer,
+        FocusPane::Tabs,
+        FocusPane::Editor,
+        FocusPane::Input,
+    ];
+
+    &WITHOUT_INSPECTOR
 }
 
 fn focused_title(title: &str, focused: bool) -> String {
@@ -1705,6 +2648,94 @@ mod tests {
     }
 
     #[test]
+    fn bytecode_options_use_open_move_file_package_and_module() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        fs::create_dir_all(temp.path().join("pkg/sources")).expect("sources");
+        fs::write(
+            temp.path().join("pkg/Move.toml"),
+            "[package]\nname = \"demo\"\n",
+        )
+        .expect("manifest");
+        let source = temp.path().join("pkg/sources/not_filename.move");
+        fs::write(&source, "module demo::actual { public fun ping() {} }").expect("source");
+        let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+        app.open_file(source.clone());
+
+        let options = app.current_bytecode_options().expect("bytecode options");
+        let target = options.targets.first().expect("target");
+
+        assert_eq!(
+            options.key.package_root,
+            temp.path().join("pkg").canonicalize().unwrap()
+        );
+        assert_eq!(options.targets.len(), 1);
+        assert_eq!(target.module_name, "actual");
+        assert_eq!(target.source_path, source.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn bytecode_options_block_dirty_editor() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        fs::create_dir_all(temp.path().join("sources")).expect("sources");
+        fs::write(
+            temp.path().join("Move.toml"),
+            "[package]\nname = \"demo\"\n",
+        )
+        .expect("manifest");
+        let source = temp.path().join("sources/m.move");
+        fs::write(&source, "module demo::m { public fun ping() {} }").expect("source");
+        let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+        app.open_file(source);
+        app.editor.insert_char(' ');
+
+        let error = app.current_bytecode_options().expect_err("dirty editor");
+
+        assert!(error.contains("Save the current file"));
+    }
+
+    #[test]
+    fn bytecode_package_root_lists_modules_for_selection() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        fs::create_dir_all(temp.path().join("sources")).expect("sources");
+        fs::write(
+            temp.path().join("Move.toml"),
+            "[package]\nname = \"demo\"\n",
+        )
+        .expect("manifest");
+        fs::write(
+            temp.path().join("sources/a.move"),
+            "module demo::a { public fun ping() {} }",
+        )
+        .expect("source a");
+        fs::write(
+            temp.path().join("sources/b.move"),
+            "module demo::b { public fun pong() {} }",
+        )
+        .expect("source b");
+        let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+
+        app.ensure_bytecode_session();
+
+        let BytecodePane::Selecting(selector) = &mut app.bytecode else {
+            panic!("expected module selector");
+        };
+
+        assert_eq!(
+            selector
+                .targets
+                .iter()
+                .map(|target| target.module_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a", "b"]
+        );
+
+        selector.handle_key(key(KeyCode::Down));
+        let request = selector.selected_request().expect("selected request");
+
+        assert_eq!(request.key.module_name, "b");
+    }
+
+    #[test]
     fn editor_standard_edits_and_saves() {
         let temp = tempfile::tempdir().expect("temp dir");
         let file = temp.path().join("module.move");
@@ -1796,6 +2827,51 @@ mod tests {
         assert_eq!(app.active_tab, WorkbenchTab::Code);
         app.handle_key_event(key(KeyCode::Enter));
         assert_eq!(app.focus, FocusPane::Editor);
+    }
+
+    #[test]
+    fn bytecode_tab_hides_inspector_until_other_tab_selected() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+
+        app.set_active_tab(WorkbenchTab::Bytecode);
+        assert!(!app.inspector_visible());
+
+        let backend = TestBackend::new(120, 30);
+        let mut terminal = Terminal::new(backend).expect("terminal");
+        terminal.draw(|frame| app.render(frame)).expect("draw");
+        let rendered = buffer_to_string(terminal.backend().buffer());
+
+        assert!(rendered.contains("Bytecode"));
+        assert!(!rendered.contains("Inspector"));
+
+        app.set_active_tab(WorkbenchTab::Cfg);
+        assert!(app.inspector_visible());
+
+        let backend = TestBackend::new(120, 30);
+        let mut terminal = Terminal::new(backend).expect("terminal");
+        terminal.draw(|frame| app.render(frame)).expect("draw");
+        let rendered = buffer_to_string(terminal.backend().buffer());
+
+        assert!(rendered.contains("cfg view placeholder"));
+        assert!(rendered.contains("Inspector placeholder"));
+    }
+
+    #[test]
+    fn hidden_inspector_cannot_keep_focus_on_bytecode_tab() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+
+        app.focus = FocusPane::Inspector;
+        app.set_active_tab(WorkbenchTab::Bytecode);
+        assert_eq!(app.focus, FocusPane::Editor);
+
+        app.apply_navigation_command(NavigationCommand::Focus(FocusPane::Inspector));
+        assert_eq!(app.focus, FocusPane::Editor);
+
+        app.set_active_tab(WorkbenchTab::Code);
+        app.apply_navigation_command(NavigationCommand::Focus(FocusPane::Inspector));
+        assert_eq!(app.focus, FocusPane::Inspector);
     }
 
     #[test]

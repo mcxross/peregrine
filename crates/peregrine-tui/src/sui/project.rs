@@ -142,6 +142,38 @@ pub fn bytecode_target(
     context: &CliContext,
     args: &BytecodeArgs,
 ) -> Result<BytecodeTarget, CliDiagnostic> {
+    let requested_module = args
+        .module
+        .as_deref()
+        .map(str::trim)
+        .filter(|module| !module.is_empty());
+    let requested_file = args
+        .file
+        .as_deref()
+        .map(normalize_requested_file)
+        .filter(|file| !file.is_empty());
+    let targets = bytecode_targets(context, requested_module, requested_file.as_deref())?;
+
+    match targets.as_slice() {
+        [] => Err(no_bytecode_target(requested_file)),
+        [target] => Ok(target.clone()),
+        _ => Err(CliDiagnostic {
+            severity: CliDiagnosticSeverity::Error,
+            source: "bytecode".to_string(),
+            code: Some("AmbiguousBytecodeTarget".to_string()),
+            message: "More than one Move module matched. Pass --module or --file to choose one."
+                .to_string(),
+            file: requested_file,
+            span: None,
+        }),
+    }
+}
+
+pub fn bytecode_targets(
+    context: &CliContext,
+    requested_module: Option<&str>,
+    requested_file: Option<&str>,
+) -> Result<Vec<BytecodeTarget>, CliDiagnostic> {
     let project = discover_move_project_fast(&context.project_root);
     let Some(package) = project
         .packages
@@ -160,22 +192,11 @@ pub fn bytecode_target(
 
     require_package_source_modules("bytecode", package)?;
 
-    let requested_module = args
-        .module
-        .as_deref()
-        .map(str::trim)
-        .filter(|module| !module.is_empty());
-    let requested_file = args
-        .file
-        .as_deref()
-        .map(normalize_requested_file)
-        .filter(|file| !file.is_empty());
-
-    let targets = package
+    Ok(package
         .modules
         .iter()
         .filter(|module| {
-            requested_file.as_deref().map_or(true, |file| {
+            requested_file.map_or(true, |file| {
                 normalize_path_label(Path::new(&module.file_path)) == file
             })
         })
@@ -187,27 +208,17 @@ pub fn bytecode_target(
             module_name: module.name.clone(),
             source_path: context.project_root.join(&module.file_path),
         })
-        .collect::<Vec<_>>();
+        .collect())
+}
 
-    match targets.as_slice() {
-        [] => Err(CliDiagnostic {
-            severity: CliDiagnosticSeverity::Error,
-            source: "bytecode".to_string(),
-            code: Some("NoBytecodeTarget".to_string()),
-            message: "No Move module matched the requested bytecode target.".to_string(),
-            file: requested_file,
-            span: None,
-        }),
-        [target] => Ok(target.clone()),
-        _ => Err(CliDiagnostic {
-            severity: CliDiagnosticSeverity::Error,
-            source: "bytecode".to_string(),
-            code: Some("AmbiguousBytecodeTarget".to_string()),
-            message: "More than one Move module matched. Pass --module or --file to choose one."
-                .to_string(),
-            file: requested_file,
-            span: None,
-        }),
+fn no_bytecode_target(requested_file: Option<String>) -> CliDiagnostic {
+    CliDiagnostic {
+        severity: CliDiagnosticSeverity::Error,
+        source: "bytecode".to_string(),
+        code: Some("NoBytecodeTarget".to_string()),
+        message: "No Move module matched the requested bytecode target.".to_string(),
+        file: requested_file,
+        span: None,
     }
 }
 
