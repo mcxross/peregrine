@@ -1,0 +1,4 @@
+interface:
+  display_name: "Peregrine Move Audit"
+  short_description: "Audit Sui Move package security"
+  default_prompt: "Audit this Sui Move package for security issues."

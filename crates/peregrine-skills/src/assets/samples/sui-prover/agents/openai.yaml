@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sui Prover"
+  short_description: "Write and debug Move proofs"
+  default_prompt: "Help me verify this Move code with Sui Prover."

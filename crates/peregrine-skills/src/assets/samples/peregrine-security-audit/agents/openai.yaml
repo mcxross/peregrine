@@ -1,0 +1,4 @@
+interface:
+  display_name: "Peregrine Security Audit"
+  short_description: "Review Peregrine security boundaries"
+  default_prompt: "Audit this Peregrine change for security regressions."
