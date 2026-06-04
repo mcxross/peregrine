@@ -379,7 +379,7 @@ use peregrine_core::windows_sandbox::WindowsSandboxSetupRequest;
 use peregrine_core::windows_sandbox::sandbox_setup_is_complete;
 use peregrine_memories_write::clear_memory_roots_contents;
 use peregrine_model_provider::ProviderAccountError;
-use peregrine_model_provider::create_model_provider;
+use peregrine_provider_registry::create_model_provider;
 use peregrine_types::ThreadId;
 use peregrine_types::config_types::CollaborationMode;
 use peregrine_types::config_types::ForcedLoginMethod;

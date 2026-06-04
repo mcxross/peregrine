@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "ModelProviderAuthStrategy": {
+      "enum": [
+        "accountOrApiKey",
+        "apiKey",
+        "aws",
+        "none",
+        "external",
+        "unsupported"
+      ],
+      "type": "string"
+    },
+    "ModelProviderCredentialState": {
+      "enum": [
+        "ready",
+        "missingApiKey",
+        "needsLogin",
+        "notRequired",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "ModelProviderEntry": {
+      "properties": {
+        "authStrategy": {
+          "$ref": "#/definitions/ModelProviderAuthStrategy"
+        },
+        "configured": {
+          "type": "boolean"
+        },
+        "credentialState": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModelProviderCredentialState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "defaultModel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "disabledReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ModelProviderKind"
+        },
+        "selectable": {
+          "type": "boolean"
+        },
+        "selected": {
+          "type": "boolean"
+        },
+        "setupHint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "wireApi": {
+          "$ref": "#/definitions/ModelProviderWireApi"
+        }
+      },
+      "required": [
+        "authStrategy",
+        "configured",
+        "description",
+        "displayName",
+        "id",
+        "kind",
+        "selectable",
+        "selected",
+        "wireApi"
+      ],
+      "type": "object"
+    },
+    "ModelProviderKind": {
+      "enum": [
+        "openAi",
+        "anthropic",
+        "ollama",
+        "amazonBedrock",
+        "openAiCompatible",
+        "localOpenAiCompatible"
+      ],
+      "type": "string"
+    },
+    "ModelProviderWireApi": {
+      "enum": [
+        "responses",
+        "chatCompletions",
+        "anthropicMessages"
+      ],
+      "type": "string"
+    }
+  },
+  "properties": {
+    "data": {
+      "items": {
+        "$ref": "#/definitions/ModelProviderEntry"
+      },
+      "type": "array"
+    },
+    "selectedProviderId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "data",
+    "selectedProviderId"
+  ],
+  "title": "ModelProviderListResponse",
+  "type": "object"
+}

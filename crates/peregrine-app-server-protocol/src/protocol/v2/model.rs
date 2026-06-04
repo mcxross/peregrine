@@ -36,6 +36,145 @@ pub struct ModelProviderCapabilitiesReadResponse {
     pub web_search: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub enum ModelProviderKind {
+    OpenAi,
+    Anthropic,
+    Ollama,
+    AmazonBedrock,
+    OpenAiCompatible,
+    LocalOpenAiCompatible,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub enum ModelProviderWireApi {
+    Responses,
+    ChatCompletions,
+    AnthropicMessages,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub enum ModelProviderAuthStrategy {
+    AccountOrApiKey,
+    ApiKey,
+    Aws,
+    None,
+    External,
+    Unsupported,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub enum ModelProviderCredentialState {
+    Ready,
+    MissingApiKey,
+    NeedsLogin,
+    NotRequired,
+    Unknown,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ModelProviderListParams {}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ModelProviderEntry {
+    pub id: String,
+    pub display_name: String,
+    pub description: String,
+    pub kind: ModelProviderKind,
+    pub wire_api: ModelProviderWireApi,
+    pub auth_strategy: ModelProviderAuthStrategy,
+    pub selected: bool,
+    pub configured: bool,
+    pub selectable: bool,
+    pub disabled_reason: Option<String>,
+    pub default_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional = nullable)]
+    pub credential_state: Option<ModelProviderCredentialState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional = nullable)]
+    pub setup_hint: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ModelProviderListResponse {
+    pub selected_provider_id: String,
+    pub data: Vec<ModelProviderEntry>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ModelProviderSelectParams {
+    pub provider_id: String,
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub model: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ModelProviderSelection {
+    pub id: String,
+    pub display_name: String,
+    pub requires_openai_auth: bool,
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub runtime_base_url: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ModelProviderSelectResponse {
+    pub provider: ModelProviderEntry,
+    pub selected_provider: ModelProviderSelection,
+    pub model: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ModelProviderModelsListParams {
+    pub provider_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ModelProviderModel {
+    pub id: String,
+    pub model: String,
+    pub display_name: String,
+    #[serde(default)]
+    #[ts(optional = nullable)]
+    pub description: Option<String>,
+    pub is_default: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct ModelProviderModelsListResponse {
+    pub provider_id: String,
+    pub data: Vec<ModelProviderModel>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, JsonSchema, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export_to = "v2/")]

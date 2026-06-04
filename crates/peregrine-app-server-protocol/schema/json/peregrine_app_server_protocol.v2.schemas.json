@@ -2256,6 +2256,78 @@
             },
             "method": {
               "enum": [
+                "modelProvider/list"
+              ],
+              "title": "ModelProvider/listRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/ModelProviderListParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "ModelProvider/listRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/RequestId"
+            },
+            "method": {
+              "enum": [
+                "modelProvider/select"
+              ],
+              "title": "ModelProvider/selectRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/ModelProviderSelectParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "ModelProvider/selectRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/RequestId"
+            },
+            "method": {
+              "enum": [
+                "modelProvider/models/list"
+              ],
+              "title": "ModelProvider/models/listRequestMethod",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/definitions/ModelProviderModelsListParams"
+            }
+          },
+          "required": [
+            "id",
+            "method",
+            "params"
+          ],
+          "title": "ModelProvider/models/listRequest",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/RequestId"
+            },
+            "method": {
+              "enum": [
                 "experimentalFeature/list"
               ],
               "title": "ExperimentalFeature/listRequestMethod",
@@ -2971,7 +3043,7 @@
       "type": "string"
     },
     "CollaborationMode": {
-      "description": "Collaboration mode for a Peregrine session.",
+      "description": "Collaboration mode for a Codex session.",
       "properties": {
         "mode": {
           "$ref": "#/definitions/ModeKind"
@@ -7997,6 +8069,17 @@
       "title": "ModelListResponse",
       "type": "object"
     },
+    "ModelProviderAuthStrategy": {
+      "enum": [
+        "accountOrApiKey",
+        "apiKey",
+        "aws",
+        "none",
+        "external",
+        "unsupported"
+      ],
+      "type": "string"
+    },
     "ModelProviderCapabilitiesReadParams": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ModelProviderCapabilitiesReadParams",
@@ -8022,6 +8105,263 @@
       ],
       "title": "ModelProviderCapabilitiesReadResponse",
       "type": "object"
+    },
+    "ModelProviderCredentialState": {
+      "enum": [
+        "ready",
+        "missingApiKey",
+        "needsLogin",
+        "notRequired",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "ModelProviderEntry": {
+      "properties": {
+        "authStrategy": {
+          "$ref": "#/definitions/ModelProviderAuthStrategy"
+        },
+        "configured": {
+          "type": "boolean"
+        },
+        "credentialState": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModelProviderCredentialState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "defaultModel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "disabledReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ModelProviderKind"
+        },
+        "selectable": {
+          "type": "boolean"
+        },
+        "selected": {
+          "type": "boolean"
+        },
+        "setupHint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "wireApi": {
+          "$ref": "#/definitions/ModelProviderWireApi"
+        }
+      },
+      "required": [
+        "authStrategy",
+        "configured",
+        "description",
+        "displayName",
+        "id",
+        "kind",
+        "selectable",
+        "selected",
+        "wireApi"
+      ],
+      "type": "object"
+    },
+    "ModelProviderKind": {
+      "enum": [
+        "openAi",
+        "anthropic",
+        "ollama",
+        "amazonBedrock",
+        "openAiCompatible",
+        "localOpenAiCompatible"
+      ],
+      "type": "string"
+    },
+    "ModelProviderListParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ModelProviderListParams",
+      "type": "object"
+    },
+    "ModelProviderListResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "data": {
+          "items": {
+            "$ref": "#/definitions/ModelProviderEntry"
+          },
+          "type": "array"
+        },
+        "selectedProviderId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "data",
+        "selectedProviderId"
+      ],
+      "title": "ModelProviderListResponse",
+      "type": "object"
+    },
+    "ModelProviderModel": {
+      "properties": {
+        "description": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "isDefault": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "displayName",
+        "id",
+        "isDefault",
+        "model"
+      ],
+      "type": "object"
+    },
+    "ModelProviderModelsListParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "providerId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "providerId"
+      ],
+      "title": "ModelProviderModelsListParams",
+      "type": "object"
+    },
+    "ModelProviderModelsListResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "data": {
+          "items": {
+            "$ref": "#/definitions/ModelProviderModel"
+          },
+          "type": "array"
+        },
+        "providerId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "data",
+        "providerId"
+      ],
+      "title": "ModelProviderModelsListResponse",
+      "type": "object"
+    },
+    "ModelProviderSelectParams": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "model": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "providerId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "providerId"
+      ],
+      "title": "ModelProviderSelectParams",
+      "type": "object"
+    },
+    "ModelProviderSelectResponse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "$ref": "#/definitions/ModelProviderEntry"
+        },
+        "selectedProvider": {
+          "$ref": "#/definitions/ModelProviderSelection"
+        }
+      },
+      "required": [
+        "provider",
+        "selectedProvider"
+      ],
+      "title": "ModelProviderSelectResponse",
+      "type": "object"
+    },
+    "ModelProviderSelection": {
+      "properties": {
+        "displayName": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "requiresOpenaiAuth": {
+          "type": "boolean"
+        },
+        "runtimeBaseUrl": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "displayName",
+        "id",
+        "requiresOpenaiAuth"
+      ],
+      "type": "object"
+    },
+    "ModelProviderWireApi": {
+      "enum": [
+        "responses",
+        "chatCompletions",
+        "anthropicMessages"
+      ],
+      "type": "string"
     },
     "ModelRerouteReason": {
       "enum": [

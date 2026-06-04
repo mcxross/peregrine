@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "ModelProviderModel": {
+      "properties": {
+        "description": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "isDefault": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "displayName",
+        "id",
+        "isDefault",
+        "model"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "data": {
+      "items": {
+        "$ref": "#/definitions/ModelProviderModel"
+      },
+      "type": "array"
+    },
+    "providerId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "data",
+    "providerId"
+  ],
+  "title": "ModelProviderModelsListResponse",
+  "type": "object"
+}

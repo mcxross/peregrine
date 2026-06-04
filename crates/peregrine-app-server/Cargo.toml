@@ -55,6 +55,7 @@ codex-image-generation-extension = { workspace = true }
 codex-login = { workspace = true }
 codex-mcp = { workspace = true }
 codex-memories-extension = { workspace = true }
+codex-model-provider-info = { workspace = true }
 codex-models-manager = { workspace = true }
 codex-otel = { workspace = true }
 codex-plugin = { workspace = true }
@@ -77,7 +78,9 @@ peregrine-config = { workspace = true }
 peregrine-core = { workspace = true }
 peregrine-memories-write = { workspace = true }
 peregrine-model-provider = { workspace = true }
+peregrine-provider-registry = { workspace = true }
 peregrine-types = { workspace = true }
+reqwest = { workspace = true, features = ["rustls-tls"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
@@ -108,7 +111,6 @@ axum = { workspace = true, default-features = false, features = [
     "tokio",
 ] }
 base64 = { workspace = true }
-codex-model-provider-info = { workspace = true }
 codex-utils-cargo-bin = { workspace = true }
 core_test_support = { workspace = true }
 flate2 = { workspace = true }
@@ -116,7 +118,6 @@ hmac = { workspace = true }
 opentelemetry = { workspace = true }
 opentelemetry_sdk = { workspace = true }
 pretty_assertions = { workspace = true }
-reqwest = { workspace = true, features = ["rustls-tls"] }
 rmcp = { workspace = true, default-features = false, features = [
     "elicitation",
     "server",

@@ -178,7 +178,7 @@
       "type": "object"
     },
     "CollaborationMode": {
-      "description": "Collaboration mode for a Peregrine session.",
+      "description": "Collaboration mode for a Codex session.",
       "properties": {
         "mode": {
           "$ref": "#/definitions/ModeKind"
@@ -1579,6 +1579,38 @@
       "type": "object"
     },
     "ModelProviderCapabilitiesReadParams": {
+      "type": "object"
+    },
+    "ModelProviderListParams": {
+      "type": "object"
+    },
+    "ModelProviderModelsListParams": {
+      "properties": {
+        "providerId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "providerId"
+      ],
+      "type": "object"
+    },
+    "ModelProviderSelectParams": {
+      "properties": {
+        "model": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "providerId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "providerId"
+      ],
       "type": "object"
     },
     "NetworkAccess": {
@@ -5587,6 +5619,78 @@
         "params"
       ],
       "title": "ModelProvider/capabilities/readRequest",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "enum": [
+            "modelProvider/list"
+          ],
+          "title": "ModelProvider/listRequestMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/ModelProviderListParams"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "title": "ModelProvider/listRequest",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "enum": [
+            "modelProvider/select"
+          ],
+          "title": "ModelProvider/selectRequestMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/ModelProviderSelectParams"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "title": "ModelProvider/selectRequest",
+      "type": "object"
+    },
+    {
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/RequestId"
+        },
+        "method": {
+          "enum": [
+            "modelProvider/models/list"
+          ],
+          "title": "ModelProvider/models/listRequestMethod",
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/ModelProviderModelsListParams"
+        }
+      },
+      "required": [
+        "id",
+        "method",
+        "params"
+      ],
+      "title": "ModelProvider/models/listRequest",
       "type": "object"
     },
     {

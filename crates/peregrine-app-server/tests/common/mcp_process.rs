@@ -57,6 +57,9 @@ use peregrine_app_server_protocol::McpServerToolCallParams;
 use peregrine_app_server_protocol::MockExperimentalMethodParams;
 use peregrine_app_server_protocol::ModelListParams;
 use peregrine_app_server_protocol::ModelProviderCapabilitiesReadParams;
+use peregrine_app_server_protocol::ModelProviderListParams;
+use peregrine_app_server_protocol::ModelProviderModelsListParams;
+use peregrine_app_server_protocol::ModelProviderSelectParams;
 use peregrine_app_server_protocol::PermissionProfileListParams;
 use peregrine_app_server_protocol::PluginInstallParams;
 use peregrine_app_server_protocol::PluginInstalledParams;
@@ -599,6 +602,33 @@ impl McpProcess {
         let params = Some(serde_json::to_value(params)?);
         self.send_request("modelProvider/capabilities/read", params)
             .await
+    }
+
+    /// Send a `modelProvider/list` JSON-RPC request.
+    pub async fn send_model_provider_list_request(
+        &mut self,
+        params: ModelProviderListParams,
+    ) -> anyhow::Result<i64> {
+        let params = Some(serde_json::to_value(params)?);
+        self.send_request("modelProvider/list", params).await
+    }
+
+    /// Send a `modelProvider/select` JSON-RPC request.
+    pub async fn send_model_provider_select_request(
+        &mut self,
+        params: ModelProviderSelectParams,
+    ) -> anyhow::Result<i64> {
+        let params = Some(serde_json::to_value(params)?);
+        self.send_request("modelProvider/select", params).await
+    }
+
+    /// Send a `modelProvider/models/list` JSON-RPC request.
+    pub async fn send_model_provider_models_list_request(
+        &mut self,
+        params: ModelProviderModelsListParams,
+    ) -> anyhow::Result<i64> {
+        let params = Some(serde_json::to_value(params)?);
+        self.send_request("modelProvider/models/list", params).await
     }
 
     /// Send an `experimentalFeature/list` JSON-RPC request.

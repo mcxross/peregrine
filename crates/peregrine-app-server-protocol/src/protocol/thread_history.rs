@@ -3160,7 +3160,7 @@ mod tests {
             }),
             EventMsg::Error(ErrorEvent {
                 message: "rollback failed".into(),
-                peregrine_error_info: Some(PeregrineErrorInfo::ThreadRollbackFailed),
+                codex_error_info: Some(PeregrineErrorInfo::ThreadRollbackFailed),
             }),
         ];
 
@@ -3201,7 +3201,7 @@ mod tests {
             }),
             EventMsg::Error(ErrorEvent {
                 message: "request-level failure".into(),
-                peregrine_error_info: Some(PeregrineErrorInfo::BadRequest),
+                codex_error_info: Some(PeregrineErrorInfo::BadRequest),
             }),
         ];
 
@@ -3253,7 +3253,7 @@ mod tests {
             }),
             EventMsg::Error(ErrorEvent {
                 message: "stream failure".into(),
-                peregrine_error_info: Some(PeregrineErrorInfo::ResponseStreamDisconnected {
+                codex_error_info: Some(PeregrineErrorInfo::ResponseStreamDisconnected {
                     http_status_code: Some(502),
                 }),
             }),

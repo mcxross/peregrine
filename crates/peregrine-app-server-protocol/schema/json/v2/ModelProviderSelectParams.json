@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "properties": {
+    "model": {
+      "default": null,
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "providerId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "providerId"
+  ],
+  "title": "ModelProviderSelectParams",
+  "type": "object"
+}

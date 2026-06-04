@@ -810,6 +810,21 @@ client_request_definitions! {
         serialization: None,
         response: v2::ModelProviderCapabilitiesReadResponse,
     },
+    ModelProviderList => "modelProvider/list" {
+        params: v2::ModelProviderListParams,
+        serialization: global_shared_read("config"),
+        response: v2::ModelProviderListResponse,
+    },
+    ModelProviderSelect => "modelProvider/select" {
+        params: v2::ModelProviderSelectParams,
+        serialization: global("config"),
+        response: v2::ModelProviderSelectResponse,
+    },
+    ModelProviderModelsList => "modelProvider/models/list" {
+        params: v2::ModelProviderModelsListParams,
+        serialization: global_shared_read("config"),
+        response: v2::ModelProviderModelsListResponse,
+    },
     ExperimentalFeatureList => "experimentalFeature/list" {
         params: v2::ExperimentalFeatureListParams,
         serialization: global("config"),
@@ -1399,7 +1414,7 @@ pub struct FuzzyFileSearchParams {
     pub cancellation_token: Option<String>,
 }
 
-/// Superset of [`codex_file_search::FileMatch`]
+/// Superset of [`peregrine_file_search::FileMatch`]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
 pub struct FuzzyFileSearchResult {
     pub root: String,
@@ -2644,6 +2659,122 @@ mod tests {
                 "method": "modelProvider/capabilities/read",
                 "id": 7,
                 "params": {}
+            }),
+            serde_json::to_value(&request)?,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_model_provider_list() -> Result<()> {
+        let request = ClientRequest::ModelProviderList {
+            request_id: RequestId::Integer(8),
+            params: v2::ModelProviderListParams {},
+        };
+        assert_eq!(
+            json!({
+                "method": "modelProvider/list",
+                "id": 8,
+                "params": {}
+            }),
+            serde_json::to_value(&request)?,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_model_provider_select() -> Result<()> {
+        let request = ClientRequest::ModelProviderSelect {
+            request_id: RequestId::Integer(9),
+            params: v2::ModelProviderSelectParams {
+                provider_id: "ollama".to_string(),
+                model: Some("llama3.2".to_string()),
+            },
+        };
+        assert_eq!(
+            json!({
+                "method": "modelProvider/select",
+                "id": 9,
+                "params": {
+                    "providerId": "ollama",
+                    "model": "llama3.2"
+                }
+            }),
+            serde_json::to_value(&request)?,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_model_provider_select_response() -> Result<()> {
+        let response = v2::ModelProviderSelectResponse {
+            provider: v2::ModelProviderEntry {
+                id: "ollama".to_string(),
+                display_name: "Ollama".to_string(),
+                description: "Use local models served by Ollama.".to_string(),
+                kind: v2::ModelProviderKind::Ollama,
+                wire_api: v2::ModelProviderWireApi::Responses,
+                auth_strategy: v2::ModelProviderAuthStrategy::None,
+                selected: true,
+                configured: true,
+                selectable: true,
+                disabled_reason: None,
+                default_model: Some("gpt-oss:20b".to_string()),
+                credential_state: Some(v2::ModelProviderCredentialState::NotRequired),
+                setup_hint: None,
+            },
+            selected_provider: v2::ModelProviderSelection {
+                id: "ollama".to_string(),
+                display_name: "Ollama".to_string(),
+                requires_openai_auth: false,
+                runtime_base_url: Some("http://localhost:11434/v1".to_string()),
+            },
+            model: Some("llama3.2".to_string()),
+        };
+        assert_eq!(
+            json!({
+                "provider": {
+                    "id": "ollama",
+                    "displayName": "Ollama",
+                    "description": "Use local models served by Ollama.",
+                    "kind": "ollama",
+                    "wireApi": "responses",
+                    "authStrategy": "none",
+                    "selected": true,
+                    "configured": true,
+                    "selectable": true,
+                    "disabledReason": null,
+                    "defaultModel": "gpt-oss:20b",
+                    "credentialState": "notRequired"
+                },
+                "selectedProvider": {
+                    "id": "ollama",
+                    "displayName": "Ollama",
+                    "requiresOpenaiAuth": false,
+                    "runtimeBaseUrl": "http://localhost:11434/v1"
+                },
+                "model": "llama3.2"
+            }),
+            serde_json::to_value(&response)?,
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_model_provider_models_list() -> Result<()> {
+        let request = ClientRequest::ModelProviderModelsList {
+            request_id: RequestId::Integer(10),
+            params: v2::ModelProviderModelsListParams {
+                provider_id: "ollama".to_string(),
+            },
+        };
+        assert_eq!(
+            json!({
+                "method": "modelProvider/models/list",
+                "id": 10,
+                "params": {
+                    "providerId": "ollama"
+                }
             }),
             serde_json::to_value(&request)?,
         );

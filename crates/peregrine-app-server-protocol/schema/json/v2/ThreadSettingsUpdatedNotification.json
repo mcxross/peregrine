@@ -85,7 +85,7 @@
       ]
     },
     "CollaborationMode": {
-      "description": "Collaboration mode for a Peregrine session.",
+      "description": "Collaboration mode for a Codex session.",
       "properties": {
         "mode": {
           "$ref": "#/definitions/ModeKind"
