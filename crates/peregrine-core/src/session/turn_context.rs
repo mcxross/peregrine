@@ -6,7 +6,7 @@ use codex_sandboxing::compatibility_sandbox_policy_for_permission_profile;
 use codex_sandboxing::policy_transforms::effective_file_system_sandbox_policy;
 use codex_sandboxing::policy_transforms::effective_network_sandbox_policy;
 use peregrine_model_provider::SharedModelProvider;
-use peregrine_model_provider::create_model_provider;
+use peregrine_provider_registry::create_model_provider;
 use peregrine_types::SessionId;
 use peregrine_types::models::AdditionalPermissionProfile;
 use peregrine_types::openai_models::ToolMode;

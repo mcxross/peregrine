@@ -508,6 +508,15 @@ impl PeregrineThread {
             .await;
     }
 
+    /// Refresh the selected model provider/model for already-open sessions after
+    /// an explicit provider selection.
+    pub async fn refresh_runtime_model_provider(&self, next_config: crate::config::Config) {
+        self.peregrine
+            .session
+            .refresh_runtime_model_provider(next_config)
+            .await;
+    }
+
     pub async fn environment_selections(&self) -> Vec<TurnEnvironmentSelection> {
         self.peregrine.thread_environment_selections().await
     }

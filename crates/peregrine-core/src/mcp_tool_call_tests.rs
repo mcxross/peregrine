@@ -33,7 +33,7 @@ use peregrine_config::types::ApprovalsReviewer;
 use peregrine_config::types::AppsConfigToml;
 use peregrine_config::types::McpServerConfig;
 use peregrine_config::types::McpServerToolConfig;
-use peregrine_model_provider::create_model_provider;
+use peregrine_provider_registry::create_model_provider;
 use peregrine_types::models::PermissionProfile;
 use peregrine_types::protocol::AskForApproval;
 use peregrine_types::protocol::EventMsg;

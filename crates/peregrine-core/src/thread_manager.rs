@@ -43,7 +43,7 @@ use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use peregrine_app_server_protocol::ThreadHistoryBuilder;
 use peregrine_app_server_protocol::TurnStatus;
-use peregrine_model_provider::create_model_provider;
+use peregrine_provider_registry::create_model_provider;
 use peregrine_types::ThreadId;
 use peregrine_types::config_types::CollaborationModeMask;
 use peregrine_types::error::PeregrineErr;

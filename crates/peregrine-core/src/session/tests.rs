@@ -27,6 +27,7 @@ use codex_app_server_protocol::McpServerElicitationRequestParams;
 use codex_features::Feature;
 use codex_login::CodexAuth;
 use codex_model_provider_info::ModelProviderInfo;
+use codex_model_provider_info::OLLAMA_OSS_PROVIDER_ID;
 use codex_models_manager::bundled_models_response;
 use codex_models_manager::model_info;
 use codex_models_manager::test_support::construct_model_info_offline_for_tests;
@@ -1443,6 +1444,78 @@ async fn refresh_runtime_config_refreshes_hooks() -> anyhow::Result<()> {
 
     assert_eq!(session.hooks().preview_session_start(&request).len(), 1);
     Ok(())
+}
+
+#[tokio::test]
+async fn refresh_runtime_model_provider_updates_active_session_provider_and_model_client() {
+    let (session, _turn_context) = make_session_and_context().await;
+    let mut next_config = load_latest_config_for_session(&session).await;
+    let ollama_provider = next_config
+        .model_providers
+        .get(OLLAMA_OSS_PROVIDER_ID)
+        .expect("Ollama provider is built in")
+        .clone();
+    let ollama_base_url = ollama_provider
+        .base_url
+        .as_deref()
+        .expect("Ollama provider has a base URL")
+        .to_string();
+    let ollama_model = "llama3.2:latest".to_string();
+
+    let initial_snapshot = {
+        let state = session.state.lock().await;
+        state.session_configuration.thread_config_snapshot()
+    };
+    assert_ne!(initial_snapshot.model_provider_id, OLLAMA_OSS_PROVIDER_ID);
+    assert_ne!(
+        session
+            .services
+            .model_client
+            .provider_info()
+            .base_url
+            .as_deref(),
+        Some(ollama_base_url.as_str())
+    );
+
+    next_config.model_provider_id = OLLAMA_OSS_PROVIDER_ID.to_string();
+    next_config.model_provider = ollama_provider;
+    next_config.model = Some(ollama_model.clone());
+    next_config.model_reasoning_effort = Some(ReasoningEffortConfig::Minimal);
+
+    session.refresh_runtime_model_provider(next_config).await;
+
+    let config = session.get_config().await;
+    assert_eq!(config.model_provider_id, OLLAMA_OSS_PROVIDER_ID);
+    assert_eq!(config.model.as_deref(), Some(ollama_model.as_str()));
+    assert_eq!(
+        config.model_provider.base_url.as_deref(),
+        Some(ollama_base_url.as_str())
+    );
+
+    let snapshot = {
+        let state = session.state.lock().await;
+        state.session_configuration.thread_config_snapshot()
+    };
+    assert_eq!(snapshot.model_provider_id, OLLAMA_OSS_PROVIDER_ID);
+    assert_eq!(snapshot.model, ollama_model);
+    assert_eq!(
+        snapshot.reasoning_effort,
+        Some(ReasoningEffortConfig::Minimal)
+    );
+    assert_eq!(
+        session.provider().await.base_url.as_deref(),
+        Some(ollama_base_url.as_str())
+    );
+    assert_eq!(session.collaboration_mode().await.model(), ollama_model);
+    assert_eq!(
+        session
+            .services
+            .model_client
+            .provider_info()
+            .base_url
+            .as_deref(),
+        Some(ollama_base_url.as_str())
+    );
 }
 
 #[tokio::test]

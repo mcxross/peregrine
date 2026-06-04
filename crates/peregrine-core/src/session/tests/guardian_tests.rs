@@ -29,7 +29,7 @@ use peregrine_app_server_protocol::ConfigLayerSource;
 use peregrine_config::ConfigLayerEntry;
 use peregrine_config::ConfigRequirements;
 use peregrine_config::ConfigRequirementsToml;
-use peregrine_model_provider::create_model_provider;
+use peregrine_provider_registry::create_model_provider;
 use peregrine_types::config_types::ApprovalsReviewer;
 use peregrine_types::models::AdditionalPermissionProfile as PermissionProfile;
 use peregrine_types::models::ContentItem;

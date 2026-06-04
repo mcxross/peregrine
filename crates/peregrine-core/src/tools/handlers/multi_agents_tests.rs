@@ -22,7 +22,7 @@ use codex_login::CodexAuth;
 use codex_model_provider_info::built_in_model_providers;
 use codex_state::DirectionalThreadSpawnEdgeStatus;
 use core_test_support::TempDirExt;
-use peregrine_model_provider::create_model_provider;
+use peregrine_provider_registry::create_model_provider;
 use peregrine_types::AgentPath;
 use peregrine_types::ThreadId;
 use peregrine_types::config_types::ServiceTier;

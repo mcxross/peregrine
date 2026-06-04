@@ -17,7 +17,7 @@ use codex_models_manager::manager::SharedModelsManager;
 use codex_models_manager::test_support::construct_model_info_offline_for_tests;
 use codex_models_manager::test_support::get_model_offline_for_tests;
 use once_cell::sync::Lazy;
-use peregrine_model_provider::create_model_provider;
+use peregrine_provider_registry::create_model_provider;
 use peregrine_types::config_types::CollaborationModeMask;
 use peregrine_types::openai_models::ModelInfo;
 use peregrine_types::openai_models::ModelPreset;

@@ -17,7 +17,7 @@ use codex_tools::ToolExposure;
 use codex_tools::ToolName;
 use codex_tools::ToolOutput;
 use codex_tools::ToolSpec;
-use peregrine_model_provider::create_model_provider;
+use peregrine_provider_registry::create_model_provider;
 use peregrine_types::config_types::WebSearchMode;
 use peregrine_types::dynamic_tools::DynamicToolSpec;
 use peregrine_types::openai_models::ApplyPatchToolType;

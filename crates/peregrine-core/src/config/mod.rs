@@ -80,6 +80,7 @@ use peregrine_config::types::TuiPetAnchor;
 use peregrine_config::types::UriBasedFileOpener;
 use peregrine_config::types::WindowsSandboxModeToml;
 use peregrine_memories_read::memory_root;
+use peregrine_model_provider::add_peregrine_builtin_model_providers;
 use peregrine_types::config_types::AltScreenMode;
 use peregrine_types::config_types::AutoCompactTokenLimitScope;
 use peregrine_types::config_types::ForcedLoginMethod;
@@ -2994,9 +2995,12 @@ impl Config {
             .clone()
             .filter(|value| !value.is_empty());
 
-        let model_providers =
-            merge_configured_model_providers(built_in_model_providers(openai_base_url), cfg.model_providers)
-                .map_err(|message| std::io::Error::new(std::io::ErrorKind::InvalidData, message))?;
+        let model_providers = merge_configured_model_providers(
+            built_in_model_providers(openai_base_url),
+            cfg.model_providers,
+        )
+        .map(add_peregrine_builtin_model_providers)
+        .map_err(|message| std::io::Error::new(std::io::ErrorKind::InvalidData, message))?;
 
         let model_provider_id = model_provider
             .or(cfg.model_provider)

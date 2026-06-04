@@ -1495,6 +1495,54 @@ impl Session {
         }
     }
 
+    pub(crate) async fn refresh_runtime_model_provider(&self, next_config: Config) {
+        // Provider/model selection is explicitly user-directed and should affect the next
+        // turn in already-open sessions. Keep this separate from the generic config reload
+        // path, which intentionally preserves session-static fields.
+        let provider = next_config.model_provider.clone();
+        let model = next_config.model.clone();
+        let model_reasoning_effort = next_config.model_reasoning_effort;
+        let model_reasoning_summary = next_config.model_reasoning_summary;
+        let service_tier = next_config.service_tier.clone();
+        let model_providers = next_config.model_providers.clone();
+        let model_provider_id = next_config.model_provider_id.clone();
+        let config_layer_stack = next_config.config_layer_stack.clone();
+
+        {
+            let mut state = self.state.lock().await;
+            let mut config = (*state.session_configuration.original_config_do_not_use).clone();
+            config.config_layer_stack = config
+                .config_layer_stack
+                .with_user_layer_from(&config_layer_stack);
+            config.tool_suggest =
+                resolve_tool_suggest_config_from_layer_stack(&config.config_layer_stack);
+            config.model_provider_id = model_provider_id;
+            config.model_provider = provider.clone();
+            config.model_providers = model_providers;
+            config.model = model.clone();
+            config.model_reasoning_effort = model_reasoning_effort;
+            config.model_reasoning_summary = model_reasoning_summary;
+            config.service_tier = service_tier.clone();
+
+            state.session_configuration.provider = provider.clone();
+            state.session_configuration.model_reasoning_summary = model_reasoning_summary;
+            state.session_configuration.service_tier = service_tier;
+            if let Some(model) = model {
+                state.session_configuration.collaboration_mode =
+                    state.session_configuration.collaboration_mode.with_updates(
+                        Some(model),
+                        Some(model_reasoning_effort),
+                        /*developer_instructions*/ None,
+                    );
+            }
+            state.session_configuration.original_config_do_not_use = Arc::new(config);
+        }
+
+        self.services
+            .model_client
+            .refresh_provider(provider, Some(Arc::clone(&self.services.auth_manager)));
+    }
+
     fn emit_config_changed_contributors(
         &self,
         previous_config: Option<&Config>,

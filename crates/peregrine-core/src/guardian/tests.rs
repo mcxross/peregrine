@@ -43,7 +43,7 @@ use peregrine_config::RequirementSource;
 use peregrine_config::Sourced;
 use peregrine_config::config_toml::ConfigToml;
 use peregrine_config::types::McpServerConfig;
-use peregrine_model_provider::create_model_provider;
+use peregrine_provider_registry::create_model_provider;
 use peregrine_types::ThreadId;
 use peregrine_types::approvals::NetworkApprovalProtocol;
 use peregrine_types::config_types::ApprovalsReviewer;
