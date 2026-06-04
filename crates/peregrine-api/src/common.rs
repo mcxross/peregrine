@@ -189,6 +189,225 @@ pub struct ResponsesApiRequest {
     pub client_metadata: Option<HashMap<String, String>>,
 }
 
+#[derive(Debug, Serialize, Clone, PartialEq)]
+pub struct ChatCompletionsApiRequest {
+    pub model: String,
+    pub messages: Vec<ChatCompletionMessage>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tools: Vec<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parallel_tool_calls: Option<bool>,
+    pub stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_options: Option<ChatCompletionsStreamOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
+}
+
+impl ChatCompletionsApiRequest {
+    pub fn from_responses_request(request: ResponsesApiRequest) -> Self {
+        let ResponsesApiRequest {
+            model,
+            instructions,
+            input,
+            tools,
+            tool_choice,
+            parallel_tool_calls,
+            ..
+        } = request;
+
+        let mut messages = Vec::new();
+        if !instructions.trim().is_empty() {
+            messages.push(ChatCompletionMessage::system(instructions));
+        }
+        messages.extend(response_items_to_chat_messages(input));
+
+        let tools = responses_tools_to_chat_tools(tools);
+        let tool_choice = if tools.is_empty() {
+            None
+        } else {
+            Some(tool_choice)
+        };
+        let parallel_tool_calls = if tools.is_empty() {
+            None
+        } else {
+            Some(parallel_tool_calls)
+        };
+
+        Self {
+            model,
+            messages,
+            tools,
+            tool_choice,
+            parallel_tool_calls,
+            stream: true,
+            stream_options: Some(ChatCompletionsStreamOptions {
+                include_usage: true,
+            }),
+            max_tokens: Some(4096),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq)]
+pub struct ChatCompletionMessage {
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<ChatCompletionToolCall>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+}
+
+impl ChatCompletionMessage {
+    fn system(content: String) -> Self {
+        Self {
+            role: "system".to_string(),
+            content: Some(content),
+            tool_calls: Vec::new(),
+            tool_call_id: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq)]
+pub struct ChatCompletionToolCall {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub function: ChatCompletionToolCallFunction,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq)]
+pub struct ChatCompletionToolCallFunction {
+    pub name: String,
+    pub arguments: String,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq)]
+pub struct ChatCompletionsStreamOptions {
+    pub include_usage: bool,
+}
+
+fn response_items_to_chat_messages(items: Vec<ResponseItem>) -> Vec<ChatCompletionMessage> {
+    items
+        .into_iter()
+        .filter_map(response_item_to_chat_message)
+        .collect()
+}
+
+fn response_item_to_chat_message(item: ResponseItem) -> Option<ChatCompletionMessage> {
+    match item {
+        ResponseItem::Message { role, content, .. } => {
+            let content = content_items_to_text(content);
+            if content.is_empty() {
+                None
+            } else {
+                Some(ChatCompletionMessage {
+                    role,
+                    content: Some(content),
+                    tool_calls: Vec::new(),
+                    tool_call_id: None,
+                })
+            }
+        }
+        ResponseItem::FunctionCall {
+            name,
+            arguments,
+            call_id,
+            ..
+        } => Some(ChatCompletionMessage {
+            role: "assistant".to_string(),
+            content: None,
+            tool_calls: vec![ChatCompletionToolCall {
+                id: call_id,
+                kind: "function".to_string(),
+                function: ChatCompletionToolCallFunction { name, arguments },
+            }],
+            tool_call_id: None,
+        }),
+        ResponseItem::CustomToolCall {
+            name,
+            input,
+            call_id,
+            ..
+        } => Some(ChatCompletionMessage {
+            role: "assistant".to_string(),
+            content: None,
+            tool_calls: vec![ChatCompletionToolCall {
+                id: call_id,
+                kind: "function".to_string(),
+                function: ChatCompletionToolCallFunction {
+                    name,
+                    arguments: input,
+                },
+            }],
+            tool_call_id: None,
+        }),
+        ResponseItem::FunctionCallOutput { call_id, output } => Some(ChatCompletionMessage {
+            role: "tool".to_string(),
+            content: Some(output.to_string()),
+            tool_calls: Vec::new(),
+            tool_call_id: Some(call_id),
+        }),
+        ResponseItem::CustomToolCallOutput {
+            call_id, output, ..
+        } => Some(ChatCompletionMessage {
+            role: "tool".to_string(),
+            content: Some(output.to_string()),
+            tool_calls: Vec::new(),
+            tool_call_id: Some(call_id),
+        }),
+        _ => None,
+    }
+}
+
+fn content_items_to_text(items: Vec<peregrine_types::models::ContentItem>) -> String {
+    items
+        .into_iter()
+        .filter_map(|item| match item {
+            peregrine_types::models::ContentItem::InputText { text }
+            | peregrine_types::models::ContentItem::OutputText { text } => Some(text),
+            peregrine_types::models::ContentItem::InputImage { .. } => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn responses_tools_to_chat_tools(tools: Vec<Value>) -> Vec<Value> {
+    tools
+        .into_iter()
+        .filter_map(response_tool_to_chat_tool)
+        .collect()
+}
+
+fn response_tool_to_chat_tool(tool: Value) -> Option<Value> {
+    let object = tool.as_object()?;
+    if object.get("type").and_then(Value::as_str) != Some("function") {
+        return None;
+    }
+    let name = object.get("name")?.clone();
+    let mut function = serde_json::Map::new();
+    function.insert("name".to_string(), name);
+    if let Some(description) = object.get("description") {
+        function.insert("description".to_string(), description.clone());
+    }
+    if let Some(parameters) = object.get("parameters") {
+        function.insert("parameters".to_string(), parameters.clone());
+    }
+    if let Some(strict) = object.get("strict") {
+        function.insert("strict".to_string(), strict.clone());
+    }
+
+    Some(serde_json::json!({
+        "type": "function",
+        "function": Value::Object(function),
+    }))
+}
+
 impl From<&ResponsesApiRequest> for ResponseCreateWsRequest {
     fn from(request: &ResponsesApiRequest) -> Self {
         Self {

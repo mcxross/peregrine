@@ -18,7 +18,7 @@ use tokio_tungstenite::tungstenite::Message;
 // telemetry is paused.
 const TELEMETRY_PAUSED: bool = true;
 
-pub(crate) fn telemetry_enabled() -> bool {
+pub fn telemetry_enabled() -> bool {
     !TELEMETRY_PAUSED
 }
 

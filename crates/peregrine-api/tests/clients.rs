@@ -5,14 +5,19 @@ use std::time::Duration;
 use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
+use futures::StreamExt;
 use http::HeaderMap;
 use http::HeaderValue;
 use http::StatusCode;
 use peregrine_api::ApiError;
 use peregrine_api::AuthError;
 use peregrine_api::AuthProvider;
+use peregrine_api::ChatCompletionsApiRequest;
+use peregrine_api::ChatCompletionsClient;
+use peregrine_api::ChatCompletionsOptions;
 use peregrine_api::Compression;
 use peregrine_api::Provider;
+use peregrine_api::ResponseEvent;
 use peregrine_api::ResponsesApiRequest;
 use peregrine_api::ResponsesClient;
 use peregrine_api::ResponsesOptions;
@@ -81,6 +86,27 @@ impl HttpTransport for RecordingTransport {
         self.state.record(req);
 
         let stream = futures::stream::iter(Vec::<Result<Bytes, TransportError>>::new());
+        Ok(StreamResponse {
+            status: StatusCode::OK,
+            headers: HeaderMap::new(),
+            bytes: Box::pin(stream),
+        })
+    }
+}
+
+#[derive(Clone)]
+struct StaticSseTransport {
+    body: &'static str,
+}
+
+#[async_trait]
+impl HttpTransport for StaticSseTransport {
+    async fn execute(&self, _req: Request) -> Result<Response, TransportError> {
+        Err(TransportError::Build("execute should not run".to_string()))
+    }
+
+    async fn stream(&self, _req: Request) -> Result<StreamResponse, TransportError> {
+        let stream = futures::stream::iter(vec![Ok(Bytes::from_static(self.body.as_bytes()))]);
         Ok(StreamResponse {
             status: StatusCode::OK,
             headers: HeaderMap::new(),
@@ -269,6 +295,217 @@ async fn responses_client_uses_responses_path() -> Result<()> {
 
     let requests = state.take_stream_requests();
     assert_path_ends_with(&requests, "/responses");
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_completions_client_uses_chat_completions_path() -> Result<()> {
+    let state = RecordingState::default();
+    let transport = RecordingTransport::new(state.clone());
+    let client =
+        ChatCompletionsClient::new(transport, provider("openai-compatible"), Arc::new(NoAuth));
+
+    let request = ChatCompletionsApiRequest::from_responses_request(ResponsesApiRequest {
+        model: "compatible-model".into(),
+        instructions: "You are concise.".into(),
+        input: vec![ResponseItem::Message {
+            id: None,
+            role: "user".into(),
+            content: vec![ContentItem::InputText {
+                text: "Say hi".into(),
+            }],
+            phase: None,
+        }],
+        tools: Vec::new(),
+        tool_choice: "auto".into(),
+        parallel_tool_calls: false,
+        reasoning: None,
+        store: false,
+        stream: true,
+        include: Vec::new(),
+        service_tier: None,
+        prompt_cache_key: None,
+        text: None,
+        client_metadata: None,
+    });
+
+    let _stream = client
+        .stream_request(
+            request,
+            ChatCompletionsOptions {
+                session_id: Some("sess_123".into()),
+                thread_id: Some("thread_123".into()),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+    let requests = state.take_stream_requests();
+    assert_path_ends_with(&requests, "/chat/completions");
+    let req = &requests[0];
+    assert_eq!(
+        req.headers
+            .get(http::header::ACCEPT)
+            .and_then(|v| v.to_str().ok()),
+        Some("text/event-stream")
+    );
+    assert_eq!(
+        req.headers.get("session-id").and_then(|v| v.to_str().ok()),
+        Some("sess_123")
+    );
+    Ok(())
+}
+
+#[test]
+fn chat_completions_request_converts_messages_and_function_tools() {
+    let request = ChatCompletionsApiRequest::from_responses_request(ResponsesApiRequest {
+        model: "compatible-model".into(),
+        instructions: "Follow instructions.".into(),
+        input: vec![
+            ResponseItem::Message {
+                id: None,
+                role: "user".into(),
+                content: vec![ContentItem::InputText {
+                    text: "Run the tool".into(),
+                }],
+                phase: None,
+            },
+            ResponseItem::FunctionCall {
+                id: None,
+                name: "echo".into(),
+                namespace: None,
+                arguments: r#"{"value":"hi"}"#.into(),
+                call_id: "call_1".into(),
+            },
+            ResponseItem::FunctionCallOutput {
+                call_id: "call_1".into(),
+                output: peregrine_types::models::FunctionCallOutputPayload::from_text("ok".into()),
+            },
+        ],
+        tools: vec![
+            serde_json::json!({
+                "type": "function",
+                "name": "echo",
+                "description": "Echo input.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "value": { "type": "string" }
+                    }
+                }
+            }),
+            serde_json::json!({
+                "type": "web_search"
+            }),
+        ],
+        tool_choice: "auto".into(),
+        parallel_tool_calls: true,
+        reasoning: None,
+        store: false,
+        stream: true,
+        include: Vec::new(),
+        service_tier: None,
+        prompt_cache_key: None,
+        text: None,
+        client_metadata: None,
+    });
+
+    let body = serde_json::to_value(request).expect("serialize request");
+    assert_eq!(body["model"], "compatible-model");
+    assert_eq!(body["messages"][0]["role"], "system");
+    assert_eq!(body["messages"][1]["role"], "user");
+    assert_eq!(body["messages"][1]["content"], "Run the tool");
+    assert_eq!(body["messages"][2]["tool_calls"][0]["id"], "call_1");
+    assert_eq!(
+        body["messages"][2]["tool_calls"][0]["function"]["arguments"],
+        r#"{"value":"hi"}"#
+    );
+    assert_eq!(body["messages"][3]["role"], "tool");
+    assert_eq!(body["messages"][3]["tool_call_id"], "call_1");
+    assert_eq!(body["messages"][3]["content"], "ok");
+    assert_eq!(body["tools"].as_array().expect("tools").len(), 1);
+    assert_eq!(body["tools"][0]["function"]["name"], "echo");
+}
+
+#[tokio::test]
+async fn chat_completions_stream_maps_text_tool_call_and_completion() -> Result<()> {
+    let body = r#"data: {"id":"chatcmpl-1","choices":[{"delta":{"role":"assistant","content":"hi"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-1","choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"echo","arguments":"{\"value\""}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-1","choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":":\"hi\"}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":3,"completion_tokens":5,"total_tokens":8}}
+
+data: [DONE]
+
+"#;
+    let transport = StaticSseTransport { body };
+    let client =
+        ChatCompletionsClient::new(transport, provider("openai-compatible"), Arc::new(NoAuth));
+    let request = ChatCompletionsApiRequest::from_responses_request(ResponsesApiRequest {
+        model: "compatible-model".into(),
+        instructions: String::new(),
+        input: Vec::new(),
+        tools: Vec::new(),
+        tool_choice: "auto".into(),
+        parallel_tool_calls: false,
+        reasoning: None,
+        store: false,
+        stream: true,
+        include: Vec::new(),
+        service_tier: None,
+        prompt_cache_key: None,
+        text: None,
+        client_metadata: None,
+    });
+
+    let mut stream = client
+        .stream_request(request, ChatCompletionsOptions::default())
+        .await?;
+    let mut events = Vec::new();
+    while let Some(event) = stream.next().await {
+        let event = event?;
+        let is_completed = matches!(event, ResponseEvent::Completed { .. });
+        events.push(event);
+        if is_completed {
+            break;
+        }
+    }
+
+    assert!(matches!(events.first(), Some(ResponseEvent::Created)));
+    assert!(
+        events
+            .iter()
+            .any(|event| matches!(event, ResponseEvent::OutputTextDelta(delta) if delta == "hi"))
+    );
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            ResponseEvent::OutputItemDone(ResponseItem::Message { role, content, .. })
+                if role == "assistant"
+                    && matches!(content.as_slice(), [ContentItem::OutputText { text }] if text == "hi")
+        )
+    }));
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            ResponseEvent::OutputItemDone(ResponseItem::FunctionCall {
+                name,
+                arguments,
+                call_id,
+                ..
+            }) if name == "echo" && arguments == r#"{"value":"hi"}"# && call_id == "call_1"
+        )
+    }));
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            ResponseEvent::Completed {
+                response_id,
+                token_usage: Some(token_usage),
+                end_turn: Some(false),
+            } if response_id == "chatcmpl-1" && token_usage.total_tokens == 8
+        )
+    }));
     Ok(())
 }
 
