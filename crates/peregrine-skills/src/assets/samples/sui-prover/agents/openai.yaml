@@ -1,4 +1,4 @@
 interface:
   display_name: "Sui Prover"
-  short_description: "Write and debug Move proofs"
-  default_prompt: "Help me verify this Move code with Sui Prover."
+  short_description: "Write and debug bundled Move proofs"
+  default_prompt: "Use $sui-prover to verify this Move code with Peregrine's bundled Sui Prover."
