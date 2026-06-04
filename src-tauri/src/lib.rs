@@ -4,6 +4,7 @@ pub mod helper_args;
 mod menu;
 mod state;
 
+use state::AgentServerCommandState;
 use state::IndexerCommandState;
 use state::MoveAnalyzerCommandState;
 
@@ -42,6 +43,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(IndexerCommandState::default())
+        .manage(AgentServerCommandState::default())
         .manage(MoveAnalyzerCommandState::default())
         .manage(peregrine_terminal::TerminalManager::default())
         .invoke_handler(tauri::generate_handler![
@@ -119,6 +121,13 @@ pub fn run() {
             commands::sui::export_sui_private_key,
             commands::metadata::load_project_metadata,
             commands::metadata::save_project_metadata,
+            commands::agent_server::agent_server_start,
+            commands::agent_server::agent_server_turn_send,
+            commands::agent_server::agent_server_turn_interrupt,
+            commands::agent_server::agent_server_stop,
+            commands::agent_server::agent_server_request_resolve,
+            commands::agent_server::agent_server_request_reject,
+            commands::agent_server::agent_server_model_list,
             commands::terminal::terminal_start,
             commands::terminal::terminal_write,
             commands::terminal::terminal_resize,

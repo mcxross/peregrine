@@ -6,7 +6,7 @@ export type AgentStatus =
   | "needsApproval"
   | "failed"
   | "completed";
-export type AgentKind = "default" | "custom";
+export type AgentKind = "server";
 export type ProviderScope = "cloud" | "local";
 export type ExecutionMode = "manual" | "approvalGated" | "background";
 
@@ -37,6 +37,10 @@ export type AgentExecutionConfig = {
 export type AgentDefinition = {
   id: string;
   kind: AgentKind;
+  isClosed?: boolean;
+  isPrimary?: boolean;
+  roleName?: string;
+  serverThreadId?: string;
   name: string;
   description: string;
   systemPrompt: string;
@@ -103,15 +107,12 @@ export type AgentStudioState = {
   selectedWorkflowId: string;
 };
 
-export type AuditReportExport = {
-  auditSessionId: string;
-  defaultFileName: string;
-  generatedAt: string;
-  markdown: string;
+export type AgentToolProjectContext = {
+  rootPath: string;
+  packagePath: string;
   packageName: string;
-  projectName: string;
-  reportJson: string;
-  traceJson?: string;
+  manifestPath: string;
+  packageTree: unknown;
 };
 
 export type ModelProviderDescriptor = {

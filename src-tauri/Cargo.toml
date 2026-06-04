@@ -23,7 +23,15 @@ pulldown-cmark = { workspace = true }
 reqwest = { workspace = true }
 syntect = { workspace = true }
 tokio = { workspace = true }
+codex-arg0 = { workspace = true }
+codex-exec-server = { workspace = true }
+codex-feedback = { workspace = true }
+codex-rollout = { workspace = true }
+codex-state = { workspace = true }
+codex-utils-absolute-path = { workspace = true }
 peregrine-adapters = { workspace = true }
+peregrine-app-server-client = { workspace = true }
+peregrine-app-server-protocol = { workspace = true }
 peregrine-bytecode = { workspace = true }
 peregrine-dynamic-analysis = { workspace = true }
 peregrine-helper-protocol = { workspace = true }
@@ -35,6 +43,10 @@ peregrine-project-loader = { workspace = true }
 peregrine-plugins = { workspace = true }
 peregrine-static-analysis = { workspace = true }
 peregrine-terminal = { workspace = true }
+peregrine-config = { workspace = true }
+peregrine-utils-home-dir = { workspace = true }
+toml = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

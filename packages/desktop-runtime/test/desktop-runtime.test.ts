@@ -34,11 +34,19 @@ import {
 } from "../src/lsp/normalizers";
 import type { MoveAnalyzerTextEdit } from "../src/lsp/types";
 import {
-  defaultAgents,
-} from "../src/agents/default-agents";
+  ensurePrimaryAgentThreadState,
+  formatAgentThreadName,
+  syncAgentStudioStateWithServerThread,
+} from "../src/agents/agent-server-threads";
 import {
+  agentStudioStateToProjectMetadata,
   loadAgentStudioStateFromProjectMetadata,
 } from "../src/agents/agent-workflow-store";
+import {
+  mapAgentServerNotificationToRunEvents,
+} from "../src/agents/agent-runner";
+import type { ServerNotification } from "../../../crates/peregrine-app-server-protocol/schema/typescript";
+import type { Thread } from "../../../crates/peregrine-app-server-protocol/schema/typescript/v2";
 
 function packageTreeWire(): PackageTreeWire {
   return {
@@ -223,15 +231,16 @@ describe("desktop runtime LSP helpers", () => {
 });
 
 describe("desktop runtime agent store", () => {
-  test("normalizes persisted agent metadata against current defaults", () => {
-    const firstDefault = defaultAgents[0];
+  test("removes persisted desktop agent rosters from project metadata", () => {
     const metadata = {
       ...defaultProjectMetadata(),
       agents: {
         agents: [
           {
-            ...firstDefault,
-            tools: ["custom.extra"],
+            id: "agent-orchestrator",
+            kind: "default",
+            name: "Orchestrator Agent",
+            description: "Old desktop audit agent.",
             status: "running",
           },
         ],
@@ -243,10 +252,171 @@ describe("desktop runtime agent store", () => {
     };
 
     const state = loadAgentStudioStateFromProjectMetadata(metadata);
-    const normalizedDefault = state.agents.find((agent) => agent.id === firstDefault.id);
+    const nextMetadata = agentStudioStateToProjectMetadata(metadata, state);
 
-    expect(normalizedDefault?.tools).toContain(firstDefault.tools[0]);
-    expect(normalizedDefault?.tools).toContain("custom.extra");
-    expect(state.selectedAgentId).toBe(defaultAgents[0].id);
+    expect(state.agents).toEqual([]);
+    expect(state.workflows).toEqual([]);
+    expect(nextMetadata.agents?.agents).toEqual([]);
+    expect(nextMetadata.agents?.workflows).toEqual([]);
+  });
+
+  test("tracks app-server threads instead of hydrating a role roster", () => {
+    const primaryOnly = ensurePrimaryAgentThreadState(
+      loadAgentStudioStateFromProjectMetadata(defaultProjectMetadata()),
+    );
+    const state = syncAgentStudioStateWithServerThread(primaryOnly, appServerThread({
+      id: "thread-worker",
+      agentNickname: "audit",
+      agentRole: "worker",
+    }));
+
+    expect(primaryOnly.agents.map((agent) => agent.name)).toEqual(["Main [default]"]);
+    expect(state.agents.map((agent) => agent.name)).toEqual(["Main [default]", "audit [worker]"]);
+    expect(state.agents.map((agent) => agent.kind)).toEqual(["server", "server"]);
+    expect(state.agents[1].serverThreadId).toBe("thread-worker");
+    expect("source" in state.agents[1]).toBe(false);
+    expect(state.selectedAgentId).toBe("main");
+  });
+
+  test("matches TUI agent picker naming rules", () => {
+    expect(formatAgentThreadName({ isPrimary: true })).toBe("Main [default]");
+    expect(formatAgentThreadName({
+      agentNickname: "audit",
+      agentRole: "worker",
+      isPrimary: false,
+    })).toBe("audit [worker]");
+    expect(formatAgentThreadName({ agentRole: "worker", isPrimary: false })).toBe("[worker]");
+    expect(formatAgentThreadName({ isPrimary: false })).toBe("Agent");
   });
 });
+
+describe("desktop runtime app-server event mapping", () => {
+  test("maps app-server text and reasoning deltas to run stream events", () => {
+    expect(mapAgentServerNotificationToRunEvents({
+      method: "item/agentMessage/delta",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        itemId: "item-1",
+        delta: "hello",
+      },
+    })).toEqual([{ type: "text-delta", text: "hello" }]);
+
+    expect(mapAgentServerNotificationToRunEvents({
+      method: "item/reasoning/summaryTextDelta",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        itemId: "item-2",
+        delta: "thinking",
+      },
+    })).toEqual([{ type: "reasoning-delta", text: "thinking" }]);
+  });
+
+  test("maps app-server status, finish, and error notifications", () => {
+    const commandItemStarted = {
+      method: "item/started",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        item: {
+          type: "commandExecution",
+          id: "item-3",
+          command: "cargo test",
+        },
+      },
+    } as unknown as ServerNotification;
+
+    expect(mapAgentServerNotificationToRunEvents(commandItemStarted)).toEqual([{
+      type: "status",
+      level: "trace",
+      title: "Item started",
+      message: "cargo test",
+    }]);
+
+    expect(mapAgentServerNotificationToRunEvents({
+      method: "item/commandExecution/outputDelta",
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        itemId: "item-3",
+        delta: "ok",
+      },
+    })).toEqual([{
+      type: "status",
+      level: "trace",
+      title: "Command output",
+      message: "ok",
+    }]);
+
+    const completed = {
+      method: "turn/completed",
+      params: {
+        threadId: "thread-1",
+        turn: {
+          id: "turn-1",
+          status: "completed",
+        },
+      },
+    } as unknown as ServerNotification;
+
+    expect(mapAgentServerNotificationToRunEvents(completed)).toEqual([{
+      type: "finish",
+      finishReason: "completed",
+    }]);
+
+    const error = {
+      method: "error",
+      params: {
+        error: {
+          code: -32000,
+          message: "failed",
+        },
+      },
+    } as unknown as ServerNotification;
+
+    expect(mapAgentServerNotificationToRunEvents(error)).toEqual([{
+      type: "error",
+      message: "failed",
+    }]);
+  });
+
+  test("maps app-server thread lifecycle notifications", () => {
+    const thread = appServerThread({ id: "thread-worker", agentRole: "worker" });
+
+    expect(mapAgentServerNotificationToRunEvents({
+      method: "thread/started",
+      params: { thread },
+    })).toEqual([{ type: "thread-started", thread }]);
+
+    expect(mapAgentServerNotificationToRunEvents({
+      method: "thread/closed",
+      params: { threadId: "thread-worker" },
+    })).toEqual([{ type: "thread-closed", threadId: "thread-worker" }]);
+  });
+});
+
+function appServerThread(overrides: Partial<Thread>): Thread {
+  return {
+    id: "thread-main",
+    sessionId: "session-1",
+    forkedFromId: null,
+    preview: "",
+    ephemeral: true,
+    modelProvider: "openai",
+    createdAt: 0,
+    updatedAt: 0,
+    status: { type: "idle" },
+    path: null,
+    cwd: "/tmp/demo",
+    cliVersion: "test",
+    source: { type: "custom", value: "test" },
+    threadSource: null,
+    agentNickname: null,
+    agentRole: null,
+    gitInfo: null,
+    name: null,
+    turns: [],
+    ...overrides,
+  } as unknown as Thread;
+}

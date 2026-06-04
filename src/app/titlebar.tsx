@@ -8,7 +8,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Play,
-  Share,
   SquareFunction,
 } from "lucide-react";
 
@@ -28,19 +27,16 @@ import {
 
 type TitlebarProps = {
   activeWorkspaceTab?: WorkspaceTab;
-  auditReportExportAvailable?: boolean;
   buildActionState?: WorkspaceActionState;
   coverageActionState?: WorkspaceActionState;
   formalActionState?: WorkspaceActionState;
   fuzzActionState?: WorkspaceActionState;
   isLeftPanelOpen?: boolean;
-  isExportingAuditReport?: boolean;
   layout: LayoutSettings;
   hasWorkspace?: boolean;
   network: SuiNetworkSelection;
   onBuildPackage?: () => void;
   onCheckCoverage?: () => void;
-  onExportAuditReport?: () => void;
   onFormalVerification?: () => void;
   onFuzzPackage?: () => void;
   onNetworkChange: (network: SuiNetworkSelection) => void;
@@ -53,19 +49,16 @@ type TitlebarProps = {
 };
 
 export function Titlebar({
-  auditReportExportAvailable = false,
   buildActionState,
   coverageActionState,
   formalActionState,
   fuzzActionState,
   isLeftPanelOpen = true,
-  isExportingAuditReport = false,
   layout,
   hasWorkspace = true,
   network,
   onBuildPackage,
   onCheckCoverage,
-  onExportAuditReport,
   onFormalVerification,
   onFuzzPackage,
   onNetworkChange,
@@ -175,18 +168,6 @@ export function Titlebar({
 
       {hasWorkspace ? (
         <div className="flex h-full items-center justify-end gap-4 pr-5" onPointerDown={(event) => event.stopPropagation()}>
-          <TitlebarAction
-            disabled={!auditReportExportAvailable || isExportingAuditReport}
-            icon={Share}
-            isRunning={isExportingAuditReport}
-            label="Export"
-            onClick={onExportAuditReport}
-            title={
-              auditReportExportAvailable
-                ? "Export latest audit report"
-                : "Run the full audit workflow to export a report"
-            }
-          />
           {showNetworkSelector ? (
             <SuiNetworkSelector network={network} onNetworkChange={onNetworkChange} />
           ) : null}
@@ -253,39 +234,6 @@ function WorkspaceActionButton({
         )}
         aria-hidden="true"
       />
-    </Button>
-  );
-}
-
-function TitlebarAction({
-  disabled,
-  icon: Icon,
-  isRunning,
-  label,
-  onClick,
-  suffix,
-  title,
-}: {
-  disabled?: boolean;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  isRunning?: boolean;
-  label: string;
-  onClick?: () => void;
-  suffix?: string;
-  title?: string;
-}) {
-  return (
-    <Button
-      className="h-auto gap-2 p-0 text-sm font-medium text-foreground hover:text-chart-1 disabled:opacity-50"
-      disabled={disabled}
-      onClick={onClick}
-      title={title ?? label}
-      type="button"
-      variant="ghost"
-    >
-      <Icon className={cn("size-4", isRunning && "animate-spin")} aria-hidden="true" />
-      <span>{label}</span>
-      {suffix ? <span className="text-muted-foreground">{suffix}</span> : null}
     </Button>
   );
 }

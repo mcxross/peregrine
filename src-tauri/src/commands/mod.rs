@@ -1,3 +1,4 @@
+pub(crate) mod agent_server;
 pub(crate) mod analyzers;
 pub(crate) mod files;
 pub(crate) mod indexer;

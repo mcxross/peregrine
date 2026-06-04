@@ -20,7 +20,6 @@ use peregrine_config::ConfigLayerStackOrdering;
 use peregrine_config::config_toml::ConfigToml;
 use peregrine_config::loader::resolve_relative_paths_in_config_toml;
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::LazyLock;
 use toml::Value as TomlValue;
@@ -216,6 +215,7 @@ mod reload {
 
 pub(crate) mod spawn_tool_spec {
     use super::*;
+    use std::collections::BTreeSet;
 
     /// Builds the spawn-agent tool description text from built-in and configured roles.
     pub(crate) fn build(user_defined_agent_roles: &BTreeMap<String, AgentRoleConfig>) -> String {

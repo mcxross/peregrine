@@ -11,9 +11,9 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "@peregrine/agent-runtime": path.resolve(
+      "@peregrine/app-server-protocol": path.resolve(
         __dirname,
-        "./packages/agent-runtime/src/index.ts",
+        "./crates/peregrine-app-server-protocol/schema/typescript/index.ts",
       ),
       "@peregrine/coding-agent-adapters": path.resolve(
         __dirname,
@@ -22,10 +22,6 @@ export default defineConfig(async () => ({
       "@peregrine/desktop-runtime": path.resolve(
         __dirname,
         "./packages/desktop-runtime/src/index.ts",
-      ),
-      "@peregrine/harness-control": path.resolve(
-        __dirname,
-        "./packages/harness-control/src/index.ts",
       ),
     },
   },

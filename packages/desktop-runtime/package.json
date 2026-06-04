@@ -7,10 +7,6 @@
     ".": "./src/index.ts"
   },
   "peerDependencies": {
-    "@peregrine/agent-runtime": "0.1.0",
-    "@peregrine/harness-control": "0.1.0",
-    "@tauri-apps/api": "2.11.0",
-    "ai": "6.0.184",
-    "ai-sdk-ollama": "3.8.4"
+    "@tauri-apps/api": "2.11.0"
   }
 }

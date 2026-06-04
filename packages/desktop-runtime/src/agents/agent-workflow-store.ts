@@ -1,16 +1,8 @@
 import type {
-  AgentDefinition,
   AgentExecutionLog,
-  AgentStatus,
   AgentStudioState,
-  AgentWorkflow,
   AgentWorkflowNodeType,
 } from "./types";
-import {
-  createAgentWorkflow,
-  defaultAgents,
-  defaultWorkflows,
-} from "./default-agents";
 import type { ProjectMetadata } from "../project/filesystem-tree";
 
 const STORAGE_KEY = "peregrine.agents.studio.v1";
@@ -49,98 +41,15 @@ export function agentStudioStateToProjectMetadata(
 ): ProjectMetadata {
   return {
     ...metadata,
-    agents: state,
+    agents: persistedAgentStudioState(state),
   };
 }
 
 export function saveAgentStudioState(state: AgentStudioState) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
-
-export function createCustomAgent(): {
-  agent: AgentDefinition;
-  workflow: AgentWorkflow;
-} {
-  const id = createClientId("agent");
-  const workflowId = createClientId("workflow");
-  const name = "Custom Agent";
-  const workflow = createAgentWorkflow({
-    id: workflowId,
-    agentName: name,
-    description: "Custom visual workflow.",
-    modelId: "",
-    providerId: "ollama",
-  });
-
-  return {
-    agent: {
-      id,
-      kind: "custom",
-      name,
-      description: "User-defined agent workflow.",
-      systemPrompt:
-        "You are a Peregrine agent. Use structured context, deterministic tools, and evidence-backed output.",
-      tools: ["index.context.lookup"],
-      provider: {
-        providerId: "ollama",
-        modelId: "",
-        endpoint: "http://127.0.0.1:11434",
-      },
-      execution: {
-        mode: "approvalGated",
-        maxSteps: 10,
-        requireToolApproval: true,
-        persistMemory: false,
-      },
-      status: "idle",
-      workflowId,
-      updatedAt: Date.now(),
-    },
-    workflow,
-  };
-}
-
-export function duplicateAgent(
-  agent: AgentDefinition,
-  workflow: AgentWorkflow,
-): { agent: AgentDefinition; workflow: AgentWorkflow } {
-  const agentId = createClientId("agent");
-  const workflowId = createClientId("workflow");
-  const nextName = `${agent.name} Copy`;
-
-  return {
-    agent: {
-      ...agent,
-      id: agentId,
-      kind: "custom",
-      name: nextName,
-      workflowId,
-      status: "idle",
-      updatedAt: Date.now(),
-    },
-    workflow: {
-      ...workflow,
-      id: workflowId,
-      name: nextName,
-      version: workflow.version + 1,
-      updatedAt: Date.now(),
-      nodes: workflow.nodes.map((node) => ({
-        ...node,
-        id: node.id.replace(workflow.id, workflowId),
-        data: {
-          ...node.data,
-          label: node.data.nodeType === "agent" ? nextName : node.data.label,
-          status: "idle",
-        },
-      })),
-      edges: workflow.edges.map((edge) => ({
-        ...edge,
-        id: edge.id.replace(workflow.id, workflowId),
-        source: edge.source.replace(workflow.id, workflowId),
-        target: edge.target.replace(workflow.id, workflowId),
-      })),
-    },
-  };
+  window.localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(persistedAgentStudioState(state)),
+  );
 }
 
 export function createWorkflowNode(
@@ -184,101 +93,32 @@ export function createExecutionLog(
 
 function createInitialState(): AgentStudioState {
   return {
-    agents: clone(defaultAgents),
-    workflows: clone(defaultWorkflows),
+    agents: [],
+    workflows: [],
     logs: [],
-    selectedAgentId: defaultAgents[0].id,
-    selectedWorkflowId: defaultAgents[0].workflowId,
+    selectedAgentId: "",
+    selectedWorkflowId: "",
   };
 }
 
 function normalizeAgentStudioState(parsed: Partial<AgentStudioState>): AgentStudioState {
-  const agents = mergeDefaultAgents(parsed.agents ?? []);
-  const workflows = mergeDefaultWorkflows(parsed.workflows ?? []);
-  const selectedAgentId = agents.some((agent) => agent.id === parsed.selectedAgentId)
-    ? parsed.selectedAgentId
-    : agents[0]?.id;
-  const selectedWorkflowId = workflows.some((workflow) => workflow.id === parsed.selectedWorkflowId)
-    ? parsed.selectedWorkflowId
-    : agents.find((agent) => agent.id === selectedAgentId)?.workflowId ?? workflows[0]?.id;
-
   return {
-    agents,
-    workflows,
-    logs: parsed.logs ?? [],
-    selectedAgentId: selectedAgentId ?? defaultAgents[0].id,
-    selectedWorkflowId: selectedWorkflowId ?? defaultWorkflows[0].id,
+    agents: [],
+    workflows: [],
+    logs: Array.isArray(parsed.logs) ? parsed.logs : [],
+    selectedAgentId: typeof parsed.selectedAgentId === "string" ? parsed.selectedAgentId : "",
+    selectedWorkflowId: typeof parsed.selectedWorkflowId === "string" ? parsed.selectedWorkflowId : "",
   };
 }
 
-function mergeDefaultAgents(agents: AgentDefinition[]) {
-  const customAgents = agents
-    .filter((agent) => agent.kind === "custom")
-    .map((agent) => ({
-      ...clone(agent),
-      status: persistedAgentStatus(agent.status, "idle"),
-    }));
-
-  return [
-    ...defaultAgents.map((defaultAgent) => {
-      const storedAgent = agents.find((agent) => agent.id === defaultAgent.id);
-
-      return {
-        ...defaultAgent,
-        provider: storedAgent?.provider ?? defaultAgent.provider,
-        execution: storedAgent?.execution ?? defaultAgent.execution,
-        systemPrompt: storedAgent?.systemPrompt ?? defaultAgent.systemPrompt,
-        tools: mergeDefaultAgentTools(defaultAgent.tools, storedAgent?.tools),
-        status: persistedDefaultAgentStatus(defaultAgent.id, storedAgent?.status, defaultAgent.status),
-        updatedAt: storedAgent?.updatedAt ?? defaultAgent.updatedAt,
-      };
-    }),
-    ...customAgents,
-  ];
-}
-
-function persistedDefaultAgentStatus(
-  agentId: string,
-  status: AgentStatus | undefined,
-  fallback: AgentStatus,
-): AgentStatus {
-  if (agentId !== "agent-orchestrator") {
-    return fallback;
-  }
-
-  return persistedAgentStatus(status, fallback);
-}
-
-function persistedAgentStatus(
-  status: AgentStatus | undefined,
-  fallback: AgentStatus,
-): AgentStatus {
-  if (status === "active" || status === "idle") {
-    return status;
-  }
-
-  return fallback;
-}
-
-function mergeDefaultAgentTools(defaultTools: string[], storedTools: string[] | undefined) {
-  if (!storedTools) {
-    return defaultTools;
-  }
-
-  return Array.from(new Set([...defaultTools, ...storedTools]));
-}
-
-function mergeDefaultWorkflows(workflows: AgentWorkflow[]) {
-  const customWorkflows = workflows.filter(
-    (workflow) => !defaultWorkflows.some((defaultWorkflow) => defaultWorkflow.id === workflow.id),
-  ).map(clone);
-  const mergedDefaultWorkflows = defaultWorkflows.map((defaultWorkflow) => {
-    const storedWorkflow = workflows.find((workflow) => workflow.id === defaultWorkflow.id);
-
-    return clone(storedWorkflow ?? defaultWorkflow);
-  });
-
-  return [...mergedDefaultWorkflows, ...customWorkflows];
+function persistedAgentStudioState(state: AgentStudioState): AgentStudioState {
+  return {
+    agents: [],
+    workflows: [],
+    logs: state.logs,
+    selectedAgentId: state.selectedAgentId,
+    selectedWorkflowId: state.selectedWorkflowId,
+  };
 }
 
 function createClientId(prefix: string) {
@@ -287,8 +127,4 @@ function createClientId(prefix: string) {
   }
 
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
-}
-
-function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
 }

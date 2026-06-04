@@ -13,7 +13,6 @@ import type {
   BuildLogUpdateOptions,
 } from "@/features/project-workspace/build-log-sheet";
 import type { PackageLoadAssessment } from "@peregrine/desktop-runtime";
-import type { AuditReportExport } from "@peregrine/desktop-runtime";
 
 const ProjectWorkspace = React.lazy(() =>
   import("@/features/project-workspace/project-workspace").then((module) => ({
@@ -34,7 +33,6 @@ type WorkspaceProps = {
   onNetworkChange: (network: SuiNetworkSelection) => void;
   onToggleMode: () => void;
   onActivePackageManifestPathChange: (manifestPath: string | null) => void;
-  onAuditReportExportReady?: (report: AuditReportExport | null) => void;
   onCommandLog: (run: BuildLogRun, options?: BuildLogUpdateOptions) => void;
   onFormalVerificationTargetChange: (target: FormalVerificationTarget | null) => void;
   packageTree: PackageTree | null;
@@ -55,7 +53,6 @@ export function Workspace({
   onNetworkChange,
   onToggleMode,
   onActivePackageManifestPathChange,
-  onAuditReportExportReady,
   onCommandLog,
   onFormalVerificationTargetChange,
   onWorkspaceTabChange,
@@ -77,7 +74,6 @@ export function Workspace({
           network={network}
           onToggleMode={onToggleMode}
           onActivePackageManifestPathChange={onActivePackageManifestPathChange}
-          onAuditReportExportReady={onAuditReportExportReady}
           onCommandLog={onCommandLog}
           onFormalVerificationTargetChange={onFormalVerificationTargetChange}
           onProjectSelected={onProjectSelected}
