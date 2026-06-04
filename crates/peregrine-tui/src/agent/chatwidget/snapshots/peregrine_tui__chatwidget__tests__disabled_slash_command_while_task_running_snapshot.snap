@@ -1,0 +1,6 @@
+---
+source: crates/peregrine-tui/src/agent/chatwidget/tests/exec_flow.rs
+assertion_line: 1065
+expression: blob
+---
+■ '/permissions' is disabled while a task is in progress.

@@ -40,7 +40,7 @@ pub struct TabNav<'a> {
     highlight_bold: bool,
     border_style: Style,
     indicator: Option<&'a str>,
-    border_set: symbols::border::Set<'a>,
+    border_set: symbols::border::Set,
 }
 
 impl<'a> TabNav<'a> {
@@ -95,10 +95,26 @@ impl<'a> TabNav<'a> {
 
     /// Border character set. Default: [`symbols::border::ROUNDED`].
     /// Pass [`symbols::border::PLAIN`] for square corners.
-    pub fn border_set(mut self, set: symbols::border::Set<'a>) -> Self {
+    pub fn border_set(mut self, set: symbols::border::Set) -> Self {
         self.border_set = set;
         self
     }
+}
+
+pub(crate) fn tab_hit_areas(tabs: &[&str], area: Rect) -> Vec<Rect> {
+    if area.height < 3 || area.width == 0 || tabs.is_empty() {
+        return Vec::new();
+    }
+
+    compute_tab_positions(tabs, area.x, area.right())
+        .into_iter()
+        .map(|(x, width)| Rect {
+            x,
+            y: area.y,
+            width,
+            height: 3,
+        })
+        .collect()
 }
 
 /// `│  ▸ Label  │` → border(1) + pad(3) + label + pad(3) + border(1)

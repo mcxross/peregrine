@@ -172,49 +172,53 @@ impl ImportEngine {
         )]);
         let mut queue = VecDeque::from([(package_id.clone(), 0usize)]);
 
-        while request.generate_buildable {
-            let Some((current_package_id, current_depth)) = queue.pop_front() else {
-                break;
-            };
-            let Some(current_package) = packages.get(&current_package_id).cloned() else {
-                continue;
-            };
-            let dependencies = package_dependency_addresses(&current_package.package)?;
-
-            for dependency_id in dependencies {
-                if is_framework_address(&dependency_id) || packages.contains_key(&dependency_id) {
+        if request.generate_buildable {
+            loop {
+                let Some((current_package_id, current_depth)) = queue.pop_front() else {
+                    break;
+                };
+                let Some(current_package) = packages.get(&current_package_id).cloned() else {
                     continue;
-                }
+                };
+                let dependencies = package_dependency_addresses(&current_package.package)?;
 
-                if current_depth + 1 > self.config.max_dependency_depth {
-                    return Err(format!(
-                        "Package {current_package_id} references {dependency_id}, which exceeds the configured dependency depth of {}.",
-                        self.config.max_dependency_depth
-                    ));
-                }
+                for dependency_id in dependencies {
+                    if is_framework_address(&dependency_id) || packages.contains_key(&dependency_id)
+                    {
+                        continue;
+                    }
 
-                let dependency_count = packages
-                    .values()
-                    .filter(|package| package.depth > 0)
-                    .count();
-                if dependency_count >= self.config.max_dependency_packages {
-                    return Err(format!(
-                        "Package {current_package_id} references {dependency_id}, but the configured dependency package limit of {} has been reached.",
-                        self.config.max_dependency_packages
-                    ));
-                }
+                    if current_depth + 1 > self.config.max_dependency_depth {
+                        return Err(format!(
+                            "Package {current_package_id} references {dependency_id}, which exceeds the configured dependency depth of {}.",
+                            self.config.max_dependency_depth
+                        ));
+                    }
 
-                let fetched =
-                    fetch_move_package_from_graphql(&request.graph_ql_url, &dependency_id).await?;
-                let fetched_id = normalize_sui_package_id(&fetched.address)?;
-                packages.insert(
-                    fetched_id.clone(),
-                    ResolvedPackage {
-                        package: fetched,
-                        depth: current_depth + 1,
-                    },
-                );
-                queue.push_back((fetched_id, current_depth + 1));
+                    let dependency_count = packages
+                        .values()
+                        .filter(|package| package.depth > 0)
+                        .count();
+                    if dependency_count >= self.config.max_dependency_packages {
+                        return Err(format!(
+                            "Package {current_package_id} references {dependency_id}, but the configured dependency package limit of {} has been reached.",
+                            self.config.max_dependency_packages
+                        ));
+                    }
+
+                    let fetched =
+                        fetch_move_package_from_graphql(&request.graph_ql_url, &dependency_id)
+                            .await?;
+                    let fetched_id = normalize_sui_package_id(&fetched.address)?;
+                    packages.insert(
+                        fetched_id.clone(),
+                        ResolvedPackage {
+                            package: fetched,
+                            depth: current_depth + 1,
+                        },
+                    );
+                    queue.push_back((fetched_id, current_depth + 1));
+                }
             }
         }
 

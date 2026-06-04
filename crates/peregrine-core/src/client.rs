@@ -393,7 +393,7 @@ impl ModelClient {
                 .state
                 .provider_state
                 .write()
-                .unwrap_or_else(|err| err.into_inner());
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             *guard = provider_state;
         }
         self.state
@@ -406,7 +406,7 @@ impl ModelClient {
         self.state
             .provider_state
             .read()
-            .unwrap_or_else(|err| err.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
     }
 

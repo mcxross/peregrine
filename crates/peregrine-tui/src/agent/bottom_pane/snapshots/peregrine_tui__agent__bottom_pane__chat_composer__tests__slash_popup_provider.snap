@@ -1,0 +1,10 @@
+---
+source: crates/peregrine-tui/src/agent/bottom_pane/chat_composer.rs
+assertion_line: 7831
+expression: terminal.backend()
+---
+"                                                            "
+"› /pr                                                       "
+"                                                            "
+"                                                            "
+"  /provider  choose the AI provider Peregrine uses          "

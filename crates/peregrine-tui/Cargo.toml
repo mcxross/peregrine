@@ -12,29 +12,149 @@ name = "peregrine-tui"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = { workspace = true }
+base64 = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
 clap = { workspace = true }
-crossterm = { workspace = true }
-crossterm-keybind = { workspace = true }
+codex-ansi-escape = { workspace = true }
+codex-arg0 = { workspace = true }
+codex-core-plugins = { workspace = true }
+codex-core-skills = { workspace = true }
+codex-exec-server = { workspace = true }
+codex-features = { workspace = true }
+codex-feedback = { workspace = true }
+codex-file-search = { workspace = true }
+codex-git-utils = { workspace = true }
+codex-install-context = { workspace = true }
+codex-model-provider-info = { workspace = true }
+codex-models-manager = { workspace = true }
+codex-otel = { workspace = true }
+codex-plugin = { workspace = true }
+codex-realtime-webrtc = { workspace = true }
+codex-rollout = { workspace = true }
+codex-sandboxing = { workspace = true }
+codex-shell-command = { workspace = true }
+codex-state = { workspace = true }
+codex-terminal-detection = { workspace = true }
+codex-utils-absolute-path = { workspace = true }
+codex-utils-approval-presets = { workspace = true }
+codex-utils-cli = { workspace = true }
+codex-utils-elapsed = { workspace = true }
+codex-utils-fuzzy-match = { workspace = true }
+codex-utils-path = { workspace = true }
+codex-utils-plugins = { workspace = true }
+codex-utils-sandbox-summary = { workspace = true }
+codex-utils-sleep-inhibitor = { workspace = true }
+codex-utils-string = { workspace = true }
+codex-windows-sandbox = { workspace = true }
+color-eyre = { workspace = true }
+crossterm = { version = "0.28.1", features = ["bracketed-paste", "event-stream"] }
+derive_more = { workspace = true, features = ["is_variant"] }
+diffy = { workspace = true }
+dirs = { workspace = true }
+dunce = { workspace = true }
+image = { workspace = true, features = ["jpeg", "png", "gif", "webp"] }
+itertools = { workspace = true }
+lazy_static = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-source-map = { workspace = true }
 move-cli = { workspace = true }
+move-command-line-common = { workspace = true }
+move-compiler = { workspace = true }
 move-disassembler = { workspace = true }
 move-package-alt-compilation = { workspace = true }
+pathdiff = { workspace = true }
 peregrine-adapters = { workspace = true }
+peregrine-app-server-client = { workspace = true }
+peregrine-app-server-protocol = { workspace = true }
 peregrine-bytecode = { workspace = true }
 peregrine-config = { workspace = true }
+peregrine-core = { workspace = true }
 peregrine-dynamic-analysis = { workspace = true }
 peregrine-helper-protocol = { workspace = true }
 peregrine-import-engine = { workspace = true }
+peregrine-model-provider = { workspace = true }
 peregrine-move-graphs = { workspace = true }
 peregrine-move-model = { workspace = true }
+peregrine-scanner = { workspace = true }
 peregrine-static-analysis = { workspace = true }
+peregrine-types = { workspace = true }
 peregrine-utils-home-dir = { workspace = true }
-ratatui = { workspace = true }
+pulldown-cmark = { workspace = true }
+rand = { workspace = true }
+ratatui = { version = "0.29.0", features = [
+    "scrolling-regions",
+    "unstable-backend-writer",
+    "unstable-rendered-line-info",
+    "unstable-widget-ref",
+] }
+ratatui-macros = "0.6"
 regex = { workspace = true }
+regex-lite = { workspace = true }
+reqwest = { workspace = true, features = ["blocking", "json"] }
+rmcp = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json = { workspace = true, features = ["preserve_order"] }
+sha2 = { workspace = true }
+shlex = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 sui-package-alt = { workspace = true }
+supports-color = { workspace = true }
 tempfile = { workspace = true }
-tokio = { workspace = true }
+textwrap = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = [
+    "io-std",
+    "macros",
+    "process",
+    "rt-multi-thread",
+    "signal",
+    "test-util",
+    "time",
+] }
+tokio-stream = { workspace = true, features = ["sync"] }
+tokio-util = { workspace = true, features = ["time"] }
 toml = { workspace = true }
+tracing = { workspace = true, features = ["log"] }
+tracing-appender = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+syntect = "5"
+two-face = { version = "0.5", default-features = false, features = ["syntect-default-onig"] }
+unicode-segmentation = { workspace = true }
+unicode-width = { workspace = true }
+url = { workspace = true }
+urlencoding = { workspace = true }
+uuid = { workspace = true }
+webbrowser = { workspace = true }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+cpal = "0.15"
+
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+which = { workspace = true }
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Console",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
+winsplit = "0.1"
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+arboard = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+core_test_support = { workspace = true }
+insta = { workspace = true }
+pretty_assertions = { workspace = true }
+serial_test = { workspace = true }
+vt100 = "0.15.2"
+wiremock = { workspace = true }

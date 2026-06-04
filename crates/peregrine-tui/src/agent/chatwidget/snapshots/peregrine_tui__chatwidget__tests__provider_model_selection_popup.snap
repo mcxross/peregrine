@@ -1,0 +1,12 @@
+---
+source: crates/peregrine-tui/src/agent/chatwidget/tests/popups_and_settings.rs
+assertion_line: 2379
+expression: popup
+---
+  Select Ollama Model
+  Pick an installed local model for new sessions.
+
+› 1. llama3.2 (default)  Local Ollama model
+  2. qwen2.5-coder
+
+  Press enter to confirm or esc to go back

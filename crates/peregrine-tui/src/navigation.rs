@@ -1,17 +1,16 @@
 use crate::keybinds::KeyBindEvent;
 use crate::{FocusPane, WorkbenchTab};
-use crossterm_keybind::KeyBindTrait;
-use ratatui::crossterm::event::KeyEvent;
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub const WORKBENCH_CANCELED: &str = "Workbench navigation canceled";
 pub const WORKBENCH_UNBOUND: &str = "Workbench navigation key is not bound";
 
 const FOCUS_ORDER: [FocusPane; 5] = [
     FocusPane::Explorer,
-    FocusPane::Tabs,
     FocusPane::Editor,
     FocusPane::Input,
     FocusPane::Inspector,
+    FocusPane::Tabs,
 ];
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -103,7 +102,7 @@ pub fn move_focus(current: FocusPane, direction: FocusDirection) -> FocusPane {
             FocusPane::Explorer => FocusPane::Explorer,
         },
         FocusDirection::Right => match current {
-            FocusPane::Explorer => FocusPane::Tabs,
+            FocusPane::Explorer => FocusPane::Editor,
             FocusPane::Tabs | FocusPane::Editor | FocusPane::Input => FocusPane::Inspector,
             FocusPane::Inspector => FocusPane::Inspector,
         },
@@ -121,7 +120,7 @@ pub fn move_focus(current: FocusPane, direction: FocusDirection) -> FocusPane {
 }
 
 fn always_available_command(key: KeyEvent) -> Option<NavigationCommand> {
-    for event in KeyBindEvent::dispatch(&key) {
+    for event in dispatch_key(key) {
         if event == KeyBindEvent::Quit {
             return Some(NavigationCommand::Quit);
         }
@@ -130,7 +129,7 @@ fn always_available_command(key: KeyEvent) -> Option<NavigationCommand> {
 }
 
 fn global_command(key: KeyEvent, focus: FocusPane) -> Option<NavigationCommand> {
-    for event in KeyBindEvent::dispatch(&key) {
+    for event in dispatch_key(key) {
         let command = match event {
             KeyBindEvent::BeginWorkbenchNavigation => NavigationCommand::BeginWorkbenchNavigation,
             KeyBindEvent::Save => NavigationCommand::Save,
@@ -161,7 +160,7 @@ fn chord_command(chord: NavigationChord, key: KeyEvent) -> NavigationCommand {
 }
 
 fn workbench_command(key: KeyEvent) -> NavigationCommand {
-    for event in KeyBindEvent::dispatch(&key) {
+    for event in dispatch_key(key) {
         let command = match event {
             KeyBindEvent::WorkbenchCancel => NavigationCommand::CancelWorkbenchNavigation,
             KeyBindEvent::WorkbenchFocusLeft => NavigationCommand::MoveFocus(FocusDirection::Left),
@@ -198,6 +197,79 @@ fn workbench_command(key: KeyEvent) -> NavigationCommand {
         return command;
     }
     NavigationCommand::UnboundWorkbenchNavigation
+}
+
+fn dispatch_key(key: KeyEvent) -> Vec<KeyBindEvent> {
+    let mut events = Vec::new();
+    let modifiers = key.modifiers;
+    let code = key.code;
+
+    match (code, modifiers) {
+        (KeyCode::Char('c' | 'C'), KeyModifiers::CONTROL)
+        | (KeyCode::Char('q' | 'Q'), KeyModifiers::CONTROL) => events.push(KeyBindEvent::Quit),
+        (KeyCode::Char('w' | 'W'), KeyModifiers::CONTROL) => {
+            events.push(KeyBindEvent::BeginWorkbenchNavigation)
+        }
+        (KeyCode::Char('s' | 'S'), KeyModifiers::CONTROL) => events.push(KeyBindEvent::Save),
+        (KeyCode::Char('r' | 'R'), KeyModifiers::CONTROL) => events.push(KeyBindEvent::Reload),
+        (KeyCode::Char('z' | 'Z'), KeyModifiers::CONTROL) => events.push(KeyBindEvent::Undo),
+        (KeyCode::Tab, KeyModifiers::NONE) => events.push(KeyBindEvent::FocusNext),
+        (KeyCode::BackTab, _) => events.push(KeyBindEvent::FocusPrevious),
+        (KeyCode::Char('1'), KeyModifiers::ALT) => events.push(KeyBindEvent::SelectCodeTab),
+        (KeyCode::Char('2'), KeyModifiers::ALT) => events.push(KeyBindEvent::SelectBytecodeTab),
+        (KeyCode::Char('3'), KeyModifiers::ALT) => events.push(KeyBindEvent::SelectCfgTab),
+        (KeyCode::Char('4'), KeyModifiers::ALT) => events.push(KeyBindEvent::SelectCallGraphTab),
+        (KeyCode::Char('5'), KeyModifiers::ALT) => events.push(KeyBindEvent::SelectTypeGraphTab),
+        (KeyCode::Esc, _) => events.push(KeyBindEvent::WorkbenchCancel),
+        (KeyCode::Char('h'), KeyModifiers::NONE) | (KeyCode::Left, KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchFocusLeft)
+        }
+        (KeyCode::Char('j'), KeyModifiers::NONE) | (KeyCode::Down, KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchFocusDown)
+        }
+        (KeyCode::Char('k'), KeyModifiers::NONE) | (KeyCode::Up, KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchFocusUp)
+        }
+        (KeyCode::Char('l'), KeyModifiers::NONE) | (KeyCode::Right, KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchFocusRight)
+        }
+        (KeyCode::Char('e'), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchFocusExplorer)
+        }
+        (KeyCode::Char('t'), KeyModifiers::NONE) => events.push(KeyBindEvent::WorkbenchFocusTabs),
+        (KeyCode::Char('c'), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchFocusCodeEditor)
+        }
+        (KeyCode::Char('i'), KeyModifiers::NONE) => events.push(KeyBindEvent::WorkbenchFocusInput),
+        (KeyCode::Char('p'), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchFocusInspector)
+        }
+        (KeyCode::Char('m'), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchToggleEditorMode)
+        }
+        (KeyCode::Char('['), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchPreviousTheme)
+        }
+        (KeyCode::Char(']'), KeyModifiers::NONE) => events.push(KeyBindEvent::WorkbenchNextTheme),
+        (KeyCode::Char('1'), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchSelectCodeTab)
+        }
+        (KeyCode::Char('2'), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchSelectBytecodeTab)
+        }
+        (KeyCode::Char('3'), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchSelectCfgTab)
+        }
+        (KeyCode::Char('4'), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchSelectCallGraphTab)
+        }
+        (KeyCode::Char('5'), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchSelectTypeGraphTab)
+        }
+        _ => {}
+    }
+
+    events
 }
 
 #[cfg(test)]
@@ -254,7 +326,7 @@ mod tests {
     fn focus_graph_is_explicit() {
         assert_eq!(
             move_focus(FocusPane::Explorer, FocusDirection::Right),
-            FocusPane::Tabs
+            FocusPane::Editor
         );
         assert_eq!(
             move_focus(FocusPane::Editor, FocusDirection::Down),
@@ -263,6 +335,23 @@ mod tests {
         assert_eq!(
             move_focus(FocusPane::Inspector, FocusDirection::Left),
             FocusPane::Editor
+        );
+        assert_eq!(
+            move_focus(FocusPane::Editor, FocusDirection::Up),
+            FocusPane::Tabs
+        );
+    }
+
+    #[test]
+    fn dispatch_maps_core_workbench_keys() {
+        assert_eq!(dispatch_key(ctrl('c')), vec![KeyBindEvent::Quit]);
+        assert_eq!(
+            dispatch_key(ctrl('w')),
+            vec![KeyBindEvent::BeginWorkbenchNavigation]
+        );
+        assert_eq!(
+            dispatch_key(key(KeyCode::Char('p'))),
+            vec![KeyBindEvent::WorkbenchFocusInspector]
         );
     }
 

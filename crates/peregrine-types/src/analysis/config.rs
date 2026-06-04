@@ -31,7 +31,7 @@ impl AnalysisConfig {
         let contents = fs::read_to_string(&config_path)
             .map_err(|error| format!("Could not read {}: {error}", config_path.display()))?;
         toml::from_str::<Self>(&contents)
-            .map(|config| config.with_defaults())
+            .map(AnalysisConfig::with_defaults)
             .map_err(|error| format!("Could not parse {}: {error}", config_path.display()))
     }
 

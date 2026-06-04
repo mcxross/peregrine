@@ -506,8 +506,14 @@ where
     T: Serialize,
     U: DeserializeOwned,
 {
-    serde_json::from_value(serde_json::to_value(value).expect("protocol value should serialize"))
-        .expect("Codex and Peregrine protocol types should be wire-compatible")
+    let value = match serde_json::to_value(value) {
+        Ok(value) => value,
+        Err(err) => panic!("protocol value should serialize: {err}"),
+    };
+    match serde_json::from_value(value) {
+        Ok(value) => value,
+        Err(err) => panic!("Codex and Peregrine protocol types should be wire-compatible: {err}"),
+    }
 }
 
 fn auth_mode_to_api(mode: codex_app_server_protocol::AuthMode) -> AuthMode {

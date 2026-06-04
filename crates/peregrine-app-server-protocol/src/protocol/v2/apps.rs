@@ -104,8 +104,73 @@ pub struct AppInfo {
 
 impl From<codex_app_server_protocol::AppInfo> for AppInfo {
     fn from(value: codex_app_server_protocol::AppInfo) -> Self {
-        serde_json::from_value(serde_json::to_value(value).expect("codex AppInfo should serialize"))
-            .expect("codex AppInfo should match Peregrine AppInfo")
+        Self {
+            id: value.id,
+            name: value.name,
+            description: value.description,
+            logo_url: value.logo_url,
+            logo_url_dark: value.logo_url_dark,
+            distribution_channel: value.distribution_channel,
+            branding: value.branding.map(AppBranding::from),
+            app_metadata: value.app_metadata.map(AppMetadata::from),
+            labels: value.labels,
+            install_url: value.install_url,
+            is_accessible: value.is_accessible,
+            is_enabled: value.is_enabled,
+            plugin_display_names: value.plugin_display_names,
+        }
+    }
+}
+
+impl From<codex_app_server_protocol::AppBranding> for AppBranding {
+    fn from(value: codex_app_server_protocol::AppBranding) -> Self {
+        Self {
+            category: value.category,
+            developer: value.developer,
+            website: value.website,
+            privacy_policy: value.privacy_policy,
+            terms_of_service: value.terms_of_service,
+            is_discoverable_app: value.is_discoverable_app,
+        }
+    }
+}
+
+impl From<codex_app_server_protocol::AppReview> for AppReview {
+    fn from(value: codex_app_server_protocol::AppReview) -> Self {
+        Self {
+            status: value.status,
+        }
+    }
+}
+
+impl From<codex_app_server_protocol::AppScreenshot> for AppScreenshot {
+    fn from(value: codex_app_server_protocol::AppScreenshot) -> Self {
+        Self {
+            url: value.url,
+            file_id: value.file_id,
+            user_prompt: value.user_prompt,
+        }
+    }
+}
+
+impl From<codex_app_server_protocol::AppMetadata> for AppMetadata {
+    fn from(value: codex_app_server_protocol::AppMetadata) -> Self {
+        Self {
+            review: value.review.map(AppReview::from),
+            categories: value.categories,
+            sub_categories: value.sub_categories,
+            seo_description: value.seo_description,
+            screenshots: value
+                .screenshots
+                .map(|screenshots| screenshots.into_iter().map(AppScreenshot::from).collect()),
+            developer: value.developer,
+            version: value.version,
+            version_id: value.version_id,
+            version_notes: value.version_notes,
+            first_party_type: value.first_party_type,
+            first_party_requires_install: value.first_party_requires_install,
+            show_in_composer_when_unlinked: value.show_in_composer_when_unlinked,
+        }
     }
 }
 
