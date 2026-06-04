@@ -1,0 +1,17 @@
+[package]
+name = "peregrine-provider-registry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+codex-login = { workspace = true }
+codex-model-provider-info = { workspace = true }
+peregrine-model-provider = { workspace = true }
+peregrine-anthropic = { workspace = true }
+
+[lints]
+workspace = true
+
+[lib]
+doctest = false
