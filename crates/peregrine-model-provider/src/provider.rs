@@ -25,6 +25,13 @@ use crate::auth::auth_manager_for_provider;
 use crate::auth::resolve_provider_auth;
 use crate::models_endpoint::OpenAiModelsEndpoint;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimeWireApi {
+    Responses,
+    ChatCompletions,
+    AnthropicMessages,
+}
+
 /// Optional provider-backed features that Codex may expose at runtime.
 ///
 /// These capabilities are a provider-owned upper bound. Callers can disable
@@ -157,6 +164,11 @@ fn build_header_map(provider: &ModelProviderInfo) -> HeaderMap {
 pub trait ModelProvider: fmt::Debug + Send + Sync {
     /// Returns the configured provider metadata.
     fn info(&self) -> &ModelProviderInfo;
+
+    /// Returns the concrete runtime transport used to stream turns.
+    fn runtime_wire_api(&self) -> RuntimeWireApi {
+        RuntimeWireApi::Responses
+    }
 
     /// Returns the provider-owned capability upper bounds.
     fn capabilities(&self) -> ProviderCapabilities {
