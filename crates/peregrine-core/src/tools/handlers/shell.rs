@@ -42,22 +42,24 @@ fn shell_command_payload_command(payload: &ToolPayload) -> Option<String> {
         .map(|params| params.command)
 }
 
-struct RunExecLikeArgs {
-    tool_name: ToolName,
-    exec_params: ExecParams,
-    cancellation_token: CancellationToken,
-    hook_command: String,
-    shell_type: Option<ShellType>,
-    additional_permissions: Option<AdditionalPermissionProfile>,
-    prefix_rule: Option<Vec<String>>,
-    session: Arc<crate::session::session::Session>,
-    turn: Arc<TurnContext>,
-    tracker: crate::tools::context::SharedTurnDiffTracker,
-    call_id: String,
-    shell_runtime_backend: ShellRuntimeBackend,
+pub(crate) struct RunExecLikeArgs {
+    pub(crate) tool_name: ToolName,
+    pub(crate) exec_params: ExecParams,
+    pub(crate) cancellation_token: CancellationToken,
+    pub(crate) hook_command: String,
+    pub(crate) shell_type: Option<ShellType>,
+    pub(crate) additional_permissions: Option<AdditionalPermissionProfile>,
+    pub(crate) prefix_rule: Option<Vec<String>>,
+    pub(crate) session: Arc<crate::session::session::Session>,
+    pub(crate) turn: Arc<TurnContext>,
+    pub(crate) tracker: crate::tools::context::SharedTurnDiffTracker,
+    pub(crate) call_id: String,
+    pub(crate) shell_runtime_backend: ShellRuntimeBackend,
 }
 
-async fn run_exec_like(args: RunExecLikeArgs) -> Result<FunctionToolOutput, FunctionCallError> {
+pub(crate) async fn run_exec_like(
+    args: RunExecLikeArgs,
+) -> Result<FunctionToolOutput, FunctionCallError> {
     let RunExecLikeArgs {
         tool_name,
         exec_params,

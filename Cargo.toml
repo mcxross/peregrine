@@ -15,6 +15,7 @@ members = [
   "crates/peregrine-project-loader",
   "crates/peregrine-plugins",
   "crates/peregrine-scanner",
+  "crates/peregrine-security-tools",
   "crates/peregrine-static-analysis",
   "crates/peregrine-terminal",
   "crates/peregrine-tui",
@@ -289,6 +290,7 @@ codex-rollout = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-
 codex-rollout-trace = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-sandboxing = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 peregrine-scanner = { path = "crates/peregrine-scanner" }
+peregrine-security-tools = { path = "crates/peregrine-security-tools" }
 codex-secrets = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-shell-command = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-shell-escalation = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }

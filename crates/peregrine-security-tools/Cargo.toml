@@ -1,0 +1,23 @@
+[package]
+name = "peregrine-security-tools"
+version.workspace = true
+edition.workspace = true
+description = "Harness-facing Sui/Move security tool services for Peregrine"
+
+[dependencies]
+peregrine-adapters = { workspace = true }
+peregrine-bytecode = { workspace = true }
+peregrine-dynamic-analysis = { workspace = true }
+peregrine-helper-protocol = { workspace = true }
+peregrine-move-graphs = { workspace = true }
+peregrine-move-insights = { workspace = true }
+peregrine-move-model = { workspace = true }
+peregrine-scanner = { workspace = true }
+peregrine-static-analysis = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
