@@ -15,4 +15,5 @@ pub use peregrine_adapters::sui::{SuiAdapterSettings, SuiAdapterSource};
 pub use reports::{
     DecompiledPackageReport, static_analyze_package, static_rule_catalog, sui_bytecode_decompile,
     sui_bytecode_view, sui_function_state_graph, sui_graphs, sui_package_insights,
+    sui_scanner_report,
 };

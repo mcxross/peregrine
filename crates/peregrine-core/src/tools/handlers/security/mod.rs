@@ -16,6 +16,7 @@ const TOOL_SEARCH_SOURCE_DESCRIPTION: &str =
 pub(crate) const SECURITY_TOOL_NAMES: &[&str] = &[
     spec::STATIC_RULE_CATALOG,
     spec::STATIC_ANALYZE_PACKAGE,
+    spec::SCANNER_REPORT,
     spec::PACKAGE_INSIGHTS,
     spec::GRAPHS,
     spec::FUNCTION_STATE_GRAPH,

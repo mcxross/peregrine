@@ -9,7 +9,7 @@ use codex_tools::{ToolName, ToolSpec};
 use peregrine_security_tools::{
     SecurityToolsError, resolve_move_package, static_analyze_package, static_rule_catalog,
     sui_bytecode_decompile, sui_bytecode_view, sui_function_state_graph, sui_graphs,
-    sui_package_insights,
+    sui_package_insights, sui_scanner_report,
 };
 use serde::Deserialize;
 use serde::Serialize;
@@ -22,6 +22,7 @@ use super::{spec, tool_search_info};
 pub(crate) enum ReadToolKind {
     StaticRuleCatalog,
     StaticAnalyzePackage,
+    ScannerReport,
     PackageInsights,
     Graphs,
     FunctionStateGraph,
@@ -42,6 +43,7 @@ impl ReadToolHandler {
         match self.kind {
             ReadToolKind::StaticRuleCatalog => "sui move static analysis rules rule catalog analyzer plugins security".to_string(),
             ReadToolKind::StaticAnalyzePackage => "sui move static analysis analyze package vulnerabilities findings metrics".to_string(),
+            ReadToolKind::ScannerReport => "sui move scanner raw scan objects capabilities ownership tests formal specs diagnostics security".to_string(),
             ReadToolKind::PackageInsights => "sui move package insights attack surface capabilities shared objects tests formal specs".to_string(),
             ReadToolKind::Graphs => "sui move call graph type graph state access graph package security".to_string(),
             ReadToolKind::FunctionStateGraph => "sui move function state access graph object reads writes borrows security".to_string(),
@@ -57,6 +59,7 @@ impl ToolExecutor<ToolInvocation> for ReadToolHandler {
         ToolName::plain(match self.kind {
             ReadToolKind::StaticRuleCatalog => spec::STATIC_RULE_CATALOG,
             ReadToolKind::StaticAnalyzePackage => spec::STATIC_ANALYZE_PACKAGE,
+            ReadToolKind::ScannerReport => spec::SCANNER_REPORT,
             ReadToolKind::PackageInsights => spec::PACKAGE_INSIGHTS,
             ReadToolKind::Graphs => spec::GRAPHS,
             ReadToolKind::FunctionStateGraph => spec::FUNCTION_STATE_GRAPH,
@@ -69,6 +72,7 @@ impl ToolExecutor<ToolInvocation> for ReadToolHandler {
         match self.kind {
             ReadToolKind::StaticRuleCatalog => spec::create_static_rule_catalog_tool(),
             ReadToolKind::StaticAnalyzePackage => spec::create_static_analyze_package_tool(),
+            ReadToolKind::ScannerReport => spec::create_scanner_report_tool(),
             ReadToolKind::PackageInsights => spec::create_package_insights_tool(),
             ReadToolKind::Graphs => spec::create_graphs_tool(),
             ReadToolKind::FunctionStateGraph => spec::create_function_state_graph_tool(),
@@ -106,6 +110,11 @@ impl ToolExecutor<ToolInvocation> for ReadToolHandler {
                 "status": "ok",
                 "package": package,
                 "report": static_analyze_package(&ctx),
+            }),
+            ReadToolKind::ScannerReport => json!({
+                "status": "ok",
+                "package": package,
+                "report": sui_scanner_report(&ctx).map_err(to_model_error)?,
             }),
             ReadToolKind::PackageInsights => json!({
                 "status": "ok",

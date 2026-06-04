@@ -553,6 +553,7 @@ fn add_security_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mut Pla
     for kind in [
         SecurityReadToolKind::StaticRuleCatalog,
         SecurityReadToolKind::StaticAnalyzePackage,
+        SecurityReadToolKind::ScannerReport,
         SecurityReadToolKind::PackageInsights,
         SecurityReadToolKind::Graphs,
         SecurityReadToolKind::FunctionStateGraph,

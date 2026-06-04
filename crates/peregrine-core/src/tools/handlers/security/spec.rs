@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 pub(crate) const STATIC_RULE_CATALOG: &str = "security_sui_static_rule_catalog";
 pub(crate) const STATIC_ANALYZE_PACKAGE: &str = "security_sui_static_analyze_package";
+pub(crate) const SCANNER_REPORT: &str = "security_sui_scanner_report";
 pub(crate) const PACKAGE_INSIGHTS: &str = "security_sui_package_insights";
 pub(crate) const GRAPHS: &str = "security_sui_graphs";
 pub(crate) const FUNCTION_STATE_GRAPH: &str = "security_sui_function_state_graph";
@@ -26,6 +27,15 @@ pub(crate) fn create_static_analyze_package_tool() -> ToolSpec {
     function_tool(
         STATIC_ANALYZE_PACKAGE,
         "Run Peregrine static analysis on a Sui Move package and return findings, metrics, loaded rulesets, loaded plugins, and diagnostics.",
+        common_package_properties(),
+        None,
+    )
+}
+
+pub(crate) fn create_scanner_report_tool() -> ToolSpec {
+    function_tool(
+        SCANNER_REPORT,
+        "Run Peregrine's Sui Move scanners directly and return raw scanner outputs for object ownership, capabilities, tests, formal specs, diagnostics, and source evidence.",
         common_package_properties(),
         None,
     )

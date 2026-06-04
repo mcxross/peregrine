@@ -11,7 +11,7 @@ use peregrine_move_insights::{
     attack_surface::{MovePackageSurface, package_surface_from_scanner_report},
     scanner_report::{MovePackageScannerReport, package_scanner_report_for_package},
 };
-use peregrine_move_model::build_move_package;
+use peregrine_move_model::{MovePackageModel, build_move_package};
 use peregrine_scanner::{ScanInput, ScanReport, SourceMode, sui::scan_package};
 use peregrine_static_analysis::{
     AnalysisConfig, AnalysisEngine, AnalysisEngineOptions, AnalysisReport, AnalysisRuleCatalog,
@@ -35,33 +35,48 @@ pub fn static_analyze_package(ctx: &MovePackageContext) -> AnalysisReport {
     )
 }
 
+pub fn sui_scanner_report(ctx: &MovePackageContext) -> SecurityToolsResult<ScanReport> {
+    let model = build_package_model(ctx)?;
+    Ok(scan_package(scanner_input(ctx, &model)))
+}
+
 pub fn sui_package_insights(
     ctx: &MovePackageContext,
 ) -> SecurityToolsResult<SuiPackageInsightsReport> {
-    let manifest_path = ctx.package_root.join("Move.toml");
-    let model = build_move_package(&ctx.project_root, &manifest_path, true).ok_or_else(|| {
-        SecurityToolsError::Analysis(format!(
-            "Could not build Move package model for {}",
-            ctx.package_root.display()
-        ))
-    })?;
-    let package_root = Some(ctx.package_root.clone());
-    let build_root = Some(ctx.package_root.join("build").join(&ctx.package_name));
-    let scanner_report =
-        package_scanner_report_for_package(&model, package_root.clone(), build_root.clone());
+    let model = build_package_model(ctx)?;
+    let scanner_input = scanner_input(ctx, &model);
+    let scanner_report = package_scanner_report_for_package(
+        &model,
+        scanner_input.package_root.clone(),
+        scanner_input.build_root.clone(),
+    );
     let attack_surface = package_surface_from_scanner_report(&model, &scanner_report);
-    let raw_scanner_report = scan_package(ScanInput {
-        package_model: &model,
-        package_root,
-        build_root,
-        source_mode: SourceMode::BestAvailable,
-    });
+    let raw_scanner_report = scan_package(scanner_input);
 
     Ok(SuiPackageInsightsReport {
         scanner_report,
         raw_scanner_report,
         attack_surface,
     })
+}
+
+fn build_package_model(ctx: &MovePackageContext) -> SecurityToolsResult<MovePackageModel> {
+    let manifest_path = ctx.package_root.join("Move.toml");
+    build_move_package(&ctx.project_root, &manifest_path, true).ok_or_else(|| {
+        SecurityToolsError::Analysis(format!(
+            "Could not build Move package model for {}",
+            ctx.package_root.display()
+        ))
+    })
+}
+
+fn scanner_input<'a>(ctx: &MovePackageContext, model: &'a MovePackageModel) -> ScanInput<'a> {
+    ScanInput {
+        package_model: model,
+        package_root: Some(ctx.package_root.clone()),
+        build_root: Some(ctx.package_root.join("build").join(&ctx.package_name)),
+        source_mode: SourceMode::BestAvailable,
+    }
 }
 
 #[derive(Serialize)]
