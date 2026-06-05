@@ -75,7 +75,9 @@ pub(crate) fn builtins_for_input(flags: BuiltinCommandFlags) -> Vec<(&'static st
         .filter(|(_, cmd)| flags.collaboration_modes_enabled || *cmd != SlashCommand::Plan)
         .filter(|(_, cmd)| flags.connectors_enabled || *cmd != SlashCommand::Apps)
         .filter(|(_, cmd)| flags.plugins_command_enabled || *cmd != SlashCommand::Plugins)
-        .filter(|(_, cmd)| flags.goal_command_enabled || *cmd != SlashCommand::Goal)
+        .filter(|(_, cmd)| {
+            flags.goal_command_enabled || !matches!(*cmd, SlashCommand::Goal | SlashCommand::Scan)
+        })
         .filter(|(_, cmd)| flags.personality_command_enabled || *cmd != SlashCommand::Personality)
         .filter(|(_, cmd)| flags.realtime_conversation_enabled || *cmd != SlashCommand::Realtime)
         .filter(|(_, cmd)| flags.audio_device_selection_enabled || *cmd != SlashCommand::Settings)
@@ -254,6 +256,7 @@ mod tests {
         let mut flags = all_enabled_flags();
         flags.goal_command_enabled = false;
         assert_eq!(find_builtin_command("goal", flags), None);
+        assert_eq!(find_builtin_command("scan", flags), None);
     }
 
     #[test]

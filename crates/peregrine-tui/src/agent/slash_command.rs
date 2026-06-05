@@ -37,6 +37,7 @@ pub enum SlashCommand {
     Compact,
     Plan,
     Goal,
+    Scan,
     Agent,
     Side,
     Btw,
@@ -115,6 +116,7 @@ impl SlashCommand {
             SlashCommand::Settings => "configure realtime microphone/speaker",
             SlashCommand::Plan => "switch to Plan mode",
             SlashCommand::Goal => "set or view the goal for a long-running task",
+            SlashCommand::Scan => "start a Sui Move security scan goal",
             SlashCommand::Agent | SlashCommand::MultiAgents => "switch the active agent thread",
             SlashCommand::Side | SlashCommand::Btw => {
                 "start a side conversation in an ephemeral fork"
@@ -151,6 +153,7 @@ impl SlashCommand {
                 | SlashCommand::Rename
                 | SlashCommand::Plan
                 | SlashCommand::Goal
+                | SlashCommand::Scan
                 | SlashCommand::Ide
                 | SlashCommand::Keymap
                 | SlashCommand::Mcp
@@ -212,6 +215,7 @@ impl SlashCommand {
             | SlashCommand::Ps
             | SlashCommand::Stop
             | SlashCommand::Goal
+            | SlashCommand::Scan
             | SlashCommand::Mcp
             | SlashCommand::Apps
             | SlashCommand::Plugins
@@ -286,12 +290,20 @@ mod tests {
     #[test]
     fn certain_commands_are_available_during_task() {
         assert!(SlashCommand::Goal.available_during_task());
+        assert!(SlashCommand::Scan.available_during_task());
         assert!(SlashCommand::Ide.available_during_task());
         assert!(SlashCommand::Title.available_during_task());
         assert!(SlashCommand::Statusline.available_during_task());
         assert!(SlashCommand::Raw.available_during_task());
         assert!(SlashCommand::Raw.available_in_side_conversation());
         assert!(SlashCommand::Raw.supports_inline_args());
+        assert!(SlashCommand::Scan.supports_inline_args());
+    }
+
+    #[test]
+    fn scan_command_parses_to_scan() {
+        assert_eq!(SlashCommand::Scan.command(), "scan");
+        assert_eq!(SlashCommand::from_str("scan"), Ok(SlashCommand::Scan));
     }
 
     #[test]

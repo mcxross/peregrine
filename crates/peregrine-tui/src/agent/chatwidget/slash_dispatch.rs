@@ -34,7 +34,28 @@ const SIDE_SLASH_COMMAND_UNAVAILABLE_HINT: &str =
     "Press Ctrl+C to return to the main thread first.";
 const GOAL_USAGE: &str = "Usage: /goal <objective>";
 const GOAL_USAGE_HINT: &str = "Example: /goal improve benchmark coverage";
+const SCAN_USAGE: &str = "Usage: /scan [scope or focus]";
 const RAW_USAGE: &str = "Usage: /raw [on|off]";
+
+fn security_scan_goal_objective(scope: Option<&str>) -> String {
+    let mut objective = String::from(
+        "Run a full Sui Move security scan of the loaded package as Peregrine's security-focused harness.\n\
+         Refer to the harness as Peregrine, not Codex, unless quoting source names.\n\
+         If `tool_search` is available, first use it to discover Sui security tools relevant to package insight, static analysis, scanner reports, graphs, bytecode, fuzzing, and formal verification. Call returned `security_sui_*` entries as harness/model tools with their JSON arguments. They are not shell commands; never run `security_sui_*` names through the shell.\n\
+         Do not wait for the user to enumerate audit steps. First infer and state what the package intends to do from source-grounded evidence: Move.toml, README/docs, tests, public entry points, module APIs, object/resource types, events, comments, and dependency usage.\n\
+         Based on that inferred package intent, build your own analysis plan and execute it. Use any available Sui/Move security tools, source inspection, package insight tools, static rules, graphs, bytecode/decompile views, build/test commands, fuzzing, and formal verification when they are relevant and allowed. Do not call tools randomly; pick tools because they test a concrete hypothesis or invariant from the package intent.\n\
+         Cover assets, trust boundaries, capabilities and privileges, object ownership and transfer/share/freeze/delete flows, dynamic fields, coin/balance accounting, upgrade or dependency risks, oracle/time/randomness assumptions, arithmetic, abort paths, and meaningful test or specification gaps when applicable.\n\
+         Deliver a security state report with: package intent summary, analysis plan actually executed, tools and evidence used, confirmed findings with severity/confidence/affected locations/exploit scenario/impact/remediation, important non-findings, and remaining gaps or blocked checks.\n\
+         Keep the user in control: adapt to follow-up steering, narrow or expand scope when asked, and request approval before destructive, external-network, or expensive actions that require it.",
+    );
+
+    if let Some(scope) = scope.map(str::trim).filter(|scope| !scope.is_empty()) {
+        objective.push_str("\n\nUser-provided scan scope or focus:\n");
+        objective.push_str(scope);
+    }
+
+    objective
+}
 
 impl ChatWidget {
     /// Dispatch a bare slash command and record its staged local-history entry.
@@ -44,7 +65,7 @@ impl ChatWidget {
     /// rule as normal text.
     pub(super) fn handle_slash_command_dispatch(&mut self, cmd: SlashCommand) {
         self.dispatch_command(cmd);
-        if cmd == SlashCommand::Goal {
+        if matches!(cmd, SlashCommand::Goal | SlashCommand::Scan) {
             self.bottom_pane.drain_pending_submission_state();
         }
         self.bottom_pane.record_pending_slash_command_history();
@@ -122,6 +143,61 @@ impl ChatWidget {
         };
 
         self.request_side_conversation(parent_thread_id, /*user_message*/ None);
+    }
+
+    fn dispatch_security_scan_goal(
+        &mut self,
+        scope: Option<&str>,
+        source: SlashCommandDispatchSource,
+    ) {
+        if !self.config.features.enabled(Feature::Goals) {
+            return;
+        }
+
+        let objective = security_scan_goal_objective(scope);
+        let validation_source = match source {
+            SlashCommandDispatchSource::Live => GoalObjectiveValidationSource::Live,
+            SlashCommandDispatchSource::Queued => GoalObjectiveValidationSource::Queued,
+        };
+        if !self.goal_objective_is_allowed(&objective, validation_source) {
+            return;
+        }
+
+        let command_text = match scope.map(str::trim).filter(|scope| !scope.is_empty()) {
+            Some(scope) => format!("/scan {scope}"),
+            None => "/scan".to_string(),
+        };
+        let Some(thread_id) = self.thread_id else {
+            if source == SlashCommandDispatchSource::Live {
+                self.queue_user_message_with_options(
+                    UserMessage {
+                        text: command_text,
+                        local_images: Vec::new(),
+                        remote_image_urls: Vec::new(),
+                        text_elements: Vec::new(),
+                        mention_bindings: Vec::new(),
+                    },
+                    QueuedInputAction::ParseSlash,
+                );
+                self.bottom_pane.drain_pending_submission_state();
+            } else {
+                self.add_info_message(
+                    SCAN_USAGE.to_string(),
+                    Some("The session must start before you can run a scan.".to_string()),
+                );
+            }
+            return;
+        };
+
+        self.app_event_tx.send(AppEvent::SetThreadGoalObjective {
+            thread_id,
+            objective,
+            mode: ThreadGoalSetMode::ConfirmIfExists,
+        });
+        self.append_message_history_entry(command_text);
+        if source == SlashCommandDispatchSource::Live {
+            self.bottom_pane.drain_pending_submission_state();
+        }
     }
 
     fn emit_raw_output_mode_changed(&self, enabled: bool) {
@@ -255,6 +331,9 @@ impl ChatWidget {
                         Some(GOAL_USAGE_HINT.to_string()),
                     );
                 }
+            }
+            SlashCommand::Scan => {
+                self.dispatch_security_scan_goal(None, SlashCommandDispatchSource::Live);
             }
             SlashCommand::Side | SlashCommand::Btw => {
                 self.request_empty_side_conversation(cmd);
@@ -767,6 +846,10 @@ impl ChatWidget {
                     self.bottom_pane.drain_pending_submission_state();
                 }
             }
+            SlashCommand::Scan if !trimmed.is_empty() => {
+                self.dispatch_security_scan_goal(Some(trimmed), source);
+                return;
+            }
             SlashCommand::Side | SlashCommand::Btw if !trimmed.is_empty() => {
                 let Some(parent_thread_id) = self.thread_id else {
                     let command = cmd.command();
@@ -979,6 +1062,7 @@ impl ChatWidget {
             | SlashCommand::Personality
             | SlashCommand::Plan
             | SlashCommand::Goal
+            | SlashCommand::Scan
             | SlashCommand::Side
             | SlashCommand::Btw
             | SlashCommand::Keymap
