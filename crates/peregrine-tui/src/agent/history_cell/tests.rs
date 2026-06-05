@@ -319,7 +319,7 @@ fn proposed_plan_cell_preserves_wrapped_table_web_links() {
 
 #[test]
 fn composite_cell_preserves_child_web_links() {
-    let destination = "https://chatgpt.com/codex/settings/usage";
+    let destination = "https://example.com/settings/usage";
     let cell = CompositeHistoryCell::new(vec![
         Box::new(PlainHistoryCell::new(vec![Line::from("/status")])),
         Box::new(WebHyperlinkHistoryCell::new(vec![Line::from(destination)])),
@@ -1067,18 +1067,17 @@ fn web_search_history_cell_snapshot() {
 }
 
 #[test]
-fn standalone_unix_update_available_history_cell_snapshot() {
+fn brew_update_available_history_cell_snapshot() {
     let cell =
-        UpdateAvailableHistoryCell::new("9.9.9".to_string(), Some(UpdateAction::StandaloneUnix));
+        UpdateAvailableHistoryCell::new("9.9.9".to_string(), Some(UpdateAction::BrewUpgrade));
     let rendered = render_lines(&cell.display_lines(/*width*/ 110)).join("\n");
 
     insta::assert_snapshot!(rendered);
 }
 
 #[test]
-fn standalone_windows_update_available_history_cell_snapshot() {
-    let cell =
-        UpdateAvailableHistoryCell::new("9.9.9".to_string(), Some(UpdateAction::StandaloneWindows));
+fn package_manager_update_available_history_cell_snapshot() {
+    let cell = UpdateAvailableHistoryCell::new("9.9.9".to_string(), None);
     let rendered = render_lines(&cell.display_lines(/*width*/ 110)).join("\n");
 
     insta::assert_snapshot!(rendered);

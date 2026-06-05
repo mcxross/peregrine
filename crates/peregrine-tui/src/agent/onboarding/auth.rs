@@ -551,15 +551,9 @@ impl AuthModeWidget {
             "  Before you start:".into(),
             "".into(),
             "  Decide how much autonomy you want to grant Peregrine".into(),
-            Line::from(vec![
-                "  For more details see the ".into(),
-                crate::agent::terminal_hyperlinks::osc8_hyperlink(
-                    "https://developers.openai.com/codex/security",
-                    "Peregrine docs",
-                )
-                .underlined(),
-            ])
-            .dim(),
+            "  Review permission prompts and sandbox settings before granting access"
+                .dim()
+                .into(),
             "".into(),
             "  Peregrine can make mistakes".into(),
             "  Review the code it writes and commands it runs"
@@ -624,7 +618,7 @@ impl AuthModeWidget {
         let mut intro_lines: Vec<Line> = vec![
             Line::from(vec![
                 "> ".into(),
-                "Use your own OpenAI API key for usage-based billing".bold(),
+                "Use an API key for usage-based billing".bold(),
             ]),
             "".into(),
             "  Paste or type your API key below. It will be stored locally in auth.json.".into(),

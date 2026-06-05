@@ -1,8 +1,6 @@
 #[cfg(unix)]
 use std::process::Command as StdCommand;
 #[cfg(unix)]
-use std::process::Stdio;
-#[cfg(unix)]
 use std::time::Duration;
 
 #[cfg(unix)]
@@ -14,10 +12,6 @@ use anyhow::bail;
 use futures::FutureExt;
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
-#[cfg(unix)]
-use tokio::io::AsyncWriteExt;
-#[cfg(unix)]
-use tokio::process::Command;
 #[cfg(unix)]
 use tokio::signal::unix::Signal;
 #[cfg(unix)]
@@ -156,41 +150,9 @@ pub(crate) fn reexec_managed_updater(managed_peregrine_bin: &std::path::Path) ->
 
 #[cfg(unix)]
 async fn install_latest_standalone() -> Result<()> {
-    let script = reqwest::get("https://chatgpt.com/codex/install.sh")
-        .await
-        .context("failed to fetch standalone Peregrine updater")?
-        .error_for_status()
-        .context("standalone Peregrine updater request failed")?
-        .bytes()
-        .await
-        .context("failed to read standalone Peregrine updater")?;
-
-    let mut child = Command::new("/bin/sh")
-        .arg("-s")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .context("failed to invoke standalone Peregrine updater")?;
-    let mut stdin = child
-        .stdin
-        .take()
-        .context("standalone Peregrine updater stdin was unavailable")?;
-    stdin
-        .write_all(&script)
-        .await
-        .context("failed to pass standalone Peregrine updater to shell")?;
-    drop(stdin);
-    let status = child
-        .wait()
-        .await
-        .context("failed to wait for standalone Peregrine updater")?;
-
-    if status.success() {
-        Ok(())
-    } else {
-        anyhow::bail!("standalone Peregrine updater exited with status {status}")
-    }
+    anyhow::bail!(
+        "managed standalone Peregrine auto-update is disabled until a Peregrine-owned installer is configured"
+    )
 }
 
 #[cfg(all(test, unix))]

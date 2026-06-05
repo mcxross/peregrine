@@ -763,7 +763,6 @@ pub struct Config {
     /// Preferred store for MCP OAuth credentials.
     /// keyring: Use an OS-specific keyring service.
     ///          Credentials stored in the keyring will only be readable by Peregrine unless the user explicitly grants access via OS-level keyring access.
-    ///          https://github.com/openai/codex/blob/main/peregrine-rs/rmcp-client/src/oauth.rs#L2
     /// file: PEREGRINE_HOME/.credentials.json
     ///       This file will be readable to Peregrine and other applications running as the same user.
     /// auto (default): keyring if available, otherwise file.

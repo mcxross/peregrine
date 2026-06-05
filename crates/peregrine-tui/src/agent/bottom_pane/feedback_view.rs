@@ -28,11 +28,6 @@ use super::popup_consts::standard_popup_hint_line;
 use super::textarea::TextArea;
 use super::textarea::TextAreaState;
 
-const BASE_CLI_BUG_ISSUE_URL: &str =
-    "https://github.com/openai/codex/issues/new?template=3-cli.yml";
-/// Internal routing link for employee feedback follow-ups. This must not be shown to external users.
-const CODEX_FEEDBACK_INTERNAL_URL: &str = "http://go/codex-feedback-internal";
-
 /// The target audience for feedback follow-up instructions.
 ///
 /// This is used strictly for messaging/links after feedback upload completes. It
@@ -332,12 +327,6 @@ pub(crate) fn feedback_success_cell(
             lines.extend([
                 "".into(),
                 Line::from(vec!["  ".into(), url.cyan().underlined()]),
-                "".into(),
-                Line::from("  Share this and add some info about your problem:"),
-                Line::from(vec![
-                    "    ".into(),
-                    format!("https://go/codex-feedback/{thread_id}").bold(),
-                ]),
             ]);
         }
         Some(url) => {
@@ -363,33 +352,11 @@ pub(crate) fn feedback_success_cell(
 }
 
 fn issue_url_for_category(
-    category: FeedbackCategory,
-    thread_id: &str,
-    feedback_audience: FeedbackAudience,
+    _category: FeedbackCategory,
+    _thread_id: &str,
+    _feedback_audience: FeedbackAudience,
 ) -> Option<String> {
-    // Only certain categories provide a follow-up link. We intentionally keep
-    // the external GitHub behavior identical while routing internal users to
-    // the internal go link.
-    match category {
-        FeedbackCategory::Bug
-        | FeedbackCategory::BadResult
-        | FeedbackCategory::SafetyCheck
-        | FeedbackCategory::Other => Some(match feedback_audience {
-            FeedbackAudience::OpenAiEmployee => slack_feedback_url(thread_id),
-            FeedbackAudience::External => {
-                format!("{BASE_CLI_BUG_ISSUE_URL}&steps=Uploaded%20thread:%20{thread_id}")
-            }
-        }),
-        FeedbackCategory::GoodResult => None,
-    }
-}
-
-/// Build the internal follow-up URL.
-///
-/// We accept a `thread_id` so the call site stays symmetric with the external
-/// path, but we currently point to a fixed channel without prefilling text.
-fn slack_feedback_url(_thread_id: &str) -> String {
-    CODEX_FEEDBACK_INTERNAL_URL.to_string()
+    None
 }
 
 // Build the selection popup params for feedback categories.
@@ -815,48 +782,22 @@ mod tests {
     }
 
     #[test]
-    fn issue_url_available_for_bug_bad_result_safety_check_and_other() {
-        let bug_url = issue_url_for_category(
+    fn issue_url_is_not_generated_without_peregrine_feedback_target() {
+        for category in [
             FeedbackCategory::Bug,
-            "thread-1",
-            FeedbackAudience::OpenAiEmployee,
-        );
-        let expected_slack_url = "http://go/codex-feedback-internal".to_string();
-        assert_eq!(bug_url.as_deref(), Some(expected_slack_url.as_str()));
-
-        let bad_result_url = issue_url_for_category(
             FeedbackCategory::BadResult,
-            "thread-2",
-            FeedbackAudience::OpenAiEmployee,
-        );
-        assert!(bad_result_url.is_some());
-
-        let other_url = issue_url_for_category(
-            FeedbackCategory::Other,
-            "thread-3",
-            FeedbackAudience::OpenAiEmployee,
-        );
-        assert!(other_url.is_some());
-
-        let safety_check_url = issue_url_for_category(
             FeedbackCategory::SafetyCheck,
-            "thread-4",
-            FeedbackAudience::OpenAiEmployee,
-        );
-        assert!(safety_check_url.is_some());
-
-        assert!(
-            issue_url_for_category(
-                FeedbackCategory::GoodResult,
-                "t",
-                FeedbackAudience::OpenAiEmployee
-            )
-            .is_none()
-        );
-        let bug_url_non_employee =
-            issue_url_for_category(FeedbackCategory::Bug, "t", FeedbackAudience::External);
-        let expected_external_url = "https://github.com/openai/codex/issues/new?template=3-cli.yml&steps=Uploaded%20thread:%20t";
-        assert_eq!(bug_url_non_employee.as_deref(), Some(expected_external_url));
+            FeedbackCategory::Other,
+            FeedbackCategory::GoodResult,
+        ] {
+            assert!(
+                issue_url_for_category(category, "thread-1", FeedbackAudience::OpenAiEmployee)
+                    .is_none()
+            );
+            assert!(
+                issue_url_for_category(category, "thread-1", FeedbackAudience::External).is_none()
+            );
+        }
     }
 
     #[test]
@@ -872,7 +813,7 @@ mod tests {
         );
         assert_eq!(
             rendered,
-            "• Feedback uploaded. Please open an issue using the following URL:\n\n  https://github.com/openai/codex/issues/new?template=3-cli.yml&steps=Uploaded%20thread:%20thread-1\n\n  Or mention your thread ID thread-1 in an existing issue."
+            "• Feedback uploaded. Thanks for the feedback!\n\n  Thread ID: thread-1"
         );
     }
 
@@ -889,7 +830,7 @@ mod tests {
         );
         assert_eq!(
             rendered,
-            "• Feedback uploaded. Please report this in the Peregrine feedback channel:\n\n  http://go/codex-feedback-internal\n\n  Share this and add some info about your problem:\n    https://go/codex-feedback/thread-2"
+            "• Feedback uploaded. Thanks for the feedback!\n\n  Thread ID: thread-2"
         );
     }
 
@@ -911,7 +852,7 @@ mod tests {
     }
 
     #[test]
-    fn feedback_success_cell_uses_issue_links_for_remaining_categories() {
+    fn feedback_success_cell_uses_thread_id_for_remaining_categories() {
         for category in [
             FeedbackCategory::BadResult,
             FeedbackCategory::SafetyCheck,
@@ -926,7 +867,10 @@ mod tests {
                 ),
                 /*width*/ 120,
             );
-            assert!(rendered.contains("Please open an issue using the following URL:"));
+            assert!(
+                issue_url_for_category(category, "thread-4", FeedbackAudience::External).is_none()
+            );
+            assert!(rendered.contains("Thanks for the feedback!"));
             assert!(rendered.contains("thread-4"));
         }
     }

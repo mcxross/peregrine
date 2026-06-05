@@ -27,8 +27,6 @@ use ratatui::widgets::Clear;
 use ratatui::widgets::WidgetRef;
 use tokio_stream::StreamExt;
 
-const RELEASE_NOTES_URL: &str = "https://github.com/openai/codex/releases/latest";
-
 pub(crate) enum UpdatePromptOutcome {
     Continue,
     RunUpdate(UpdateAction),
@@ -203,14 +201,6 @@ impl WidgetRef for &UpdatePromptScreen {
             .dim(),
         ]));
         column.push("");
-        column.push(
-            Line::from(vec![
-                "Release notes: ".dim(),
-                RELEASE_NOTES_URL.dim().underlined(),
-            ])
-            .inset(Insets::tlbr(0, 2, 0, 0)),
-        );
-        column.push("");
         column.push(selection_option_row(
             0,
             format!("Update now (runs `{update_command}`)"),
@@ -236,7 +226,6 @@ impl WidgetRef for &UpdatePromptScreen {
             .inset(Insets::tlbr(0, 2, 0, 0)),
         );
         column.render(area, buf);
-        crate::agent::terminal_hyperlinks::mark_underlined_hyperlink(buf, area, RELEASE_NOTES_URL);
     }
 }
 
@@ -254,7 +243,7 @@ mod tests {
         UpdatePromptScreen::new(
             FrameRequester::test_dummy(),
             "9.9.9".into(),
-            UpdateAction::NpmGlobalLatest,
+            UpdateAction::BrewUpgrade,
         )
     }
 

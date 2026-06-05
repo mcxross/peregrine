@@ -1,21 +1,22 @@
 ---
-source: tui/src/status/tests.rs
+source: crates/peregrine-tui/src/agent/status/tests.rs
 expression: sanitized
 ---
 /status
 
 ╭─────────────────────────────────────────────────────────────────────────────╮
-│  >_ OpenAI Codex (v0.0.0)                                                   │
+│  >_ Peregrine (v0.1.0)                                                      │
 │                                                                             │
-│ Visit https://chatgpt.com/codex/settings/usage for up-to-date               │
-│ information on rate limits and credits                                      │
+│ Rate limits and credits are managed by the active provider.                 │
 │                                                                             │
-│  Model:            gpt-5.1-codex-max (reasoning none, summaries auto)       │
+│  Model:            gpt-5.1-codex (reasoning none, summaries auto)           │
 │  Directory: [[workspace]]                                                   │
 │  Permissions:      Custom (workspace with network access, Ask for approval) │
 │  Agents.md:        <none>                                                   │
 │                                                                             │
-│  Token usage:      1.2K total  (800 input + 400 output)                     │
-│  Context window:   100% left (1.2K used / 272K)                             │
-│  Monthly limit:    [██████████████████░░] 88% left (resets 07:08 on 7 May)  │
+│  Token usage:      2K total  (1.4K input + 600 output)                      │
+│  Context window:   100% left (2.2K used / 272K)                             │
+│  5h limit:         [███████████░░░░░░░░░] 55% left (resets 09:25)           │
+│  Weekly limit:     [██████████████░░░░░░] 70% left (resets 09:55)           │
+│  Credits:          38 credits                                               │
 ╰─────────────────────────────────────────────────────────────────────────────╯

@@ -23,6 +23,7 @@ use peregrine_api::SharedAuthProvider;
 use crate::amazon_bedrock::AmazonBedrockModelProvider;
 use crate::auth::auth_manager_for_provider;
 use crate::auth::resolve_provider_auth;
+use crate::identity::wrap_models_manager;
 use crate::models_endpoint::OpenAiModelsEndpoint;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -325,7 +326,7 @@ impl ModelProvider for ConfiguredModelProvider {
         codex_home: PathBuf,
         config_model_catalog: Option<ModelsResponse>,
     ) -> SharedModelsManager {
-        match config_model_catalog {
+        let manager: SharedModelsManager = match config_model_catalog {
             Some(model_catalog) => Arc::new(StaticModelsManager::new(
                 self.auth_manager.clone(),
                 model_catalog,
@@ -341,7 +342,8 @@ impl ModelProvider for ConfiguredModelProvider {
                     self.auth_manager.clone(),
                 ))
             }
-        }
+        };
+        wrap_models_manager(manager)
     }
 }
 

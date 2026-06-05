@@ -1,0 +1,8 @@
+---
+source: crates/peregrine-tui/src/agent/history_cell/tests.rs
+expression: rendered
+---
+╭──────────────────────────────────────────────╮
+│ ✨ Update available! 0.1.0 -> 9.9.9          │
+│ Run brew upgrade --cask peregrine to update. │
+╰──────────────────────────────────────────────╯

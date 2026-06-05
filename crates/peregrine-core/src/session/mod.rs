@@ -422,8 +422,6 @@ pub(crate) struct PeregrineSpawnArgs {
 
 pub(crate) const INITIAL_SUBMIT_ID: &str = "";
 pub(crate) const SUBMISSION_CHANNEL_CAPACITY: usize = 512;
-const CYBER_VERIFY_URL: &str = "https://chatgpt.com/cyber";
-const CYBER_SAFETY_URL: &str = "https://developers.openai.com/codex/concepts/cyber-safety";
 
 impl Peregrine {
     /// Spawn a new [`Peregrine`] and initialize the session.
@@ -544,7 +542,11 @@ impl Peregrine {
         let base_instructions = config
             .base_instructions
             .clone()
-            .or_else(|| conversation_history.get_base_instructions().map(|s| s.text))
+            .or_else(|| {
+                conversation_history.get_base_instructions().map(|s| {
+                    peregrine_model_provider::normalize_persisted_base_instructions(s.text)
+                })
+            })
             .unwrap_or_else(|| model_info.get_model_instructions(config.personality));
 
         // Dynamic tools are defined at thread start and persisted in rollout session metadata.
@@ -2575,9 +2577,9 @@ impl Session {
 
         warn!("server reported model {server_model} while requested model was {requested_model}");
 
-        let warning_message = format!(
-            "Your account was flagged for potentially high-risk cyber activity and this request was routed to gpt-5.2 as a fallback. To regain access to gpt-5.3-codex, apply for trusted access: {CYBER_VERIFY_URL} or learn more: {CYBER_SAFETY_URL}"
-        );
+        let warning_message =
+            "This request was flagged for potentially high-risk cybersecurity activity and routed to a safer fallback model for additional review."
+                .to_string();
 
         self.send_event(
             turn_context,

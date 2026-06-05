@@ -639,7 +639,7 @@ async fn status_model_provider_uses_bedrock_runtime_base_url_and_gates_usage_lin
         "expected /status to ignore configured Bedrock base URL, got: {rendered}"
     );
     assert!(
-        !rendered.contains("https://chatgpt.com/codex/settings/usage"),
+        !rendered.contains("chatgpt.com"),
         "expected /status to hide ChatGPT usage link for Bedrock, got: {rendered}"
     );
 
@@ -672,8 +672,8 @@ async fn status_model_provider_uses_bedrock_runtime_base_url_and_gates_usage_lin
     let rendered = render_lines(&composite.display_lines(/*width*/ 120)).join("\n");
 
     assert!(
-        rendered.contains("https://chatgpt.com/codex/settings/usage"),
-        "expected /status to show ChatGPT usage link for OpenAI-auth proxy, got: {rendered}"
+        !rendered.contains("chatgpt.com"),
+        "expected /status to hide ChatGPT usage link for OpenAI-auth proxy, got: {rendered}"
     );
 
     let wide_destinations: Vec<String> = composite
@@ -682,10 +682,7 @@ async fn status_model_provider_uses_bedrock_runtime_base_url_and_gates_usage_lin
         .flat_map(|line| line.hyperlinks.into_iter())
         .map(|link| link.destination)
         .collect();
-    assert_eq!(
-        wide_destinations,
-        vec!["https://chatgpt.com/codex/settings/usage"]
-    );
+    assert_eq!(wide_destinations, Vec::<String>::new());
 
     let narrow_destinations: Vec<String> = composite
         .display_hyperlink_lines(/*width*/ 24)

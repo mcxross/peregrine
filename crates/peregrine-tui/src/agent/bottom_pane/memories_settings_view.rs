@@ -30,8 +30,6 @@ use super::selection_popup_common::GenericDisplayRow;
 use super::selection_popup_common::measure_rows_height;
 use super::selection_popup_common::render_rows;
 
-const MEMORIES_DOC_URL: &str = "https://developers.openai.com/codex/memories";
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum MemoriesSetting {
     Use,
@@ -98,10 +96,7 @@ impl MemoriesSettingsView {
             reset_confirmation: None,
             complete: false,
             app_event_tx,
-            docs_link: Line::from(vec![
-                "Learn more: ".dim(),
-                MEMORIES_DOC_URL.cyan().underlined(),
-            ]),
+            docs_link: Line::from(""),
             keymap,
         };
         view.initialize_selection();
@@ -422,7 +417,6 @@ impl Renderable for MemoriesSettingsView {
         }
         if self.reset_confirmation.is_none() {
             self.docs_link.clone().render(docs_area, buf);
-            crate::agent::terminal_hyperlinks::mark_url_hyperlink(buf, docs_area, MEMORIES_DOC_URL);
         }
 
         let hint_area = Rect {

@@ -1791,7 +1791,7 @@ async fn plugin_list_includes_remote_marketplaces_when_remote_plugin_enabled() -
             .interface
             .as_ref()
             .and_then(|interface| interface.display_name.as_deref()),
-        Some("OpenAI Curated Remote")
+        Some("Bundled Curated")
     );
     assert_eq!(remote_marketplace.plugins.len(), 1);
     assert_eq!(
@@ -1914,7 +1914,7 @@ async fn plugin_list_includes_openai_curated_remote_collection_when_requested() 
             .interface
             .as_ref()
             .and_then(|interface| interface.display_name.as_deref()),
-        Some("OpenAI Curated Remote")
+        Some("Bundled Curated")
     );
     assert_eq!(remote_marketplace.plugins.len(), 1);
     let plugin = &remote_marketplace.plugins[0];

@@ -1,6 +1,7 @@
 mod amazon_bedrock;
 mod auth;
 mod bearer_auth_provider;
+mod identity;
 mod models_endpoint;
 mod provider;
 mod provider_catalog;
@@ -10,6 +11,9 @@ pub use auth::unauthenticated_auth_provider;
 pub use bearer_auth_provider::BearerAuthProvider;
 pub use bearer_auth_provider::BearerAuthProvider as CoreAuthProvider;
 pub use codex_protocol::account::ProviderAccount;
+pub use identity::normalize_model_info;
+pub use identity::normalize_model_instructions_text;
+pub use identity::normalize_persisted_base_instructions;
 pub use provider::ModelProvider;
 pub use provider::ProviderAccountError;
 pub use provider::ProviderAccountResult;

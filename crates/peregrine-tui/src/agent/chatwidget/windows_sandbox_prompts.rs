@@ -233,7 +233,7 @@ impl ChatWidget {
             header.push(*Box::new(
                 Paragraph::new(vec![
                     line!["Agent mode on Windows uses an experimental sandbox to limit network and filesystem access.".bold()],
-                    line!["Learn more: https://developers.openai.com/codex/windows"],
+                    line!["Review the sandbox options before granting filesystem or network access."],
                 ])
                 .wrap(Wrap { trim: false }),
             ));
@@ -288,12 +288,11 @@ impl ChatWidget {
         header.push(*Box::new(
             Paragraph::new(if allow_unelevated {
                 vec![
-                    line!["Set up the Peregrine agent sandbox to protect your files and control network access. Learn more <https://developers.openai.com/codex/windows>"],
+                    line!["Set up the Peregrine agent sandbox to protect your files and control network access."],
                 ]
             } else {
                 vec![
                     line!["Your organization requires the default Peregrine agent sandbox to continue. Set it up to protect your files and control network access."],
-                    line!["Learn more <https://developers.openai.com/codex/windows>"],
                 ]
             })
             .wrap(Wrap { trim: false }),
@@ -408,9 +407,7 @@ impl ChatWidget {
                 "Your organization requires the default sandbox before Peregrine can continue."
             ]);
         }
-        lines.push(line![
-            "Learn more <https://developers.openai.com/codex/windows>"
-        ]);
+        lines.push(line!["Review sandbox settings before continuing."]);
 
         let mut header = ColumnRenderable::new();
         header.push(*Box::new(Paragraph::new(lines).wrap(Wrap { trim: false })));

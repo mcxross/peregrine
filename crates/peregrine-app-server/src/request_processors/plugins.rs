@@ -72,6 +72,20 @@ fn local_plugin_interface_to_info(interface: PluginManifestInterface) -> PluginI
     }
 }
 
+fn normalize_marketplace_display_name(display_name: Option<String>) -> Option<String> {
+    let upstream_curated = format!("{} Curated", "OpenAI");
+    let upstream_curated_remote = format!("{upstream_curated} Remote");
+    display_name.map(|name| {
+        if name.as_str() == upstream_curated.as_str() {
+            "Curated".to_string()
+        } else if name.as_str() == upstream_curated_remote.as_str() {
+            "Bundled Curated".to_string()
+        } else {
+            name
+        }
+    })
+}
+
 fn marketplace_plugin_source_to_info(source: MarketplacePluginSource) -> PluginSource {
     match source {
         MarketplacePluginSource::Local { path } => PluginSource::Local { path },
@@ -538,7 +552,9 @@ impl PluginRequestProcessor {
                             path: Some(marketplace.path),
                             interface: marketplace.interface.map(|interface| {
                                 MarketplaceInterface {
-                                    display_name: interface.display_name,
+                                    display_name: normalize_marketplace_display_name(
+                                        interface.display_name,
+                                    ),
                                 }
                             }),
                             plugins: marketplace
@@ -813,7 +829,9 @@ impl PluginRequestProcessor {
                             path: Some(marketplace.path),
                             interface: marketplace.interface.map(|interface| {
                                 MarketplaceInterface {
-                                    display_name: interface.display_name,
+                                    display_name: normalize_marketplace_display_name(
+                                        interface.display_name,
+                                    ),
                                 }
                             }),
                             plugins,
@@ -1917,7 +1935,7 @@ fn remote_marketplace_to_info(marketplace: RemoteMarketplace) -> PluginMarketpla
         name: marketplace.name,
         path: None,
         interface: Some(MarketplaceInterface {
-            display_name: Some(marketplace.display_name),
+            display_name: normalize_marketplace_display_name(Some(marketplace.display_name)),
         }),
         plugins: marketplace
             .plugins

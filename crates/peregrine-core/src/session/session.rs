@@ -411,6 +411,22 @@ impl SessionConfiguration {
     }
 }
 
+fn normalize_deprecation_notice_details(details: String) -> String {
+    let feature_flags_url = [
+        "https://developers.",
+        "openai.com/",
+        "codex",
+        "/config-basic#feature-flags",
+    ]
+    .concat();
+    details
+        .replace(&format!(" See {feature_flags_url} for details."), "")
+        .replace(
+            &format!(" See {feature_flags_url} for more information."),
+            "",
+        )
+}
+
 #[derive(Default, Clone)]
 pub(crate) struct SessionSettingsUpdate {
     pub(crate) cwd: Option<PathBuf>,
@@ -724,7 +740,10 @@ impl Session {
                     id: INITIAL_SUBMIT_ID.to_owned(),
                     msg: EventMsg::DeprecationNotice(DeprecationNoticeEvent {
                         summary: usage.summary.clone(),
-                        details: usage.details.clone(),
+                        details: usage
+                            .details
+                            .clone()
+                            .map(normalize_deprecation_notice_details),
                     }),
                 });
             }

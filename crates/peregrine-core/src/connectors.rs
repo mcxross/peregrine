@@ -121,10 +121,10 @@ async fn connector_auth(config: &Config) -> anyhow::Result<CodexAuth> {
     let auth = auth_manager
         .auth()
         .await
-        .ok_or_else(|| anyhow::anyhow!("ChatGPT auth not available"))?;
+        .ok_or_else(|| anyhow::anyhow!("Connector auth is not available"))?;
     anyhow::ensure!(
         auth.uses_codex_backend(),
-        "ChatGPT connectors require Codex backend auth"
+        "Connectors require compatible hosted account auth"
     );
     Ok(auth)
 }

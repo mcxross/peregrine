@@ -26,7 +26,6 @@ use ratatui::prelude::*;
 use ratatui::style::Stylize;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
-use unicode_width::UnicodeWidthStr;
 use url::Url;
 
 use super::account::StatusAccountDisplay;
@@ -52,8 +51,6 @@ use crate::agent::wrapping::adaptive_wrap_lines;
 use crate::agent::wrapping::word_wrap_lines;
 use std::sync::Arc;
 use std::sync::RwLock;
-
-const CHATGPT_USAGE_URL: &str = "https://chatgpt.com/codex/settings/usage";
 
 #[derive(Debug, Clone)]
 struct StatusContextWindowData {
@@ -697,7 +694,7 @@ impl HistoryCell for StatusHistoryCell {
         let mut lines: Vec<Line<'static>> = Vec::new();
         lines.push(Line::from(vec![
             Span::from(format!("{}>_ ", FieldFormatter::INDENT)).dim(),
-            Span::from("OpenAI Peregrine").bold(),
+            Span::from("Peregrine").bold(),
             Span::from(" ").dim(),
             Span::from(format!("(v{CODEX_CLI_VERSION})")).dim(),
         ]));
@@ -766,20 +763,12 @@ impl HistoryCell for StatusHistoryCell {
         let value_width = formatter.value_width(available_inner_width);
 
         let note_first_line = Line::from(vec![
-            Span::from("Visit ").cyan(),
-            CHATGPT_USAGE_URL.cyan().underlined(),
-            Span::from(" for up-to-date").cyan(),
+            Span::from("Rate limits and credits are managed by the active provider.").cyan(),
         ]);
-        let note_second_line = Line::from(vec![
-            Span::from("information on rate limits and credits").cyan(),
-        ]);
-        let note_lines = adaptive_wrap_lines(
-            [note_first_line, note_second_line],
-            RtOptions::new(available_inner_width),
-        );
+        let note_lines =
+            adaptive_wrap_lines([note_first_line], RtOptions::new(available_inner_width));
         lines.push(Line::from(Vec::<Span<'static>>::new()));
-        // The ChatGPT usage page only applies to providers backed by OpenAI auth;
-        // providers like Bedrock manage limits and billing elsewhere.
+        // Provider-backed usage details are intentionally rendered without product-owned links.
         if self.show_chatgpt_usage_link {
             lines.extend(note_lines);
             lines.push(Line::from(Vec::<Span<'static>>::new()));
@@ -868,25 +857,7 @@ impl HistoryCell for StatusHistoryCell {
         &self,
         width: u16,
     ) -> Vec<crate::agent::terminal_hyperlinks::HyperlinkLine> {
-        let mut lines =
-            crate::agent::terminal_hyperlinks::plain_hyperlink_lines(self.display_lines(width));
-        for line in &mut lines {
-            let visible = line
-                .line
-                .spans
-                .iter()
-                .map(|span| span.content.as_ref())
-                .collect::<String>();
-            if let Some(start_byte) = visible.find(CHATGPT_USAGE_URL) {
-                let start = visible[..start_byte].width();
-                line.hyperlinks
-                    .push(crate::agent::terminal_hyperlinks::TerminalHyperlink {
-                        columns: start..start + CHATGPT_USAGE_URL.width(),
-                        destination: CHATGPT_USAGE_URL.to_string(),
-                    });
-            }
-        }
-        lines
+        crate::agent::terminal_hyperlinks::plain_hyperlink_lines(self.display_lines(width))
     }
 
     fn transcript_hyperlink_lines(

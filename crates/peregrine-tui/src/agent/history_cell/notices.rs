@@ -26,11 +26,7 @@ impl HistoryCell for UpdateAvailableHistoryCell {
         let update_instruction = if let Some(update_action) = self.update_action {
             line!["Run ", update_action.command_str().cyan(), " to update."]
         } else {
-            line![
-                "See ",
-                "https://github.com/openai/codex".cyan().underlined(),
-                " for installation options."
-            ]
+            line!["Use your package manager to update Peregrine."]
         };
 
         let content = text![
@@ -41,11 +37,6 @@ impl HistoryCell for UpdateAvailableHistoryCell {
                 format!("{CODEX_CLI_VERSION} -> {}", self.latest_version).bold(),
             ],
             update_instruction,
-            "",
-            "See full release notes:",
-            "https://github.com/openai/codex/releases/latest"
-                .cyan()
-                .underlined(),
         ];
 
         let inner_width = content
@@ -60,15 +51,12 @@ impl HistoryCell for UpdateAvailableHistoryCell {
         let update_instruction = if let Some(update_action) = self.update_action {
             format!("Run {} to update.", update_action.command_str())
         } else {
-            "See https://github.com/openai/peregrine for installation options.".to_string()
+            "Use your package manager to update Peregrine.".to_string()
         };
         vec![
             Line::from("Update available!"),
             Line::from(format!("{CODEX_CLI_VERSION} -> {}", self.latest_version)),
             Line::from(update_instruction),
-            Line::from(""),
-            Line::from("See full release notes:"),
-            Line::from("https://github.com/openai/codex/releases/latest"),
         ]
     }
 
@@ -84,8 +72,6 @@ impl HistoryCell for UpdateAvailableHistoryCell {
 pub(crate) fn new_warning_event(message: String) -> PrefixedWrappedHistoryCell {
     PrefixedWrappedHistoryCell::new(message.yellow(), "⚠ ".yellow(), "  ")
 }
-
-const TRUSTED_ACCESS_FOR_CYBER_URL: &str = "https://chatgpt.com/cyber";
 
 #[derive(Debug)]
 pub(crate) struct CyberPolicyNoticeCell;
@@ -106,24 +92,14 @@ impl HistoryCell for CyberPolicyNoticeCell {
         );
 
         let wrap_width = width.saturating_sub(2).max(1) as usize;
-        let body = Line::from(vec![
-            "  If this seems wrong, try rephrasing your request. To get authorized for security work, join the "
-                .dim(),
-            "Trusted Access for Cyber".cyan().underlined(),
-            " program.".dim(),
-        ]);
+        let body = Line::from(
+            "  If this seems wrong, try rephrasing your request or adjust the task scope.".dim(),
+        );
         let wrapped = adaptive_wrap_line(
             &body,
             RtOptions::new(wrap_width).subsequent_indent("  ".into()),
         );
         push_owned_lines(&wrapped, &mut lines);
-        lines.push(
-            vec![
-                "  ".into(),
-                TRUSTED_ACCESS_FOR_CYBER_URL.cyan().underlined(),
-            ]
-            .into(),
-        );
 
         lines
     }
@@ -132,9 +108,8 @@ impl HistoryCell for CyberPolicyNoticeCell {
         vec![
             Line::from("This chat was flagged for possible cybersecurity risk"),
             Line::from(
-                "If this seems wrong, try rephrasing your request. To get authorized for security work, join the Trusted Access for Cyber program.",
+                "If this seems wrong, try rephrasing your request or adjust the task scope.",
             ),
-            Line::from(TRUSTED_ACCESS_FOR_CYBER_URL),
         ]
     }
 

@@ -323,16 +323,7 @@ pub(crate) fn empty_mcp_output() -> PlainHistoryCell {
         vec!["🔌  ".into(), "MCP Tools".bold()].into(),
         "".into(),
         "  • No MCP servers configured.".italic().into(),
-        Line::from(vec![
-            "    See the ".into(),
-            crate::agent::terminal_hyperlinks::osc8_hyperlink(
-                "https://developers.openai.com/codex/mcp",
-                "MCP docs",
-            )
-            .underlined(),
-            " to configure them.".into(),
-        ])
-        .style(Style::default().add_modifier(Modifier::DIM)),
+        "    Use `peregrine mcp add` to configure one.".dim().into(),
     ];
 
     PlainHistoryCell::new(lines)

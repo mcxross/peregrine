@@ -85,7 +85,11 @@ pub(crate) fn executable_identity_from_bytes(bytes: &[u8]) -> ExecutableIdentity
 }
 
 fn managed_peregrine_file_name() -> &'static str {
-    if cfg!(windows) { "codex.exe" } else { "codex" }
+    if cfg!(windows) {
+        "peregrine.exe"
+    } else {
+        "peregrine"
+    }
 }
 
 #[cfg(unix)]

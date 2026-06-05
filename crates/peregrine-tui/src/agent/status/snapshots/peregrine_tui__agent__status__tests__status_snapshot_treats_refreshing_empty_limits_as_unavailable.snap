@@ -1,14 +1,13 @@
 ---
-source: tui/src/status/tests.rs
+source: crates/peregrine-tui/src/agent/status/tests.rs
 expression: sanitized
 ---
 /status
 
 ╭─────────────────────────────────────────────────────────────────────────────╮
-│  >_ OpenAI Codex (v0.0.0)                                                   │
+│  >_ Peregrine (v0.1.0)                                                      │
 │                                                                             │
-│ Visit https://chatgpt.com/codex/settings/usage for up-to-date               │
-│ information on rate limits and credits                                      │
+│ Rate limits and credits are managed by the active provider.                 │
 │                                                                             │
 │  Model:            gpt-5.1-codex-max (reasoning none, summaries auto)       │
 │  Directory: [[workspace]]                                                   │

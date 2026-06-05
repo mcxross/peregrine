@@ -6,14 +6,14 @@ use super::parse_peregrine_version;
 #[test]
 fn parses_peregrine_cli_version_output() {
     assert_eq!(
-        parse_peregrine_version("codex 1.2.3\n").expect("version"),
+        parse_peregrine_version("peregrine 1.2.3\n").expect("version"),
         "1.2.3"
     );
 }
 
 #[test]
 fn rejects_malformed_peregrine_cli_version_output() {
-    assert!(parse_peregrine_version("codex\n").is_err());
+    assert!(parse_peregrine_version("peregrine\n").is_err());
 }
 
 #[test]

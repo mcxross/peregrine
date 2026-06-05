@@ -132,7 +132,7 @@ model = "gpt-work"
         "unexpected error message: {message}"
     );
     assert!(
-        message.contains("https://developers.openai.com/codex/config-advanced#profiles"),
+        !message.contains("developers.openai.com"),
         "unexpected error message: {message}"
     );
 }

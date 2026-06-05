@@ -13,8 +13,6 @@ Use /mcp to list configured MCP tools.
 Run `peregrine app` to open Peregrine Desktop.
 Use /personality to customize how Peregrine communicates.
 Use /rename to rename your threads for easier thread resuming.
-Use the OpenAI docs MCP for API questions; enable it with `peregrine mcp add openaiDeveloperDocs --url https://developers.openai.com/mcp`.
-Join the OpenAI community Discord: http://discord.gg/openai
 Visit the Peregrine community forum for support and updates.
 You can run any shell command from Peregrine using `!` (e.g. `!ls`)
 Type / to open the command popup; Tab autocompletes slash commands.
