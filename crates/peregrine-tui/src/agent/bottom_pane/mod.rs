@@ -1587,6 +1587,17 @@ impl BottomPane {
         &'_ self,
         composer_right_reserve: u16,
     ) -> RenderableItem<'_> {
+        self.as_renderable_with_composer_right_reserve_and_inline_popup(
+            composer_right_reserve,
+            /*inline_popup*/ true,
+        )
+    }
+
+    fn as_renderable_with_composer_right_reserve_and_inline_popup(
+        &'_ self,
+        composer_right_reserve: u16,
+        inline_popup: bool,
+    ) -> RenderableItem<'_> {
         if let Some(view) = self.active_view() {
             RenderableItem::Borrowed(view)
         } else {
@@ -1628,12 +1639,13 @@ impl BottomPane {
             }
             let mut flex2 = FlexRenderable::new();
             flex2.push(/*flex*/ 1, RenderableItem::Owned(flex.into()));
-            let composer: RenderableItem<'_> = if composer_right_reserve == 0 {
+            let composer: RenderableItem<'_> = if composer_right_reserve == 0 && inline_popup {
                 RenderableItem::Borrowed(&self.composer)
             } else {
                 RenderableItem::Owned(Box::new(ChatComposerRightReserveRenderable {
                     composer: &self.composer,
                     right_reserve: composer_right_reserve,
+                    inline_popup,
                 }))
             };
             flex2.push(/*flex*/ 0, composer);
@@ -1651,6 +1663,13 @@ impl BottomPane {
             .render(area, buf);
     }
 
+    pub(crate) fn render_with_composer_popup_overlay(&self, area: Rect, buf: &mut Buffer) {
+        self.as_renderable_with_composer_right_reserve_and_inline_popup(
+            /*composer_right_reserve*/ 0, /*inline_popup*/ false,
+        )
+        .render(area, buf);
+    }
+
     pub(crate) fn desired_height_with_composer_right_reserve(
         &self,
         width: u16,
@@ -1660,6 +1679,13 @@ impl BottomPane {
             .desired_height(width)
     }
 
+    pub(crate) fn desired_height_with_composer_popup_overlay(&self, width: u16) -> u16 {
+        self.as_renderable_with_composer_right_reserve_and_inline_popup(
+            /*composer_right_reserve*/ 0, /*inline_popup*/ false,
+        )
+        .desired_height(width)
+    }
+
     pub(crate) fn cursor_pos_with_composer_right_reserve(
         &self,
         area: Rect,
@@ -1667,6 +1693,27 @@ impl BottomPane {
     ) -> Option<(u16, u16)> {
         self.as_renderable_with_composer_right_reserve(composer_right_reserve)
             .cursor_pos(area)
+    }
+
+    pub(crate) fn cursor_pos_with_composer_popup_overlay(&self, area: Rect) -> Option<(u16, u16)> {
+        self.as_renderable_with_composer_right_reserve_and_inline_popup(
+            /*composer_right_reserve*/ 0, /*inline_popup*/ false,
+        )
+        .cursor_pos(area)
+    }
+
+    pub(crate) fn active_composer_popup_height(&self, width: u16) -> Option<u16> {
+        if self.active_view().is_some() {
+            return None;
+        }
+        self.composer.active_popup_height(width)
+    }
+
+    pub(crate) fn render_active_composer_popup(&self, area: Rect, buf: &mut Buffer) -> bool {
+        if self.active_view().is_some() {
+            return false;
+        }
+        self.composer.render_active_popup(area, buf)
     }
 
     pub(crate) fn cursor_style_with_composer_right_reserve(
@@ -1716,26 +1763,52 @@ impl BottomPane {
 struct ChatComposerRightReserveRenderable<'a> {
     composer: &'a chat_composer::ChatComposer,
     right_reserve: u16,
+    inline_popup: bool,
 }
 
 impl Renderable for ChatComposerRightReserveRenderable<'_> {
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        self.composer.render_with_mask_and_textarea_right_reserve(
-            area,
-            buf,
-            /*mask_char*/ None,
-            self.right_reserve,
-        );
+        if self.inline_popup {
+            self.composer.render_with_mask_and_textarea_right_reserve(
+                area,
+                buf,
+                /*mask_char*/ None,
+                self.right_reserve,
+            );
+        } else {
+            self.composer
+                .render_without_inline_popup_with_textarea_right_reserve(
+                    area,
+                    buf,
+                    self.right_reserve,
+                );
+        }
     }
 
     fn desired_height(&self, width: u16) -> u16 {
-        self.composer
-            .desired_height_with_textarea_right_reserve(width, self.right_reserve)
+        if self.inline_popup {
+            self.composer
+                .desired_height_with_textarea_right_reserve(width, self.right_reserve)
+        } else {
+            self.composer
+                .desired_height_without_inline_popup_with_textarea_right_reserve(
+                    width,
+                    self.right_reserve,
+                )
+        }
     }
 
     fn cursor_pos(&self, area: Rect) -> Option<(u16, u16)> {
-        self.composer
-            .cursor_pos_with_textarea_right_reserve(area, self.right_reserve)
+        if self.inline_popup {
+            self.composer
+                .cursor_pos_with_textarea_right_reserve(area, self.right_reserve)
+        } else {
+            self.composer
+                .cursor_pos_without_inline_popup_with_textarea_right_reserve(
+                    area,
+                    self.right_reserve,
+                )
+        }
     }
 
     fn cursor_style(&self, area: Rect) -> crossterm::cursor::SetCursorStyle {

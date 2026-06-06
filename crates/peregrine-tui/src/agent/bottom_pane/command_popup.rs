@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::WidgetRef;
@@ -36,7 +38,19 @@ pub(crate) enum CommandItem {
 pub(crate) struct CommandPopup {
     command_filter: String,
     commands: Vec<CommandItem>,
+    filtered_items: Vec<CommandItem>,
+    rows: Vec<GenericDisplayRow>,
     state: ScrollState,
+    height_cache: Cell<Option<HeightCache>>,
+}
+
+#[derive(Clone, Copy)]
+struct HeightCache {
+    width: u16,
+    selected_idx: Option<usize>,
+    scroll_top: usize,
+    rows_len: usize,
+    height: u16,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -85,39 +99,52 @@ impl CommandPopup {
                 SlashCommandItem::ServiceTier(command) => Some(CommandItem::ServiceTier(command)),
             })
             .collect();
-        Self {
+        let mut popup = Self {
             command_filter: String::new(),
             commands,
+            filtered_items: Vec::new(),
+            rows: Vec::new(),
             state: ScrollState::new(),
-        }
+            height_cache: Cell::new(None),
+        };
+        popup.rebuild_filtered_cache();
+        popup.state.clamp_selection(popup.filtered_items.len());
+        popup.state.ensure_visible(
+            popup.filtered_items.len(),
+            MAX_POPUP_ROWS.min(popup.filtered_items.len()),
+        );
+        popup
     }
 
     /// Update the filter string based on the current composer text. The text
     /// passed in is expected to start with a leading '/'. Everything after the
     /// *first* '/' on the *first* line becomes the active filter that is used
     /// to narrow down the list of available commands.
-    pub(crate) fn on_composer_text_change(&mut self, text: String) {
-        let first_line = text.lines().next().unwrap_or("");
-
-        if let Some(stripped) = first_line.strip_prefix('/') {
+    pub(crate) fn on_composer_text_change(&mut self, text: impl AsRef<str>) {
+        let first_line = text.as_ref().lines().next().unwrap_or("");
+        let next_filter = if let Some(stripped) = first_line.strip_prefix('/') {
             // Extract the *first* token (sequence of non-whitespace
             // characters) after the slash so that `/clear something` still
             // shows the help for `/clear`.
             let token = stripped.trim_start();
             let cmd_token = token.split_whitespace().next().unwrap_or("");
-
-            // Update the filter keeping the original case (commands are all
-            // lower-case for now but this may change in the future).
-            self.command_filter = cmd_token.to_string();
+            cmd_token.to_string()
         } else {
             // The composer no longer starts with '/'. Reset the filter so the
             // popup shows the *full* command list if it is still displayed
             // for some reason.
-            self.command_filter.clear();
+            String::new()
+        };
+
+        if self.command_filter != next_filter {
+            // Update the filter keeping the original case (commands are all
+            // lower-case for now but this may change in the future).
+            self.command_filter = next_filter;
+            self.rebuild_filtered_cache();
         }
 
         // Reset or clamp selected index based on new filtered list.
-        let matches_len = self.filtered_items().len();
+        let matches_len = self.filtered_items.len();
         self.state.clamp_selection(matches_len);
         self.state
             .ensure_visible(matches_len, MAX_POPUP_ROWS.min(matches_len));
@@ -126,15 +153,30 @@ impl CommandPopup {
     /// Determine the preferred height of the popup for a given width.
     /// Accounts for wrapped descriptions so that long tooltips don't overflow.
     pub(crate) fn calculate_required_height(&self, width: u16) -> u16 {
-        let rows = self.rows_from_matches(self.filtered());
+        if let Some(cache) = self.height_cache.get()
+            && cache.width == width
+            && cache.selected_idx == self.state.selected_idx
+            && cache.scroll_top == self.state.scroll_top
+            && cache.rows_len == self.rows.len()
+        {
+            return cache.height;
+        }
 
-        measure_rows_height_with_col_width_mode(
-            &rows,
+        let height = measure_rows_height_with_col_width_mode(
+            &self.rows,
             &self.state,
             MAX_POPUP_ROWS,
             width,
             COMMAND_COLUMN_WIDTH,
-        )
+        );
+        self.height_cache.set(Some(HeightCache {
+            width,
+            selected_idx: self.state.selected_idx,
+            scroll_top: self.state.scroll_top,
+            rows_len: self.rows.len(),
+            height,
+        }));
+        height
     }
 
     /// Compute exact/prefix matches over built-in commands and user prompts,
@@ -191,7 +233,7 @@ impl CommandPopup {
     }
 
     fn filtered_items(&self) -> Vec<CommandItem> {
-        self.filtered().into_iter().map(|(c, _)| c).collect()
+        self.filtered_items.clone()
     }
 
     fn rows_from_matches(
@@ -218,27 +260,57 @@ impl CommandPopup {
             .collect()
     }
 
+    fn rebuild_filtered_cache(&mut self) {
+        let matches = self.filtered();
+        let mut filtered_items = Vec::with_capacity(matches.len());
+        let mut rows = Vec::with_capacity(matches.len());
+        for (item, indices) in matches {
+            rows.push(self.row_from_match(&item, indices));
+            filtered_items.push(item);
+        }
+        self.filtered_items = filtered_items;
+        self.rows = rows;
+        self.height_cache.set(None);
+    }
+
+    fn row_from_match(&self, item: &CommandItem, indices: Option<Vec<usize>>) -> GenericDisplayRow {
+        let name = format!("/{}", item.command());
+        let description = item.description().to_string();
+        GenericDisplayRow {
+            name,
+            name_prefix_spans: Vec::new(),
+            match_indices: indices.map(|v| v.into_iter().map(|i| i + 1).collect()),
+            display_shortcut: None,
+            description: Some(description),
+            category_tag: None,
+            wrap_indent: None,
+            is_disabled: false,
+            disabled_reason: None,
+        }
+    }
+
     /// Move the selection cursor one step up.
     pub(crate) fn move_up(&mut self) {
-        let len = self.filtered_items().len();
+        let len = self.filtered_items.len();
         self.state.move_up_wrap(len);
         self.state.ensure_visible(len, MAX_POPUP_ROWS.min(len));
+        self.height_cache.set(None);
     }
 
     /// Move the selection cursor one step down.
     pub(crate) fn move_down(&mut self) {
-        let matches_len = self.filtered_items().len();
+        let matches_len = self.filtered_items.len();
         self.state.move_down_wrap(matches_len);
         self.state
             .ensure_visible(matches_len, MAX_POPUP_ROWS.min(matches_len));
+        self.height_cache.set(None);
     }
 
     /// Return currently selected command, if any.
     pub(crate) fn selected_item(&self) -> Option<CommandItem> {
-        let matches = self.filtered_items();
         self.state
             .selected_idx
-            .and_then(|idx| matches.get(idx).cloned())
+            .and_then(|idx| self.filtered_items.get(idx).cloned())
     }
 }
 
@@ -260,13 +332,12 @@ impl CommandItem {
 
 impl WidgetRef for CommandPopup {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
-        let rows = self.rows_from_matches(self.filtered());
         render_rows_with_col_width_mode(
             area.inset(Insets::tlbr(
                 /*top*/ 0, /*left*/ 2, /*bottom*/ 0, /*right*/ 0,
             )),
             buf,
-            &rows,
+            &self.rows,
             &self.state,
             MAX_POPUP_ROWS,
             "no matches",
@@ -380,7 +451,6 @@ mod tests {
         assert_eq!(
             cmds,
             vec![
-                "model".to_string(),
                 "memories".to_string(),
                 "mention".to_string(),
                 "mcp".to_string()

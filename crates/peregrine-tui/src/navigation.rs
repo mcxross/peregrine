@@ -5,11 +5,10 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub const WORKBENCH_CANCELED: &str = "Workbench navigation canceled";
 pub const WORKBENCH_UNBOUND: &str = "Workbench navigation key is not bound";
 
-const FOCUS_ORDER: [FocusPane; 5] = [
+const FOCUS_ORDER: [FocusPane; 4] = [
     FocusPane::Explorer,
     FocusPane::Editor,
     FocusPane::Input,
-    FocusPane::Inspector,
     FocusPane::Tabs,
 ];
 
@@ -36,6 +35,37 @@ impl Navigation {
         } else {
             NavigationIntent::PassThrough
         }
+    }
+
+    pub fn translate_workbench_navigation_only(&mut self, key: KeyEvent) -> NavigationIntent {
+        if let Some(chord) = self.pending_chord.take() {
+            return NavigationIntent::Command(chord_command(chord, key));
+        }
+
+        for event in dispatch_key(key) {
+            let command = match event {
+                KeyBindEvent::BeginWorkbenchNavigation => {
+                    self.pending_chord = Some(NavigationChord::Workbench);
+                    NavigationCommand::BeginWorkbenchNavigation
+                }
+                KeyBindEvent::SelectCodeTab => NavigationCommand::SelectTab(WorkbenchTab::Code),
+                KeyBindEvent::SelectBytecodeTab => {
+                    NavigationCommand::SelectTab(WorkbenchTab::Bytecode)
+                }
+                KeyBindEvent::SelectCfgTab => NavigationCommand::SelectTab(WorkbenchTab::Cfg),
+                KeyBindEvent::SelectCallGraphTab => {
+                    NavigationCommand::SelectTab(WorkbenchTab::CallGraph)
+                }
+                KeyBindEvent::SelectTypeGraphTab => {
+                    NavigationCommand::SelectTab(WorkbenchTab::TypeGraph)
+                }
+                KeyBindEvent::SelectChatTab => NavigationCommand::SelectTab(WorkbenchTab::Chat),
+                _ => continue,
+            };
+            return NavigationIntent::Command(command);
+        }
+
+        NavigationIntent::PassThrough
     }
 }
 
@@ -97,14 +127,12 @@ pub fn previous_focus(current: FocusPane) -> FocusPane {
 pub fn move_focus(current: FocusPane, direction: FocusDirection) -> FocusPane {
     match direction {
         FocusDirection::Left => match current {
-            FocusPane::Inspector => FocusPane::Editor,
             FocusPane::Tabs | FocusPane::Editor | FocusPane::Input => FocusPane::Explorer,
             FocusPane::Explorer => FocusPane::Explorer,
         },
         FocusDirection::Right => match current {
             FocusPane::Explorer => FocusPane::Editor,
-            FocusPane::Tabs | FocusPane::Editor | FocusPane::Input => FocusPane::Inspector,
-            FocusPane::Inspector => FocusPane::Inspector,
+            FocusPane::Tabs | FocusPane::Editor | FocusPane::Input => FocusPane::Editor,
         },
         FocusDirection::Up => match current {
             FocusPane::Input => FocusPane::Editor,
@@ -146,6 +174,7 @@ fn global_command(key: KeyEvent, focus: FocusPane) -> Option<NavigationCommand> 
             KeyBindEvent::SelectTypeGraphTab => {
                 NavigationCommand::SelectTab(WorkbenchTab::TypeGraph)
             }
+            KeyBindEvent::SelectChatTab => NavigationCommand::SelectTab(WorkbenchTab::Chat),
             _ => continue,
         };
         return Some(command);
@@ -173,7 +202,6 @@ fn workbench_command(key: KeyEvent) -> NavigationCommand {
             KeyBindEvent::WorkbenchFocusTabs => NavigationCommand::Focus(FocusPane::Tabs),
             KeyBindEvent::WorkbenchFocusCodeEditor => NavigationCommand::FocusCodeEditor,
             KeyBindEvent::WorkbenchFocusInput => NavigationCommand::Focus(FocusPane::Input),
-            KeyBindEvent::WorkbenchFocusInspector => NavigationCommand::Focus(FocusPane::Inspector),
             KeyBindEvent::WorkbenchToggleEditorMode => NavigationCommand::ToggleEditorMode,
             KeyBindEvent::WorkbenchPreviousTheme => NavigationCommand::PreviousTheme,
             KeyBindEvent::WorkbenchNextTheme => NavigationCommand::NextTheme,
@@ -189,6 +217,9 @@ fn workbench_command(key: KeyEvent) -> NavigationCommand {
             }
             KeyBindEvent::WorkbenchSelectTypeGraphTab => {
                 NavigationCommand::SelectTab(WorkbenchTab::TypeGraph)
+            }
+            KeyBindEvent::WorkbenchSelectChatTab => {
+                NavigationCommand::SelectTab(WorkbenchTab::Chat)
             }
             KeyBindEvent::FocusNext => NavigationCommand::FocusNext,
             KeyBindEvent::FocusPrevious => NavigationCommand::FocusPrevious,
@@ -220,6 +251,7 @@ fn dispatch_key(key: KeyEvent) -> Vec<KeyBindEvent> {
         (KeyCode::Char('3'), KeyModifiers::ALT) => events.push(KeyBindEvent::SelectCfgTab),
         (KeyCode::Char('4'), KeyModifiers::ALT) => events.push(KeyBindEvent::SelectCallGraphTab),
         (KeyCode::Char('5'), KeyModifiers::ALT) => events.push(KeyBindEvent::SelectTypeGraphTab),
+        (KeyCode::Char('6'), KeyModifiers::ALT) => events.push(KeyBindEvent::SelectChatTab),
         (KeyCode::Esc, _) => events.push(KeyBindEvent::WorkbenchCancel),
         (KeyCode::Char('h'), KeyModifiers::NONE) | (KeyCode::Left, KeyModifiers::NONE) => {
             events.push(KeyBindEvent::WorkbenchFocusLeft)
@@ -241,9 +273,6 @@ fn dispatch_key(key: KeyEvent) -> Vec<KeyBindEvent> {
             events.push(KeyBindEvent::WorkbenchFocusCodeEditor)
         }
         (KeyCode::Char('i'), KeyModifiers::NONE) => events.push(KeyBindEvent::WorkbenchFocusInput),
-        (KeyCode::Char('p'), KeyModifiers::NONE) => {
-            events.push(KeyBindEvent::WorkbenchFocusInspector)
-        }
         (KeyCode::Char('m'), KeyModifiers::NONE) => {
             events.push(KeyBindEvent::WorkbenchToggleEditorMode)
         }
@@ -266,6 +295,9 @@ fn dispatch_key(key: KeyEvent) -> Vec<KeyBindEvent> {
         (KeyCode::Char('5'), KeyModifiers::NONE) => {
             events.push(KeyBindEvent::WorkbenchSelectTypeGraphTab)
         }
+        (KeyCode::Char('6'), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchSelectChatTab)
+        }
         _ => {}
     }
 
@@ -283,7 +315,7 @@ mod tests {
         keybinds::init_default_keybindings().expect("keybindings");
         let mut navigation = Navigation::default();
         let first = navigation.translate(ctrl('w'), FocusPane::Editor);
-        let second = navigation.translate(key(KeyCode::Char('p')), FocusPane::Editor);
+        let second = navigation.translate(key(KeyCode::Char('i')), FocusPane::Editor);
 
         assert_eq!(
             first,
@@ -291,7 +323,50 @@ mod tests {
         );
         assert_eq!(
             second,
-            NavigationIntent::Command(NavigationCommand::Focus(FocusPane::Inspector))
+            NavigationIntent::Command(NavigationCommand::Focus(FocusPane::Input))
+        );
+    }
+
+    #[test]
+    fn workbench_chord_maps_six_to_chat_tab() {
+        keybinds::init_default_keybindings().expect("keybindings");
+        let mut navigation = Navigation::default();
+        let first = navigation.translate(ctrl('w'), FocusPane::Editor);
+        let second = navigation.translate(key(KeyCode::Char('6')), FocusPane::Editor);
+
+        assert_eq!(
+            first,
+            NavigationIntent::Command(NavigationCommand::BeginWorkbenchNavigation)
+        );
+        assert_eq!(
+            second,
+            NavigationIntent::Command(NavigationCommand::SelectTab(WorkbenchTab::Chat))
+        );
+    }
+
+    #[test]
+    fn alt_six_selects_chat_tab() {
+        keybinds::init_default_keybindings().expect("keybindings");
+        let mut navigation = Navigation::default();
+
+        assert_eq!(
+            navigation.translate(alt('6'), FocusPane::Editor),
+            NavigationIntent::Command(NavigationCommand::SelectTab(WorkbenchTab::Chat))
+        );
+    }
+
+    #[test]
+    fn chat_tab_navigation_only_keeps_ctrl_c_for_chat() {
+        keybinds::init_default_keybindings().expect("keybindings");
+        let mut navigation = Navigation::default();
+
+        assert_eq!(
+            navigation.translate_workbench_navigation_only(ctrl('c')),
+            NavigationIntent::PassThrough
+        );
+        assert_eq!(
+            navigation.translate_workbench_navigation_only(alt('6')),
+            NavigationIntent::Command(NavigationCommand::SelectTab(WorkbenchTab::Chat))
         );
     }
 
@@ -333,7 +408,7 @@ mod tests {
             FocusPane::Input
         );
         assert_eq!(
-            move_focus(FocusPane::Inspector, FocusDirection::Left),
+            move_focus(FocusPane::Editor, FocusDirection::Right),
             FocusPane::Editor
         );
         assert_eq!(
@@ -350,8 +425,8 @@ mod tests {
             vec![KeyBindEvent::BeginWorkbenchNavigation]
         );
         assert_eq!(
-            dispatch_key(key(KeyCode::Char('p'))),
-            vec![KeyBindEvent::WorkbenchFocusInspector]
+            dispatch_key(key(KeyCode::Char('i'))),
+            vec![KeyBindEvent::WorkbenchFocusInput]
         );
     }
 
@@ -361,5 +436,9 @@ mod tests {
 
     fn ctrl(c: char) -> KeyEvent {
         KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL)
+    }
+
+    fn alt(c: char) -> KeyEvent {
+        KeyEvent::new(KeyCode::Char(c), KeyModifiers::ALT)
     }
 }

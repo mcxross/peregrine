@@ -111,7 +111,7 @@ impl ChatWidget {
             let startup_tooltip_override = self.startup_tooltip_override.take();
             let show_fast_status = self
                 .should_show_fast_status(&model_for_header, self.effective_service_tier.as_deref());
-            let session_info_cell = history_cell::new_session_info(
+            let session_info_cell = history_cell::new_session_info_with_directory(
                 &self.config,
                 &model_for_header,
                 &session,
@@ -119,6 +119,7 @@ impl ChatWidget {
                 startup_tooltip_override,
                 self.plan_type,
                 show_fast_status,
+                self.show_session_header_directory,
             );
             self.apply_session_info_cell(session_info_cell);
         } else if self
@@ -163,6 +164,10 @@ impl ChatWidget {
             SessionConfiguredDisplay::Quiet,
             /*fork_parent_title*/ None,
         );
+    }
+
+    pub(crate) fn set_session_header_directory_visible(&mut self, visible: bool) {
+        self.show_session_header_directory = visible;
     }
 
     pub(crate) fn handle_side_thread_session(&mut self, session: ThreadSessionState) {

@@ -635,6 +635,12 @@ pub(crate) struct ChatWidget {
     show_welcome_banner: bool,
     // One-shot tooltip override for the primary startup session.
     startup_tooltip_override: Option<String>,
+    // Embedded surfaces can provide the current working context elsewhere and keep the session
+    // header compact.
+    show_session_header_directory: bool,
+    // Embedded surfaces can own their own status bar instead of duplicating the configurable
+    // agent status line below the composer.
+    show_status_line: bool,
     // When resuming an existing session (selected via resume picker), avoid an
     // immediate redraw on SessionConfigured to prevent a gratuitous UI flicker.
     suppress_session_configured_redraw: bool,

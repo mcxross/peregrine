@@ -38,6 +38,76 @@ impl ChatWidget {
         );
         RenderableItem::Owned(Box::new(flex))
     }
+
+    pub(crate) fn embedded_bottom_height(&self, width: u16) -> u16 {
+        self.bottom_pane.desired_height(width)
+    }
+
+    pub(crate) fn embedded_bottom_height_with_popup_overlay(&self, width: u16) -> u16 {
+        self.bottom_pane
+            .desired_height_with_composer_popup_overlay(width)
+    }
+
+    pub(crate) fn embedded_bottom_popup_overlay_height(&self, width: u16) -> Option<u16> {
+        self.bottom_pane.active_composer_popup_height(width)
+    }
+
+    pub(crate) fn render_embedded_bottom(&self, area: Rect, buf: &mut Buffer) {
+        self.bottom_pane.render(area, buf);
+    }
+
+    pub(crate) fn render_embedded_bottom_with_popup_overlay(&self, area: Rect, buf: &mut Buffer) {
+        self.bottom_pane
+            .render_with_composer_popup_overlay(area, buf);
+    }
+
+    pub(crate) fn render_embedded_bottom_popup_overlay(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+    ) -> bool {
+        self.bottom_pane.render_active_composer_popup(area, buf)
+    }
+
+    pub(crate) fn embedded_bottom_cursor_pos(&self, area: Rect) -> Option<(u16, u16)> {
+        self.bottom_pane.cursor_pos(area)
+    }
+
+    pub(crate) fn embedded_bottom_cursor_pos_with_popup_overlay(
+        &self,
+        area: Rect,
+    ) -> Option<(u16, u16)> {
+        self.bottom_pane
+            .cursor_pos_with_composer_popup_overlay(area)
+    }
+
+    pub(crate) fn embedded_bottom_cursor_style(
+        &self,
+        area: Rect,
+    ) -> crossterm::cursor::SetCursorStyle {
+        self.bottom_pane.cursor_style(area)
+    }
+
+    pub(crate) fn embedded_transcript_lines(
+        &self,
+        history_cells: &[Arc<dyn HistoryCell>],
+        width: u16,
+    ) -> Vec<Line<'static>> {
+        let mut lines = Vec::new();
+        for cell in history_cells {
+            if !lines.is_empty() {
+                lines.push(Line::from(""));
+            }
+            lines.extend(cell.display_lines(width));
+        }
+        if let Some(cell) = &self.transcript.active_cell {
+            if !lines.is_empty() {
+                lines.push(Line::from(""));
+            }
+            lines.extend(cell.display_lines(width));
+        }
+        lines
+    }
 }
 
 struct BottomPaneComposerReserveRenderable<'a> {

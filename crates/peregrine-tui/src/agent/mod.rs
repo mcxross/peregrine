@@ -214,6 +214,7 @@ mod version;
 #[cfg(not(target_os = "linux"))]
 mod voice;
 mod width;
+pub(crate) mod workbench_chat;
 mod workspace_command;
 #[cfg(target_os = "linux")]
 #[allow(dead_code)]

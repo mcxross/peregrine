@@ -184,7 +184,7 @@ impl<'a> SlashInput<'a> {
             },
             self.service_tier_commands.to_vec(),
         );
-        command_popup.on_composer_text_change(filter_text.to_string());
+        command_popup.on_composer_text_change(filter_text);
         command_popup
     }
 
@@ -269,7 +269,7 @@ impl ChatComposer {
                 let cursor = self.draft.textarea.cursor();
                 let filter_text = command_popup_filter_text(&first_line, cursor)
                     .unwrap_or_else(|| first_line.clone());
-                popup.on_composer_text_change(filter_text);
+                popup.on_composer_text_change(&filter_text);
                 if let Some(selected_cmd) = popup.selected_item() {
                     if selected_command_dispatches_immediately_on_tab(&selected_cmd)
                         && let CommandItem::Builtin(cmd) = &selected_cmd
@@ -319,7 +319,7 @@ impl ChatComposer {
                 let cursor = self.draft.textarea.cursor();
                 let filter_text = command_popup_filter_text(&first_line, cursor)
                     .unwrap_or_else(|| first_line.clone());
-                popup.on_composer_text_change(filter_text);
+                popup.on_composer_text_change(&filter_text);
                 if let Some(selected_cmd) = popup.selected_item() {
                     if self
                         .complete_selected_slash_command_preserving_existing_draft_tail_as_inline_args(

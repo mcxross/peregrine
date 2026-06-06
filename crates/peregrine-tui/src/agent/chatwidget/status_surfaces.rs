@@ -160,7 +160,7 @@ impl ChatWidget {
     }
 
     fn refresh_status_line_from_selections(&mut self, selections: &StatusSurfaceSelections) {
-        let enabled = !selections.status_line_items.is_empty();
+        let enabled = self.show_status_line && !selections.status_line_items.is_empty();
         self.bottom_pane.set_status_line_enabled(enabled);
         if !enabled {
             self.set_status_line(/*status_line*/ None);
@@ -185,6 +185,14 @@ impl ChatWidget {
             .then(|| self.status_line_pull_request_url())
             .flatten();
         self.set_status_line_hyperlink(hyperlink_url);
+    }
+
+    pub(crate) fn set_status_line_visible(&mut self, visible: bool) {
+        if self.show_status_line == visible {
+            return;
+        }
+        self.show_status_line = visible;
+        self.refresh_status_surfaces();
     }
 
     /// Clears the terminal title Peregrine most recently wrote, if any.

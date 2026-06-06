@@ -146,6 +146,28 @@ pub(crate) fn new_session_info(
     auth_plan: Option<PlanType>,
     show_fast_status: bool,
 ) -> SessionInfoCell {
+    new_session_info_with_directory(
+        config,
+        requested_model,
+        session,
+        is_first_event,
+        tooltip_override,
+        auth_plan,
+        show_fast_status,
+        true,
+    )
+}
+
+pub(crate) fn new_session_info_with_directory(
+    config: &Config,
+    requested_model: &str,
+    session: &ThreadSessionState,
+    is_first_event: bool,
+    tooltip_override: Option<String>,
+    auth_plan: Option<PlanType>,
+    show_fast_status: bool,
+    show_directory: bool,
+) -> SessionInfoCell {
     // Header box rendered as history (so it appears at the very top)
     let header = SessionHeaderHistoryCell::new(
         session.model.clone(),
@@ -157,7 +179,8 @@ pub(crate) fn new_session_info(
     .with_yolo_mode(has_yolo_permissions(
         session.approval_policy,
         &session.permission_profile,
-    ));
+    ))
+    .with_directory_visible(show_directory);
     let mut parts: Vec<Box<dyn HistoryCell>> = vec![Box::new(header)];
 
     if is_first_event {
@@ -245,6 +268,7 @@ pub(crate) struct SessionHeaderHistoryCell {
     reasoning_effort: Option<ReasoningEffortConfig>,
     show_fast_status: bool,
     directory: PathBuf,
+    show_directory: bool,
     yolo_mode: bool,
 }
 
@@ -281,12 +305,18 @@ impl SessionHeaderHistoryCell {
             reasoning_effort,
             show_fast_status,
             directory,
+            show_directory: true,
             yolo_mode: false,
         }
     }
 
     pub(crate) fn with_yolo_mode(mut self, yolo_mode: bool) -> Self {
         self.yolo_mode = yolo_mode;
+        self
+    }
+
+    pub(crate) fn with_directory_visible(mut self, show_directory: bool) -> Self {
+        self.show_directory = show_directory;
         self
     }
 
@@ -350,9 +380,15 @@ impl HistoryCell for SessionHeaderHistoryCell {
         const DIR_LABEL: &str = "directory:";
         const PERMISSIONS_LABEL: &str = "permissions:";
         let label_width = if self.yolo_mode {
-            DIR_LABEL.len().max(PERMISSIONS_LABEL.len())
-        } else {
+            if self.show_directory {
+                DIR_LABEL.len().max(PERMISSIONS_LABEL.len())
+            } else {
+                PERMISSIONS_LABEL.len()
+            }
+        } else if self.show_directory {
             DIR_LABEL.len()
+        } else {
+            "model:".len()
         };
 
         let model_label = format!(
@@ -380,19 +416,21 @@ impl HistoryCell for SessionHeaderHistoryCell {
             spans
         };
 
-        let dir_label = format!("{DIR_LABEL:<label_width$}");
-        let dir_prefix = format!("{dir_label} ");
-        let dir_prefix_width = UnicodeWidthStr::width(dir_prefix.as_str());
-        let dir_max_width = inner_width.saturating_sub(dir_prefix_width);
-        let dir = self.format_directory(Some(dir_max_width));
-        let dir_spans = vec![Span::from(dir_prefix).dim(), Span::from(dir)];
-
         let mut lines = vec![
             make_row(title_spans),
             make_row(Vec::new()),
             make_row(model_spans),
-            make_row(dir_spans),
         ];
+
+        if self.show_directory {
+            let dir_label = format!("{DIR_LABEL:<label_width$}");
+            let dir_prefix = format!("{dir_label} ");
+            let dir_prefix_width = UnicodeWidthStr::width(dir_prefix.as_str());
+            let dir_max_width = inner_width.saturating_sub(dir_prefix_width);
+            let dir = self.format_directory(Some(dir_max_width));
+            let dir_spans = vec![Span::from(dir_prefix).dim(), Span::from(dir)];
+            lines.push(make_row(dir_spans));
+        }
 
         if self.yolo_mode {
             let permissions_label = format!("{PERMISSIONS_LABEL:<label_width$}");
@@ -415,11 +453,13 @@ impl HistoryCell for SessionHeaderHistoryCell {
                     .map(|reasoning| format!(" {reasoning}"))
                     .unwrap_or_default()
             )),
-            Line::from(format!(
+        ];
+        if self.show_directory {
+            lines.push(Line::from(format!(
                 "directory: {}",
                 self.format_directory(/*max_width*/ None)
-            )),
-        ];
+            )));
+        }
         if self.yolo_mode {
             lines.push(Line::from("permissions: YOLO mode"));
         }

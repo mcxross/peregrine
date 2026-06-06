@@ -15,6 +15,7 @@ pub enum KeyBindEvent {
     SelectCfgTab,
     SelectCallGraphTab,
     SelectTypeGraphTab,
+    SelectChatTab,
     WorkbenchCancel,
     WorkbenchFocusLeft,
     WorkbenchFocusDown,
@@ -24,7 +25,6 @@ pub enum KeyBindEvent {
     WorkbenchFocusTabs,
     WorkbenchFocusCodeEditor,
     WorkbenchFocusInput,
-    WorkbenchFocusInspector,
     WorkbenchToggleEditorMode,
     WorkbenchPreviousTheme,
     WorkbenchNextTheme,
@@ -33,6 +33,7 @@ pub enum KeyBindEvent {
     WorkbenchSelectCfgTab,
     WorkbenchSelectCallGraphTab,
     WorkbenchSelectTypeGraphTab,
+    WorkbenchSelectChatTab,
 }
 
 pub fn init_default_keybindings() -> io::Result<()> {
@@ -40,11 +41,11 @@ pub fn init_default_keybindings() -> io::Result<()> {
 }
 
 pub fn default_hint() -> String {
-    "Editor view: hjkl/arrows navigate, Enter/i edit | Alt-1..5 views | Ctrl-S save | Ctrl-C quit"
+    "Editor view: hjkl/arrows navigate, Enter/i edit | Alt-1..6 views | Ctrl-S save | Ctrl-C quit"
         .to_string()
 }
 
 pub fn workbench_hint() -> String {
-    "Ctrl-W then arrows/hjkl move, e explorer, t tabs, c code, i input, p inspector, 1-5 views, m mode"
+    "Ctrl-W then arrows/hjkl move, e explorer, t tabs, c code, i input, 1-6 views, m mode"
         .to_string()
 }

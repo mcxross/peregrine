@@ -733,24 +733,47 @@ impl ChatComposer {
         area: Rect,
         textarea_right_reserve: u16,
     ) -> [Rect; 4] {
+        self.layout_areas_with_textarea_right_reserve_and_inline_popup(
+            area,
+            textarea_right_reserve,
+            /*inline_popup*/ true,
+        )
+    }
+
+    fn footer_total_height(&self) -> u16 {
         let footer_props = self.footer_props();
         let footer_hint_height = self
             .custom_footer_height()
             .unwrap_or_else(|| footer_height(&footer_props));
         let footer_spacing = Self::footer_spacing(footer_hint_height);
-        let footer_total_height = footer_hint_height + footer_spacing;
+        footer_hint_height + footer_spacing
+    }
+
+    fn layout_areas_with_textarea_right_reserve_and_inline_popup(
+        &self,
+        area: Rect,
+        textarea_right_reserve: u16,
+        inline_popup: bool,
+    ) -> [Rect; 4] {
+        let footer_total_height = self.footer_total_height();
         let popup_constraint = match &self.popups.active {
-            ActivePopup::Command(popup) => {
+            ActivePopup::Command(popup) if inline_popup => {
                 Constraint::Max(popup.calculate_required_height(area.width))
             }
-            ActivePopup::File(popup) => Constraint::Max(popup.calculate_required_height()),
-            ActivePopup::Skill(popup) => {
+            ActivePopup::File(popup) if inline_popup => {
+                Constraint::Max(popup.calculate_required_height())
+            }
+            ActivePopup::Skill(popup) if inline_popup => {
                 Constraint::Max(popup.calculate_required_height(area.width))
             }
-            ActivePopup::MentionV2(popup) => {
+            ActivePopup::MentionV2(popup) if inline_popup => {
                 Constraint::Max(popup.calculate_required_height(area.width))
             }
-            ActivePopup::None => Constraint::Max(footer_total_height),
+            ActivePopup::None
+            | ActivePopup::Command(_)
+            | ActivePopup::File(_)
+            | ActivePopup::Skill(_)
+            | ActivePopup::MentionV2(_) => Constraint::Max(footer_total_height),
         };
         let [composer_rect, popup_rect] =
             Layout::vertical([Constraint::Min(3), popup_constraint]).areas(area);
@@ -797,6 +820,31 @@ impl ChatComposer {
         area: Rect,
         textarea_right_reserve: u16,
     ) -> Option<(u16, u16)> {
+        self.cursor_pos_with_textarea_right_reserve_and_inline_popup(
+            area,
+            textarea_right_reserve,
+            /*inline_popup*/ true,
+        )
+    }
+
+    pub(crate) fn cursor_pos_without_inline_popup_with_textarea_right_reserve(
+        &self,
+        area: Rect,
+        textarea_right_reserve: u16,
+    ) -> Option<(u16, u16)> {
+        self.cursor_pos_with_textarea_right_reserve_and_inline_popup(
+            area,
+            textarea_right_reserve,
+            /*inline_popup*/ false,
+        )
+    }
+
+    fn cursor_pos_with_textarea_right_reserve_and_inline_popup(
+        &self,
+        area: Rect,
+        textarea_right_reserve: u16,
+        inline_popup: bool,
+    ) -> Option<(u16, u16)> {
         if !self.draft.input_enabled || self.attachments.selected_remote_image_index.is_some() {
             return None;
         }
@@ -805,8 +853,12 @@ impl ChatComposer {
             return Some(pos);
         }
 
-        let [_, _, textarea_rect, _] =
-            self.layout_areas_with_textarea_right_reserve(area, textarea_right_reserve);
+        let [_, _, textarea_rect, _] = self
+            .layout_areas_with_textarea_right_reserve_and_inline_popup(
+                area,
+                textarea_right_reserve,
+                inline_popup,
+            );
         let state = *self.draft.textarea_state.borrow();
         self.draft
             .textarea
@@ -3605,7 +3657,7 @@ impl ChatComposer {
             ActivePopup::Command(popup) => {
                 if is_editing_slash_command_name {
                     if let Some(command_filter_text) = command_filter_text.as_deref() {
-                        popup.on_composer_text_change(command_filter_text.to_string());
+                        popup.on_composer_text_change(command_filter_text);
                     }
                 } else {
                     self.popups.active = ActivePopup::None;
@@ -4093,12 +4145,32 @@ impl ChatComposer {
         width: u16,
         textarea_right_reserve: u16,
     ) -> u16 {
-        let footer_props = self.footer_props();
-        let footer_hint_height = self
-            .custom_footer_height()
-            .unwrap_or_else(|| footer_height(&footer_props));
-        let footer_spacing = Self::footer_spacing(footer_hint_height);
-        let footer_total_height = footer_hint_height + footer_spacing;
+        self.desired_height_with_textarea_right_reserve_and_inline_popup(
+            width,
+            textarea_right_reserve,
+            /*inline_popup*/ true,
+        )
+    }
+
+    pub(crate) fn desired_height_without_inline_popup_with_textarea_right_reserve(
+        &self,
+        width: u16,
+        textarea_right_reserve: u16,
+    ) -> u16 {
+        self.desired_height_with_textarea_right_reserve_and_inline_popup(
+            width,
+            textarea_right_reserve,
+            /*inline_popup*/ false,
+        )
+    }
+
+    fn desired_height_with_textarea_right_reserve_and_inline_popup(
+        &self,
+        width: u16,
+        textarea_right_reserve: u16,
+        inline_popup: bool,
+    ) -> u16 {
+        let footer_total_height = self.footer_total_height();
         const COLS_WITH_MARGIN: u16 = LIVE_PREFIX_COLS + 1;
         let inner_width =
             width.saturating_sub(COLS_WITH_MARGIN.saturating_add(textarea_right_reserve));
@@ -4114,12 +4186,48 @@ impl ChatComposer {
             + remote_images_separator
             + 2
             + match &self.popups.active {
-                ActivePopup::None => footer_total_height,
-                ActivePopup::Command(c) => c.calculate_required_height(width),
-                ActivePopup::File(c) => c.calculate_required_height(),
-                ActivePopup::Skill(c) => c.calculate_required_height(width),
-                ActivePopup::MentionV2(c) => c.calculate_required_height(width),
+                ActivePopup::Command(c) if inline_popup => c.calculate_required_height(width),
+                ActivePopup::File(c) if inline_popup => c.calculate_required_height(),
+                ActivePopup::Skill(c) if inline_popup => c.calculate_required_height(width),
+                ActivePopup::MentionV2(c) if inline_popup => c.calculate_required_height(width),
+                ActivePopup::None
+                | ActivePopup::Command(_)
+                | ActivePopup::File(_)
+                | ActivePopup::Skill(_)
+                | ActivePopup::MentionV2(_) => footer_total_height,
             }
+    }
+
+    pub(crate) fn active_popup_height(&self, width: u16) -> Option<u16> {
+        match &self.popups.active {
+            ActivePopup::Command(popup) => Some(popup.calculate_required_height(width)),
+            ActivePopup::File(popup) => Some(popup.calculate_required_height()),
+            ActivePopup::Skill(popup) => Some(popup.calculate_required_height(width)),
+            ActivePopup::MentionV2(popup) => Some(popup.calculate_required_height(width)),
+            ActivePopup::None => None,
+        }
+    }
+
+    pub(crate) fn render_active_popup(&self, area: Rect, buf: &mut Buffer) -> bool {
+        match &self.popups.active {
+            ActivePopup::Command(popup) => {
+                popup.render_ref(area, buf);
+                true
+            }
+            ActivePopup::File(popup) => {
+                popup.render_ref(area, buf);
+                true
+            }
+            ActivePopup::Skill(popup) => {
+                popup.render_ref(area, buf);
+                true
+            }
+            ActivePopup::MentionV2(popup) => {
+                popup.render_ref(area, buf);
+                true
+            }
+            ActivePopup::None => false,
+        }
     }
 }
 
@@ -4137,22 +4245,58 @@ impl ChatComposer {
         mask_char: Option<char>,
         textarea_right_reserve: u16,
     ) {
-        let [composer_rect, remote_images_rect, textarea_rect, popup_rect] =
-            self.layout_areas_with_textarea_right_reserve(area, textarea_right_reserve);
-        match &self.popups.active {
-            ActivePopup::Command(popup) => {
+        self.render_with_mask_textarea_right_reserve_and_inline_popup(
+            area,
+            buf,
+            mask_char,
+            textarea_right_reserve,
+            /*inline_popup*/ true,
+        );
+    }
+
+    pub(crate) fn render_without_inline_popup_with_textarea_right_reserve(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        textarea_right_reserve: u16,
+    ) {
+        self.render_with_mask_textarea_right_reserve_and_inline_popup(
+            area,
+            buf,
+            /*mask_char*/ None,
+            textarea_right_reserve,
+            /*inline_popup*/ false,
+        );
+    }
+
+    fn render_with_mask_textarea_right_reserve_and_inline_popup(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        mask_char: Option<char>,
+        textarea_right_reserve: u16,
+        inline_popup: bool,
+    ) {
+        let [composer_rect, remote_images_rect, textarea_rect, popup_rect] = self
+            .layout_areas_with_textarea_right_reserve_and_inline_popup(
+                area,
+                textarea_right_reserve,
+                inline_popup,
+            );
+        match (inline_popup, &self.popups.active) {
+            (true, ActivePopup::Command(popup)) => {
                 popup.render_ref(popup_rect, buf);
             }
-            ActivePopup::File(popup) => {
+            (true, ActivePopup::File(popup)) => {
                 popup.render_ref(popup_rect, buf);
             }
-            ActivePopup::Skill(popup) => {
+            (true, ActivePopup::Skill(popup)) => {
                 popup.render_ref(popup_rect, buf);
             }
-            ActivePopup::MentionV2(popup) => {
+            (true, ActivePopup::MentionV2(popup)) => {
                 popup.render_ref(popup_rect, buf);
             }
-            ActivePopup::None => {
+            (false, _) | (true, ActivePopup::None) => {
                 let footer_props = self.footer_props();
                 let show_cycle_hint = !footer_props.is_task_running
                     && self.footer.collaboration_mode_indicator.is_some();

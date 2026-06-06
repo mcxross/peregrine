@@ -66,7 +66,14 @@ const PAGE_SIZE: usize = 12;
 const MOUSE_VERTICAL_SCROLL_STEP: usize = 3;
 const MOUSE_HORIZONTAL_SCROLL_STEP: usize = 8;
 const AGENT_SUBCOMMAND: &str = "agent";
-const WORKBENCH_TAB_LABELS: [&str; 5] = ["code", "bytecode", "cfg", "call graph", "type graph"];
+const WORKBENCH_TAB_LABELS: [&str; 6] = [
+    "code",
+    "bytecode",
+    "cfg",
+    "call graph",
+    "type graph",
+    "chat",
+];
 const CLI_COMMAND_NAMES: &[&str] = &[
     "build",
     "test",
@@ -534,7 +541,6 @@ pub enum FocusPane {
     Tabs,
     Editor,
     Input,
-    Inspector,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -544,15 +550,17 @@ pub enum WorkbenchTab {
     Cfg,
     CallGraph,
     TypeGraph,
+    Chat,
 }
 
 impl WorkbenchTab {
-    const ALL: [Self; 5] = [
+    const ALL: [Self; 6] = [
         Self::Code,
         Self::Bytecode,
         Self::Cfg,
         Self::CallGraph,
         Self::TypeGraph,
+        Self::Chat,
     ];
 
     fn title(self) -> &'static str {
@@ -562,6 +570,7 @@ impl WorkbenchTab {
             Self::Cfg => "cfg",
             Self::CallGraph => "call graph",
             Self::TypeGraph => "type graph",
+            Self::Chat => "chat",
         }
     }
 
@@ -717,7 +726,7 @@ struct WorkbenchLayout {
     tab_hit_areas: Vec<(WorkbenchTab, Rect)>,
     editor: Rect,
     input: Rect,
-    inspector: Option<Rect>,
+    bottom_bar: Rect,
 }
 
 pub struct App {
@@ -737,6 +746,7 @@ pub struct App {
     bytecode_loader_rx: Option<mpsc::Receiver<BytecodeLoadResult>>,
     bytecode_load_epoch: u64,
     graphs: GraphPanes,
+    chat: agent::workbench_chat::WorkbenchChatHost,
     input: CommandInput,
     startup: WorkbenchStartupState,
     startup_task_rx: Option<mpsc::Receiver<StartupTaskResult>>,
@@ -794,6 +804,7 @@ impl App {
             bytecode_loader_rx: None,
             bytecode_load_epoch: 0,
             graphs: GraphPanes::default(),
+            chat: agent::workbench_chat::WorkbenchChatHost::default(),
             input: CommandInput::default(),
             startup: WorkbenchStartupState::Workbench,
             startup_task_rx: None,
@@ -1060,6 +1071,8 @@ impl App {
             Explorer::new(root).map_err(|error| format!("Could not open project root: {error}"))?;
         self.editor = EditorBuffer::new_empty();
         self.input = CommandInput::default();
+        self.chat.shutdown();
+        self.chat = agent::workbench_chat::WorkbenchChatHost::default();
         self.focus = FocusPane::Explorer;
         self.active_tab = WorkbenchTab::Code;
         self.standard_editor_editing = false;
@@ -1075,6 +1088,7 @@ impl App {
         loop {
             self.drain_startup_task();
             self.drain_bytecode_loader();
+            self.tick_chat();
             terminal.draw(|frame| self.render(frame))?;
             if let Some(exit) = self.exit {
                 return Ok(exit);
@@ -1089,6 +1103,10 @@ impl App {
                     }
                 }
                 Event::Mouse(mouse) => self.handle_mouse_event(mouse),
+                Event::Paste(pasted) if self.active_tab == WorkbenchTab::Chat => {
+                    let action = self.chat.handle_paste(&self.explorer.root, pasted);
+                    self.apply_chat_action(action);
+                }
                 _ => {}
             }
         }
@@ -1100,6 +1118,11 @@ impl App {
             return;
         }
 
+        if self.active_tab == WorkbenchTab::Chat {
+            self.handle_chat_key_event(key);
+            return;
+        }
+
         match self.navigation.translate(key, self.focus) {
             NavigationIntent::Command(command) => self.apply_navigation_command(command),
             NavigationIntent::PassThrough => match self.focus {
@@ -1107,8 +1130,51 @@ impl App {
                 FocusPane::Tabs => self.handle_tabs_key(key),
                 FocusPane::Editor => self.handle_editor_key(key),
                 FocusPane::Input => self.handle_input_key(key),
-                FocusPane::Inspector => self.handle_inspector_key(key),
             },
+        }
+    }
+
+    fn tick_chat(&mut self) {
+        if self.active_tab != WorkbenchTab::Chat {
+            return;
+        }
+        let action = self.chat.tick(&self.explorer.root);
+        self.apply_chat_action(action);
+    }
+
+    fn handle_chat_key_event(&mut self, key: KeyEvent) {
+        match self.navigation.translate_workbench_navigation_only(key) {
+            NavigationIntent::Command(command) => self.apply_navigation_command(command),
+            NavigationIntent::PassThrough => {
+                let action = self.chat.handle_key(&self.explorer.root, key);
+                self.apply_chat_action(action);
+            }
+        }
+    }
+
+    fn apply_chat_action(&mut self, action: agent::workbench_chat::WorkbenchChatAction) {
+        match action {
+            agent::workbench_chat::WorkbenchChatAction::None => {}
+            agent::workbench_chat::WorkbenchChatAction::FocusCode => {
+                self.focus_code_editor();
+                self.status = "Returned to workbench".to_string();
+            }
+            agent::workbench_chat::WorkbenchChatAction::Quit => {
+                self.exit = Some(WorkbenchExit::Quit);
+            }
+            agent::workbench_chat::WorkbenchChatAction::ThemeSelected(name) => {
+                match name.parse::<ThemeName>() {
+                    Ok(theme_name) => {
+                        self.theme = Theme::new(theme_name);
+                        self.sync_syntax_theme();
+                        self.invalidate_workbench_views();
+                        self.status = format!("Theme: {}", self.theme);
+                    }
+                    Err(err) => {
+                        self.status = format!("Theme unavailable: {err}");
+                    }
+                }
+            }
         }
     }
 
@@ -1280,12 +1346,22 @@ impl App {
         }
 
         if rect_contains(self.layout.editor, x, y) {
-            self.set_focus(FocusPane::Editor);
             match self.active_tab {
-                WorkbenchTab::Code => self.scroll_editor(direction),
-                WorkbenchTab::Bytecode => self.scroll_bytecode(direction),
+                WorkbenchTab::Code => {
+                    self.set_focus(FocusPane::Editor);
+                    self.scroll_editor(direction);
+                }
+                WorkbenchTab::Bytecode => {
+                    self.set_focus(FocusPane::Editor);
+                    self.scroll_bytecode(direction);
+                }
                 WorkbenchTab::Cfg | WorkbenchTab::CallGraph | WorkbenchTab::TypeGraph => {
-                    self.scroll_graph(direction)
+                    self.set_focus(FocusPane::Editor);
+                    self.scroll_graph(direction);
+                }
+                WorkbenchTab::Chat => {
+                    self.set_focus(FocusPane::Input);
+                    self.chat.scroll(direction, MOUSE_VERTICAL_SCROLL_STEP);
                 }
             }
             return;
@@ -1303,14 +1379,6 @@ impl App {
                 ScrollDirection::Up | ScrollDirection::Down => {}
             }
             return;
-        }
-
-        if self
-            .layout
-            .inspector
-            .is_some_and(|area| rect_contains(area, x, y))
-        {
-            self.set_focus(FocusPane::Inspector);
         }
     }
 
@@ -1400,7 +1468,11 @@ impl App {
     fn handle_left_click(&mut self, x: u16, y: u16) {
         if let Some(tab) = self.clicked_tab(x, y) {
             self.set_active_tab(tab);
-            self.set_focus(FocusPane::Editor);
+            if tab == WorkbenchTab::Chat {
+                self.set_focus(FocusPane::Input);
+            } else {
+                self.set_focus(FocusPane::Editor);
+            }
             return;
         }
 
@@ -1422,14 +1494,6 @@ impl App {
         if rect_contains(self.layout.input, x, y) {
             self.handle_input_click(x);
             return;
-        }
-
-        if self
-            .layout
-            .inspector
-            .is_some_and(|area| rect_contains(area, x, y))
-        {
-            self.set_focus(FocusPane::Inspector);
         }
     }
 
@@ -1463,6 +1527,11 @@ impl App {
     }
 
     fn handle_editor_click(&mut self, x: u16, y: u16) {
+        if self.active_tab == WorkbenchTab::Chat {
+            self.set_focus(FocusPane::Input);
+            let _ = (x, y);
+            return;
+        }
         self.set_focus(FocusPane::Editor);
         if self.active_tab == WorkbenchTab::Code {
             if self.markdown_preview_enabled() {
@@ -1580,6 +1649,10 @@ impl App {
             WorkbenchTab::Cfg | WorkbenchTab::CallGraph | WorkbenchTab::TypeGraph => {
                 self.handle_graph_key(key)
             }
+            WorkbenchTab::Chat => {
+                let action = self.chat.handle_key(&self.explorer.root, key);
+                self.apply_chat_action(action);
+            }
         }
     }
 
@@ -1617,12 +1690,12 @@ impl App {
             KeyCode::Char('e') if plain => self.set_focus(FocusPane::Explorer),
             KeyCode::Char('t') if plain => self.set_focus(FocusPane::Tabs),
             KeyCode::Char('c') if plain => self.focus_code_editor(),
-            KeyCode::Char('p') if plain => self.set_focus(FocusPane::Inspector),
             KeyCode::Char('1') if plain => self.set_active_tab(WorkbenchTab::Code),
             KeyCode::Char('2') if plain => self.set_active_tab(WorkbenchTab::Bytecode),
             KeyCode::Char('3') if plain => self.set_active_tab(WorkbenchTab::Cfg),
             KeyCode::Char('4') if plain => self.set_active_tab(WorkbenchTab::CallGraph),
             KeyCode::Char('5') if plain => self.set_active_tab(WorkbenchTab::TypeGraph),
+            KeyCode::Char('6') if plain => self.set_active_tab(WorkbenchTab::Chat),
             KeyCode::PageUp if plain => self.editor.page_up(),
             KeyCode::PageDown if plain => self.editor.page_down(),
             KeyCode::Home if plain => self.editor.move_line_start(),
@@ -1795,13 +1868,6 @@ impl App {
         }
     }
 
-    fn handle_inspector_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Left | KeyCode::Char('h') | KeyCode::Esc => self.set_focus(FocusPane::Editor),
-            _ => {}
-        }
-    }
-
     fn focus_code_editor(&mut self) {
         self.standard_editor_editing = false;
         self.active_tab = WorkbenchTab::Code;
@@ -1813,15 +1879,17 @@ impl App {
         if tab != WorkbenchTab::Code {
             self.standard_editor_editing = false;
         }
+        if tab == WorkbenchTab::Chat {
+            self.focus = FocusPane::Input;
+            let action = self.chat.tick(&self.explorer.root);
+            self.apply_chat_action(action);
+            return;
+        }
         self.set_focus(self.focus);
     }
 
     fn set_focus(&mut self, pane: FocusPane) {
-        let focus = if pane == FocusPane::Inspector && !self.inspector_visible() {
-            FocusPane::Editor
-        } else {
-            pane
-        };
+        let focus = pane;
         if focus != FocusPane::Editor || self.active_tab != WorkbenchTab::Code {
             self.standard_editor_editing = false;
         }
@@ -1829,29 +1897,11 @@ impl App {
     }
 
     fn next_focus_pane(&self) -> FocusPane {
-        if self.inspector_visible() {
-            return navigation::next_focus(self.focus);
-        }
-
-        let order = hidden_inspector_focus_order();
-        let index = order
-            .iter()
-            .position(|pane| *pane == self.focus)
-            .unwrap_or_default();
-        order[(index + 1) % order.len()]
+        navigation::next_focus(self.focus)
     }
 
     fn previous_focus_pane(&self) -> FocusPane {
-        if self.inspector_visible() {
-            return navigation::previous_focus(self.focus);
-        }
-
-        let order = hidden_inspector_focus_order();
-        let index = order
-            .iter()
-            .position(|pane| *pane == self.focus)
-            .unwrap_or_default();
-        order[(index + order.len() - 1) % order.len()]
+        navigation::previous_focus(self.focus)
     }
 
     fn next_tab(&mut self) {
@@ -2028,18 +2078,6 @@ impl App {
             .title_style(self.title_style(focused))
     }
 
-    fn inspector_line(
-        &self,
-        label: &'static str,
-        value: impl Into<String>,
-        value_style: Style,
-    ) -> Line<'static> {
-        Line::from(vec![
-            Span::styled(format!("{label}: "), self.muted_style()),
-            Span::styled(value.into(), value_style),
-        ])
-    }
-
     pub fn render(&mut self, frame: &mut Frame<'_>) {
         let area = frame.area();
         frame.buffer_mut().set_style(area, self.base_style());
@@ -2048,33 +2086,21 @@ impl App {
             return;
         }
 
-        let show_inspector = self.inspector_visible();
-        let constraints = if show_inspector {
-            vec![
-                Constraint::Percentage(25),
-                Constraint::Percentage(50),
-                Constraint::Percentage(25),
-            ]
-        } else {
-            vec![Constraint::Percentage(25), Constraint::Percentage(75)]
-        };
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(6), Constraint::Length(1)])
+            .split(area);
 
         let columns = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(constraints)
-            .split(area);
+            .constraints([Constraint::Percentage(25), Constraint::Percentage(75)])
+            .split(rows[0]);
 
         self.layout.explorer = columns[0];
-        self.layout.inspector = if show_inspector {
-            Some(columns[2])
-        } else {
-            None
-        };
+        self.layout.bottom_bar = rows[1];
         self.render_explorer(frame, columns[0]);
         self.render_center(frame, columns[1]);
-        if show_inspector {
-            self.render_inspector(frame, columns[2]);
-        }
+        self.render_bottom_bar(frame, rows[1]);
     }
 
     fn render_startup(&self, frame: &mut Frame<'_>, area: Rect) {
@@ -2236,10 +2262,6 @@ impl App {
         ])
     }
 
-    fn inspector_visible(&self) -> bool {
-        self.active_tab != WorkbenchTab::Bytecode
-    }
-
     fn render_explorer(&self, frame: &mut Frame<'_>, area: Rect) {
         let palette = self.palette();
         let items = self
@@ -2280,18 +2302,29 @@ impl App {
 
     fn render_center(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let palette = self.palette();
-        let rows = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3),
-                Constraint::Min(3),
-                Constraint::Length(3),
-            ])
-            .split(area);
+        let rows = if self.active_tab == WorkbenchTab::Chat {
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(3), Constraint::Min(3)])
+                .split(area)
+        } else {
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(3),
+                    Constraint::Min(3),
+                    Constraint::Length(3),
+                ])
+                .split(area)
+        };
 
         self.layout.tabs = rows[0];
         self.layout.editor = rows[1];
-        self.layout.input = rows[2];
+        self.layout.input = if self.active_tab == WorkbenchTab::Chat {
+            Rect::default()
+        } else {
+            rows[2]
+        };
         self.layout.tab_hit_areas = tab_hit_areas(&WORKBENCH_TAB_LABELS, rows[0])
             .into_iter()
             .zip(WorkbenchTab::ALL)
@@ -2311,9 +2344,15 @@ impl App {
             WorkbenchTab::Cfg | WorkbenchTab::CallGraph | WorkbenchTab::TypeGraph => {
                 self.render_graph(frame, rows[1], self.active_tab)
             }
+            WorkbenchTab::Chat => {
+                self.chat
+                    .render(frame, rows[1], self.focus == FocusPane::Input);
+            }
         }
 
-        self.render_input(frame, rows[2]);
+        if self.active_tab != WorkbenchTab::Chat {
+            self.render_input(frame, rows[2]);
+        }
     }
 
     fn render_graph(&mut self, frame: &mut Frame<'_>, area: Rect, tab: WorkbenchTab) {
@@ -2626,7 +2665,7 @@ impl App {
             WorkbenchTab::Cfg => self.load_cfg_graph_document(&context),
             WorkbenchTab::CallGraph => self.load_call_graph_document(&context),
             WorkbenchTab::TypeGraph => self.load_type_graph_document(&context),
-            WorkbenchTab::Code | WorkbenchTab::Bytecode => {
+            WorkbenchTab::Code | WorkbenchTab::Bytecode | WorkbenchTab::Chat => {
                 Err(format!("{} is not a graph tab.", tab.title()))
             }
         }
@@ -2878,10 +2917,9 @@ impl App {
     fn render_input(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let inner_width = area.width.saturating_sub(2) as usize;
         self.input.set_viewport_width(inner_width);
-        let title = format!("Input - {}", self.status);
         let paragraph = Paragraph::new(self.input.text.as_str())
             .style(self.base_style())
-            .block(self.panel_block(title, self.focus == FocusPane::Input))
+            .block(self.panel_block("Input", self.focus == FocusPane::Input))
             .scroll((0, usize_to_u16_saturating(self.input.scroll)));
         frame.render_widget(paragraph, area);
 
@@ -2894,36 +2932,44 @@ impl App {
         }
     }
 
-    fn render_inspector(&self, frame: &mut Frame<'_>, area: Rect) {
-        let palette = self.palette();
-        let mut lines = Vec::new();
+    fn render_bottom_bar(&self, frame: &mut Frame<'_>, area: Rect) {
+        let mut spans = Vec::new();
         if let Some(state) = self.package_load_running_state() {
-            lines.push(Line::from(vec![
-                Span::styled(
-                    package_load_spinner(state.started_at),
-                    self.style_fg(palette.accent).add_modifier(Modifier::BOLD),
-                ),
-                Span::raw(" "),
-                Span::styled("running", self.style_fg(palette.warning)),
-            ]));
-            lines.push(self.inspector_line(
-                "elapsed",
-                format_elapsed(state.started_at.elapsed()),
+            spans.push(Span::styled(
+                package_load_spinner(state.started_at),
+                self.style_fg(self.palette().accent)
+                    .add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::raw(" package: "));
+            spans.push(Span::styled(
+                "running",
+                self.style_fg(self.palette().warning),
+            ));
+            spans.push(Span::styled(
+                format!(" {}", format_elapsed(state.started_at.elapsed())),
                 self.muted_style(),
             ));
         } else if let Some(report) = &self.package_load_report {
-            lines.extend(package_load_status_lines(report, self));
+            spans.extend(package_load_status_spans(report, self));
         } else {
-            lines.push(Line::styled(
-                "Package",
-                self.style_fg(palette.info).add_modifier(Modifier::BOLD),
-            ));
-            lines.push(Line::styled("No package status yet", self.muted_style()));
+            spans.push(Span::styled("package: ", self.muted_style()));
+            spans.push(Span::styled("no status yet", self.muted_style()));
         }
-        let paragraph = Paragraph::new(lines)
-            .style(self.base_style())
-            .block(self.panel_block("Inspector", self.focus == FocusPane::Inspector))
-            .wrap(Wrap { trim: false });
+
+        if !self.status.is_empty() {
+            spans.push(Span::styled(" | ", self.muted_style()));
+            spans.push(Span::styled(self.status.clone(), self.muted_style()));
+        }
+
+        if self.active_tab == WorkbenchTab::Chat {
+            spans.push(Span::styled(" | ", self.muted_style()));
+            spans.push(Span::styled(
+                self.chat.status().to_string(),
+                self.muted_style(),
+            ));
+        }
+
+        let paragraph = Paragraph::new(Line::from(spans)).style(self.base_style());
         frame.render_widget(paragraph, area);
     }
 
@@ -2991,7 +3037,7 @@ impl GraphPanes {
             WorkbenchTab::Cfg => Some(&self.cfg),
             WorkbenchTab::CallGraph => Some(&self.call_graph),
             WorkbenchTab::TypeGraph => Some(&self.type_graph),
-            WorkbenchTab::Code | WorkbenchTab::Bytecode => None,
+            WorkbenchTab::Code | WorkbenchTab::Bytecode | WorkbenchTab::Chat => None,
         }
     }
 
@@ -3000,7 +3046,7 @@ impl GraphPanes {
             WorkbenchTab::Cfg => Some(&mut self.cfg),
             WorkbenchTab::CallGraph => Some(&mut self.call_graph),
             WorkbenchTab::TypeGraph => Some(&mut self.type_graph),
-            WorkbenchTab::Code | WorkbenchTab::Bytecode => None,
+            WorkbenchTab::Code | WorkbenchTab::Bytecode | WorkbenchTab::Chat => None,
         }
     }
 
@@ -4271,17 +4317,6 @@ fn bytecode_cache_skipped_dir(path: &Path) -> bool {
         })
 }
 
-fn hidden_inspector_focus_order() -> &'static [FocusPane] {
-    const WITHOUT_INSPECTOR: [FocusPane; 4] = [
-        FocusPane::Explorer,
-        FocusPane::Editor,
-        FocusPane::Input,
-        FocusPane::Tabs,
-    ];
-
-    &WITHOUT_INSPECTOR
-}
-
 fn rect_contains(rect: Rect, x: u16, y: u16) -> bool {
     x >= rect.x && x < rect.right() && y >= rect.y && y < rect.bottom()
 }
@@ -4441,6 +4476,7 @@ fn package_load_status(report: &PackageLoadReport) -> String {
     "Package load complete".to_string()
 }
 
+#[cfg(test)]
 fn package_load_status_lines(report: &PackageLoadReport, app: &App) -> Vec<Line<'static>> {
     let build_status = TaskStatus::from_cli(report.build.status);
     let test_status = child_task_status(build_status, TaskStatus::from_cli(report.test.status));
@@ -4493,6 +4529,75 @@ fn package_load_status_lines(report: &PackageLoadReport, app: &App) -> Vec<Line<
     lines
 }
 
+fn package_load_status_spans(report: &PackageLoadReport, app: &App) -> Vec<Span<'static>> {
+    let build_status = TaskStatus::from_cli(report.build.status);
+    let test_status = child_task_status(build_status, TaskStatus::from_cli(report.test.status));
+    let unit_total = best_scanner_count(
+        &report.scanners.compiler_unit_tests,
+        &report.scanners.heuristic_unit_tests,
+    );
+    let random_fuzz_total = best_scanner_count(
+        &report.scanners.compiler_fuzz_tests,
+        &report.scanners.heuristic_fuzz_tests,
+    );
+    let invariant_fuzz_total = best_scanner_count(
+        &report.scanners.compiler_movy_invariant_tests,
+        &report.scanners.heuristic_movy_invariant_tests,
+    );
+    let fuzz_total = random_fuzz_total + invariant_fuzz_total;
+    let verification_total = best_scanner_count(
+        &report.scanners.compiler_formal_verification,
+        &report.scanners.heuristic_formal_verification,
+    );
+    let fuzz_status = child_task_status(test_status, scanner_task_status(fuzz_total));
+    let verification_status =
+        child_task_status(test_status, scanner_task_status(verification_total));
+
+    let mut spans = vec![Span::styled("package: ", app.muted_style())];
+    append_task_status_spans(&mut spans, app, "build", None, build_status);
+    append_task_separator(&mut spans, app);
+    append_task_status_spans(
+        &mut spans,
+        app,
+        "test",
+        Some((unit_total, unit_total)),
+        test_status,
+    );
+    append_task_separator(&mut spans, app);
+    append_task_status_spans(
+        &mut spans,
+        app,
+        "fuzz",
+        Some((fuzz_total, fuzz_total)),
+        fuzz_status,
+    );
+    append_task_separator(&mut spans, app);
+    append_task_status_spans(
+        &mut spans,
+        app,
+        "verification",
+        Some((verification_total, verification_total)),
+        verification_status,
+    );
+
+    if report.build.status == CliStatus::Failed {
+        append_task_separator(&mut spans, app);
+        spans.push(Span::styled(
+            format!("build: {}", render_cli_step_summary(&report.build)),
+            app.style_fg(app.palette().warning),
+        ));
+    }
+    if report.test.status == CliStatus::Failed {
+        append_task_separator(&mut spans, app);
+        spans.push(Span::styled(
+            format!("test: {}", render_cli_step_summary(&report.test)),
+            app.style_fg(app.palette().warning),
+        ));
+    }
+
+    spans
+}
+
 fn package_load_spinner(started_at: Instant) -> &'static str {
     const FRAMES: [&str; 4] = ["-", "\\", "|", "/"];
     let frame = (started_at.elapsed().as_millis() / 125) as usize % FRAMES.len();
@@ -4542,6 +4647,7 @@ fn scanner_task_status(total: usize) -> TaskStatus {
     }
 }
 
+#[cfg(test)]
 fn task_status_line(
     app: &App,
     label: &'static str,
@@ -4562,6 +4668,34 @@ fn task_status_line(
         Span::raw(" "),
         Span::styled(format!("{label}{count_suffix}"), app.base_style()),
     ])
+}
+
+fn append_task_status_spans(
+    spans: &mut Vec<Span<'static>>,
+    app: &App,
+    label: &'static str,
+    counts: Option<(usize, usize)>,
+    status: TaskStatus,
+) {
+    let (marker, style) = match status {
+        TaskStatus::Passed => ("✓", app.style_fg(app.palette().success)),
+        TaskStatus::Failed => ("✕", app.style_fg(app.palette().warning)),
+        TaskStatus::Skipped => ("-", app.muted_style()),
+    };
+    let count_suffix = counts
+        .map(|(complete, total)| format!(" ({complete}/{total})"))
+        .unwrap_or_default();
+
+    spans.push(Span::styled(marker.to_string(), style));
+    spans.push(Span::raw(" "));
+    spans.push(Span::styled(
+        format!("{label}{count_suffix}"),
+        app.base_style(),
+    ));
+}
+
+fn append_task_separator(spans: &mut Vec<Span<'static>>, app: &App) {
+    spans.push(Span::styled(" | ", app.muted_style()));
 }
 
 fn best_scanner_count(compiler: &ScannerResult, heuristic: &ScannerResult) -> usize {
@@ -5667,7 +5801,7 @@ mod tests {
     }
 
     #[test]
-    fn package_load_running_renders_spinner_in_inspector() {
+    fn package_load_running_renders_spinner_in_bottom_bar() {
         let temp = tempfile::tempdir().expect("temp dir");
         let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
         app.startup = WorkbenchStartupState::PackageLoadRunning(PackageLoadRunningState {
@@ -5690,7 +5824,7 @@ mod tests {
     }
 
     #[test]
-    fn package_load_completion_renders_in_inspector_without_modal() {
+    fn package_load_completion_renders_in_bottom_bar_without_modal() {
         let temp = tempfile::tempdir().expect("temp dir");
         let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
         let report = PackageLoadReport {
@@ -6087,6 +6221,19 @@ mod tests {
     }
 
     #[test]
+    fn chat_theme_selection_updates_workbench_theme() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+
+        app.apply_chat_action(agent::workbench_chat::WorkbenchChatAction::ThemeSelected(
+            "zero-day".to_string(),
+        ));
+
+        assert_eq!(app.theme.name, ThemeName::ZeroDay);
+        assert_eq!(app.status, "Theme: Zero Day");
+    }
+
+    #[test]
     fn navigation_moves_between_workbench_sections() {
         let temp = tempfile::tempdir().expect("temp dir");
         let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
@@ -6099,9 +6246,12 @@ mod tests {
         assert_eq!(app.focus, FocusPane::Input);
 
         workbench_nav(&mut app, KeyCode::Char('l'));
-        assert_eq!(app.focus, FocusPane::Inspector);
+        assert_eq!(app.focus, FocusPane::Editor);
 
         workbench_nav(&mut app, KeyCode::Char('h'));
+        assert_eq!(app.focus, FocusPane::Explorer);
+
+        workbench_nav(&mut app, KeyCode::Char('l'));
         assert_eq!(app.focus, FocusPane::Editor);
 
         workbench_nav(&mut app, KeyCode::Char('k'));
@@ -6127,12 +6277,11 @@ mod tests {
     }
 
     #[test]
-    fn bytecode_tab_hides_inspector_until_other_tab_selected() {
+    fn workbench_never_renders_inspector_panel() {
         let temp = tempfile::tempdir().expect("temp dir");
         let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
 
         app.set_active_tab(WorkbenchTab::Bytecode);
-        assert!(!app.inspector_visible());
 
         let backend = TestBackend::new(120, 30);
         let mut terminal = Terminal::new(backend).expect("terminal");
@@ -6143,7 +6292,6 @@ mod tests {
         assert!(!rendered.contains("Inspector"));
 
         app.set_active_tab(WorkbenchTab::Cfg);
-        assert!(app.inspector_visible());
 
         let backend = TestBackend::new(120, 30);
         let mut terminal = Terminal::new(backend).expect("terminal");
@@ -6151,24 +6299,20 @@ mod tests {
         let rendered = buffer_to_string(terminal.backend().buffer());
 
         assert!(rendered.contains("cfg is not loaded"));
-        assert!(rendered.contains("No package status yet"));
+        assert!(rendered.contains("package: no status yet"));
+        assert!(!rendered.contains("Inspector"));
     }
 
     #[test]
-    fn hidden_inspector_cannot_keep_focus_on_bytecode_tab() {
+    fn removed_inspector_shortcut_is_unbound() {
         let temp = tempfile::tempdir().expect("temp dir");
         let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+        app.focus = FocusPane::Editor;
 
-        app.focus = FocusPane::Inspector;
-        app.set_active_tab(WorkbenchTab::Bytecode);
+        workbench_nav(&mut app, KeyCode::Char('p'));
+
         assert_eq!(app.focus, FocusPane::Editor);
-
-        app.apply_navigation_command(NavigationCommand::Focus(FocusPane::Inspector));
-        assert_eq!(app.focus, FocusPane::Editor);
-
-        app.set_active_tab(WorkbenchTab::Code);
-        app.apply_navigation_command(NavigationCommand::Focus(FocusPane::Inspector));
-        assert_eq!(app.focus, FocusPane::Inspector);
+        assert_eq!(app.status, navigation::WORKBENCH_UNBOUND);
     }
 
     #[test]
@@ -6196,7 +6340,7 @@ mod tests {
 
         app.focus = FocusPane::Editor;
         app.handle_key_event(key(KeyCode::Char('l')));
-        assert_eq!(app.focus, FocusPane::Inspector);
+        assert_eq!(app.focus, FocusPane::Editor);
         assert_eq!(app.editor.text(), "");
 
         app.focus = FocusPane::Editor;
@@ -6242,7 +6386,7 @@ mod tests {
     }
 
     #[test]
-    fn mouse_clicking_bytecode_tab_hides_inspector_without_panic() {
+    fn mouse_clicking_bytecode_tab_does_not_start_loading() {
         let temp = tempfile::tempdir().expect("temp dir");
         let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
         let backend = TestBackend::new(120, 30);
@@ -6253,11 +6397,11 @@ mod tests {
         app.handle_mouse_event(left_click(bytecode_tab.x + 1, bytecode_tab.y + 1));
 
         assert_eq!(app.active_tab, WorkbenchTab::Bytecode);
-        assert!(!app.inspector_visible());
         assert!(matches!(app.bytecode, BytecodePane::Empty));
         assert!(app.bytecode_loader_rx.is_none());
         terminal.draw(|frame| app.render(frame)).expect("draw");
-        assert!(app.layout.inspector.is_none());
+        let rendered = buffer_to_string(terminal.backend().buffer());
+        assert!(!rendered.contains("Inspector"));
     }
 
     #[test]
@@ -6561,7 +6705,7 @@ mod tests {
         assert!(rendered.contains("bytecode"));
         assert!(rendered.contains("call graph"));
         assert!(rendered.contains("Input"));
-        assert!(rendered.contains("No package status yet"));
+        assert!(rendered.contains("package: no status yet"));
         assert!(rendered.contains("standard"));
         assert!(!rendered.contains("app mode"));
         assert!(!rendered.contains("theme:"));
