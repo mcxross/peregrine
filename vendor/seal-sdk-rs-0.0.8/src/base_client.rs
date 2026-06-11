@@ -1,0 +1,891 @@
+// Copyright 2025 Quentin Diebold
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use crate::cache::SealCache;
+use crate::cache_key::{DerivedKeyCacheKey, KeyServerInfoCacheKey};
+use crate::crypto::{EncryptedObject, FetchKeyRequest, FetchKeyResponse, seal_decrypt_all_objects};
+use crate::error::SealClientError;
+use crate::generic_types::{BCSSerializableProgrammableTransaction, ObjectID};
+use crate::http_client::HttpClient;
+use crate::session_key::SessionKey;
+use crate::sui_client::SuiClient;
+use fastcrypto::groups::FromTrustedByteArray;
+use fastcrypto::groups::bls12381::G2Element;
+use futures::future::join_all;
+use seal_crypto::{EncryptionInput, IBEPublicKeys, seal_encrypt};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::sync::Arc;
+
+/// PartialKeyServer struct for a committee member.
+///
+/// Mirrors the on-chain `PartialKeyServer` Move struct.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PartialKeyServer {
+    /// Unique name of the partial key server.
+    pub name: String,
+    /// Server URL, can be updated by the owning member.
+    pub url: String,
+    /// Partial public key (G2 element).
+    pub partial_pk: Vec<u8>,
+    /// Party ID in the DKG committee.
+    pub party_id: u16,
+}
+
+/// Server types for KeyServerV2.
+///
+/// Mirrors the on-chain `ServerType` Move enum.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ServerType {
+    Independent {
+        url: String,
+    },
+    Committee {
+        /// Incremented on every rotation of the committee.
+        version: u32,
+        threshold: u16,
+        /// Vector of partial key servers indexed by party_id.
+        partial_key_servers: Vec<PartialKeyServer>,
+    },
+}
+
+/// Key server object layout containing object id, name, and public key.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyServerInfo {
+    pub object_id: ObjectID,
+    pub name: String,
+    pub public_key: String,
+    pub server_type: ServerType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyServerConfig {
+    object_id: ObjectID,
+    aggregator_url: Option<String>,
+}
+
+impl KeyServerConfig {
+    pub fn new<ID>(object_id: ID, aggregator_url: Option<String>) -> Self
+    where
+        ObjectID: From<ID>,
+    {
+        Self {
+            object_id: object_id.into(),
+            aggregator_url,
+        }
+    }
+}
+
+pub type DerivedKeys = (ObjectID, FetchKeyResponse);
+
+#[derive(Clone)]
+pub struct BaseSealClient<KeyServerInfoCache, DerivedKeysCache, SuiError, Sui, HttpError, Http>
+where
+    KeyServerInfoCache: SealCache<Key = KeyServerInfoCacheKey, Value = KeyServerInfo>,
+    DerivedKeysCache: SealCache<Key = DerivedKeyCacheKey, Value = DerivedKeys>,
+    SealClientError: From<SuiError>,
+    SuiError: Send + Sync + Display + 'static,
+    Sui: SuiClient<Error = SuiError>,
+    SealClientError: From<HttpError>,
+    Http: HttpClient<PostError = HttpError>,
+{
+    key_server_info_cache: KeyServerInfoCache,
+    derived_key_cache: DerivedKeysCache,
+    sui_client: Sui,
+    http_client: Http,
+}
+
+impl<KeyServerInfoCache, DerivedKeysCache, SuiError, Sui, HttpError, Http>
+    BaseSealClient<KeyServerInfoCache, DerivedKeysCache, SuiError, Sui, HttpError, Http>
+where
+    KeyServerInfoCache: SealCache<Key = KeyServerInfoCacheKey, Value = KeyServerInfo>,
+    DerivedKeysCache: SealCache<Key = DerivedKeyCacheKey, Value = DerivedKeys>,
+    SealClientError: From<SuiError>,
+    SuiError: Send + Sync + Display + 'static,
+    Sui: SuiClient<Error = SuiError>,
+    SealClientError: From<HttpError>,
+    Http: HttpClient<PostError = HttpError>,
+{
+    pub fn new_custom(
+        key_server_info_cache: KeyServerInfoCache,
+        derived_key_cache: DerivedKeysCache,
+        sui_client: Sui,
+        http_client: Http,
+    ) -> Self {
+        BaseSealClient {
+            key_server_info_cache,
+            derived_key_cache,
+            sui_client,
+            http_client,
+        }
+    }
+
+    /// Retrieves [`KeyServerInfo`] for a single key server, using the cache when available.
+    ///
+    /// This is useful when you want to inspect a key server's metadata (name, URL, public key)
+    /// without performing an encryption or decryption operation.
+    pub async fn get_key_server_info<ID>(
+        &self,
+        key_server_id: ID,
+    ) -> Result<KeyServerInfo, SealClientError>
+    where
+        ObjectID: From<ID>,
+    {
+        let object_id: ObjectID = key_server_id.into();
+        let cache_key = KeyServerInfoCacheKey::new(object_id);
+
+        self.key_server_info_cache
+            .try_get_with(cache_key, self.sui_client.get_key_server_info(object_id.0))
+            .await
+            .map_err(unwrap_cache_error)
+    }
+
+    /// Fetch committee details for a committee-type key server.
+    ///
+    /// Reads the `KeyServerV2` dynamic field from the given key server object,
+    /// and if it is a committee server type, returns the threshold, version,
+    /// and partial key server list.
+    ///
+    /// Returns `Ok(None)` if the key server is independent (not a committee).
+    pub async fn get_committee_info<ID>(
+        &self,
+        key_server_id: ID,
+    ) -> Result<Option<ServerType>, SealClientError>
+    where
+        ObjectID: From<ID>,
+    {
+        let info = self.get_key_server_info(key_server_id).await?;
+        match info.server_type {
+            ServerType::Committee { .. } => Ok(Some(info.server_type)),
+            ServerType::Independent { .. } => Ok(None),
+        }
+    }
+
+    /// Convenience wrapper around [`encrypt_bytes`] that accepts a serializable value.
+    ///
+    /// The payload is converted to BCS and encrypted with the provided package, identifier,
+    /// key servers, and threshold. The returned tuple contains the encrypted object and the
+    /// emergency recovery key surfaced by [`encrypt_multiple_bytes`]; discard the key when
+    /// you do not want any single authority to retain unilateral decryption power.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use seal_sdk_rs::error::SealClientError;
+    /// # use seal_sdk_rs::generic_types::ObjectID;
+    /// # use seal_sdk_rs::native_sui_sdk::client::seal_client::SealClient;
+    /// #
+    /// # #[derive(Clone)]
+    /// # struct DemoSetup {
+    /// #     approve_package_id: ObjectID,
+    /// #     key_server_id: ObjectID,
+    /// # }
+    /// #
+    /// # async fn demo(client: &SealClient, setup: &DemoSetup) -> Result<(), SealClientError> {
+    /// let (encrypted, recovery_key) = client
+    ///     .encrypt(
+    ///         setup.approve_package_id,
+    ///         vec![6u8],
+    ///         1,
+    ///         vec![seal_sdk_rs::base_client::KeyServerConfig::new(setup.key_server_id, None)],
+    ///         17u64,
+    ///     )
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn encrypt<T, ID1>(
+        &self,
+        package_id: ID1,
+        id: Vec<u8>,
+        threshold: u8,
+        key_servers: Vec<KeyServerConfig>,
+        data: T,
+    ) -> Result<(EncryptedObject, [u8; 32]), SealClientError>
+    where
+        T: Serialize,
+        ObjectID: From<ID1>,
+    {
+        let data = bcs::to_bytes(&data)?;
+        self.encrypt_bytes(package_id, id, threshold, key_servers, data)
+            .await
+    }
+
+    /// Convenience wrapper around [`encrypt_multiple_bytes`] for serializable values.
+    ///
+    /// Mirrors the relationship between [`encrypt`] and [`encrypt_bytes`]: every item is
+    /// serialized to BCS before delegating to [`encrypt_multiple_bytes`]. Each tuple pairs
+    /// the encrypted object with its recovery key—drop the key if you do not want an
+    /// authority outside the key servers to decrypt the data.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use seal_sdk_rs::error::SealClientError;
+    /// # use seal_sdk_rs::generic_types::ObjectID;
+    /// # use seal_sdk_rs::native_sui_sdk::client::seal_client::SealClient;
+    /// #
+    /// # #[derive(Clone)]
+    /// # struct DemoSetup {
+    /// #     approve_package_id: ObjectID,
+    /// #     key_server_id: ObjectID,
+    /// # }
+    /// #
+    /// # async fn demo(client: &SealClient, setup: &DemoSetup) -> Result<(), SealClientError> {
+    /// let encrypted = client
+    ///     .encrypt_multiple(
+    ///         setup.approve_package_id,
+    ///         vec![6u8],
+    ///         1,
+    ///         vec![seal_sdk_rs::base_client::KeyServerConfig::new(setup.key_server_id, None)],
+    ///         vec![10u64, 17u64],
+    ///     )
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn encrypt_multiple<T, ID1>(
+        &self,
+        package_id: ID1,
+        id: Vec<u8>,
+        threshold: u8,
+        key_servers: Vec<KeyServerConfig>,
+        data: Vec<T>,
+    ) -> Result<Vec<(EncryptedObject, [u8; 32])>, SealClientError>
+    where
+        T: Serialize,
+        ObjectID: From<ID1>,
+    {
+        let data = data
+            .into_iter()
+            .map(|item| bcs::to_bytes(&item))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.encrypt_multiple_bytes(package_id, id, threshold, key_servers, data)
+            .await
+    }
+
+    /// Encrypt a single byte payload, delegating to [`encrypt_multiple_bytes`].
+    ///
+    /// Internally the payload is wrapped in a one-element `Vec` so that the heavier-weight
+    /// logic in [`encrypt_multiple_bytes`] is reused. The returned tuple contains the
+    /// encrypted object and an emergency recovery key; discard the key if you do not want an
+    /// authority to retain direct decryption capability outside the key servers.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use seal_sdk_rs::error::SealClientError;
+    /// # use seal_sdk_rs::generic_types::ObjectID;
+    /// # use seal_sdk_rs::native_sui_sdk::client::seal_client::SealClient;
+    /// #
+    /// # #[derive(Clone)]
+    /// # struct DemoSetup {
+    /// #     approve_package_id: ObjectID,
+    /// #     key_server_id: ObjectID,
+    /// # }
+    /// #
+    /// # async fn demo(client: &SealClient, setup: &DemoSetup) -> Result<(), SealClientError> {
+    /// let data = vec![0u8, 1, 2, 3];
+    /// let (encrypted, recovery_key) = client
+    ///     .encrypt_bytes(
+    ///         setup.approve_package_id,
+    ///         vec![6u8],
+    ///         1,
+    ///         vec![seal_sdk_rs::base_client::KeyServerConfig::new(setup.key_server_id, None)],
+    ///         data,
+    ///     )
+    ///     .await?;
+    /// # let _ = encrypted;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn encrypt_bytes<ID1>(
+        &self,
+        package_id: ID1,
+        id: Vec<u8>,
+        threshold: u8,
+        key_servers: Vec<KeyServerConfig>,
+        data: Vec<u8>,
+    ) -> Result<(EncryptedObject, [u8; 32]), SealClientError>
+    where
+        ObjectID: From<ID1>,
+    {
+        let (encrypted, recovery_key) = self
+            .encrypt_multiple_bytes(package_id, id, threshold, key_servers, vec![data])
+            .await?
+            .into_iter()
+            .next()
+            .unwrap();
+
+        Ok((encrypted, recovery_key))
+    }
+
+    /// Encrypt multiple byte payloads with shared key server metadata.
+    ///
+    /// Fetches key-server information once and reuses it to encrypt every entry in `data`,
+    /// which is more efficient than issuing repeated [`encrypt_bytes`] calls. Each tuple in
+    /// the returned vector contains the encrypted object and an emergency recovery key that
+    /// can be used if key servers become unavailable. Discard these keys when you do not
+    /// want any single authority to decrypt the data without the key servers.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use seal_sdk_rs::error::SealClientError;
+    /// # use seal_sdk_rs::generic_types::ObjectID;
+    /// # use seal_sdk_rs::native_sui_sdk::client::seal_client::SealClient;
+    /// #
+    /// # #[derive(Clone)]
+    /// # struct DemoSetup {
+    /// #     approve_package_id: ObjectID,
+    /// #     key_server_id: ObjectID,
+    /// # }
+    /// #
+    /// # async fn demo(client: &SealClient, setup: &DemoSetup) -> Result<(), SealClientError> {
+    /// let payloads = vec![vec![0u8, 1, 2, 3], vec![4u8, 5, 6, 7, 8]];
+    /// let encrypted = client
+    ///     .encrypt_multiple_bytes(
+    ///         setup.approve_package_id,
+    ///         vec![6u8],
+    ///         1,
+    ///         vec![seal_sdk_rs::base_client::KeyServerConfig::new(setup.key_server_id, None)],
+    ///         payloads,
+    ///     )
+    ///     .await?;
+    ///
+    /// for (_ciphertext, recovery_key) in encrypted {
+    ///     drop(recovery_key);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn encrypt_multiple_bytes<ID1>(
+        &self,
+        package_id: ID1,
+        id: Vec<u8>,
+        threshold: u8,
+        key_servers: Vec<KeyServerConfig>,
+        data: Vec<Vec<u8>>,
+    ) -> Result<Vec<(EncryptedObject, [u8; 32])>, SealClientError>
+    where
+        ObjectID: From<ID1>,
+    {
+        let package_id: ObjectID = package_id.into();
+
+        let key_server_info = self.fetch_key_server_info(key_servers.clone()).await?;
+        let public_keys_g2 = key_server_info
+            .iter()
+            .map(|info| self.decode_public_key(info))
+            .collect::<Result<_, _>>()?;
+
+        let public_keys = IBEPublicKeys::BonehFranklinBLS12381(public_keys_g2);
+
+        let mut results = Vec::with_capacity(data.len());
+
+        for data in data {
+            let (encrypted_object, recovery_key) = seal_encrypt(
+                package_id.0.into(),
+                id.clone(),
+                key_servers
+                    .iter()
+                    .map(|e| e.object_id.into())
+                    .collect::<Vec<_>>(),
+                &public_keys,
+                threshold,
+                EncryptionInput::Aes256Gcm { data, aad: None },
+            )?;
+
+            results.push((encrypted_object.into(), recovery_key));
+        }
+
+        Ok(results)
+    }
+
+    #[allow(dead_code)]
+    pub async fn key_server_info(
+        &self,
+        key_server_ids: Vec<KeyServerConfig>,
+    ) -> Result<Vec<KeyServerInfo>, SealClientError> {
+        self.fetch_key_server_info(key_server_ids).await
+    }
+
+    /// Convenience wrapper around [`decrypt_object_bytes`] that deserializes the result.
+    ///
+    /// Accepts the BCS-encoded `EncryptedObject` bytes and returns the decrypted payload
+    /// as type `T`. This is the mirror of [`encrypt`], handling both byte recovery and
+    /// BCS decoding.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use seal_sdk_rs::generic_types::BCSSerializableProgrammableTransaction;
+    /// # use seal_sdk_rs::crypto::EncryptedObject;
+    /// # use seal_sdk_rs::error::SealClientError;
+    /// # use seal_sdk_rs::native_sui_sdk::client::seal_client::SealClient;
+    /// # use seal_sdk_rs::session_key::SessionKey;
+    /// # struct DemoTransaction;
+    /// # impl BCSSerializableProgrammableTransaction for DemoTransaction {
+    /// #     fn to_bcs_bytes(&self) -> Result<Vec<u8>, SealClientError> {
+    /// #         Ok(vec![])
+    /// #     }
+    /// # }
+    /// # async fn demo(
+    /// #     client: &SealClient,
+    /// #     session_key: &SessionKey,
+    /// #     encrypted: &EncryptedObject,
+    /// # ) -> Result<(), SealClientError> {
+    /// let encrypted_bytes = bcs::to_bytes(encrypted).expect("serialize EncryptedObject");
+    ///
+    /// let approve_ptb = DemoTransaction;
+    ///
+    /// let value: Vec<u8> = client
+    ///     .decrypt_object(&encrypted_bytes, approve_ptb, session_key, std::collections::HashMap::new())
+    ///     .await?;
+    /// # let _ = value;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn decrypt_object<T, PTB>(
+        &self,
+        encrypted_object_data: &[u8],
+        approve_transaction_data: PTB,
+        session_key: &SessionKey,
+        aggregator_urls_for_ker_server: HashMap<ObjectID, String>,
+    ) -> Result<T, SealClientError>
+    where
+        T: DeserializeOwned,
+        PTB: BCSSerializableProgrammableTransaction,
+    {
+        let bytes = self
+            .decrypt_object_bytes(
+                encrypted_object_data,
+                approve_transaction_data,
+                session_key,
+                aggregator_urls_for_ker_server,
+            )
+            .await?;
+
+        Ok(bcs::from_bytes::<T>(&bytes)?)
+    }
+
+    /// Batch-oriented variant of [`decrypt_object`] for multiple payloads.
+    ///
+    /// Each entry in `encrypted_object_data` should be a BCS-encoded `EncryptedObject`.
+    /// Internally delegates to [`decrypt_multiple_objects_bytes`] before deserializing
+    /// every item to `T`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use seal_sdk_rs::generic_types::BCSSerializableProgrammableTransaction;
+    /// # use seal_sdk_rs::crypto::EncryptedObject;
+    /// # use seal_sdk_rs::error::SealClientError;
+    /// # use seal_sdk_rs::native_sui_sdk::client::seal_client::SealClient;
+    /// # use seal_sdk_rs::session_key::SessionKey;
+    ///
+    /// # struct DemoTransaction;
+    ///
+    /// # impl BCSSerializableProgrammableTransaction for DemoTransaction {
+    /// #     fn to_bcs_bytes(&self) -> Result<Vec<u8>, SealClientError> {
+    /// #         Ok(vec![])
+    /// #     }
+    /// # }
+    /// # async fn demo(
+    /// #     client: &SealClient,
+    /// #     session_key: &SessionKey,
+    /// #     encrypted: &[EncryptedObject],
+    /// # ) -> Result<(), SealClientError> {
+    /// let encrypted_bytes = encrypted
+    ///     .iter()
+    ///     .map(|item| bcs::to_bytes(item).expect("serialize EncryptedObject"))
+    ///     .collect::<Vec<_>>();
+    /// let encrypted_refs = encrypted_bytes
+    ///     .iter()
+    ///     .map(AsRef::<[u8]>::as_ref)
+    ///     .collect::<Vec<_>>();
+    ///
+    /// let approve_ptb = DemoTransaction;
+    ///
+    /// let values: Vec<Vec<u8>> = client
+    ///     .decrypt_multiple_objects(&encrypted_refs, approve_ptb, session_key, std::collections::HashMap::new())
+    ///     .await?;
+    /// # let _ = values;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn decrypt_multiple_objects<T, PTB>(
+        &self,
+        encrypted_object_data: &[&[u8]],
+        approve_transaction_data: PTB,
+        session_key: &SessionKey,
+        aggregator_urls_for_ker_server: HashMap<ObjectID, String>,
+    ) -> Result<Vec<T>, SealClientError>
+    where
+        T: DeserializeOwned,
+        PTB: BCSSerializableProgrammableTransaction,
+    {
+        let results = self
+            .decrypt_multiple_objects_bytes(
+                encrypted_object_data,
+                approve_transaction_data,
+                session_key,
+                aggregator_urls_for_ker_server,
+            )
+            .await?
+            .into_iter()
+            .map(|bytes| bcs::from_bytes::<T>(&bytes))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(results)
+    }
+
+    /// Decrypt a single BCS-encoded `EncryptedObject`, yielding the raw bytes.
+    ///
+    /// This is the byte-level counterpart to [`decrypt_object`], calling
+    /// [`decrypt_multiple_objects_bytes`] with a single element.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use seal_sdk_rs::generic_types::BCSSerializableProgrammableTransaction;
+    /// # use seal_sdk_rs::crypto::EncryptedObject;
+    /// # use seal_sdk_rs::error::SealClientError;
+    /// # use seal_sdk_rs::native_sui_sdk::client::seal_client::SealClient;
+    /// # use seal_sdk_rs::session_key::SessionKey;
+    /// # struct DemoTransaction;
+    /// # impl BCSSerializableProgrammableTransaction for DemoTransaction {
+    /// #     fn to_bcs_bytes(&self) -> Result<Vec<u8>, SealClientError> {
+    /// #         Ok(vec![])
+    /// #     }
+    /// # }
+    /// # async fn demo(
+    /// #     client: &SealClient,
+    /// #     session_key: &SessionKey,
+    /// #     encrypted: &EncryptedObject,
+    /// # ) -> Result<(), SealClientError> {
+    /// let encrypted_bytes = bcs::to_bytes(encrypted).expect("serialize EncryptedObject");
+    /// let approve_ptb = DemoTransaction;
+    /// let bytes = client
+    ///     .decrypt_object_bytes(&encrypted_bytes, approve_ptb, session_key, std::collections::HashMap::new())
+    ///     .await?;
+    /// # let _ = bytes;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn decrypt_object_bytes<PTB>(
+        &self,
+        encrypted_object_data: &[u8],
+        approve_transaction_data: PTB,
+        session_key: &SessionKey,
+        aggregator_urls_for_ker_server: HashMap<ObjectID, String>,
+    ) -> Result<Vec<u8>, SealClientError>
+    where
+        PTB: BCSSerializableProgrammableTransaction,
+    {
+        let result = self
+            .decrypt_multiple_objects_bytes(
+                &[encrypted_object_data],
+                approve_transaction_data,
+                session_key,
+                aggregator_urls_for_ker_server,
+            )
+            .await?
+            .into_iter()
+            .next()
+            .unwrap();
+
+        Ok(result)
+    }
+
+    /// Decrypt multiple BCS-encoded `EncryptedObject` values, returning raw bytes.
+    ///
+    /// All entries must correspond to the same package, id, services, and threshold;
+    /// otherwise the approval transaction will fail. The byte slices should be obtained
+    /// by serializing [`EncryptedObject`] instances with `bcs::to_bytes`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use seal_sdk_rs::generic_types::BCSSerializableProgrammableTransaction;
+    /// # use seal_sdk_rs::crypto::EncryptedObject;
+    /// # use seal_sdk_rs::error::SealClientError;
+    /// # use seal_sdk_rs::native_sui_sdk::client::seal_client::SealClient;
+    /// # use seal_sdk_rs::session_key::SessionKey;
+    /// # struct DemoTransaction;
+    /// # impl BCSSerializableProgrammableTransaction for DemoTransaction {
+    /// #     fn to_bcs_bytes(&self) -> Result<Vec<u8>, SealClientError> {
+    /// #         Ok(vec![])
+    /// #     }
+    /// # }
+    /// # async fn demo(
+    /// #     client: &SealClient,
+    /// #     session_key: &SessionKey,
+    /// #     encrypted: &[EncryptedObject],
+    /// # ) -> Result<(), SealClientError> {
+    /// let encrypted_bytes = encrypted
+    ///     .iter()
+    ///     .map(|item| bcs::to_bytes(item).expect("serialize EncryptedObject"))
+    ///     .collect::<Vec<_>>();
+    /// let encrypted_refs = encrypted_bytes
+    ///     .iter()
+    ///     .map(AsRef::<[u8]>::as_ref)
+    ///     .collect::<Vec<_>>();
+    /// let approve_ptb = DemoTransaction;
+    /// let decrypted = client
+    ///     .decrypt_multiple_objects_bytes(&encrypted_refs, approve_ptb, session_key, std::collections::HashMap::new())
+    ///     .await?;
+    /// # let _ = decrypted;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn decrypt_multiple_objects_bytes<PTB>(
+        &self,
+        encrypted_objects_data: &[&[u8]],
+        approve_transaction_data: PTB,
+        session_key: &SessionKey,
+        aggregator_urls_for_ker_server: HashMap<ObjectID, String>,
+    ) -> Result<Vec<Vec<u8>>, SealClientError>
+    where
+        PTB: BCSSerializableProgrammableTransaction,
+    {
+        if encrypted_objects_data.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let encrypted_objects = encrypted_objects_data
+            .iter()
+            .map(|bytes| bcs::from_bytes::<EncryptedObject>(bytes))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let first_encrypted_object = encrypted_objects.first().unwrap();
+
+        let services: Vec<KeyServerConfig> = first_encrypted_object
+            .services
+            .iter()
+            .map(|(id, _)| KeyServerConfig {
+                object_id: *id,
+                aggregator_url: aggregator_urls_for_ker_server.get(id).cloned(),
+            })
+            .collect();
+
+        let key_server_info = self.fetch_key_server_info(services).await?;
+        let servers_public_keys_map = key_server_info
+            .iter()
+            .map(|info| Ok::<_, SealClientError>((info.object_id, self.decode_public_key(info)?)))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .collect::<HashMap<_, _>>();
+
+        let (signed_request, enc_secret) =
+            session_key.get_fetch_key_request(approve_transaction_data.to_bcs_bytes()?)?;
+
+        let derived_keys = self
+            .fetch_derived_keys(
+                signed_request,
+                key_server_info,
+                first_encrypted_object.threshold,
+                &aggregator_urls_for_ker_server,
+            )
+            .await?
+            .into_iter()
+            .map(|derived_key| (derived_key.0, derived_key.1))
+            .collect::<Vec<_>>();
+
+        seal_decrypt_all_objects(
+            &enc_secret,
+            &derived_keys,
+            encrypted_objects,
+            &servers_public_keys_map,
+        )
+        .map_err(Into::into)
+    }
+
+    async fn fetch_key_server_info(
+        &self,
+        key_servers: Vec<KeyServerConfig>,
+    ) -> Result<Vec<KeyServerInfo>, SealClientError> {
+        let mut key_server_info_futures = vec![];
+        for key_server in key_servers {
+            let cache_key = KeyServerInfoCacheKey::new(key_server.object_id);
+
+            let future = async move {
+                let result = self
+                    .key_server_info_cache
+                    .try_get_with(
+                        cache_key,
+                        self.sui_client.get_key_server_info(key_server.object_id.0),
+                    )
+                    .await
+                    .map_err(unwrap_cache_error);
+
+                match &result {
+                    Ok(info) => log::debug!(
+                        "seal: resolved key server object_id={} type={:?}",
+                        info.object_id,
+                        info.server_type,
+                    ),
+                    Err(err) => log::debug!(
+                        "seal: failed to resolve key server object_id={}: {}",
+                        key_server.object_id,
+                        err,
+                    ),
+                }
+
+                result
+            };
+
+            key_server_info_futures.push(future);
+        }
+
+        join_all(key_server_info_futures)
+            .await
+            .into_iter()
+            .collect::<Result<_, _>>()
+    }
+
+    async fn fetch_derived_keys(
+        &self,
+        request: FetchKeyRequest,
+        key_servers_info: Vec<KeyServerInfo>,
+        threshold: u8,
+        aggregator_urls: &HashMap<ObjectID, String>,
+    ) -> Result<Vec<DerivedKeys>, SealClientError> {
+        let request_json = request.to_json_string()?;
+
+        log::debug!(
+            "seal: fetching keys from {} servers, threshold={}",
+            key_servers_info.len(),
+            threshold,
+        );
+
+        let mut seal_responses_futures = Vec::new();
+        for server in key_servers_info.iter() {
+            let request_bytes = bcs::to_bytes(&request)?;
+
+            // Use aggregator URL if provided, otherwise fall back to the on-chain server URL.
+            let on_chain_url = match &server.server_type {
+                ServerType::Independent { url } => url.clone(),
+                ServerType::Committee { .. } => String::new(),
+            };
+            let base_url = aggregator_urls
+                .get(&server.object_id)
+                .cloned()
+                .unwrap_or(on_chain_url);
+
+            let request_json_clone = request_json.clone();
+            let response_future = async move {
+                let mut headers = HashMap::new();
+
+                headers.insert("Client-Sdk-Version".to_string(), "1.0.0".to_string());
+                headers.insert("Content-Type".to_string(), "application/json".to_string());
+
+                let url = format!("{}/v1/fetch_key", base_url);
+                log::debug!(
+                    "seal: requesting key from server object_id={} base_url={}",
+                    server.object_id,
+                    base_url,
+                );
+                let response = self
+                    .http_client
+                    .post(&url, headers, request_json_clone)
+                    .await?;
+
+                if !response.is_success() {
+                    log::debug!(
+                        "seal: key server error object_id={} url={} status={} body={}",
+                        server.object_id,
+                        url,
+                        response.status,
+                        response.text.chars().take(500).collect::<String>(),
+                    );
+                    return Err(SealClientError::ErrorWhileFetchingDerivedKeys {
+                        url,
+                        status: response.status,
+                        response: response.text,
+                    });
+                }
+
+                let seal_response: FetchKeyResponse = serde_json::from_str(&response.text)?;
+
+                Ok::<_, SealClientError>((server.object_id, seal_response))
+            };
+
+            let cache_key = DerivedKeyCacheKey::new(request_bytes, server.object_id, threshold);
+
+            seal_responses_futures.push(
+                self.derived_key_cache
+                    .try_get_with(cache_key, response_future),
+            );
+        }
+
+        let seal_responses: Vec<DerivedKeys> = join_all(seal_responses_futures)
+            .await
+            .into_iter()
+            .filter_map(|e| {
+                if let Err(ref err) = e {
+                    log::debug!("seal: key server response failed: {}", err);
+                }
+                e.ok()
+            })
+            .collect();
+
+        let seal_responses_len = seal_responses.len();
+
+        log::debug!(
+            "seal: received {}/{} key responses (threshold={})",
+            seal_responses_len,
+            key_servers_info.len(),
+            threshold,
+        );
+
+        if seal_responses_len < threshold as usize {
+            return Err(SealClientError::InsufficientKeys {
+                received: seal_responses_len,
+                threshold,
+            });
+        }
+
+        Ok(seal_responses)
+    }
+
+    fn decode_public_key(&self, info: &KeyServerInfo) -> Result<G2Element, SealClientError> {
+        let bytes = hex::decode(&info.public_key)?;
+
+        let array: [u8; 96] =
+            bytes
+                .as_slice()
+                .try_into()
+                .map_err(|_| SealClientError::InvalidPublicKey {
+                    public_key: info.public_key.clone(),
+                    reason: "Invalid length.".to_string(),
+                })?;
+
+        Ok(G2Element::from_trusted_byte_array(&array)?)
+    }
+}
+
+fn unwrap_cache_error<T>(err: Arc<T>) -> SealClientError
+where
+    T: Display,
+    SealClientError: From<T>,
+{
+    Arc::try_unwrap(err)
+        .map(Into::into)
+        .unwrap_or_else(|wrapped_error| SealClientError::CannotUnwrapTypedError {
+            error_message: wrapped_error.to_string(),
+        })
+}
