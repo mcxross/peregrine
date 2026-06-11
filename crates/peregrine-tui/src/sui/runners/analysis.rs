@@ -3,37 +3,48 @@ use crate::{
         CliDiagnostic, CliDiagnosticSeverity, CliSpan, CliStatus, CliStep, EXIT_SUCCESS,
         EXIT_WORKFLOW_FAILED, elapsed_ms,
     },
+    session::McpToolClient,
     sui::{args::AnalyzeArgs, project::CliContext},
 };
-use peregrine_static_analysis::{
-    AnalysisConfig, AnalysisDiagnostic, AnalysisEngine, AnalysisEngineOptions, Finding, RuleMetric,
-    Severity,
+use peregrine_mcp_protocol::{
+    AnalysisDiagnostic, AnalysisFinding, AnalysisRuleCatalog, AnalysisRuleMetric, AnalysisSeverity,
+    PackageArgs, StaticAnalysisArgs, StaticAnalysisResponse, StaticRuleCatalogResponse, tool_name,
 };
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, time::Instant};
 
 pub fn run_analyze(context: &CliContext, args: &AnalyzeArgs) -> CliStep {
     let started_at = Instant::now();
-    let config = match AnalysisConfig::load_from_package(&context.package_root) {
-        Ok(config) => config,
-        Err(error) => {
-            return CliStep::failed(
-                "analyze",
-                started_at,
-                CliDiagnostic::error("analysis-config", error),
-            );
-        }
-    };
-    let engine = AnalysisEngine::new();
-    let options = AnalysisEngineOptions {
-        use_global_plugins: !args.no_global_plugins,
-        extra_plugin_paths: args.plugins.clone(),
-        only_rulesets: args.rulesets.clone(),
-        ..AnalysisEngineOptions::default()
+    let request = StaticAnalysisArgs {
+        package: PackageArgs {
+            project_root: Some(context.project_root.display().to_string()),
+            package_path: Some(context.package_path.clone()),
+        },
+        no_global_plugins: args.no_global_plugins,
+        plugins: args
+            .plugins
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect(),
+        rulesets: args.rulesets.clone(),
     };
 
     if args.list_analyzers {
-        let catalog = engine.catalog_with_options(&context.package_root, config, options);
+        let response = match McpToolClient::call_blocking::<_, StaticRuleCatalogResponse>(
+            &context.project_root,
+            tool_name::STATIC_RULE_CATALOG,
+            &request,
+        ) {
+            Ok(response) => response,
+            Err(error) => {
+                return CliStep::failed(
+                    "analyze",
+                    started_at,
+                    CliDiagnostic::error("mcp:peregrine", error),
+                );
+            }
+        };
+        let catalog = response.catalog;
         let diagnostics = catalog
             .diagnostics
             .iter()
@@ -70,7 +81,21 @@ pub fn run_analyze(context: &CliContext, args: &AnalyzeArgs) -> CliStep {
         };
     }
 
-    let report = engine.analyze_package_with_options(&context.package_root, config, options);
+    let response = match McpToolClient::call_blocking::<_, StaticAnalysisResponse>(
+        &context.project_root,
+        tool_name::STATIC_ANALYZE_PACKAGE,
+        &request,
+    ) {
+        Ok(response) => response,
+        Err(error) => {
+            return CliStep::failed(
+                "analyze",
+                started_at,
+                CliDiagnostic::error("mcp:peregrine", error),
+            );
+        }
+    };
+    let report = response.report;
     let mut diagnostics = report
         .diagnostics
         .iter()
@@ -129,12 +154,12 @@ fn map_analysis_diagnostic(diagnostic: &AnalysisDiagnostic) -> CliDiagnostic {
     }
 }
 
-fn map_finding(finding: &Finding) -> CliDiagnostic {
+fn map_finding(finding: &AnalysisFinding) -> CliDiagnostic {
     CliDiagnostic {
         severity: match finding.severity {
-            Severity::Error => CliDiagnosticSeverity::Error,
-            Severity::Warning => CliDiagnosticSeverity::Warning,
-            Severity::Info => CliDiagnosticSeverity::Info,
+            AnalysisSeverity::Error => CliDiagnosticSeverity::Error,
+            AnalysisSeverity::Warning => CliDiagnosticSeverity::Warning,
+            AnalysisSeverity::Info => CliDiagnosticSeverity::Info,
         },
         source: finding.ruleset_id.clone(),
         code: Some(finding.rule_id.clone()),
@@ -147,7 +172,7 @@ fn map_finding(finding: &Finding) -> CliDiagnostic {
     }
 }
 
-fn map_metric(metric: &RuleMetric) -> Value {
+fn map_metric(metric: &AnalysisRuleMetric) -> Value {
     json!({
         "rulesetId": metric.ruleset_id,
         "ruleId": metric.rule_id,
@@ -161,7 +186,7 @@ fn map_metric(metric: &RuleMetric) -> Value {
     })
 }
 
-fn render_catalog_stdout(catalog: &peregrine_static_analysis::AnalysisRuleCatalog) -> String {
+fn render_catalog_stdout(catalog: &AnalysisRuleCatalog) -> String {
     let mut lines = Vec::new();
 
     for ruleset in &catalog.rulesets {
@@ -177,9 +202,9 @@ fn render_catalog_stdout(catalog: &peregrine_static_analysis::AnalysisRuleCatalo
                 "  {} [{}]",
                 rule.id,
                 match rule.default_severity {
-                    Severity::Info => "info",
-                    Severity::Warning => "warning",
-                    Severity::Error => "error",
+                    AnalysisSeverity::Info => "info",
+                    AnalysisSeverity::Warning => "warning",
+                    AnalysisSeverity::Error => "error",
                 }
             ));
         }

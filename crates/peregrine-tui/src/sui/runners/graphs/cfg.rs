@@ -1,15 +1,16 @@
 use super::{
     common::{DIM, EDGE, FUNCTION, HEADER, KIND, MODULE, RESET, graph_step},
     dot::{DotEdgeStyle, dot_edge_attrs, dot_id, dot_label},
-    project::{module_matches, selected_source_package},
+    project::module_matches,
 };
 use crate::{
     output::{CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, elapsed_ms},
+    session::McpToolClient,
     sui::{args::CfgArgs, project::CliContext, runners::run_build},
 };
-use peregrine_bytecode::{
-    MoveBytecodeControlFlowView, MoveBytecodeFunctionView, MoveBytecodeModuleView,
-    load_package_bytecode,
+use peregrine_mcp_protocol::{
+    BytecodeViewResponse, MoveBytecodeControlFlowView, MoveBytecodeFunctionView,
+    MoveBytecodeModuleView, PackageArgs, tool_name,
 };
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, time::Instant};
@@ -21,15 +22,10 @@ struct CfgTarget<'a> {
 
 pub fn run_cfg(context: &CliContext, args: &CfgArgs) -> CliStep {
     let started_at = Instant::now();
-    let package = match selected_source_package(context, "cfg") {
-        Ok(package) => package,
-        Err(error) => return CliStep::failed("cfg", started_at, error),
-    };
-
     let build = run_build(context);
 
     if build.status != CliStatus::Passed {
-        let details = json!({ "build": build.clone() });
+        let details = json!({ "build": &build });
 
         return CliStep {
             name: "cfg".to_string(),
@@ -53,12 +49,25 @@ pub fn run_cfg(context: &CliContext, args: &CfgArgs) -> CliStep {
         };
     }
 
-    let bytecode = match load_package_bytecode(&context.package_root, &package.name) {
-        Ok(bytecode) => bytecode,
+    let response = match McpToolClient::call_blocking::<_, BytecodeViewResponse>(
+        &context.project_root,
+        tool_name::BYTECODE_VIEW,
+        &PackageArgs {
+            project_root: Some(context.project_root.display().to_string()),
+            package_path: Some(context.package_path.clone()),
+        },
+    ) {
+        Ok(response) => response,
         Err(error) => {
-            return CliStep::failed("cfg", started_at, CliDiagnostic::error("cfg", error));
+            return CliStep::failed(
+                "cfg",
+                started_at,
+                CliDiagnostic::error("mcp:peregrine", error),
+            );
         }
     };
+    let package_name = response.package.package_name;
+    let bytecode = response.bytecode;
     let targets = selected_cfg_targets(&bytecode.modules, args);
 
     if targets.is_empty() {
@@ -75,7 +84,7 @@ pub fn run_cfg(context: &CliContext, args: &CfgArgs) -> CliStep {
     let rendered = if args.output.dot {
         render_cfg_dot(&targets)
     } else {
-        render_cfg_text(&package.name, &targets)
+        render_cfg_text(&package_name, &targets)
     };
     let block_count = targets
         .iter()
@@ -94,13 +103,13 @@ pub fn run_cfg(context: &CliContext, args: &CfgArgs) -> CliStep {
         &args.output,
         rendered,
         BTreeMap::from([
-            ("package".to_string(), json!(package.name)),
+            ("package".to_string(), json!(package_name)),
             ("functionCount".to_string(), json!(targets.len())),
             ("blockCount".to_string(), json!(block_count)),
             ("edgeCount".to_string(), json!(edge_count)),
         ]),
         json!({
-            "package": package.name,
+            "package": package_name,
             "targets": targets.iter().map(cfg_target_details).collect::<Vec<_>>(),
         }),
     )
@@ -384,7 +393,7 @@ fn display_command(args: &CfgArgs) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use peregrine_bytecode::{
+    use peregrine_mcp_protocol::{
         MoveBytecodeBasicBlockView, MoveBytecodeControlFlowEdgeView, MoveBytecodeInstructionView,
     };
 

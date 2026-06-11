@@ -11,11 +11,13 @@ members = [
   "crates/peregrine-move-graphs",
   "crates/peregrine-move-insights",
   "crates/peregrine-move-model",
+  "crates/peregrine-mcp-protocol",
+  "crates/peregrine-mcp-server",
+  "crates/peregrine-memwal",
   "crates/peregrine-package-resolution",
   "crates/peregrine-project-loader",
   "crates/peregrine-plugins",
   "crates/peregrine-scanner",
-  "crates/peregrine-security-tools",
   "crates/peregrine-static-analysis",
   "crates/peregrine-terminal",
   "crates/peregrine-tui",
@@ -275,6 +277,8 @@ peregrine-provider-registry = { path = "crates/peregrine-provider-registry" }
 peregrine-move-graphs = { path = "crates/peregrine-move-graphs" }
 peregrine-move-insights = { path = "crates/peregrine-move-insights" }
 peregrine-move-model = { path = "crates/peregrine-move-model" }
+peregrine-mcp-protocol = { path = "crates/peregrine-mcp-protocol" }
+peregrine-mcp-server = { path = "crates/peregrine-mcp-server" }
 codex-network-proxy = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-ollama = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-otel = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
@@ -290,7 +294,6 @@ codex-rollout = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-
 codex-rollout-trace = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-sandboxing = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 peregrine-scanner = { path = "crates/peregrine-scanner" }
-peregrine-security-tools = { path = "crates/peregrine-security-tools" }
 codex-secrets = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-shell-command = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-shell-escalation = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }

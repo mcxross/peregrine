@@ -18,6 +18,7 @@ use crate::agent::session_resume::ResolveCwdOutcome;
 use crate::agent::session_resume::resolve_cwd_for_resume_or_fork;
 pub use crate::agent::startup_error::LocalStateDbStartupError;
 use additional_dirs::add_dir_warning_message;
+use app::AgentRunResult;
 use app::App;
 pub use app::AppExitInfo;
 pub use app::ExitReason;
@@ -90,11 +91,11 @@ mod additional_dirs;
 
 mod app;
 mod app_backtrack;
-mod app_command;
-mod app_event;
-mod app_event_sender;
-mod app_server_approval_conversions;
-mod app_server_session;
+pub(crate) mod app_command;
+pub(crate) mod app_event;
+pub(crate) mod app_event_sender;
+pub(crate) mod app_server_approval_conversions;
+pub(crate) use crate::session::app_server as app_server_session;
 mod approval_events;
 mod ascii_animation;
 #[cfg(not(target_os = "linux"))]
@@ -113,15 +114,15 @@ mod audio_device {
         ))
     }
 }
-mod bottom_pane;
+pub(crate) mod bottom_pane;
 mod branch_summary;
-mod chatwidget;
+pub(crate) mod chatwidget;
 mod cli;
 mod clipboard_copy;
 mod clipboard_paste;
 mod collaboration_modes;
 mod color;
-mod config_update;
+pub(crate) mod config_update;
 mod connector_metadata;
 pub(crate) mod custom_terminal;
 mod pets;
@@ -140,8 +141,8 @@ mod file_search;
 mod frames;
 mod get_git_diff;
 mod git_action_directives;
-mod goal_display;
-mod history_cell;
+pub(crate) mod goal_display;
+pub(crate) mod history_cell;
 mod hooks_rpc;
 mod ide_context;
 pub(crate) mod insert_history;
@@ -157,8 +158,8 @@ mod markdown_render;
 pub(crate) use markdown_render::render_markdown_text_with_width_and_cwd;
 mod markdown_stream;
 mod mention_codec;
-mod message_history;
-mod model_catalog;
+pub(crate) mod message_history;
+pub(crate) mod model_catalog;
 mod model_migration;
 mod motion;
 mod multi_agents;
@@ -168,7 +169,7 @@ mod npm_registry;
 pub(crate) mod onboarding;
 mod oss_selection;
 mod pager_overlay;
-mod permission_compat;
+pub(crate) mod permission_compat;
 pub(crate) mod public_widgets;
 mod render;
 pub(crate) use render::highlight::{
@@ -177,17 +178,17 @@ pub(crate) use render::highlight::{
 mod resize_reflow_cap;
 mod resume_picker;
 mod selection_list;
-mod service_tier_resolution;
+pub(crate) mod service_tier_resolution;
 mod session_archive_commands;
 mod session_log;
 mod session_resume;
-mod session_state;
+pub(crate) mod session_state;
 mod shimmer;
 mod skills_helpers;
 mod slash_command;
 mod startup_error;
 mod startup_hooks_review;
-mod status;
+pub(crate) mod status;
 mod status_indicator_widget;
 mod streaming;
 mod style;
@@ -200,7 +201,7 @@ mod theme_picker;
 mod token_usage;
 mod tooltips;
 mod transcript_reflow;
-mod tui;
+pub(crate) mod tui;
 mod ui_consts;
 pub(crate) mod update_action;
 pub use update_action::UpdateAction;
@@ -214,7 +215,6 @@ mod version;
 #[cfg(not(target_os = "linux"))]
 mod voice;
 mod width;
-pub(crate) mod workbench_chat;
 mod workspace_command;
 #[cfg(target_os = "linux")]
 #[allow(dead_code)]
@@ -889,11 +889,36 @@ fn can_reuse_implicit_local_daemon(
 }
 
 pub async fn run_main(
-    mut cli: Cli,
+    cli: Cli,
     arg0_paths: Arg0DispatchPaths,
     loader_overrides: LoaderOverrides,
     explicit_remote_endpoint: Option<RemoteAppServerEndpoint>,
 ) -> std::io::Result<AppExitInfo> {
+    let result = run_main_with_session(
+        cli,
+        arg0_paths,
+        loader_overrides,
+        explicit_remote_endpoint,
+        None,
+        None,
+    )
+    .await?;
+    if let Some(app_server) = result.app_server
+        && let Err(err) = app_server.shutdown().await
+    {
+        warn!(%err, "Failed to shut down handed-off app server");
+    }
+    Ok(result.exit_info)
+}
+
+pub(crate) async fn run_main_with_session(
+    mut cli: Cli,
+    arg0_paths: Arg0DispatchPaths,
+    loader_overrides: LoaderOverrides,
+    explicit_remote_endpoint: Option<RemoteAppServerEndpoint>,
+    initial_app_server: Option<AppServerSession>,
+    shared_config: Option<Config>,
+) -> std::io::Result<AgentRunResult> {
     let strict_config = cli.strict_config;
     let (sandbox_mode, approval_policy) = if cli.dangerously_bypass_approvals_and_sandbox {
         (
@@ -990,32 +1015,40 @@ pub async fn run_main(
     }
 
     #[allow(clippy::print_stderr)]
-    let config_toml = match load_config_as_toml_with_cli_and_load_options(
-        &peregrine_home,
-        config_cwd.as_ref(),
-        cli_kv_overrides.clone(),
-        peregrine_config::ConfigLoadOptions {
-            loader_overrides: loader_overrides.clone(),
-            strict_config,
-        },
-    )
-    .await
-    {
-        Ok(config_toml) => config_toml,
-        Err(err) => {
-            let config_error = err
-                .get_ref()
-                .and_then(|err| err.downcast_ref::<ConfigLoadError>())
-                .map(ConfigLoadError::config_error);
-            if let Some(config_error) = config_error {
-                eprintln!(
-                    "Error loading config.toml:\n{}",
-                    format_config_error_with_source(config_error)
-                );
-            } else {
-                eprintln!("Error loading config.toml: {err}");
+    let config_toml = if let Some(config) = shared_config.as_ref() {
+        config
+            .config_layer_stack
+            .effective_config()
+            .try_into()
+            .map_err(|err| std::io::Error::other(format!("invalid shared configuration: {err}")))?
+    } else {
+        match load_config_as_toml_with_cli_and_load_options(
+            &peregrine_home,
+            config_cwd.as_ref(),
+            cli_kv_overrides.clone(),
+            peregrine_config::ConfigLoadOptions {
+                loader_overrides: loader_overrides.clone(),
+                strict_config,
+            },
+        )
+        .await
+        {
+            Ok(config_toml) => config_toml,
+            Err(err) => {
+                let config_error = err
+                    .get_ref()
+                    .and_then(|err| err.downcast_ref::<ConfigLoadError>())
+                    .map(ConfigLoadError::config_error);
+                if let Some(config_error) = config_error {
+                    eprintln!(
+                        "Error loading config.toml:\n{}",
+                        format_config_error_with_source(config_error)
+                    );
+                } else {
+                    eprintln!("Error loading config.toml: {err}");
+                }
+                std::process::exit(1);
             }
-            std::process::exit(1);
         }
     };
 
@@ -1079,14 +1112,19 @@ pub async fn run_main(
         ..Default::default()
     };
 
-    let mut config = load_config_or_exit(
-        cli_kv_overrides.clone(),
-        overrides.clone(),
-        loader_overrides.clone(),
-        cloud_requirements.clone(),
-        strict_config,
-    )
-    .await;
+    let mut config = match shared_config {
+        Some(config) => config,
+        None => {
+            load_config_or_exit(
+                cli_kv_overrides.clone(),
+                overrides.clone(),
+                loader_overrides.clone(),
+                cloud_requirements.clone(),
+                strict_config,
+            )
+            .await
+        }
+    };
 
     remove_legacy_tui_log_file(config.peregrine_home.as_path());
 
@@ -1252,6 +1290,7 @@ pub async fn run_main(
         log_db,
         state_db,
         environment_manager,
+        initial_app_server,
     )
     .await
     .map_err(|err| std::io::Error::other(err.to_string()))
@@ -1274,7 +1313,8 @@ async fn run_ratatui_app(
     log_db: Option<log_db::LogDbLayer>,
     state_db: Option<StateDbHandle>,
     environment_manager: Arc<EnvironmentManager>,
-) -> color_eyre::Result<AppExitInfo> {
+    initial_app_server: Option<AppServerSession>,
+) -> color_eyre::Result<AgentRunResult> {
     let uses_remote_workspace = app_server_target.uses_remote_workspace();
     color_eyre::install()?;
 
@@ -1302,27 +1342,32 @@ async fn run_ratatui_app(
     // Initialize high-fidelity session event logging if enabled.
     session_log::maybe_init(&initial_config);
 
-    let app_server_session = match start_app_server(
-        &app_server_target,
-        arg0_paths.clone(),
-        initial_config.clone(),
-        cli_kv_overrides.clone(),
-        loader_overrides.clone(),
-        strict_config,
-        cloud_requirements.clone(),
-        feedback.clone(),
-        log_db.clone(),
-        state_db.clone(),
-        environment_manager.clone(),
-    )
-    .await
-    {
-        Ok(app_server) => AppServerSession::new(app_server, app_server_target.thread_params_mode()),
-        Err(err) => {
-            terminal_restore_guard.restore_silently();
-            session_log::log_session_end();
-            return Err(err);
-        }
+    let app_server_session = match initial_app_server {
+        Some(app_server) => app_server,
+        None => match start_app_server(
+            &app_server_target,
+            arg0_paths.clone(),
+            initial_config.clone(),
+            cli_kv_overrides.clone(),
+            loader_overrides.clone(),
+            strict_config,
+            cloud_requirements.clone(),
+            feedback.clone(),
+            log_db.clone(),
+            state_db.clone(),
+            environment_manager.clone(),
+        )
+        .await
+        {
+            Ok(app_server) => {
+                AppServerSession::new(app_server, app_server_target.thread_params_mode())
+            }
+            Err(err) => {
+                terminal_restore_guard.restore_silently();
+                session_log::log_session_end();
+                return Err(err);
+            }
+        },
     }
     .with_remote_cwd_override(remote_cwd_override.clone());
     if let Some(provider) = manually_selected_oss_provider.as_deref()
@@ -1356,13 +1401,13 @@ async fn run_ratatui_app(
             terminal_restore_guard.restore_silently();
             session_log::log_session_end();
             let _ = tui.terminal.clear();
-            return Ok(AppExitInfo {
+            return Ok(AgentRunResult::finished(AppExitInfo {
                 token_usage: crate::agent::token_usage::TokenUsage::default(),
                 thread_id: None,
                 thread_name: None,
                 update_action: None,
                 exit_reason: ExitReason::UserRequested,
-            });
+            }));
         }
 
         #[cfg(target_os = "windows")]
@@ -1391,7 +1436,7 @@ async fn run_ratatui_app(
         terminal_restore_guard.restore_silently();
         session_log::log_session_end();
         let _ = tui.terminal.clear();
-        Ok(AppExitInfo {
+        Ok(AgentRunResult::finished(AppExitInfo {
             token_usage: crate::agent::token_usage::TokenUsage::default(),
             thread_id: None,
             thread_name: None,
@@ -1399,7 +1444,7 @@ async fn run_ratatui_app(
             exit_reason: ExitReason::Fatal(format!(
                 "No saved session found with ID {id_str}. Run `peregrine {action}` without an ID to choose from existing sessions."
             )),
-        })
+        }))
     };
 
     let use_fork = cli.fork_picker || cli.fork_last || cli.fork_session_id.is_some();
@@ -1448,13 +1493,13 @@ async fn run_ratatui_app(
                 resume_picker::SessionSelection::Exit => {
                     terminal_restore_guard.restore_silently();
                     session_log::log_session_end();
-                    return Ok(AppExitInfo {
+                    return Ok(AgentRunResult::finished(AppExitInfo {
                         token_usage: crate::agent::token_usage::TokenUsage::default(),
                         thread_id: None,
                         thread_name: None,
                         update_action: None,
                         exit_reason: ExitReason::UserRequested,
-                    });
+                    }));
                 }
                 other => other,
             }
@@ -1509,13 +1554,13 @@ async fn run_ratatui_app(
             resume_picker::SessionSelection::Exit => {
                 terminal_restore_guard.restore_silently();
                 session_log::log_session_end();
-                return Ok(AppExitInfo {
+                return Ok(AgentRunResult::finished(AppExitInfo {
                     token_usage: crate::agent::token_usage::TokenUsage::default(),
                     thread_id: None,
                     thread_name: None,
                     update_action: None,
                     exit_reason: ExitReason::UserRequested,
-                });
+                }));
             }
             other => other,
         }
@@ -1554,13 +1599,13 @@ async fn run_ratatui_app(
                     ResolveCwdOutcome::Exit => {
                         terminal_restore_guard.restore_silently();
                         session_log::log_session_end();
-                        return Ok(AppExitInfo {
+                        return Ok(AgentRunResult::finished(AppExitInfo {
                             token_usage: crate::agent::token_usage::TokenUsage::default(),
                             thread_id: None,
                             thread_name: None,
                             update_action: None,
                             exit_reason: ExitReason::UserRequested,
-                        });
+                        }));
                     }
                 }
             }

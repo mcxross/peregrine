@@ -20,7 +20,6 @@ use codex_tools::ToolOutput;
 use codex_tools::ToolSpec;
 use codex_utils_absolute_path::test_support::PathExt;
 use peregrine_provider_registry::create_model_provider;
-use peregrine_security_tools::SuiSecurityToolsMode;
 use peregrine_types::config_types::WebSearchMode;
 use peregrine_types::dynamic_tools::DynamicToolSpec;
 use peregrine_types::openai_models::ApplyPatchToolType;
@@ -36,7 +35,6 @@ use serde_json::json;
 use crate::session::tests::make_session_and_context;
 use crate::session::turn_context::TurnContext;
 use crate::tools::handlers::multi_agents_spec::MULTI_AGENT_V1_NAMESPACE;
-use crate::tools::handlers::security::SECURITY_TOOL_NAMES;
 use crate::tools::router::ToolRouter;
 use crate::tools::router::ToolRouterParams;
 
@@ -323,14 +321,6 @@ fn set_turn_workspace(turn: &mut TurnContext, workspace: &Path) {
     }
 }
 
-fn write_move_manifest(workspace: &Path) {
-    std::fs::write(
-        workspace.join("Move.toml"),
-        "[package]\nname = \"sample\"\n",
-    )
-    .expect("write Move.toml");
-}
-
 fn mcp_tool(server: &str, namespace: &str, name: &str) -> ToolInfo {
     ToolInfo {
         server_name: server.to_string(),
@@ -475,91 +465,6 @@ async fn environment_count_controls_environment_backed_tools() {
         multiple_environments.visible_spec("view_image"),
         "environment_id"
     ));
-}
-
-#[tokio::test]
-async fn sui_security_tools_are_gated_by_workspace_and_config() {
-    for tool_name in SECURITY_TOOL_NAMES {
-        assert!(
-            !tool_name.contains("knowledge"),
-            "security tool roster must not include knowledge corpus tools"
-        );
-    }
-
-    let non_sui_auto = probe(|turn| {
-        turn.model_info.supports_search_tool = false;
-    })
-    .await;
-    non_sui_auto.assert_registered_lacks(SECURITY_TOOL_NAMES);
-    non_sui_auto.assert_visible_lacks(SECURITY_TOOL_NAMES);
-
-    let sui_workspace = tempfile::tempdir().expect("tempdir");
-    write_move_manifest(sui_workspace.path());
-    let auto_sui = probe(|turn| {
-        turn.model_info.supports_search_tool = false;
-        set_turn_workspace(turn, sui_workspace.path());
-    })
-    .await;
-    auto_sui.assert_registered_contains(SECURITY_TOOL_NAMES);
-    auto_sui.assert_visible_contains(SECURITY_TOOL_NAMES);
-
-    let disabled = probe(|turn| {
-        turn.model_info.supports_search_tool = false;
-        set_turn_workspace(turn, sui_workspace.path());
-        update_config(turn, |config| {
-            config.sui_security_tools.mode = SuiSecurityToolsMode::Disabled;
-        });
-    })
-    .await;
-    disabled.assert_registered_lacks(SECURITY_TOOL_NAMES);
-    disabled.assert_visible_lacks(SECURITY_TOOL_NAMES);
-
-    let non_sui_workspace = tempfile::tempdir().expect("tempdir");
-    let always = probe(|turn| {
-        turn.model_info.supports_search_tool = false;
-        set_turn_workspace(turn, non_sui_workspace.path());
-        update_config(turn, |config| {
-            config.sui_security_tools.mode = SuiSecurityToolsMode::Always;
-        });
-    })
-    .await;
-    always.assert_registered_contains(SECURITY_TOOL_NAMES);
-    always.assert_visible_contains(SECURITY_TOOL_NAMES);
-
-    let no_environment = probe(|turn| {
-        set_turn_workspace(turn, sui_workspace.path());
-        turn.environments.turn_environments.clear();
-        update_config(turn, |config| {
-            config.sui_security_tools.mode = SuiSecurityToolsMode::Always;
-        });
-    })
-    .await;
-    no_environment.assert_registered_lacks(SECURITY_TOOL_NAMES);
-    no_environment.assert_visible_lacks(SECURITY_TOOL_NAMES);
-}
-
-#[tokio::test]
-async fn sui_security_tools_defer_when_tool_search_is_available() {
-    let sui_workspace = tempfile::tempdir().expect("tempdir");
-    write_move_manifest(sui_workspace.path());
-
-    let plan = probe(|turn| {
-        set_turn_workspace(turn, sui_workspace.path());
-        turn.model_info.supports_search_tool = true;
-        use_bedrock_provider(turn);
-    })
-    .await;
-
-    plan.assert_visible_contains(&["tool_search"]);
-    plan.assert_visible_lacks(SECURITY_TOOL_NAMES);
-    plan.assert_registered_contains(SECURITY_TOOL_NAMES);
-    for tool_name in SECURITY_TOOL_NAMES {
-        assert_eq!(plan.exposure(tool_name), ToolExposure::Deferred);
-    }
-    let ToolSpec::ToolSearch { description, .. } = plan.visible_spec("tool_search") else {
-        panic!("expected visible tool_search spec");
-    };
-    assert!(description.contains("- Sui security tools:"));
 }
 
 #[tokio::test]

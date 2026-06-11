@@ -1,7 +1,12 @@
-use crate::{MovePackageContext, SecurityToolsError, SecurityToolsResult};
+use super::{MovePackageContext, SecurityToolsError, SecurityToolsResult};
 use peregrine_bytecode::{
     DecompiledMoveModule, MoveModuleBytecodeInput, decompile_package_bytecode_modules,
     load_package_bytecode,
+};
+use peregrine_mcp_protocol::{
+    ModuleEntry, MoveSourceSummary, ScannerDiagnostic as ProtocolScannerDiagnostic,
+    ScannerDiagnosticSeverity as ProtocolScannerDiagnosticSeverity, ScannerSourceMode,
+    SignatureEntry, StaticAnalysisArgs, TestScannerReport,
 };
 use peregrine_move_graphs::{
     MoveProjectGraphs, MoveStateAccessGraph, discover_move_project_graphs_for_package,
@@ -12,32 +17,104 @@ use peregrine_move_insights::{
     scanner_report::{MovePackageScannerReport, package_scanner_report_for_package},
 };
 use peregrine_move_model::{MovePackageModel, build_move_package};
-use peregrine_scanner::{ScanInput, ScanReport, SourceMode, sui::scan_package};
+use peregrine_scanner::{
+    ScanInput, ScanReport, ScannerDiagnosticSeverity, ScannerOutput, SourceMode,
+    core::PackageScanner,
+    sui::{scan_package, tests::TestsScanner},
+};
 use peregrine_static_analysis::{
     AnalysisConfig, AnalysisEngine, AnalysisEngineOptions, AnalysisReport, AnalysisRuleCatalog,
 };
 use serde::Serialize;
-use std::fs;
+use std::{fs, path::PathBuf};
 
-pub fn static_rule_catalog(ctx: &MovePackageContext) -> AnalysisRuleCatalog {
-    AnalysisEngine::new().catalog_with_options(
+pub fn static_rule_catalog(
+    ctx: &MovePackageContext,
+    args: &StaticAnalysisArgs,
+) -> SecurityToolsResult<AnalysisRuleCatalog> {
+    let config = AnalysisConfig::load_from_package(&ctx.package_root)
+        .map_err(SecurityToolsError::Analysis)?;
+    Ok(AnalysisEngine::new().catalog_with_options(
         &ctx.package_root,
-        AnalysisConfig::default(),
-        AnalysisEngineOptions::default(),
-    )
+        config,
+        analysis_options(args),
+    ))
 }
 
-pub fn static_analyze_package(ctx: &MovePackageContext) -> AnalysisReport {
-    AnalysisEngine::new().analyze_package_with_options(
+pub fn static_analyze_package(
+    ctx: &MovePackageContext,
+    args: &StaticAnalysisArgs,
+) -> SecurityToolsResult<AnalysisReport> {
+    let config = AnalysisConfig::load_from_package(&ctx.package_root)
+        .map_err(SecurityToolsError::Analysis)?;
+    Ok(AnalysisEngine::new().analyze_package_with_options(
         &ctx.package_root,
-        AnalysisConfig::default(),
-        AnalysisEngineOptions::default(),
-    )
+        config,
+        analysis_options(args),
+    ))
+}
+
+fn analysis_options(args: &StaticAnalysisArgs) -> AnalysisEngineOptions {
+    AnalysisEngineOptions {
+        use_global_plugins: !args.no_global_plugins,
+        extra_plugin_paths: args.plugins.iter().map(PathBuf::from).collect(),
+        only_rulesets: args.rulesets.clone(),
+        ..AnalysisEngineOptions::default()
+    }
 }
 
 pub fn sui_scanner_report(ctx: &MovePackageContext) -> SecurityToolsResult<ScanReport> {
     let model = build_package_model(ctx)?;
     Ok(scan_package(scanner_input(ctx, &model)))
+}
+
+pub fn sui_test_scanner_report(
+    ctx: &MovePackageContext,
+    source_mode: ScannerSourceMode,
+) -> SecurityToolsResult<TestScannerReport> {
+    let mut model = build_package_model(ctx)?;
+    let source_mode = match source_mode {
+        ScannerSourceMode::BestAvailable => SourceMode::BestAvailable,
+        ScannerSourceMode::SourceOnly => {
+            model.modules.clear();
+            SourceMode::SourceOnly
+        }
+    };
+    let input = ScanInput {
+        package_model: &model,
+        package_root: Some(ctx.package_root.clone()),
+        build_root: Some(ctx.package_root.join("build").join(&ctx.package_name)),
+        source_mode,
+    };
+    let ScannerOutput::Tests(report) = TestsScanner.scan(&input) else {
+        return Err(SecurityToolsError::Analysis(
+            "tests scanner returned an object scan report".to_string(),
+        ));
+    };
+    let random_test_count = report
+        .unit_tests
+        .iter()
+        .filter(|finding| finding.is_random_test)
+        .count();
+    let diagnostics = report
+        .diagnostics
+        .into_iter()
+        .map(|diagnostic| ProtocolScannerDiagnostic {
+            severity: match diagnostic.severity {
+                ScannerDiagnosticSeverity::Info => ProtocolScannerDiagnosticSeverity::Info,
+                ScannerDiagnosticSeverity::Warning => ProtocolScannerDiagnosticSeverity::Warning,
+                ScannerDiagnosticSeverity::Error => ProtocolScannerDiagnosticSeverity::Error,
+            },
+            message: diagnostic.message,
+        })
+        .collect();
+    Ok(TestScannerReport {
+        unit_test_count: report.unit_test_count,
+        movy_invariant_test_count: report.movy_invariant_test_count,
+        random_test_count,
+        formal_prover_spec_count: report.formal_prover_spec_count,
+        diagnostics,
+    })
 }
 
 pub fn sui_package_insights(
@@ -68,6 +145,60 @@ fn build_package_model(ctx: &MovePackageContext) -> SecurityToolsResult<MovePack
             ctx.package_root.display()
         ))
     })
+}
+
+pub fn sui_signatures(ctx: &MovePackageContext) -> SecurityToolsResult<Vec<SignatureEntry>> {
+    let model = build_package_model(ctx)?;
+    let mut signatures = model
+        .modules
+        .into_iter()
+        .flat_map(|module| {
+            let module_name = module.name;
+            let module_address = module.address;
+            let file_path = module.file_path;
+            module
+                .functions
+                .into_iter()
+                .map(move |function| SignatureEntry {
+                    module_name: module_name.clone(),
+                    module_address: module_address.clone(),
+                    file_path: file_path.clone(),
+                    function_name: function.name,
+                    visibility: function.visibility,
+                    is_entry: function.is_entry,
+                    is_transaction_callable: function.is_transaction_callable,
+                    signature: function.signature,
+                })
+        })
+        .collect::<Vec<_>>();
+    signatures.sort_by(|left, right| {
+        left.module_name
+            .cmp(&right.module_name)
+            .then_with(|| left.function_name.cmp(&right.function_name))
+    });
+    Ok(signatures)
+}
+
+pub fn sui_modules(
+    ctx: &MovePackageContext,
+) -> SecurityToolsResult<(MoveSourceSummary, Vec<ModuleEntry>)> {
+    let model = build_package_model(ctx)?;
+    let source = MoveSourceSummary {
+        manifest_path: model.manifest_path.clone(),
+        source_file_count: model.source_file_count,
+        has_source_modules: model.has_source_modules,
+    };
+    let mut modules = model
+        .modules
+        .into_iter()
+        .map(|module| ModuleEntry {
+            module_name: module.name,
+            module_address: module.address,
+            file_path: module.file_path,
+        })
+        .collect::<Vec<_>>();
+    modules.sort_by(|left, right| left.module_name.cmp(&right.module_name));
+    Ok((source, modules))
 }
 
 fn scanner_input<'a>(ctx: &MovePackageContext, model: &'a MovePackageModel) -> ScanInput<'a> {
@@ -197,7 +328,16 @@ mod tests {
             package_name: "sample".to_string(),
         };
 
-        let catalog = static_rule_catalog(&ctx);
+        let args = StaticAnalysisArgs {
+            package: peregrine_mcp_protocol::PackageArgs {
+                project_root: None,
+                package_path: None,
+            },
+            no_global_plugins: false,
+            plugins: Vec::new(),
+            rulesets: Vec::new(),
+        };
+        let catalog = static_rule_catalog(&ctx, &args).expect("static rule catalog");
         let ruleset_ids = catalog
             .rulesets
             .iter()

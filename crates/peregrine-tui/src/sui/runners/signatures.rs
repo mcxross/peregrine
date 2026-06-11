@@ -1,15 +1,11 @@
 use crate::{
     output::{CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, EXIT_SUCCESS, elapsed_ms},
-    sui::{
-        args::SignaturesArgs,
-        project::{CliContext, require_package_source_modules},
-    },
+    sui::{args::SignaturesArgs, project::CliContext},
 };
-use peregrine_move_model::{MoveFunctionSignature, MoveModule};
-use peregrine_static_analysis::{MovePackage, discover_move_project_fast};
+use peregrine_mcp_protocol::SignatureEntry;
 use serde_json::{Value, json};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     ffi::OsStr,
     path::{Component, Path},
     time::Instant,
@@ -25,23 +21,31 @@ const RETURN: &str = "\x1b[95m";
 
 pub fn run_signatures(context: &CliContext, args: &SignaturesArgs) -> CliStep {
     let started_at = Instant::now();
-    let package = match selected_package(context) {
-        Ok(package) => package,
+    let (package_name, signatures) = match fetch_signatures(context, args) {
+        Ok(result) => result,
         Err(error) => return CliStep::failed("signatures", started_at, error),
     };
-    if let Err(error) = require_package_source_modules("signatures", &package) {
-        return CliStep::failed("signatures", started_at, error);
+    if signatures.is_empty() {
+        return CliStep::failed(
+            "signatures",
+            started_at,
+            CliDiagnostic {
+                severity: CliDiagnosticSeverity::Error,
+                source: "signatures".to_string(),
+                code: Some("NoSignatureTargets".to_string()),
+                message: "No Move modules matched the requested signature target.".to_string(),
+                file: args.file.clone(),
+                span: None,
+            },
+        );
     }
 
-    let modules = match selected_modules(context, &package, args) {
-        Ok(modules) => modules,
-        Err(error) => return CliStep::failed("signatures", started_at, error),
-    };
-    let function_count = modules
+    let module_count = signatures
         .iter()
-        .map(|module| module.functions.len())
-        .sum::<usize>();
-    let stdout = render_signature_tree(&package, &modules);
+        .map(|signature| &signature.module_name)
+        .collect::<BTreeSet<_>>()
+        .len();
+    let stdout = render_signature_tree(&package_name, &signatures);
 
     CliStep {
         name: "signatures".to_string(),
@@ -51,116 +55,62 @@ pub fn run_signatures(context: &CliContext, args: &SignaturesArgs) -> CliStep {
         command: Some(display_command(args)),
         diagnostics: Vec::new(),
         metadata: BTreeMap::from([
-            ("package".to_string(), json!(package.name)),
-            ("moduleCount".to_string(), json!(modules.len())),
-            ("functionCount".to_string(), json!(function_count)),
+            ("package".to_string(), json!(package_name)),
+            ("moduleCount".to_string(), json!(module_count)),
+            ("functionCount".to_string(), json!(signatures.len())),
         ]),
         stdout,
         stderr: String::new(),
         details: json!({
-            "package": package.name,
-            "modules": modules.iter().map(module_details).collect::<Vec<_>>(),
+            "package": package_name,
+            "modules": module_details(&signatures),
         }),
     }
 }
 
-fn selected_package(context: &CliContext) -> Result<MovePackage, CliDiagnostic> {
-    let project = discover_move_project_fast(&context.project_root);
-    project
-        .packages
-        .into_iter()
-        .find(|package| normalize_path_label(Path::new(&package.path)) == context.package_path)
-        .ok_or_else(|| {
-            CliDiagnostic::error(
-                "signatures",
-                format!(
-                    "Could not discover package `{}` under {}.",
-                    context.package_path,
-                    context.project_root.display()
-                ),
-            )
-        })
-}
-
-fn selected_modules(
+fn fetch_signatures(
     context: &CliContext,
-    package: &MovePackage,
     args: &SignaturesArgs,
-) -> Result<Vec<MoveModule>, CliDiagnostic> {
-    let requested_modules = args
-        .modules
-        .iter()
-        .map(|module| module.trim())
-        .filter(|module| !module.is_empty())
-        .collect::<Vec<_>>();
-    let requested_file = args
+) -> Result<(String, Vec<SignatureEntry>), CliDiagnostic> {
+    let file = args
         .file
         .as_deref()
-        .map(|file| normalize_requested_file(context, file))
-        .filter(|file| !file.is_empty());
-
-    let mut modules = package
-        .modules
-        .iter()
-        .filter(|module| {
-            requested_file.as_deref().map_or(true, |file| {
-                normalize_path_label(Path::new(&module.file_path)) == file
-            })
-        })
-        .filter(|module| {
-            requested_modules.is_empty()
-                || requested_modules
-                    .iter()
-                    .any(|requested| module_matches(requested, module))
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-
-    modules.sort_by(|left, right| left.name.cmp(&right.name));
-    for module in &mut modules {
-        module
-            .functions
-            .sort_by(|left, right| left.name.cmp(&right.name));
-    }
-
-    if modules.is_empty() {
-        return Err(CliDiagnostic {
-            severity: CliDiagnosticSeverity::Error,
-            source: "signatures".to_string(),
-            code: Some("NoSignatureTargets".to_string()),
-            message: "No Move modules matched the requested signature target.".to_string(),
-            file: requested_file,
-            span: None,
-        });
-    }
-
-    Ok(modules)
+        .map(|file| normalize_requested_file(context, file));
+    crate::session::fetch_signatures(
+        &context.project_root,
+        &context.package_path,
+        args.modules.clone(),
+        file,
+    )
+    .map(|(package, signatures)| (package.package_name, signatures))
+    .map_err(|error| CliDiagnostic::error("mcp:peregrine", error))
 }
 
-fn render_signature_tree(package: &MovePackage, modules: &[MoveModule]) -> String {
-    let mut lines = vec![format!("{PACKAGE}package{RESET} {}", package.name)];
+fn render_signature_tree(package_name: &str, signatures: &[SignatureEntry]) -> String {
+    let mut lines = vec![format!("{PACKAGE}package{RESET} {package_name}")];
+    let mut current_module = None;
 
-    for module in modules {
-        lines.push(format!(
-            "{DIM}|--{RESET} {MODULE}module{RESET} {}",
-            module.name
-        ));
-
-        for function in &module.functions {
+    for signature in signatures {
+        if current_module.as_deref() != Some(signature.module_name.as_str()) {
+            current_module = Some(signature.module_name.clone());
             lines.push(format!(
-                "{DIM}|   |--{RESET} {}",
-                render_function_signature(function)
+                "{DIM}|--{RESET} {MODULE}module{RESET} {}",
+                signature.module_name
             ));
         }
+        lines.push(format!(
+            "{DIM}|   |--{RESET} {}",
+            render_function_signature(&signature.function_name, &signature.signature)
+        ));
     }
 
     lines.join("\n")
 }
 
-fn render_function_signature(function: &MoveFunctionSignature) -> String {
-    let signature = normalized_signature(&function.signature);
+fn render_function_signature(function_name: &str, raw_signature: &str) -> String {
+    let signature = normalized_signature(raw_signature);
     let Some(rest) = signature.strip_prefix("fun ") else {
-        return format!("{DIM}fun{RESET} {FUNCTION}{}{RESET}", function.name);
+        return format!("{DIM}fun{RESET} {FUNCTION}{function_name}{RESET}");
     };
     let name_end = rest
         .char_indices()
@@ -216,24 +166,34 @@ fn parameter_close_index(signature: &str) -> Option<usize> {
         .map(|close_index| open_index + close_index)
 }
 
-fn module_details(module: &MoveModule) -> Value {
-    json!({
-        "name": module.name,
-        "address": module.address,
-        "filePath": module.file_path,
-        "functionCount": module.functions.len(),
-        "functions": module.functions.iter().map(function_details).collect::<Vec<_>>(),
-    })
-}
+fn module_details(signatures: &[SignatureEntry]) -> Vec<Value> {
+    let mut modules = BTreeMap::<&str, Vec<&SignatureEntry>>::new();
+    for signature in signatures {
+        modules
+            .entry(&signature.module_name)
+            .or_default()
+            .push(signature);
+    }
 
-fn function_details(function: &MoveFunctionSignature) -> Value {
-    json!({
-        "name": function.name,
-        "visibility": function.visibility,
-        "isEntry": function.is_entry,
-        "isTransactionCallable": function.is_transaction_callable,
-        "signature": normalized_signature(&function.signature),
-    })
+    modules
+        .into_iter()
+        .map(|(module_name, functions)| {
+            let module = functions[0];
+            json!({
+                "name": module_name,
+                "address": module.module_address,
+                "filePath": module.file_path,
+                "functionCount": functions.len(),
+                "functions": functions.into_iter().map(|function| json!({
+                    "name": function.function_name,
+                    "visibility": function.visibility,
+                    "isEntry": function.is_entry,
+                    "isTransactionCallable": function.is_transaction_callable,
+                    "signature": normalized_signature(&function.signature),
+                })).collect::<Vec<_>>(),
+            })
+        })
+        .collect()
 }
 
 fn display_command(args: &SignaturesArgs) -> String {
@@ -242,7 +202,6 @@ fn display_command(args: &SignaturesArgs) -> String {
     for module in &args.modules {
         command.push_str(&format!(" --module {module}"));
     }
-
     if let Some(file) = &args.file {
         command.push_str(&format!(" --file {file}"));
     }
@@ -252,19 +211,16 @@ fn display_command(args: &SignaturesArgs) -> String {
 
 fn normalize_requested_file(context: &CliContext, file: &str) -> String {
     let path = Path::new(file.trim());
-
-    if path.is_absolute() {
-        if let Ok(relative) = path.strip_prefix(&context.project_root) {
-            return normalize_path_label(relative);
-        }
+    if path.is_absolute()
+        && let Ok(relative) = path.strip_prefix(&context.project_root)
+    {
+        return normalize_path_label(relative);
     }
-
     normalize_path_label(path)
 }
 
 fn normalize_path_label(path: impl AsRef<Path>) -> String {
     let path = path.as_ref();
-
     if path.as_os_str().is_empty() || path == Path::new(".") {
         return ".".to_string();
     }
@@ -278,17 +234,6 @@ fn normalize_path_label(path: impl AsRef<Path>) -> String {
         .map(OsStr::to_string_lossy)
         .collect::<Vec<_>>()
         .join("/")
-}
-
-fn module_matches(requested: &str, module: &MoveModule) -> bool {
-    if requested == module.name {
-        return true;
-    }
-
-    module
-        .address
-        .as_deref()
-        .is_some_and(|address| requested == format!("{address}::{}", module.name))
 }
 
 #[cfg(test)]
@@ -315,15 +260,8 @@ mod tests {
 
     #[test]
     fn function_signature_renderer_is_colored() {
-        let rendered = render_function_signature(&MoveFunctionSignature {
-            name: "balance".to_string(),
-            visibility: "public".to_string(),
-            is_entry: false,
-            is_transaction_callable: true,
-            signature: "public fun balance(account: &Account): u64".to_string(),
-            body: None,
-            attributes: Vec::new(),
-        });
+        let rendered =
+            render_function_signature("balance", "public fun balance(account: &Account): u64");
 
         assert!(rendered.contains("\x1b[92mbalance\x1b[0m"));
         assert!(rendered.contains("\x1b[95m: u64\x1b[0m"));
@@ -331,16 +269,10 @@ mod tests {
 
     #[test]
     fn function_signature_renderer_colors_implicit_unit_return() {
-        let rendered = render_function_signature(&MoveFunctionSignature {
-            name: "transfer".to_string(),
-            visibility: "public".to_string(),
-            is_entry: true,
-            is_transaction_callable: true,
-            signature: "public entry fun transfer<T>(coin: Coin<T>, recipient: address)"
-                .to_string(),
-            body: None,
-            attributes: Vec::new(),
-        });
+        let rendered = render_function_signature(
+            "transfer",
+            "public entry fun transfer<T>(coin: Coin<T>, recipient: address)",
+        );
 
         assert!(rendered.contains("\x1b[93m<T>(coin: Coin<T>, recipient: address)\x1b[0m"));
         assert!(rendered.contains("\x1b[95m: ()\x1b[0m"));

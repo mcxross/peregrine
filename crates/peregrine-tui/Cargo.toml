@@ -56,28 +56,16 @@ dunce = { workspace = true }
 image = { workspace = true, features = ["jpeg", "png", "gif", "webp"] }
 itertools = { workspace = true }
 lazy_static = { workspace = true }
-move-binary-format = { workspace = true }
-move-bytecode-source-map = { workspace = true }
-move-cli = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler = { workspace = true }
-move-disassembler = { workspace = true }
-move-package-alt-compilation = { workspace = true }
 pathdiff = { workspace = true }
-peregrine-adapters = { workspace = true }
 peregrine-app-server-client = { workspace = true }
 peregrine-app-server-protocol = { workspace = true }
-peregrine-bytecode = { workspace = true }
 peregrine-config = { workspace = true }
 peregrine-core = { workspace = true }
-peregrine-dynamic-analysis = { workspace = true }
 peregrine-helper-protocol = { workspace = true }
-peregrine-import-engine = { workspace = true }
 peregrine-model-provider = { workspace = true }
-peregrine-move-graphs = { workspace = true }
-peregrine-move-model = { workspace = true }
-peregrine-scanner = { workspace = true }
-peregrine-static-analysis = { workspace = true }
+peregrine-mcp-protocol = { workspace = true }
 peregrine-types = { workspace = true }
 peregrine-utils-home-dir = { workspace = true }
 pulldown-cmark = { workspace = true }
@@ -92,14 +80,13 @@ ratatui-macros = "0.6"
 regex = { workspace = true }
 regex-lite = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "json"] }
-rmcp = { workspace = true }
+rmcp = { workspace = true, features = ["client", "transport-child-process"] }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["preserve_order"] }
 sha2 = { workspace = true }
 shlex = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-sui-package-alt = { workspace = true }
 supports-color = { workspace = true }
 tempfile = { workspace = true }
 textwrap = { workspace = true }

@@ -2,8 +2,45 @@ use crate::sui::args::{
     AnalyzeArgs, BytecodeArgs, CallGraphArgs, CfgArgs, CheckAllArgs, FuzzArgs, ImportPackageArgs,
     NewPackageArgs, ObjectGraphArgs, SignaturesArgs, VerifyArgs,
 };
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
+use codex_utils_cli::CliConfigOverrides;
 use std::path::PathBuf;
+
+#[derive(Debug, Parser)]
+#[command(name = "peregrine", version)]
+pub struct ApplicationCli {
+    #[arg(value_name = "PATH")]
+    pub workbench_root: Option<PathBuf>,
+
+    #[arg(long, global = true, default_value = ".", value_name = "PATH")]
+    pub project: PathBuf,
+
+    #[arg(long, global = true, default_value = ".", value_name = "PATH")]
+    pub package: String,
+
+    #[arg(long, global = true)]
+    pub json: bool,
+
+    #[command(subcommand)]
+    pub command: Option<ApplicationCommand>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ApplicationCommand {
+    Agent(AgentArgs),
+
+    #[command(flatten)]
+    Security(CliCommand),
+}
+
+#[derive(Args, Debug)]
+pub struct AgentArgs {
+    #[clap(flatten)]
+    pub config_overrides: CliConfigOverrides,
+
+    #[clap(flatten)]
+    pub inner: crate::agent::Cli,
+}
 
 #[derive(Debug, Parser)]
 #[command(
@@ -77,6 +114,34 @@ mod tests {
     use super::*;
     use crate::sui::args::ImportNetwork;
     use clap::Parser;
+
+    #[test]
+    fn application_parser_defaults_to_workbench() {
+        let cli = ApplicationCli::try_parse_from(["peregrine"]).expect("application args");
+
+        assert!(cli.command.is_none());
+        assert!(cli.workbench_root.is_none());
+    }
+
+    #[test]
+    fn application_parser_accepts_workbench_path() {
+        let cli =
+            ApplicationCli::try_parse_from(["peregrine", "/workspace"]).expect("application args");
+
+        assert_eq!(cli.workbench_root, Some(PathBuf::from("/workspace")));
+        assert!(cli.command.is_none());
+    }
+
+    #[test]
+    fn application_parser_accepts_agent_options() {
+        let cli = ApplicationCli::try_parse_from(["peregrine", "agent", "--model", "gpt-5"])
+            .expect("application args");
+
+        let Some(ApplicationCommand::Agent(agent)) = cli.command else {
+            panic!("expected agent command");
+        };
+        assert_eq!(agent.inner.model.as_deref(), Some("gpt-5"));
+    }
 
     #[test]
     fn parses_global_project_and_package_for_check_all() {

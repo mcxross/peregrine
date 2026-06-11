@@ -3,30 +3,22 @@ use crate::agent::color::is_light;
 use crate::agent::terminal_palette::StdoutColorLevel;
 use crate::agent::terminal_palette::best_color;
 use crate::agent::terminal_palette::rgb_color;
-use crate::theme::ThemeName;
-use crate::theme::ThemePalette;
+use crate::theme::{ThemeName, ThemePalette, shared_theme_state};
 use ratatui::style::Color;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
 use std::str::FromStr;
-use std::sync::OnceLock;
-use std::sync::RwLock;
 
 const LIGHT_BG_ACCENT_RGB: (u8, u8, u8) = (0, 95, 135);
 // Decorative table rules should remain visible without competing with cell content.
 const TABLE_SEPARATOR_FG_ALPHA: f32 = 0.20;
-static AGENT_THEME: OnceLock<RwLock<ThemeName>> = OnceLock::new();
-
-fn theme_lock() -> &'static RwLock<ThemeName> {
-    AGENT_THEME.get_or_init(|| RwLock::new(ThemeName::default()))
-}
 
 pub(crate) fn set_agent_theme(name: Option<&str>) -> Option<String> {
     let theme = match name {
         Some(name) => match ThemeName::from_str(name) {
             Ok(theme) => theme,
             Err(_) => {
-                *theme_lock().write().expect("agent theme lock poisoned") = ThemeName::default();
+                shared_theme_state().set(ThemeName::default());
                 return Some(format!(
                     "Theme \"{name}\" not found. Using the default Peregrine theme."
                 ));
@@ -35,12 +27,12 @@ pub(crate) fn set_agent_theme(name: Option<&str>) -> Option<String> {
         None => ThemeName::default(),
     };
 
-    *theme_lock().write().expect("agent theme lock poisoned") = theme;
+    shared_theme_state().set(theme);
     None
 }
 
 pub(crate) fn current_theme_name() -> ThemeName {
-    *theme_lock().read().expect("agent theme lock poisoned")
+    shared_theme_state().current_name()
 }
 
 pub(crate) fn current_palette() -> ThemePalette {

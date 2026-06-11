@@ -68,12 +68,20 @@ pub fn resolve_external_helper_executable() -> Option<PathBuf> {
 }
 
 pub fn resolve_helper_executable() -> Result<PathBuf, String> {
-    if let Some(helper) = resolve_external_helper_executable() {
-        return Ok(helper);
-    }
+    let current_exe = std::env::current_exe()
+        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))?;
+    resolve_helper_executable_from(&current_exe, std::env::var_os(HELPER_ENV_VAR))
+}
 
-    std::env::current_exe()
-        .map_err(|error| format!("Could not resolve Peregrine executable: {error}"))
+fn resolve_helper_executable_from(
+    current_exe: &Path,
+    env_override: Option<OsString>,
+) -> Result<PathBuf, String> {
+    resolve_external_helper_executable_from(current_exe, env_override).ok_or_else(|| {
+        "Peregrine helper is unavailable. Build or install peregrine-helper beside the \
+         Peregrine executable, or set PEREGRINE_HELPER."
+            .to_string()
+    })
 }
 
 pub fn resolve_external_helper_executable_from(
@@ -154,6 +162,18 @@ mod tests {
             resolve_external_helper_executable_from(&current, Some(current.clone().into())),
             None,
         );
+    }
+
+    #[test]
+    fn required_helper_path_resolution_does_not_fall_back_to_current_executable() {
+        let directory = tempdir().expect("tempdir");
+        let current = directory.path().join(helper_binary_file_name());
+        fs::write(&current, "").expect("write current");
+
+        let error = resolve_helper_executable_from(&current, Some(current.clone().into()))
+            .expect_err("current executable must not be used as its own helper");
+
+        assert!(error.contains("Peregrine helper is unavailable"));
     }
 
     #[test]

@@ -122,7 +122,7 @@ mod tests {
         let direct_spinner = regex_lite::Regex::new(r"(^|[^A-Za-z0-9_])spinner\s*\(").unwrap();
         let direct_shimmer =
             regex_lite::Regex::new(r"(^|[^A-Za-z0-9_])shimmer_spans\s*\(").unwrap();
-        let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/agent");
+        let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/app/agent_ui");
 
         let mut source_files = Vec::new();
         collect_rust_files(&src_dir, &mut source_files)

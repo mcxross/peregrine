@@ -1,38 +1,32 @@
 use crate::{
-    helper_args::MOVY_FUZZ_HELPER_ARG,
     output::{CliDiagnostic, CliStep},
-    sui::{
-        args::FuzzArgs,
-        project::CliContext,
-        runners::process::{command_step, run_peregrine_child},
-    },
+    session::McpToolClient,
+    sui::{args::FuzzArgs, project::CliContext, runners::process::mcp_command_step},
 };
+use peregrine_mcp_protocol::{MovyFuzzArgs, PackageArgs, tool_name};
 use serde_json::{Value, json};
-use std::{collections::BTreeMap, ffi::OsString, time::Instant};
+use std::{collections::BTreeMap, time::Instant};
 
 pub fn run_fuzz(context: &CliContext, args: &FuzzArgs) -> CliStep {
     let started_at = Instant::now();
-    let command = format!(
-        "peregrine {MOVY_FUZZ_HELPER_ARG} {} {} --time-limit-seconds {} --seed {}",
-        context.project_root.display(),
-        context.package_path,
-        args.time_limit_seconds,
-        args.seed,
+    let result = McpToolClient::call_blocking::<_, peregrine_mcp_protocol::CommandResult>(
+        &context.project_root,
+        tool_name::MOVY_FUZZ,
+        &MovyFuzzArgs {
+            package: PackageArgs {
+                project_root: None,
+                package_path: Some(context.package_path.clone()),
+            },
+            time_limit_seconds: Some(args.time_limit_seconds),
+            seed: Some(args.seed),
+        },
     );
-    let output = run_peregrine_child([
-        OsString::from(MOVY_FUZZ_HELPER_ARG),
-        context.project_root.as_os_str().to_os_string(),
-        OsString::from(&context.package_path),
-        OsString::from(args.time_limit_seconds.to_string()),
-        OsString::from(args.seed.to_string()),
-    ]);
 
-    match output {
-        Ok(output) => command_step(
+    match result {
+        Ok(result) => mcp_command_step(
             "fuzz",
             started_at,
-            Some(command),
-            output,
+            result,
             BTreeMap::from([
                 (
                     "engine".to_string(),
@@ -45,6 +39,10 @@ pub fn run_fuzz(context: &CliContext, args: &FuzzArgs) -> CliStep {
                 ),
             ]),
         ),
-        Err(error) => CliStep::failed("fuzz", started_at, CliDiagnostic::error("fuzz", error)),
+        Err(error) => CliStep::failed(
+            "fuzz",
+            started_at,
+            CliDiagnostic::error("mcp:peregrine", error),
+        ),
     }
 }

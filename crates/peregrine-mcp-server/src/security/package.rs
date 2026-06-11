@@ -1,12 +1,7 @@
-use crate::{SecurityToolsError, SecurityToolsResult};
+use super::{SecurityToolsError, SecurityToolsResult};
 use peregrine_move_model::build_move_package;
 use serde::Serialize;
-use std::{
-    fs,
-    path::{Component, Path, PathBuf},
-};
-
-const MAX_MANIFEST_SCAN_DEPTH: usize = 5;
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,62 +10,6 @@ pub struct MovePackageContext {
     pub package_root: PathBuf,
     pub package_path: String,
     pub package_name: String,
-}
-
-pub fn contains_move_manifest(root: &Path) -> bool {
-    contains_move_manifest_inner(root, 0)
-}
-
-fn contains_move_manifest_inner(directory: &Path, depth: usize) -> bool {
-    if depth > MAX_MANIFEST_SCAN_DEPTH {
-        return false;
-    }
-
-    if directory.join("Move.toml").is_file() {
-        return true;
-    }
-
-    let Ok(entries) = fs::read_dir(directory) else {
-        return false;
-    };
-
-    for entry in entries.filter_map(Result::ok) {
-        let Ok(file_type) = entry.file_type() else {
-            continue;
-        };
-        if !file_type.is_dir() {
-            continue;
-        }
-        let path = entry.path();
-        if should_skip_dir(&path) {
-            continue;
-        }
-        if contains_move_manifest_inner(&path, depth + 1) {
-            return true;
-        }
-    }
-
-    false
-}
-
-fn should_skip_dir(path: &Path) -> bool {
-    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-        return false;
-    };
-
-    matches!(
-        name,
-        ".git"
-            | ".next"
-            | ".sui"
-            | ".turbo"
-            | "build"
-            | "coverage"
-            | "dist"
-            | "node_modules"
-            | "package_summaries"
-            | "target"
-    )
 }
 
 pub fn resolve_move_package(
@@ -207,15 +146,5 @@ mod tests {
         let temp = tempdir().expect("tempdir");
         let err = resolve_move_package(temp.path(), Some("../outside")).expect_err("escape");
         assert!(matches!(err, SecurityToolsError::InvalidPackagePath { .. }));
-    }
-
-    #[test]
-    fn contains_move_manifest_finds_nested_package() {
-        let temp = tempdir().expect("tempdir");
-        let package = temp.path().join("packages/app");
-        fs::create_dir_all(&package).expect("mkdir");
-        fs::write(package.join("Move.toml"), "[package]\nname = \"app\"\n").expect("manifest");
-
-        assert!(contains_move_manifest(temp.path()));
     }
 }

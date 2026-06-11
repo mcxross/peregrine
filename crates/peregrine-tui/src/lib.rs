@@ -1,9 +1,13 @@
+#[path = "app/agent_ui/mod.rs"]
 mod agent;
+mod app;
 mod args;
+mod chat;
 pub mod helper_args;
 mod keybinds;
 mod navigation;
 mod output;
+mod session;
 pub mod sui;
 pub mod tabs;
 pub mod theme;
@@ -23,21 +27,17 @@ use crate::sui::package_loader::{
 use crate::sui::project::{BytecodeTarget, CliContext, bytecode_targets, resolve_context};
 use crate::sui::runners::{run_call_graph, run_cfg};
 use crate::tabs::{TabNav, tab_hit_areas};
-use crate::theme::{Theme, ThemeName, ThemePalette};
+use crate::theme::{Theme, ThemeName, ThemePalette, ThemeState};
 use crate::workbench_render::{
     RenderedWorkbenchDocument, is_markdown_path, render_workbench_document,
 };
 use clap::Parser;
 use codex_arg0::Arg0DispatchPaths;
-use codex_utils_cli::CliConfigOverrides;
-use move_binary_format::file_format::{CodeOffset, CompiledModule, FunctionDefinitionIndex};
-use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
-use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
-use peregrine_config::config_toml::ConfigToml;
-use peregrine_config::{CONFIG_TOML_FILE, LoaderOverrides};
-use peregrine_move_graphs::{
+use peregrine_config::LoaderOverrides;
+use peregrine_mcp_protocol::{
+    BytecodeViewResponse, GraphsResponse, MoveBytecodeModuleView, MoveBytecodeSourceSpan,
     MoveTypeGraph, MoveTypeGraphEdge, MoveTypeGraphNode, MoveUnresolvedType,
-    discover_move_project_graphs_for_package,
+    PackageArgs as McpPackageArgs, tool_name,
 };
 use ratatui::crossterm::event::{
     self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
@@ -65,7 +65,6 @@ const AGENT_TOKIO_WORKER_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;
 const PAGE_SIZE: usize = 12;
 const MOUSE_VERTICAL_SCROLL_STEP: usize = 3;
 const MOUSE_HORIZONTAL_SCROLL_STEP: usize = 8;
-const AGENT_SUBCOMMAND: &str = "agent";
 const WORKBENCH_TAB_LABELS: [&str; 6] = [
     "code",
     "bytecode",
@@ -74,28 +73,6 @@ const WORKBENCH_TAB_LABELS: [&str; 6] = [
     "type graph",
     "chat",
 ];
-const CLI_COMMAND_NAMES: &[&str] = &[
-    "build",
-    "test",
-    "coverage",
-    "bytecode",
-    "bytecode-viewer",
-    "signatures",
-    "function-signatures",
-    "call-graph",
-    "callgraph",
-    "object-graph",
-    "objectgraph",
-    "cfg",
-    "control-flow-graph",
-    "fuzz",
-    "verify",
-    "analyze",
-    "check-all",
-    "import-package",
-    "new-package",
-];
-
 pub fn run() -> io::Result<i32> {
     run_from_env_args(std::env::args_os())
 }
@@ -108,44 +85,42 @@ where
     let _binary = args.next();
     let args = args.collect::<Vec<_>>();
 
-    match classify_top_level_args(args) {
-        TopLevelDispatch::Workbench(root) => run_mode_shell(root),
-        TopLevelDispatch::Agent(args) => match run_agent_from_args(args)? {
-            AgentExit::Quit(code) => Ok(code),
-            AgentExit::SwitchToWorkbench => run_mode_shell(None),
-        },
-        TopLevelDispatch::CliOrHelper(args) => Ok(run_cli_or_helper_from_args(args)),
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum TopLevelDispatch {
-    Workbench(Option<PathBuf>),
-    Agent(Vec<OsString>),
-    CliOrHelper(Vec<OsString>),
-}
-
-fn classify_top_level_args(args: Vec<OsString>) -> TopLevelDispatch {
-    if args
-        .first()
-        .is_some_and(|arg| arg == OsStr::new(AGENT_SUBCOMMAND))
-    {
-        return TopLevelDispatch::Agent(args.into_iter().skip(1).collect());
+    if args.first().is_some_and(is_helper_arg) {
+        return Ok(run_external_helper(args));
     }
 
-    if args.is_empty() {
-        return TopLevelDispatch::Workbench(None);
-    }
-
-    if let [first] = args.as_slice() {
-        if is_helper_arg(first) || is_cli_command_arg(first) || is_flag_arg(first) {
-            return TopLevelDispatch::CliOrHelper(args);
+    let cli = match args::ApplicationCli::try_parse_from(
+        std::iter::once(OsString::from("peregrine")).chain(args),
+    ) {
+        Ok(cli) => cli,
+        Err(error) => {
+            let exit_code = error.exit_code();
+            let _ = error.print();
+            return Ok(exit_code);
         }
-
-        return TopLevelDispatch::Workbench(Some(PathBuf::from(first)));
+    };
+    let args::ApplicationCli {
+        workbench_root,
+        project,
+        package,
+        json,
+        command,
+    } = cli;
+    match command {
+        None => run_mode_shell(workbench_root, None),
+        Some(args::ApplicationCommand::Agent(agent_args)) => {
+            match run_agent(agent_args, None, None, None)? {
+                AgentExit::Quit(code) => Ok(code),
+                AgentExit::SwitchToWorkbench { app_server, .. } => run_mode_shell(None, app_server),
+            }
+        }
+        Some(args::ApplicationCommand::Security(command)) => Ok(run_security_cli(args::Cli {
+            project,
+            package,
+            json,
+            command,
+        })),
     }
-
-    TopLevelDispatch::CliOrHelper(args)
 }
 
 fn is_helper_arg(arg: &OsString) -> bool {
@@ -156,26 +131,55 @@ fn is_helper_arg(arg: &OsString) -> bool {
         || arg.as_os_str() == OsStr::new(helper_args::MOVE_ANALYZER_HELPER_ARG)
 }
 
-fn is_cli_command_arg(arg: &OsString) -> bool {
-    arg.to_str()
-        .is_some_and(|arg| CLI_COMMAND_NAMES.contains(&arg))
-}
-
-fn is_flag_arg(arg: &OsString) -> bool {
-    arg.to_str().is_some_and(|arg| arg.starts_with('-'))
-}
-
-fn run_mode_shell(root: Option<PathBuf>) -> io::Result<i32> {
+fn run_mode_shell(
+    root: Option<PathBuf>,
+    initial_app_server: Option<agent::app_server_session::AppServerSession>,
+) -> io::Result<i32> {
     let mut app = App::from_launch_dir(root)?;
+    if let (Some(runtime), Some(app_server)) = (&app.application_runtime, initial_app_server) {
+        runtime.store_app_server(app_server);
+    }
     loop {
         match run_tui(&mut app)? {
             WorkbenchExit::Quit => return Ok(0),
-            WorkbenchExit::SwitchToAgent => match run_agent_from_args(std::iter::empty())? {
-                AgentExit::Quit(code) => return Ok(code),
-                AgentExit::SwitchToWorkbench => {
-                    app = App::from_launch_dir(None)?;
+            WorkbenchExit::SwitchToAgent => {
+                app.chat.suspend()?;
+                let app_server = app
+                    .application_runtime
+                    .as_ref()
+                    .and_then(app::ApplicationRuntime::take_app_server);
+                let shared_config = app
+                    .application_runtime
+                    .as_ref()
+                    .map(app::ApplicationRuntime::config)
+                    .map(|config| config.as_ref().clone());
+                let agent_args = args::AgentArgs {
+                    config_overrides: Default::default(),
+                    inner: agent::Cli::parse_from(["peregrine"]),
+                };
+                match run_agent(
+                    agent_args,
+                    app.chat.active_thread_id(),
+                    app_server,
+                    shared_config,
+                )? {
+                    AgentExit::Quit(code) => return Ok(code),
+                    AgentExit::SwitchToWorkbench {
+                        thread_id,
+                        app_server,
+                    } => {
+                        if let (Some(runtime), Some(app_server)) =
+                            (&app.application_runtime, app_server)
+                        {
+                            runtime.store_app_server(app_server);
+                        }
+                        if let Some(thread_id) = thread_id {
+                            let root = app.explorer.root.clone();
+                            app.chat.adopt_thread(&root, thread_id);
+                        }
+                    }
                 }
-            },
+            }
         }
     }
 }
@@ -234,36 +238,34 @@ impl Drop for WorkbenchTerminalGuard {
     }
 }
 
-fn run_agent_from_args<I>(args: I) -> io::Result<AgentExit>
-where
-    I: IntoIterator<Item = OsString>,
-{
-    let top_cli = match AgentTopCli::try_parse_from(
-        std::iter::once(OsString::from("peregrine-tui agent")).chain(args),
-    ) {
-        Ok(cli) => cli,
-        Err(error) => {
-            let exit_code = error.exit_code();
-            let _ = error.print();
-            return Ok(AgentExit::Quit(exit_code));
-        }
-    };
-    let mut inner = top_cli.inner;
+fn run_agent(
+    mut agent_args: args::AgentArgs,
+    resume_thread_id: Option<peregrine_types::ThreadId>,
+    app_server: Option<agent::app_server_session::AppServerSession>,
+    shared_config: Option<agent::legacy_core::config::Config>,
+) -> io::Result<AgentExit> {
+    let mut inner = agent_args.inner;
+    inner.resume_session_id = resume_thread_id.map(|thread_id| thread_id.to_string());
     inner
         .config_overrides
         .raw_overrides
-        .splice(0..0, top_cli.config_overrides.raw_overrides);
+        .splice(0..0, agent_args.config_overrides.raw_overrides.drain(..));
 
     let runtime = build_agent_runtime()?;
-    let exit_info = runtime.block_on(agent::run_main(
+    let result = runtime.block_on(agent::run_main_with_session(
         inner,
         agent_arg0_dispatch_paths()?,
         LoaderOverrides::default(),
         /*explicit_remote_endpoint*/ None,
+        app_server,
+        shared_config,
     ))?;
 
-    match exit_info.exit_reason {
-        agent::ExitReason::SwitchToWorkbench => Ok(AgentExit::SwitchToWorkbench),
+    match result.exit_info.exit_reason {
+        agent::ExitReason::SwitchToWorkbench => Ok(AgentExit::SwitchToWorkbench {
+            thread_id: result.exit_info.thread_id,
+            app_server: result.app_server,
+        }),
         agent::ExitReason::UserRequested => Ok(AgentExit::Quit(0)),
         agent::ExitReason::Fatal(message) => {
             eprintln!("ERROR: {message}");
@@ -289,19 +291,12 @@ fn agent_arg0_dispatch_paths() -> io::Result<Arg0DispatchPaths> {
     })
 }
 
-#[derive(Parser, Debug)]
-struct AgentTopCli {
-    #[clap(flatten)]
-    config_overrides: CliConfigOverrides,
-
-    #[clap(flatten)]
-    inner: agent::Cli,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AgentExit {
     Quit(i32),
-    SwitchToWorkbench,
+    SwitchToWorkbench {
+        thread_id: Option<peregrine_types::ThreadId>,
+        app_server: Option<agent::app_server_session::AppServerSession>,
+    },
 }
 
 pub fn run_cli_or_helper_from_args<I>(args: I) -> i32
@@ -311,21 +306,7 @@ where
     let mut args = args.into_iter();
 
     match args.next() {
-        Some(arg) if arg.as_os_str() == OsStr::new(helper_args::BUNDLED_SUI_HELPER_ARG) => {
-            run_bundled_sui_helper(args);
-        }
-        Some(arg) if arg.as_os_str() == OsStr::new(helper_args::BYTECODE_VIEWER_HELPER_ARG) => {
-            run_bytecode_viewer_helper(args);
-        }
-        Some(arg) if arg.as_os_str() == OsStr::new(helper_args::MOVY_FUZZ_HELPER_ARG) => {
-            run_movy_fuzz_helper(args);
-        }
-        Some(arg) if arg.as_os_str() == OsStr::new(helper_args::FORMAL_VERIFICATION_HELPER_ARG) => {
-            run_formal_verification_helper(args);
-        }
-        Some(arg) if arg.as_os_str() == OsStr::new(helper_args::MOVE_ANALYZER_HELPER_ARG) => {
-            run_move_analyzer_helper();
-        }
+        Some(arg) if is_helper_arg(&arg) => run_external_helper(std::iter::once(arg).chain(args)),
         Some(arg) => run_cli_from_args(std::iter::once(arg).chain(args)),
         None => run_cli_from_args(std::iter::empty()),
     }
@@ -344,9 +325,14 @@ where
                 return exit_code;
             }
         };
+    run_security_cli(cli)
+}
+
+fn run_security_cli(cli: args::Cli) -> i32 {
     let json = cli.json;
     let report = workflow::execute(&cli);
     let exit_code = report.exit_code;
+    session::McpToolClient::shutdown_all();
 
     if let Err(error) = output::write_report(&report, json) {
         eprintln!("{error}");
@@ -356,169 +342,18 @@ where
     exit_code
 }
 
-fn run_bundled_sui_helper(args: impl IntoIterator<Item = OsString>) -> ! {
-    match peregrine_adapters::sui::run_bundled_sui_blocking(args) {
-        Ok(output) => {
-            print!("{}", output.stdout);
-            eprint!("{}", output.stderr);
-            std::process::exit(output.status.unwrap_or(1));
-        }
+fn run_external_helper(args: impl IntoIterator<Item = OsString>) -> i32 {
+    let Some(executable) = helper_args::resolve_external_helper_executable() else {
+        eprintln!(
+            "Peregrine helper is unavailable. Install peregrine-helper beside the TUI binary or set PEREGRINE_HELPER."
+        );
+        return 1;
+    };
+    match std::process::Command::new(executable).args(args).status() {
+        Ok(status) => status.code().unwrap_or(1),
         Err(error) => {
-            eprintln!("{error}");
-            std::process::exit(1);
-        }
-    }
-}
-
-fn run_move_analyzer_helper() -> ! {
-    peregrine_adapters::move_analyzer::run_bundled_move_analyzer_stdio();
-    std::process::exit(0);
-}
-
-fn run_bytecode_viewer_helper(mut args: impl Iterator<Item = OsString>) -> ! {
-    let Some(package_root) = args.next() else {
-        eprintln!("missing package root");
-        std::process::exit(1);
-    };
-    let Some(module_name) = args.next() else {
-        eprintln!("missing module name");
-        std::process::exit(1);
-    };
-    let mut interactive = false;
-    let mut bytecode_map = false;
-    let mut debug = false;
-
-    for arg in args {
-        match arg.to_string_lossy().as_ref() {
-            "--interactive" => interactive = true,
-            "--bytecode-map" => bytecode_map = true,
-            "--debug" => debug = true,
-            unknown => {
-                eprintln!("unknown bytecode viewer option: {unknown}");
-                std::process::exit(1);
-            }
-        }
-    }
-
-    let package_root = PathBuf::from(package_root);
-    let module_name = module_name.to_string_lossy().into_owned();
-    let install_dir = tempfile::tempdir().expect("bytecode viewer install dir");
-    let mut build_config = move_package_alt_compilation::build_config::BuildConfig::default();
-    build_config.install_dir = Some(install_dir.path().to_path_buf());
-    let disassemble = move_cli::base::disassemble::Disassemble {
-        interactive,
-        package_name: None,
-        module_or_script_name: module_name,
-        debug,
-        bytecode_map,
-    };
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .expect("bytecode viewer runtime");
-    let result = runtime.block_on(
-        disassemble
-            .execute::<sui_package_alt::SuiFlavor>(Some(package_root.as_path()), build_config),
-    );
-    if interactive {
-        restore_bytecode_viewer_terminal();
-    }
-
-    match result {
-        Ok(()) => std::process::exit(0),
-        Err(error) => {
-            eprintln!("{error:#}");
-            std::process::exit(1);
-        }
-    }
-}
-
-fn restore_bytecode_viewer_terminal() {
-    let mut stdout = std::io::stdout();
-    let _ = crossterm::execute!(
-        stdout,
-        crossterm::event::DisableMouseCapture,
-        crossterm::terminal::LeaveAlternateScreen
-    );
-    let _ = crossterm::terminal::disable_raw_mode();
-}
-
-fn run_movy_fuzz_helper(mut args: impl Iterator<Item = OsString>) -> ! {
-    let Some(root_path) = args.next() else {
-        eprintln!("missing root path");
-        std::process::exit(1);
-    };
-    let Some(package_path) = args.next() else {
-        eprintln!("missing package path");
-        std::process::exit(1);
-    };
-    let time_limit_seconds = args
-        .next()
-        .and_then(|value| value.to_string_lossy().parse::<u64>().ok())
-        .unwrap_or(30);
-    let seed = args
-        .next()
-        .and_then(|value| value.to_string_lossy().parse::<u64>().ok())
-        .unwrap_or(1);
-
-    let package_path = package_path.to_string_lossy().into_owned();
-    match peregrine_dynamic_analysis::sui::movy_fuzz::run_movy_fuzz_blocking(
-        PathBuf::from(root_path),
-        &package_path,
-        peregrine_dynamic_analysis::sui::movy_fuzz::MovyFuzzOptions {
-            time_limit_seconds,
-            seed,
-        },
-    ) {
-        Ok(run) => {
-            println!("{}", run.stdout);
-            std::process::exit(0);
-        }
-        Err(error) => {
-            eprintln!("{error}");
-            std::process::exit(1);
-        }
-    }
-}
-
-fn run_formal_verification_helper(mut args: impl Iterator<Item = OsString>) -> ! {
-    let Some(root_path) = args.next() else {
-        eprintln!("missing root path");
-        std::process::exit(1);
-    };
-    let Some(package_path) = args.next() else {
-        eprintln!("missing package path");
-        std::process::exit(1);
-    };
-    let Some(file_path) = args.next() else {
-        eprintln!("missing file path");
-        std::process::exit(1);
-    };
-    let Some(module_name) = args.next() else {
-        eprintln!("missing module name");
-        std::process::exit(1);
-    };
-    let timeout_seconds = args
-        .next()
-        .and_then(|value| value.to_string_lossy().parse::<usize>().ok());
-
-    let package_path = package_path.to_string_lossy().into_owned();
-    match peregrine_dynamic_analysis::sui::formal_verification::run_formal_verification_blocking(
-        PathBuf::from(root_path),
-        &package_path,
-        peregrine_dynamic_analysis::sui::formal_verification::FormalVerificationOptions {
-            file_path: file_path.to_string_lossy().into_owned(),
-            module_name: module_name.to_string_lossy().into_owned(),
-            timeout_seconds,
-            verbose: true,
-            trace: false,
-            keep_temp: false,
-        },
-    ) {
-        Ok(_) => std::process::exit(0),
-        Err(error) => {
-            eprintln!("{error}");
-            std::process::exit(1);
+            eprintln!("Could not run Peregrine helper: {error}");
+            1
         }
     }
 }
@@ -730,13 +565,16 @@ struct WorkbenchLayout {
 }
 
 pub struct App {
+    application_runtime: Option<app::ApplicationRuntime>,
+    application_config: Option<std::sync::Arc<agent::legacy_core::config::Config>>,
     mode: AppMode,
     focus: FocusPane,
     active_tab: WorkbenchTab,
     editor_mode: EditorMode,
     standard_editor_editing: bool,
     vim_state: VimState,
-    theme: Theme,
+    theme: ThemeState,
+    theme_generation: u64,
     navigation: Navigation,
     explorer: Explorer,
     editor: EditorBuffer,
@@ -746,7 +584,8 @@ pub struct App {
     bytecode_loader_rx: Option<mpsc::Receiver<BytecodeLoadResult>>,
     bytecode_load_epoch: u64,
     graphs: GraphPanes,
-    chat: agent::workbench_chat::WorkbenchChatHost,
+    graph_loader_rx: Option<(WorkbenchTab, mpsc::Receiver<GraphLoadResult>)>,
+    chat: chat::ChatController,
     input: CommandInput,
     startup: WorkbenchStartupState,
     startup_task_rx: Option<mpsc::Receiver<StartupTaskResult>>,
@@ -761,8 +600,8 @@ pub struct App {
 impl App {
     pub fn from_current_dir() -> io::Result<Self> {
         let cwd = std::env::current_dir()?;
-        let settings = configured_tui_settings();
-        Self::new_with_theme(cwd, settings.editor_mode, settings.theme)
+        let runtime = app::ApplicationRuntime::load(cwd.clone())?;
+        Self::new_with_runtime(cwd, runtime)
     }
 
     pub fn from_launch_dir(root: Option<PathBuf>) -> io::Result<Self> {
@@ -770,9 +609,9 @@ impl App {
             Some(root) => root,
             None => std::env::current_dir()?,
         };
-        let settings = configured_tui_settings();
+        let runtime = app::ApplicationRuntime::load(root.clone())?;
         let trust_resolution = resolve_trust_for_directory(&root)?;
-        let mut app = Self::new_with_theme(root, settings.editor_mode, settings.theme)?;
+        let mut app = Self::new_with_runtime(root, runtime)?;
         app.configure_launch_startup(trust_resolution);
         Ok(app)
     }
@@ -786,8 +625,45 @@ impl App {
         editor_mode: EditorMode,
         theme: Theme,
     ) -> io::Result<Self> {
+        Self::new_with_theme_state(root, editor_mode, ThemeState::new(theme))
+    }
+
+    fn new_with_theme_state(
+        root: impl AsRef<Path>,
+        editor_mode: EditorMode,
+        theme: ThemeState,
+    ) -> io::Result<Self> {
+        Self::new_with_parts(root, editor_mode, theme, None)
+    }
+
+    fn new_with_runtime(
+        root: impl AsRef<Path>,
+        runtime: app::ApplicationRuntime,
+    ) -> io::Result<Self> {
+        let ui = runtime.ui();
+        Self::new_with_parts(root, ui.editor_mode, runtime.theme(), Some(runtime))
+    }
+
+    fn new_with_parts(
+        root: impl AsRef<Path>,
+        editor_mode: EditorMode,
+        theme: ThemeState,
+        application_runtime: Option<app::ApplicationRuntime>,
+    ) -> io::Result<Self> {
         keybinds::init_default_keybindings()?;
+        let theme_generation = theme.generation();
+        let application_config = application_runtime
+            .as_ref()
+            .map(app::ApplicationRuntime::config);
+        let chat = application_config
+            .as_deref()
+            .cloned()
+            .zip(application_runtime.clone())
+            .map(|(config, runtime)| chat::ChatController::new(config, runtime))
+            .unwrap_or_default();
         let app = Self {
+            application_runtime,
+            application_config,
             mode: AppMode::default(),
             focus: FocusPane::Explorer,
             active_tab: WorkbenchTab::Code,
@@ -795,6 +671,7 @@ impl App {
             standard_editor_editing: false,
             vim_state: VimState::Normal,
             theme,
+            theme_generation,
             navigation: Navigation::default(),
             explorer: Explorer::new(root)?,
             editor: EditorBuffer::new_empty(),
@@ -804,7 +681,8 @@ impl App {
             bytecode_loader_rx: None,
             bytecode_load_epoch: 0,
             graphs: GraphPanes::default(),
-            chat: agent::workbench_chat::WorkbenchChatHost::default(),
+            graph_loader_rx: None,
+            chat,
             input: CommandInput::default(),
             startup: WorkbenchStartupState::Workbench,
             startup_task_rx: None,
@@ -882,7 +760,7 @@ impl App {
                 self.status = message;
             }
             TrustPostAction::LoadPackage(context) => {
-                let report = trust_denied_load_report(context.package_root.clone(), message);
+                let report = trust_denied_load_report(context.package_root, message);
                 self.status = "Project trust denied; package load skipped".to_string();
                 self.finish_package_load(report);
             }
@@ -1072,7 +950,13 @@ impl App {
         self.editor = EditorBuffer::new_empty();
         self.input = CommandInput::default();
         self.chat.shutdown();
-        self.chat = agent::workbench_chat::WorkbenchChatHost::default();
+        self.chat = self
+            .application_config
+            .as_deref()
+            .cloned()
+            .zip(self.application_runtime.clone())
+            .map(|(config, runtime)| chat::ChatController::new(config, runtime))
+            .unwrap_or_default();
         self.focus = FocusPane::Explorer;
         self.active_tab = WorkbenchTab::Code;
         self.standard_editor_editing = false;
@@ -1088,12 +972,14 @@ impl App {
         loop {
             self.drain_startup_task();
             self.drain_bytecode_loader();
+            self.drain_graph_loader();
             self.tick_chat();
+            self.refresh_shared_theme();
             terminal.draw(|frame| self.render(frame))?;
             if let Some(exit) = self.exit {
                 return Ok(exit);
             }
-            if !event::poll(Duration::from_millis(250))? {
+            if !event::poll(self.redraw_interval())? {
                 continue;
             }
             match event::read()? {
@@ -1152,29 +1038,27 @@ impl App {
         }
     }
 
-    fn apply_chat_action(&mut self, action: agent::workbench_chat::WorkbenchChatAction) {
+    fn apply_chat_action(&mut self, action: chat::ChatAction) {
         match action {
-            agent::workbench_chat::WorkbenchChatAction::None => {}
-            agent::workbench_chat::WorkbenchChatAction::FocusCode => {
+            chat::ChatAction::None => {}
+            chat::ChatAction::FocusCode => {
                 self.focus_code_editor();
                 self.status = "Returned to workbench".to_string();
             }
-            agent::workbench_chat::WorkbenchChatAction::Quit => {
+            chat::ChatAction::Quit => {
                 self.exit = Some(WorkbenchExit::Quit);
             }
-            agent::workbench_chat::WorkbenchChatAction::ThemeSelected(name) => {
-                match name.parse::<ThemeName>() {
-                    Ok(theme_name) => {
-                        self.theme = Theme::new(theme_name);
-                        self.sync_syntax_theme();
-                        self.invalidate_workbench_views();
-                        self.status = format!("Theme: {}", self.theme);
-                    }
-                    Err(err) => {
-                        self.status = format!("Theme unavailable: {err}");
-                    }
+            chat::ChatAction::ThemeSelected(name) => match name.parse::<ThemeName>() {
+                Ok(theme_name) => {
+                    self.theme.set(theme_name);
+                    self.sync_syntax_theme();
+                    self.invalidate_workbench_views();
+                    self.status = format!("Theme: {}", self.theme.current_name());
                 }
-            }
+                Err(err) => {
+                    self.status = format!("Theme unavailable: {err}");
+                }
+            },
         }
     }
 
@@ -1928,22 +1812,33 @@ impl App {
     }
 
     fn previous_theme(&mut self) {
-        self.theme.prev();
+        self.theme.previous();
         self.sync_syntax_theme();
         self.invalidate_editor_render();
-        self.status = format!("Theme: {}", self.theme);
+        self.status = format!("Theme: {}", self.theme.current_name());
     }
 
     fn next_theme(&mut self) {
         self.theme.next();
         self.sync_syntax_theme();
         self.invalidate_editor_render();
-        self.status = format!("Theme: {}", self.theme);
+        self.status = format!("Theme: {}", self.theme.current_name());
     }
 
     fn sync_syntax_theme(&self) {
-        if let Some(theme) = crate::agent::resolve_theme_by_name(self.theme.name.slug(), None) {
+        if let Some(theme) =
+            crate::agent::resolve_theme_by_name(self.theme.current_name().slug(), None)
+        {
             crate::agent::set_syntax_theme(theme);
+        }
+    }
+
+    fn refresh_shared_theme(&mut self) {
+        let generation = self.theme.generation();
+        if generation != self.theme_generation {
+            self.theme_generation = generation;
+            self.sync_syntax_theme();
+            self.invalidate_workbench_views();
         }
     }
 
@@ -2021,6 +1916,7 @@ impl App {
     }
 
     fn invalidate_graphs(&mut self) {
+        self.graph_loader_rx = None;
         self.graphs.invalidate();
     }
 
@@ -2380,6 +2276,12 @@ impl App {
                     .block(block);
                 frame.render_widget(paragraph, area);
             }
+            Some(GraphPane::Loading) => {
+                let paragraph = Paragraph::new(format!("Loading {}...", tab.title()))
+                    .style(message_style)
+                    .block(block);
+                frame.render_widget(paragraph, area);
+            }
             Some(GraphPane::Empty) | None => {
                 let paragraph = Paragraph::new(format!(
                     "{} is not loaded. Press Enter to load.",
@@ -2395,7 +2297,7 @@ impl App {
     fn render_bytecode(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let palette = self.theme.palette();
         let focused = self.focus == FocusPane::Editor;
-        let light_theme = self.theme.is_light();
+        let light_theme = self.theme.current().is_light();
         let message_style = self.muted_style();
         let message_block = self.panel_block("Bytecode", focused);
 
@@ -2627,8 +2529,8 @@ impl App {
                 "Open or select a Move source file inside a package with Move.toml.".to_string()
             })?;
         let package_path = relative_path_label(&project_root, &package_root);
-        let context = resolve_context(&project_root, &package_path)
-            .map_err(|error| error.message.to_string())?;
+        let context =
+            resolve_context(&project_root, &package_path).map_err(|error| error.message)?;
         let file = source_hint
             .as_ref()
             .filter(|path| path.is_file() && path.extension() == Some(OsStr::new("move")))
@@ -2641,30 +2543,99 @@ impl App {
     }
 
     fn ensure_graph_tab(&mut self, tab: WorkbenchTab) {
-        if matches!(self.graphs.get(tab), Some(GraphPane::Ready(_))) {
-            self.status = format!("{} already loaded", tab.title());
+        match self.graphs.get(tab) {
+            Some(GraphPane::Ready(_)) => {
+                self.status = format!("{} already loaded", tab.title());
+                return;
+            }
+            Some(GraphPane::Loading) => {
+                self.status = format!("{} is already loading", tab.title());
+                return;
+            }
+            Some(GraphPane::Empty | GraphPane::Message(_)) | None => {}
+        }
+
+        if let Some((loading_tab, _)) = &self.graph_loader_rx {
+            self.status = format!("{} is still loading", loading_tab.title());
             return;
         }
 
-        let result = self.load_graph_document(tab);
-        match result {
-            Ok(document) => {
-                self.status = format!("Loaded {}", document.title);
-                self.graphs.set_ready(tab, document);
-            }
+        let context = match self.current_graph_context() {
+            Ok(context) => context,
             Err(message) => {
+                self.status = format!("{} failed", tab.title());
+                self.graphs.set_message(tab, message);
+                return;
+            }
+        };
+        let (tx, rx) = mpsc::channel();
+        match thread::Builder::new()
+            .name(format!("peregrine-graph-{}", tab.title().replace(' ', "-")))
+            .spawn(move || {
+                let result = Self::load_graph_document(tab, &context);
+                let _ = tx.send(GraphLoadResult { tab, result });
+            }) {
+            Ok(_) => {
+                self.graph_loader_rx = Some((tab, rx));
+                self.status = format!("Loading {}", tab.title());
+                self.graphs.set_loading(tab);
+            }
+            Err(error) => {
+                let message = format!("Could not start {} loader: {error}", tab.title());
                 self.status = format!("{} failed", tab.title());
                 self.graphs.set_message(tab, message);
             }
         }
     }
 
-    fn load_graph_document(&self, tab: WorkbenchTab) -> Result<GraphDocument, String> {
-        let context = self.current_graph_context()?;
+    fn drain_graph_loader(&mut self) {
+        let event = match self.graph_loader_rx.as_ref() {
+            Some((_, rx)) => match rx.try_recv() {
+                Ok(result) => Some(Ok(result)),
+                Err(mpsc::TryRecvError::Empty) => None,
+                Err(mpsc::TryRecvError::Disconnected) => Some(Err(
+                    "Graph loader stopped before returning a result.".to_string(),
+                )),
+            },
+            None => None,
+        };
+
+        match event {
+            Some(Ok(result)) => {
+                self.graph_loader_rx = None;
+                if !matches!(self.graphs.get(result.tab), Some(GraphPane::Loading)) {
+                    return;
+                }
+                match result.result {
+                    Ok(document) => {
+                        self.status = format!("Loaded {}", document.title);
+                        self.graphs.set_ready(result.tab, document);
+                    }
+                    Err(message) => {
+                        self.status = format!("{} failed", result.tab.title());
+                        self.graphs.set_message(result.tab, message);
+                    }
+                }
+            }
+            Some(Err(message)) => {
+                let Some((tab, _)) = self.graph_loader_rx.take() else {
+                    return;
+                };
+                self.status = format!("{} failed", tab.title());
+                self.graphs.set_message(tab, message);
+            }
+            None => {}
+        }
+    }
+
+    fn load_graph_document(
+        tab: WorkbenchTab,
+        context: &WorkbenchGraphContext,
+    ) -> Result<GraphDocument, String> {
         match tab {
-            WorkbenchTab::Cfg => self.load_cfg_graph_document(&context),
-            WorkbenchTab::CallGraph => self.load_call_graph_document(&context),
-            WorkbenchTab::TypeGraph => self.load_type_graph_document(&context),
+            WorkbenchTab::Cfg => Self::load_cfg_graph_document(context),
+            WorkbenchTab::CallGraph => Self::load_call_graph_document(context),
+            WorkbenchTab::TypeGraph => Self::load_type_graph_document(context),
             WorkbenchTab::Code | WorkbenchTab::Bytecode | WorkbenchTab::Chat => {
                 Err(format!("{} is not a graph tab.", tab.title()))
             }
@@ -2691,8 +2662,8 @@ impl App {
                 "Open or select a Move source file inside a package with Move.toml.".to_string()
             })?;
         let package_path = relative_path_label(&project_root, &package_root);
-        let context = resolve_context(&project_root, &package_path)
-            .map_err(|error| error.message.to_string())?;
+        let context =
+            resolve_context(&project_root, &package_path).map_err(|error| error.message)?;
         let file = source_hint
             .as_ref()
             .filter(|path| path.is_file() && path.extension() == Some(OsStr::new("move")))
@@ -2714,7 +2685,6 @@ impl App {
     }
 
     fn load_cfg_graph_document(
-        &self,
         graph_context: &WorkbenchGraphContext,
     ) -> Result<GraphDocument, String> {
         let module = if graph_context.module_filters.len() == 1 {
@@ -2732,7 +2702,6 @@ impl App {
     }
 
     fn load_call_graph_document(
-        &self,
         graph_context: &WorkbenchGraphContext,
     ) -> Result<GraphDocument, String> {
         let args = CallGraphArgs {
@@ -2748,14 +2717,17 @@ impl App {
     }
 
     fn load_type_graph_document(
-        &self,
         graph_context: &WorkbenchGraphContext,
     ) -> Result<GraphDocument, String> {
-        let graph = discover_move_project_graphs_for_package(
+        let response = session::McpToolClient::call_blocking::<_, GraphsResponse>(
             &graph_context.context.project_root,
-            &graph_context.context.package_path,
-        )
-        .type_graph;
+            tool_name::GRAPHS,
+            &McpPackageArgs {
+                project_root: Some(graph_context.context.project_root.display().to_string()),
+                package_path: Some(graph_context.context.package_path.clone()),
+            },
+        )?;
+        let graph = response.graphs.type_graph;
         let graph = filter_type_graph(graph, &graph_context.module_filters);
 
         if graph.nodes.is_empty() {
@@ -2792,7 +2764,7 @@ impl App {
     ) -> RenderedWorkbenchDocument {
         let path = self.editor.path.clone();
         let root = self.explorer.root.clone();
-        let theme = self.theme.name;
+        let theme = self.theme.current_name();
 
         if let Some(cache) = &self.editor_render_cache
             && cache.path == path
@@ -2979,6 +2951,26 @@ impl App {
             _ => None,
         }
     }
+
+    fn redraw_interval(&self) -> Duration {
+        if self.active_tab == WorkbenchTab::Chat {
+            Duration::from_millis(16)
+        } else if self.package_load_running_state().is_some()
+            || self.bytecode_loader_rx.is_some()
+            || self.graph_loader_rx.is_some()
+        {
+            Duration::from_millis(50)
+        } else {
+            Duration::from_millis(250)
+        }
+    }
+}
+
+impl Drop for App {
+    fn drop(&mut self) {
+        self.chat.shutdown();
+        session::McpToolClient::shutdown_all();
+    }
 }
 
 #[derive(Debug, Default)]
@@ -3061,17 +3053,24 @@ impl GraphPanes {
             *pane = GraphPane::Message(message);
         }
     }
+
+    fn set_loading(&mut self, tab: WorkbenchTab) {
+        if let Some(pane) = self.get_mut(tab) {
+            *pane = GraphPane::Loading;
+        }
+    }
 }
 
 #[derive(Debug, Default)]
 enum GraphPane {
     #[default]
     Empty,
+    Loading,
     Ready(GraphDocument),
     Message(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct GraphDocument {
     title: String,
     text: String,
@@ -3169,6 +3168,12 @@ impl GraphDocument {
 struct WorkbenchGraphContext {
     context: CliContext,
     module_filters: Vec<String>,
+}
+
+#[derive(Debug)]
+struct GraphLoadResult {
+    tab: WorkbenchTab,
+    result: Result<GraphDocument, String>,
 }
 
 fn text_graph_output_args() -> GraphOutputArgs {
@@ -3760,63 +3765,42 @@ struct BytecodeSession {
 
 impl BytecodeSession {
     fn load(request: BytecodeRequest) -> Result<Self, String> {
-        let install_dir =
-            tempfile::tempdir().map_err(|error| format!("Could not create build dir: {error}"))?;
-        let mut build_config = move_package_alt_compilation::build_config::BuildConfig::default();
-        build_config.install_dir = Some(install_dir.path().to_path_buf());
-        build_config.silence_warnings = true;
-        let env = move_package_alt_compilation::find_env::<sui_package_alt::SuiFlavor>(
-            &request.context.package_root,
-            &build_config,
-        )
-        .map_err(|error| format!("Could not resolve Move package environment: {error:#}"))?;
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .map_err(|error| format!("Could not create bytecode runtime: {error}"))?;
-        let mut writer = Vec::new();
-        let package = runtime
-            .block_on(async {
-                let root_package = build_config
-                    .package_loader(&request.context.package_root, &env)
-                    .load::<sui_package_alt::SuiFlavor>()
-                    .await?;
-                move_package_alt_compilation::build_plan::BuildPlan::create(
-                    &root_package,
-                    &build_config,
-                )?
-                .compile_with_driver(&mut writer, |compiler| {
-                    let (files, units_result) = compiler.build()?;
-                    match units_result {
-                        Ok((units, _warnings)) => Ok((files, units)),
-                        Err(_diagnostics) => Err(io::Error::new(
-                            io::ErrorKind::Other,
-                            "Compilation failed; fix package errors and try again.",
-                        )
-                        .into()),
-                    }
-                })
-            })
-            .map_err(|error| format!("Could not build package bytecode: {error:#}"))?;
-        let compiled_package_name = package.compiled_package_info.package_name.as_str();
-        let unit = package
-            .get_module_by_name(compiled_package_name, &request.key.module_name)
-            .ok()
+        let build = sui::runners::run_build(&request.context);
+        if build.status != CliStatus::Passed {
+            return Err(build
+                .diagnostics
+                .first()
+                .map(|diagnostic| diagnostic.message.clone())
+                .filter(|message| !message.is_empty())
+                .unwrap_or_else(|| {
+                    "Compilation failed; fix package errors and try again.".to_string()
+                }));
+        }
+        let response = session::McpToolClient::call_blocking::<_, BytecodeViewResponse>(
+            &request.context.project_root,
+            tool_name::BYTECODE_VIEW,
+            &McpPackageArgs {
+                project_root: Some(request.context.project_root.display().to_string()),
+                package_path: Some(request.context.package_path.clone()),
+            },
+        )?;
+        let compiled_package_name = response.bytecode.package_name;
+        let module = response
+            .bytecode
+            .modules
+            .into_iter()
+            .find(|module| !module.is_dependency && module.name == request.key.module_name)
             .ok_or_else(|| {
                 format!(
                     "Built package `{compiled_package_name}` but could not find module `{}`.",
                     request.key.module_name
                 )
             })?;
-        let viewer = OwnedBytecodeView::new(
-            &unit.unit.module,
-            unit.unit.source_map.clone(),
-            &request.key.source_path,
-        )?;
+        let viewer = OwnedBytecodeView::new(&module, &request.key.source_path)?;
 
         Ok(Self {
             key: request.key,
-            package_name: compiled_package_name.to_string(),
+            package_name: compiled_package_name,
             viewer,
             current_line: 0,
             current_column: 0,
@@ -4003,35 +3987,16 @@ impl BytecodeSession {
 #[derive(Debug, Clone)]
 struct OwnedBytecodeView {
     bytecode_lines: Vec<String>,
-    line_map: HashMap<usize, BytecodeLineInfo>,
+    line_map: HashMap<usize, MoveBytecodeSourceSpan>,
     source_code: String,
-    source_map: SourceMap,
 }
 
 impl OwnedBytecodeView {
-    fn new(
-        module: &CompiledModule,
-        source_map: SourceMap,
-        source_path: &Path,
-    ) -> Result<Self, String> {
+    fn new(module: &MoveBytecodeModuleView, source_path: &Path) -> Result<Self, String> {
         let source_code = fs::read_to_string(source_path)
             .map_err(|error| format!("Could not read {}: {error}", source_path.display()))?;
-        if !source_map.check(&source_code) {
-            return Err(format!(
-                "Source map for {} is out of sync with the source file.",
-                source_path.display()
-            ));
-        }
-        let source_mapping = SourceMapping::new(source_map.clone(), module);
-        let options = DisassemblerOptions {
-            print_code: true,
-            print_basic_blocks: true,
-            ..Default::default()
-        };
-        let disassembled = Disassembler::new(source_mapping, options)
-            .disassemble()
-            .map_err(|error| format!("Could not disassemble module bytecode: {error}"))?;
-        let bytecode_lines = disassembled
+        let bytecode_lines = module
+            .disassembly
             .lines()
             .map(|line| line.replace('\t', "    "))
             .collect::<Vec<_>>();
@@ -4041,7 +4006,6 @@ impl OwnedBytecodeView {
             bytecode_lines,
             line_map,
             source_code,
-            source_map,
         })
     }
 
@@ -4095,18 +4059,15 @@ impl OwnedBytecodeView {
                 .map(|line| Line::styled(line.to_string(), base_style))
                 .collect();
         };
-        let Ok(location) = self
-            .source_map
-            .get_code_location(info.function_index, info.code_offset)
-        else {
+        let start = info.start_byte as usize;
+        let end = info.end_byte as usize;
+        let source_len = self.source_code.len();
+        if start > end || end > source_len {
             return vec![Line::styled(
-                "No source location is available for this bytecode offset.",
+                "The bytecode source location is out of sync with the source file.",
                 Style::default().fg(palette.muted).bg(palette.bg),
             )];
-        };
-        let start = location.start() as usize;
-        let end = location.end() as usize;
-        let source_len = self.source_code.len();
+        }
         let context_start = start.saturating_sub(1000);
         let context_end = end.saturating_add(1000).min(source_len);
 
@@ -4132,33 +4093,19 @@ impl OwnedBytecodeView {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct BytecodeLineInfo {
-    function_index: FunctionDefinitionIndex,
-    code_offset: CodeOffset,
-}
-
 fn build_bytecode_line_map(
-    module: &CompiledModule,
+    module: &MoveBytecodeModuleView,
     lines: &[String],
-) -> Result<HashMap<usize, BytecodeLineInfo>, String> {
+) -> Result<HashMap<usize, MoveBytecodeSourceSpan>, String> {
     let offset_regex =
         Regex::new(r"^(\d+):.*").map_err(|error| format!("Invalid offset regex: {error}"))?;
     let function_regex =
         Regex::new(r"^(?:public(?:\(\w+\))?|native|entry)?\s*(\w+)\s*(?:<.*>)?\s*\(.*\).*\{")
             .map_err(|error| format!("Invalid function regex: {error}"))?;
-    let function_def_for_name = module
-        .function_defs()
+    let functions = module
+        .functions
         .iter()
-        .enumerate()
-        .map(|(index, definition)| {
-            (
-                module
-                    .identifier_at(module.function_handle_at(definition.function).name)
-                    .to_string(),
-                FunctionDefinitionIndex(index as u16),
-            )
-        })
+        .map(|function| (function.name.as_str(), function))
         .collect::<HashMap<_, _>>();
     let mut current_function = None;
     let mut line_map = HashMap::new();
@@ -4167,26 +4114,27 @@ fn build_bytecode_line_map(
         if let Some(capture) = function_regex.captures(line) {
             current_function = capture
                 .get(1)
-                .and_then(|name| function_def_for_name.get(name.as_str()).copied());
+                .and_then(|name| functions.get(name.as_str()).copied());
         }
 
-        let Some(function_index) = current_function else {
+        let Some(function) = current_function else {
             continue;
         };
         let Some(offset) = offset_regex
             .captures(line)
             .and_then(|capture| capture.get(1))
-            .and_then(|offset| offset.as_str().parse::<CodeOffset>().ok())
+            .and_then(|offset| offset.as_str().parse::<u16>().ok())
         else {
             continue;
         };
-        line_map.insert(
-            line_index,
-            BytecodeLineInfo {
-                function_index,
-                code_offset: offset,
-            },
-        );
+        if let Some(span) = function
+            .instructions
+            .iter()
+            .find(|instruction| instruction.offset == offset)
+            .and_then(|instruction| instruction.source)
+        {
+            line_map.insert(line_index, span);
+        }
     }
 
     Ok(line_map)
@@ -4205,11 +4153,10 @@ fn append_styled_text(lines: &mut Vec<Vec<Span<'static>>>, text: &str, style: St
         if index > 0 {
             lines.push(Vec::new());
         }
-        if !part.is_empty() {
-            lines
-                .last_mut()
-                .expect("styled text has at least one line")
-                .push(Span::styled(part.to_string(), style));
+        if !part.is_empty()
+            && let Some(line) = lines.last_mut()
+        {
+            line.push(Span::styled(part.to_string(), style));
         }
     }
 }
@@ -4742,38 +4689,30 @@ impl Default for TuiSettings {
 }
 
 pub fn configured_tui_settings() -> TuiSettings {
-    match peregrine_utils_home_dir::find_peregrine_home() {
-        Ok(home) => load_tui_settings_from_home(home.as_path()),
-        Err(_) => TuiSettings::default(),
-    }
+    let Ok(root) = std::env::current_dir() else {
+        return TuiSettings::default();
+    };
+    app::ApplicationRuntime::load(root)
+        .map(|runtime| {
+            let ui = runtime.ui();
+            TuiSettings {
+                editor_mode: ui.editor_mode,
+                theme: ui.theme,
+            }
+        })
+        .unwrap_or_default()
 }
 
 pub fn load_tui_settings_from_home(home: &Path) -> TuiSettings {
-    let config_path = home.join(CONFIG_TOML_FILE);
-    let Ok(contents) = fs::read_to_string(config_path) else {
-        return TuiSettings::default();
-    };
-    let Ok(config) = toml::from_str::<ConfigToml>(&contents) else {
-        return TuiSettings::default();
-    };
-
-    let Some(tui) = config.tui.as_ref() else {
-        return TuiSettings::default();
-    };
-
-    let editor_mode = if tui.vim_mode_default {
-        EditorMode::Vim
-    } else {
-        EditorMode::Standard
-    };
-    let theme = tui
-        .theme
-        .as_deref()
-        .and_then(|name| name.parse::<ThemeName>().ok())
-        .map(Theme::new)
-        .unwrap_or_default();
-
-    TuiSettings { editor_mode, theme }
+    app::ApplicationRuntime::load_from_home(home.to_path_buf(), home.to_path_buf())
+        .map(|runtime| {
+            let ui = runtime.ui();
+            TuiSettings {
+                editor_mode: ui.editor_mode,
+                theme: ui.theme,
+            }
+        })
+        .unwrap_or_default()
 }
 
 pub fn configured_editor_mode() -> EditorMode {
@@ -5503,6 +5442,7 @@ impl CommandInput {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use peregrine_config::CONFIG_TOML_FILE;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::crossterm::event::KeyModifiers;
@@ -5574,51 +5514,10 @@ mod tests {
     }
 
     #[test]
-    fn no_args_dispatch_to_workbench() {
-        assert_eq!(
-            classify_top_level_args(Vec::new()),
-            TopLevelDispatch::Workbench(None)
-        );
-    }
-
-    #[test]
-    fn agent_subcommand_dispatches_to_agent_parser() {
-        assert_eq!(
-            classify_top_level_args(vec![
-                OsString::from("agent"),
-                OsString::from("--model"),
-                OsString::from("gpt-5"),
-            ]),
-            TopLevelDispatch::Agent(vec![OsString::from("--model"), OsString::from("gpt-5")])
-        );
-    }
-
-    #[test]
-    fn workflow_command_dispatches_to_cli() {
-        assert_eq!(
-            classify_top_level_args(vec![OsString::from("build")]),
-            TopLevelDispatch::CliOrHelper(vec![OsString::from("build")])
-        );
-    }
-
-    #[test]
-    fn single_directory_arg_dispatches_to_workbench() {
-        assert_eq!(
-            classify_top_level_args(vec![OsString::from("/tmp/peregrine-project")]),
-            TopLevelDispatch::Workbench(Some(PathBuf::from("/tmp/peregrine-project")))
-        );
-    }
-
-    #[test]
     fn helper_args_bypass_mode_dispatch() {
-        assert_eq!(
-            classify_top_level_args(vec![OsString::from(
-                helper_args::BYTECODE_VIEWER_HELPER_ARG
-            )]),
-            TopLevelDispatch::CliOrHelper(vec![OsString::from(
-                helper_args::BYTECODE_VIEWER_HELPER_ARG
-            )])
-        );
+        assert!(is_helper_arg(&OsString::from(
+            helper_args::BYTECODE_VIEWER_HELPER_ARG
+        )));
     }
 
     #[test]
@@ -6225,11 +6124,9 @@ mod tests {
         let temp = tempfile::tempdir().expect("temp dir");
         let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
 
-        app.apply_chat_action(agent::workbench_chat::WorkbenchChatAction::ThemeSelected(
-            "zero-day".to_string(),
-        ));
+        app.apply_chat_action(chat::ChatAction::ThemeSelected("zero-day".to_string()));
 
-        assert_eq!(app.theme.name, ThemeName::ZeroDay);
+        assert_eq!(app.theme.current_name(), ThemeName::ZeroDay);
         assert_eq!(app.status, "Theme: Zero Day");
     }
 
@@ -6519,6 +6416,29 @@ mod tests {
     }
 
     #[test]
+    fn graph_loader_applies_background_result() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+        let expected = GraphDocument::new("type graph", "vault::Wallet".to_string());
+        let (tx, rx) = mpsc::channel();
+        app.graphs.set_loading(WorkbenchTab::TypeGraph);
+        app.graph_loader_rx = Some((WorkbenchTab::TypeGraph, rx));
+        tx.send(GraphLoadResult {
+            tab: WorkbenchTab::TypeGraph,
+            result: Ok(expected.clone()),
+        })
+        .expect("graph result");
+
+        app.drain_graph_loader();
+
+        let Some(GraphPane::Ready(document)) = app.graphs.get(WorkbenchTab::TypeGraph) else {
+            panic!("expected ready graph document");
+        };
+        assert_eq!(document, &expected);
+        assert!(app.graph_loader_rx.is_none());
+    }
+
+    #[test]
     fn graph_tab_ready_document_scrolls_vertically_and_horizontally() {
         let temp = tempfile::tempdir().expect("temp dir");
         let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
@@ -6624,13 +6544,13 @@ mod tests {
         let temp = tempfile::tempdir().expect("temp dir");
         let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
 
-        let original = app.theme.name;
+        let original = app.theme.current_name();
         workbench_nav(&mut app, KeyCode::Char(']'));
-        assert_eq!(app.theme.name, original.next());
+        assert_eq!(app.theme.current_name(), original.next());
         assert!(app.status.contains("Theme:"));
 
         workbench_nav(&mut app, KeyCode::Char('['));
-        assert_eq!(app.theme.name, original);
+        assert_eq!(app.theme.current_name(), original);
     }
 
     #[test]

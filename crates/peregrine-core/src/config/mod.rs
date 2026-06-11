@@ -81,11 +81,11 @@ use peregrine_config::types::TuiNotificationSettings;
 use peregrine_config::types::TuiPetAnchor;
 use peregrine_config::types::UriBasedFileOpener;
 use peregrine_config::types::WindowsSandboxModeToml;
-use peregrine_memories_read::memory_root;
-use peregrine_model_provider::add_peregrine_builtin_model_providers;
-use peregrine_security_tools::{
+use peregrine_mcp_protocol::{
     SuiAdapterSettings, SuiAdapterSource, SuiSecurityToolsConfig, SuiSecurityToolsMode,
 };
+use peregrine_memories_read::memory_root;
+use peregrine_model_provider::add_peregrine_builtin_model_providers;
 use peregrine_types::config_types::AltScreenMode;
 use peregrine_types::config_types::AutoCompactTokenLimitScope;
 use peregrine_types::config_types::ForcedLoginMethod;

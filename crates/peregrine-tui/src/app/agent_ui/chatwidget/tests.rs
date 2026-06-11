@@ -183,7 +183,7 @@ pub(super) use tokio::sync::mpsc::unbounded_channel;
 pub(super) use toml::Value as TomlValue;
 
 pub(super) fn chatwidget_snapshot_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/agent/chatwidget/snapshots")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/app/agent_ui/chatwidget/snapshots")
 }
 
 macro_rules! assert_chatwidget_snapshot {

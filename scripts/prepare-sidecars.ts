@@ -7,19 +7,28 @@ const release = process.argv.includes("--release");
 const profile = release ? "release" : "debug";
 const extension = process.platform === "win32" ? ".exe" : "";
 const targetTriple = resolveTargetTriple();
-const source = join(root, "target", profile, `peregrine-helper${extension}`);
 const destinationDirectory = join(root, "src-tauri", "binaries");
-const destination = join(destinationDirectory, `peregrine-helper-${targetTriple}${extension}`);
+const sidecars = ["peregrine-helper", "peregrine-mcp-server"];
 
-run("cargo", ["build", "-p", "peregrine-helper", ...(release ? ["--release"] : [])]);
-
-if (!existsSync(source)) {
-  throw new Error(`Expected helper binary at ${source}`);
+for (const sidecar of sidecars) {
+  run("cargo", ["build", "-p", sidecar, ...(release ? ["--release"] : [])]);
 }
 
 mkdirSync(destinationDirectory, { recursive: true });
-copyFileSync(source, destination);
-console.log(`Prepared ${destination}`);
+for (const sidecar of sidecars) {
+  const source = join(root, "target", profile, `${sidecar}${extension}`);
+  const destination = join(
+    destinationDirectory,
+    `${sidecar}-${targetTriple}${extension}`,
+  );
+
+  if (!existsSync(source)) {
+    throw new Error(`Expected sidecar binary at ${source}`);
+  }
+
+  copyFileSync(source, destination);
+  console.log(`Prepared ${destination}`);
+}
 
 function resolveTargetTriple() {
   const hostTuple = spawnSync("rustc", ["--print", "host-tuple"], {

@@ -393,6 +393,20 @@ pub struct AppExitInfo {
     pub exit_reason: ExitReason,
 }
 
+pub(crate) struct AgentRunResult {
+    pub(crate) exit_info: AppExitInfo,
+    pub(crate) app_server: Option<AppServerSession>,
+}
+
+impl AgentRunResult {
+    pub(crate) fn finished(exit_info: AppExitInfo) -> Self {
+        Self {
+            exit_info,
+            app_server: None,
+        }
+    }
+}
+
 impl AppExitInfo {
     pub fn fatal(message: impl Into<String>) -> Self {
         Self {
@@ -726,7 +740,7 @@ impl App {
         state_db: Option<StateDbHandle>,
         environment_manager: Arc<EnvironmentManager>,
         startup_hooks_browser: Option<HooksListEntry>,
-    ) -> Result<AppExitInfo> {
+    ) -> Result<AgentRunResult> {
         use tokio_stream::StreamExt;
         let startup_started_at = Instant::now();
         let (app_event_tx, mut app_event_rx) = unbounded_channel();
@@ -763,13 +777,13 @@ impl App {
                         tracing::warn!("app-server shutdown failed: {err}");
                     })
                     .ok();
-                return Ok(AppExitInfo {
+                return Ok(AgentRunResult::finished(AppExitInfo {
                     token_usage: TokenUsage::default(),
                     thread_id: None,
                     thread_name: None,
                     update_action: None,
                     exit_reason: ExitReason::UserRequested,
-                });
+                }));
             }
         };
         let bootstrap_started_at = Instant::now();
@@ -798,7 +812,7 @@ impl App {
                     tracing::warn!("app-server shutdown failed: {err}");
                 })
                 .ok();
-            return Ok(exit_info);
+            return Ok(AgentRunResult::finished(exit_info));
         }
         if let Some(updated_model) = config.model.clone() {
             model = updated_model;
@@ -1185,9 +1199,15 @@ See the Peregrine keymap documentation for supported actions and examples."
                 }
             }
         };
-        if let Err(err) = app_server.shutdown().await {
-            tracing::warn!(error = %err, "failed to shut down embedded app server");
-        }
+        let handoff_app_server = matches!(&exit_reason_result, Ok(ExitReason::SwitchToWorkbench));
+        let app_server = if handoff_app_server {
+            Some(app_server)
+        } else {
+            if let Err(err) = app_server.shutdown().await {
+                tracing::warn!(error = %err, "failed to shut down embedded app server");
+            }
+            None
+        };
         let clear_pet_result = tui.clear_ambient_pet_image();
         let clear_result = tui.terminal.clear();
         let exit_reason = match exit_reason_result {
@@ -1211,12 +1231,15 @@ See the Peregrine keymap documentation for supported actions and examples."
             app.chat_widget.thread_name(),
             app.chat_widget.rollout_path().as_deref(),
         );
-        Ok(AppExitInfo {
-            token_usage: app.token_usage(),
-            thread_id: resumable_thread.as_ref().map(|thread| thread.thread_id),
-            thread_name: resumable_thread.and_then(|thread| thread.thread_name),
-            update_action: app.pending_update_action,
-            exit_reason,
+        Ok(AgentRunResult {
+            exit_info: AppExitInfo {
+                token_usage: app.token_usage(),
+                thread_id: resumable_thread.as_ref().map(|thread| thread.thread_id),
+                thread_name: resumable_thread.and_then(|thread| thread.thread_name),
+                update_action: app.pending_update_action,
+                exit_reason,
+            },
+            app_server,
         })
     }
 

@@ -1,4 +1,4 @@
-use crate::{MovePackageContext, SecurityToolsError, SecurityToolsResult};
+use super::{MovePackageContext, SecurityToolsError, SecurityToolsResult};
 use peregrine_adapters::sui::{
     SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiCommandKind, SuiExecutionTarget,
     SuiFormalVerificationOptions,
@@ -8,7 +8,7 @@ use peregrine_dynamic_analysis::sui::formal_verification::{
 };
 use peregrine_helper_protocol::{
     BUNDLED_SUI_HELPER_ARG, FORMAL_VERIFICATION_HELPER_ARG, MOVY_FUZZ_HELPER_ARG,
-    resolve_helper_executable,
+    resolve_external_helper_executable,
 };
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -116,6 +116,47 @@ pub fn build_sui_package_command(
     }
 }
 
+pub fn build_sui_move_new_command(
+    project_root: &Path,
+    adapter_settings: &SuiAdapterSettings,
+    package_name: &str,
+) -> SecurityToolsResult<SecurityCommand> {
+    let adapter = SuiAdapter::new(adapter_settings.clone(), SuiAdapterEnvironment::new());
+    let command = adapter.move_new_command(package_name)?;
+
+    match &command.execution {
+        SuiExecutionTarget::Bundled => {
+            let helper = helper_executable()?;
+            let mut argv = vec![
+                helper.to_string_lossy().into_owned(),
+                BUNDLED_SUI_HELPER_ARG.to_string(),
+            ];
+            argv.extend(
+                command
+                    .bundled_args()
+                    .into_iter()
+                    .map(|arg| arg.to_string_lossy().into_owned()),
+            );
+            Ok(SecurityCommand {
+                command: argv,
+                cwd: project_root.to_path_buf(),
+                display: command.display,
+                execution: SecurityCommandExecution::BundledSui,
+            })
+        }
+        SuiExecutionTarget::System { executable } => {
+            let mut argv = vec![executable.to_string_lossy().into_owned()];
+            argv.extend(command.args);
+            Ok(SecurityCommand {
+                command: argv,
+                cwd: project_root.to_path_buf(),
+                display: command.display,
+                execution: SecurityCommandExecution::SystemSui,
+            })
+        }
+    }
+}
+
 pub fn build_movy_fuzz_command(
     ctx: &MovePackageContext,
     time_limit_seconds: u64,
@@ -190,7 +231,13 @@ pub fn build_formal_verify_command(
 }
 
 fn helper_executable() -> SecurityToolsResult<PathBuf> {
-    resolve_helper_executable().map_err(SecurityToolsError::HelperExecutable)
+    resolve_external_helper_executable().ok_or_else(|| {
+        SecurityToolsError::HelperExecutable(
+            "Peregrine helper is unavailable; install peregrine-helper beside \
+             peregrine-mcp-server or set PEREGRINE_HELPER"
+                .to_string(),
+        )
+    })
 }
 
 #[allow(dead_code)]
@@ -198,8 +245,9 @@ fn _assert_path_send_sync(_: &Path) {}
 
 #[cfg(test)]
 mod tests {
+    use super::SecurityCommandExecution;
     use super::*;
-    use crate::{SecurityCommandExecution, SuiAdapterSource};
+    use peregrine_adapters::sui::SuiAdapterSource;
 
     #[test]
     fn security_sui_command_rejects_publish() {

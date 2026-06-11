@@ -22,7 +22,6 @@ mod request_plugin_install;
 pub(crate) mod request_plugin_install_spec;
 mod request_user_input;
 pub(crate) mod request_user_input_spec;
-pub(crate) mod security;
 mod shell;
 pub(crate) mod shell_spec;
 mod test_sync;
@@ -66,10 +65,6 @@ pub use plan::PlanHandler;
 pub use request_permissions::RequestPermissionsHandler;
 pub use request_plugin_install::RequestPluginInstallHandler;
 pub use request_user_input::RequestUserInputHandler;
-pub(crate) use security::{
-    ReadToolHandler, SecurityFormalVerifyHandler, SecurityMovyFuzzHandler, SecurityReadToolKind,
-    SecuritySuiCommandHandler,
-};
 pub use shell::ShellCommandHandler;
 pub(crate) use shell::ShellCommandHandlerOptions;
 pub use test_sync::TestSyncHandler;

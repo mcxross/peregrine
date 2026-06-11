@@ -26,33 +26,35 @@ use peregrine_config::{CloudRequirementsLoader, LoaderOverrides};
 use peregrine_types::ThreadId;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Position, Rect};
-use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
-use super::AppServerTarget;
-use super::app_command::AppCommand;
-use super::app_event::{
+use crate::agent::AppServerTarget;
+use crate::agent::app_command::AppCommand;
+use crate::agent::app_event::{
     AppEvent, HistoryLookupResponse, RateLimitRefreshOrigin, ThreadGoalSetMode,
 };
-use super::app_event_sender::AppEventSender;
-use super::app_server_approval_conversions::granted_permission_profile_from_request;
-use super::app_server_session::{
+use crate::agent::app_event_sender::AppEventSender;
+use crate::agent::app_server_approval_conversions::granted_permission_profile_from_request;
+use crate::agent::app_server_session::{
     AppServerBootstrap, AppServerSession, AppServerStartedThread, TurnPermissionsOverride,
     app_server_rate_limit_snapshots,
 };
-use super::bottom_pane::popup_consts::standard_popup_hint_line;
-use super::bottom_pane::{SelectionAction, SelectionItem, SelectionViewParams};
-use super::chatwidget::{ChatWidget, ChatWidgetInit, ReplayKind, create_initial_user_message};
-use super::goal_display::{goal_status_label, goal_usage_summary};
-use super::history_cell::HistoryCell;
-use super::legacy_core::config::{Config, ConfigBuilder, ConfigOverrides};
-use super::model_catalog::ModelCatalog;
-use super::resume_source_kinds;
-use super::status::StatusAccountDisplay;
-use super::tui::FrameRequester;
+use crate::agent::bottom_pane::popup_consts::standard_popup_hint_line;
+use crate::agent::bottom_pane::{SelectionAction, SelectionItem, SelectionViewParams};
+use crate::agent::chatwidget::{
+    ChatWidget, ChatWidgetInit, ReplayKind, create_initial_user_message,
+};
+use crate::agent::goal_display::{goal_status_label, goal_usage_summary};
+use crate::agent::history_cell::HistoryCell;
+use crate::agent::legacy_core::config::{Config, ConfigBuilder, ConfigOverrides};
+use crate::agent::model_catalog::ModelCatalog;
+use crate::agent::resume_source_kinds;
+use crate::agent::status::StatusAccountDisplay;
+use crate::agent::tui::FrameRequester;
 use uuid::Uuid;
 
 const SESSION_PAGE_SIZE: u32 = 25;
@@ -64,7 +66,7 @@ const EPHEMERAL_THREAD_GOAL_ERROR_MESSAGE: &str = concat!(
 );
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum WorkbenchChatAction {
+pub(crate) enum ChatAction {
     None,
     FocusCode,
     Quit,
@@ -113,7 +115,7 @@ struct PendingRequests {
 }
 
 struct PendingUserInputRequest {
-    item_id: String,
+    _item_id: String,
     request_id: AppServerRequestId,
 }
 
@@ -124,6 +126,9 @@ struct PendingMcpRequest {
 
 enum WorkerCommand {
     Shutdown,
+    Suspend {
+        response_tx: std::sync::mpsc::SyncSender<AppServerSession>,
+    },
     StartFresh {
         initial_text: Option<String>,
         replace_widget: bool,
@@ -182,6 +187,9 @@ enum WorkerEvent {
         command_tx: UnboundedSender<WorkerCommand>,
         context: ChatContext,
         sessions: Vec<SessionRow>,
+    },
+    ConnectionResumed {
+        command_tx: UnboundedSender<WorkerCommand>,
     },
     StartupFailed(String),
     Stopped(String),
@@ -243,7 +251,9 @@ enum WorkerEvent {
     },
 }
 
-pub(crate) struct WorkbenchChatHost {
+pub(crate) struct ChatController {
+    initial_config: Option<Config>,
+    application_runtime: Option<crate::app::ApplicationRuntime>,
     runtime: Option<tokio::runtime::Runtime>,
     mode: HostMode,
     status: String,
@@ -258,13 +268,16 @@ pub(crate) struct WorkbenchChatHost {
     active_thread_id: Option<ThreadId>,
     active_turn_id: Option<String>,
     session_request_pending: bool,
+    handoff_thread_id: Option<ThreadId>,
     pending_requests: PendingRequests,
     transcript_scroll: usize,
 }
 
-impl Default for WorkbenchChatHost {
+impl Default for ChatController {
     fn default() -> Self {
         Self {
+            initial_config: None,
+            application_runtime: None,
             runtime: None,
             mode: HostMode::Idle,
             status: "chat: idle".to_string(),
@@ -279,18 +292,42 @@ impl Default for WorkbenchChatHost {
             active_thread_id: None,
             active_turn_id: None,
             session_request_pending: false,
+            handoff_thread_id: None,
             pending_requests: PendingRequests::default(),
             transcript_scroll: 0,
         }
     }
 }
 
-impl WorkbenchChatHost {
+impl ChatController {
+    pub(crate) fn new(config: Config, application_runtime: crate::app::ApplicationRuntime) -> Self {
+        let mut controller = Self::default();
+        controller.initial_config = Some(config);
+        controller.application_runtime = Some(application_runtime);
+        controller
+    }
+
+    pub(crate) fn active_thread_id(&self) -> Option<ThreadId> {
+        self.active_thread_id
+    }
+
+    pub(crate) fn adopt_thread(&mut self, root: &Path, thread_id: ThreadId) {
+        if self.active_thread_id.as_ref() == Some(&thread_id) {
+            return;
+        }
+        self.handoff_thread_id = Some(thread_id);
+        self.ensure_started(root);
+        if self.worker_tx.is_some() {
+            self.handoff_thread_id = None;
+            let _ = self.resume_session(thread_id);
+        }
+    }
+
     pub(crate) fn status(&self) -> &str {
         &self.status
     }
 
-    pub(crate) fn tick(&mut self, root: &Path) -> WorkbenchChatAction {
+    pub(crate) fn tick(&mut self, root: &Path) -> ChatAction {
         self.ensure_started(root);
         let mut action = self.drain_worker_events();
         if !matches!(self.mode, HostMode::Chat | HostMode::Sessions) {
@@ -315,18 +352,18 @@ impl WorkbenchChatHost {
         action
     }
 
-    pub(crate) fn handle_key(&mut self, root: &Path, key: KeyEvent) -> WorkbenchChatAction {
+    pub(crate) fn handle_key(&mut self, root: &Path, key: KeyEvent) -> ChatAction {
         self.ensure_started(root);
-        let mut action = WorkbenchChatAction::None;
+        let mut action = ChatAction::None;
         if matches!(self.mode, HostMode::Sessions) {
             match session_list_key_action(key) {
                 SessionListKeyAction::Previous => {
                     self.select_previous_session();
-                    return WorkbenchChatAction::None;
+                    return ChatAction::None;
                 }
                 SessionListKeyAction::Next => {
                     self.select_next_session();
-                    return WorkbenchChatAction::None;
+                    return ChatAction::None;
                 }
                 SessionListKeyAction::ResumeSelected => {
                     return self.resume_selected_session();
@@ -334,7 +371,7 @@ impl WorkbenchChatHost {
                 SessionListKeyAction::StartFresh => {
                     self.mode = HostMode::Chat;
                     self.status = "chat: new session".to_string();
-                    return WorkbenchChatAction::None;
+                    return ChatAction::None;
                 }
                 SessionListKeyAction::PassToComposer => {
                     self.mode = HostMode::Chat;
@@ -357,7 +394,7 @@ impl WorkbenchChatHost {
         combine_action(action, self.drain_app_events())
     }
 
-    pub(crate) fn handle_paste(&mut self, root: &Path, text: String) -> WorkbenchChatAction {
+    pub(crate) fn handle_paste(&mut self, root: &Path, text: String) -> ChatAction {
         self.ensure_started(root);
         if matches!(self.mode, HostMode::Sessions) {
             self.mode = HostMode::Chat;
@@ -417,13 +454,39 @@ impl WorkbenchChatHost {
         runtime.shutdown_timeout(Duration::from_millis(250));
     }
 
+    pub(crate) fn suspend(&mut self) -> std::io::Result<()> {
+        let Some(runtime) = self.runtime.take() else {
+            return Ok(());
+        };
+        let Some(worker_tx) = self.worker_tx.take() else {
+            runtime.shutdown_timeout(Duration::from_millis(250));
+            return Ok(());
+        };
+        let (response_tx, response_rx) = std::sync::mpsc::sync_channel(1);
+        worker_tx
+            .send(WorkerCommand::Suspend { response_tx })
+            .map_err(|_| std::io::Error::other("workbench chat worker is not running"))?;
+        let app_server = response_rx
+            .recv_timeout(Duration::from_secs(2))
+            .map_err(|_| std::io::Error::other("timed out suspending workbench chat"))?;
+        runtime.shutdown_timeout(Duration::from_millis(250));
+        self.worker_event_rx = None;
+        if let Some(application_runtime) = &self.application_runtime {
+            application_runtime.store_app_server(app_server);
+        }
+        Ok(())
+    }
+
     fn ensure_started(&mut self, root: &Path) {
-        if !matches!(self.mode, HostMode::Idle | HostMode::Error) {
+        if self.runtime.is_some() {
             return;
         }
 
-        self.mode = HostMode::Loading;
-        self.status = "chat: loading sessions".to_string();
+        let preserve_ui_state = self.context.is_some();
+        if !preserve_ui_state {
+            self.mode = HostMode::Loading;
+            self.status = "chat: loading sessions".to_string();
+        }
         let runtime = match crate::build_agent_runtime() {
             Ok(runtime) => runtime,
             Err(err) => {
@@ -433,13 +496,31 @@ impl WorkbenchChatHost {
             }
         };
         let (worker_event_tx, worker_event_rx) = unbounded_channel();
-        let (app_event_tx, app_event_rx) = unbounded_channel();
-        let app_event_tx = AppEventSender::new(app_event_tx);
+        let app_event_tx = match self.context.as_ref() {
+            Some(context) => context.app_event_tx.clone(),
+            None => {
+                let (app_event_tx, app_event_rx) = unbounded_channel();
+                self.app_event_rx = Some(app_event_rx);
+                AppEventSender::new(app_event_tx)
+            }
+        };
         let root = root.to_path_buf();
+        let initial_config = self.initial_config.clone();
+        let app_server = self
+            .application_runtime
+            .as_ref()
+            .and_then(crate::app::ApplicationRuntime::take_app_server);
         runtime.spawn(async move {
-            start_worker(root, app_event_tx, worker_event_tx).await;
+            start_worker(
+                root,
+                initial_config,
+                app_server,
+                preserve_ui_state,
+                app_event_tx,
+                worker_event_tx,
+            )
+            .await;
         });
-        self.app_event_rx = Some(app_event_rx);
         self.worker_event_rx = Some(worker_event_rx);
         self.runtime = Some(runtime);
     }
@@ -620,18 +701,18 @@ impl WorkbenchChatHost {
         self.selected_session = (self.selected_session + 1).min(self.sessions.len() - 1);
     }
 
-    fn resume_selected_session(&mut self) -> WorkbenchChatAction {
+    fn resume_selected_session(&mut self) -> ChatAction {
         let Some(session) = self.sessions.get(self.selected_session).cloned() else {
             self.mode = HostMode::Chat;
             self.status = "chat: new session".to_string();
-            return WorkbenchChatAction::None;
+            return ChatAction::None;
         };
         self.resume_session(session.thread_id)
     }
 
-    fn resume_session(&mut self, thread_id: ThreadId) -> WorkbenchChatAction {
+    fn resume_session(&mut self, thread_id: ThreadId) -> ChatAction {
         if self.session_request_pending {
-            return WorkbenchChatAction::None;
+            return ChatAction::None;
         }
         self.status = "chat: resuming session".to_string();
         if self.send_worker(WorkerCommand::Resume { thread_id }) {
@@ -639,16 +720,16 @@ impl WorkbenchChatHost {
         } else {
             self.status = "chat: worker is not ready".to_string();
         }
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
     fn start_fresh_session(
         &mut self,
         initial_text: Option<String>,
         replace_widget: bool,
-    ) -> WorkbenchChatAction {
+    ) -> ChatAction {
         if self.session_request_pending {
-            return WorkbenchChatAction::None;
+            return ChatAction::None;
         }
         self.status = "chat: starting session".to_string();
         if self.send_worker(WorkerCommand::StartFresh {
@@ -659,7 +740,7 @@ impl WorkbenchChatHost {
         } else {
             self.status = "chat: worker is not ready".to_string();
         }
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
     fn attach_thread(
@@ -721,7 +802,18 @@ impl WorkbenchChatHost {
         chat.set_session_header_directory_visible(false);
         chat.set_status_line_visible(false);
         chat.set_queue_submissions_until_session_configured(true);
+        chat.set_mcp_startup_expected_servers(enabled_mcp_server_names(&context.config));
         Some(chat)
+    }
+
+    fn refresh_mcp_startup_expected_servers(&mut self) {
+        let Some(context) = self.context.as_ref() else {
+            return;
+        };
+        let Some(chat) = self.chat_widget.as_mut() else {
+            return;
+        };
+        chat.set_mcp_startup_expected_servers(enabled_mcp_server_names(&context.config));
     }
 
     fn send_worker(&self, command: WorkerCommand) -> bool {
@@ -730,8 +822,8 @@ impl WorkbenchChatHost {
             .is_some_and(|worker_tx| worker_tx.send(command).is_ok())
     }
 
-    fn drain_worker_events(&mut self) -> WorkbenchChatAction {
-        let mut action = WorkbenchChatAction::None;
+    fn drain_worker_events(&mut self) -> ChatAction {
+        let mut action = ChatAction::None;
         for _ in 0..APP_SERVER_EVENT_DRAIN_LIMIT {
             let event = match self
                 .worker_event_rx
@@ -746,7 +838,7 @@ impl WorkbenchChatHost {
         action
     }
 
-    fn handle_worker_event(&mut self, event: WorkerEvent) -> WorkbenchChatAction {
+    fn handle_worker_event(&mut self, event: WorkerEvent) -> ChatAction {
         match event {
             WorkerEvent::Started {
                 command_tx,
@@ -771,13 +863,24 @@ impl WorkbenchChatHost {
                 } else {
                     format!("chat: {} previous sessions", self.sessions.len())
                 };
+                if let Some(thread_id) = self.handoff_thread_id.take() {
+                    return self.resume_session(thread_id);
+                }
+                self.drain_app_events()
+            }
+            WorkerEvent::ConnectionResumed { command_tx } => {
+                self.worker_tx = Some(command_tx);
+                self.status = "chat: ready".to_string();
+                if let Some(thread_id) = self.handoff_thread_id.take() {
+                    return self.resume_session(thread_id);
+                }
                 self.drain_app_events()
             }
             WorkerEvent::StartupFailed(message) => {
                 self.session_request_pending = false;
                 self.mode = HostMode::Error;
                 self.status = format!("chat: {message}");
-                WorkbenchChatAction::None
+                ChatAction::None
             }
             WorkerEvent::Stopped(message) => {
                 self.session_request_pending = false;
@@ -992,12 +1095,14 @@ impl WorkbenchChatHost {
         }
     }
 
-    fn handle_app_server_event(&mut self, event: AppServerEvent) -> WorkbenchChatAction {
+    fn handle_app_server_event(&mut self, event: AppServerEvent) -> ChatAction {
         match event {
             AppServerEvent::Lagged { skipped } => {
                 self.status = format!("chat: app-server lagged by {skipped} events");
+                self.refresh_mcp_startup_expected_servers();
                 if let Some(chat) = self.chat_widget.as_mut() {
                     chat.add_warning_message(self.status.clone());
+                    chat.finish_mcp_startup_after_lag();
                 }
                 self.drain_app_events()
             }
@@ -1021,25 +1126,31 @@ impl WorkbenchChatHost {
 
     fn handle_server_notification(&mut self, notification: ServerNotification) {
         match &notification {
-            ServerNotification::TurnStarted(notification) => {
-                if parsed_thread_id(&notification.thread_id) == self.active_thread_id {
-                    self.active_turn_id = Some(notification.turn.id.clone());
-                    self.status = "chat: turn running".to_string();
-                }
+            ServerNotification::TurnStarted(notification)
+                if parsed_thread_id(&notification.thread_id) == self.active_thread_id =>
+            {
+                self.active_turn_id = Some(notification.turn.id.clone());
+                self.status = "chat: turn running".to_string();
             }
-            ServerNotification::TurnCompleted(notification) => {
-                if parsed_thread_id(&notification.thread_id) == self.active_thread_id {
-                    self.active_turn_id = None;
-                    self.status = "chat: ready".to_string();
-                }
+            ServerNotification::TurnCompleted(notification)
+                if parsed_thread_id(&notification.thread_id) == self.active_thread_id =>
+            {
+                self.active_turn_id = None;
+                self.status = "chat: ready".to_string();
             }
-            ServerNotification::ThreadClosed(notification) => {
-                if parsed_thread_id(&notification.thread_id) == self.active_thread_id {
-                    self.active_turn_id = None;
-                    self.status = "chat: thread closed".to_string();
-                }
+            ServerNotification::ThreadClosed(notification)
+                if parsed_thread_id(&notification.thread_id) == self.active_thread_id =>
+            {
+                self.active_turn_id = None;
+                self.status = "chat: thread closed".to_string();
             }
+            ServerNotification::TurnStarted(_)
+            | ServerNotification::TurnCompleted(_)
+            | ServerNotification::ThreadClosed(_) => {}
             ServerNotification::ServerRequestResolved(_) => {}
+            ServerNotification::McpServerStatusUpdated(_) => {
+                self.refresh_mcp_startup_expected_servers();
+            }
             ServerNotification::AccountRateLimitsUpdated(notification) => {
                 if let Some(chat) = self.chat_widget.as_mut() {
                     chat.on_rate_limit_snapshot(Some(notification.rate_limits.clone()));
@@ -1077,8 +1188,8 @@ impl WorkbenchChatHost {
         }
     }
 
-    fn drain_app_events(&mut self) -> WorkbenchChatAction {
-        let mut action = WorkbenchChatAction::None;
+    fn drain_app_events(&mut self) -> ChatAction {
+        let mut action = ChatAction::None;
         for _ in 0..APP_EVENT_DRAIN_LIMIT {
             let event = match self.app_event_rx.as_mut().and_then(|rx| rx.try_recv().ok()) {
                 Some(event) => event,
@@ -1089,20 +1200,20 @@ impl WorkbenchChatHost {
         action
     }
 
-    fn handle_app_event(&mut self, event: AppEvent) -> WorkbenchChatAction {
+    fn handle_app_event(&mut self, event: AppEvent) -> ChatAction {
         match event {
             AppEvent::InsertHistoryCell(cell) => {
                 let cell: Arc<dyn HistoryCell> = cell.into();
                 self.history_cells.push(cell);
                 self.transcript_scroll = 0;
-                WorkbenchChatAction::None
+                ChatAction::None
             }
             AppEvent::PeregrineOp(op) => self.submit_active_thread_op(op),
             AppEvent::SubmitThreadOp { thread_id, op } => self.submit_thread_op(thread_id, op),
             AppEvent::OpenResumePicker => {
                 self.reload_sessions();
                 self.mode = HostMode::Sessions;
-                WorkbenchChatAction::None
+                ChatAction::None
             }
             AppEvent::ResumeSessionByIdOrName(id_or_name) => {
                 self.resume_session_by_id_or_name(id_or_name)
@@ -1115,8 +1226,8 @@ impl WorkbenchChatHost {
                 self.history_cells.clear();
                 self.start_fresh_session(Some(text), true)
             }
-            AppEvent::Exit(_) => WorkbenchChatAction::Quit,
-            AppEvent::SwitchToWorkbench => WorkbenchChatAction::FocusCode,
+            AppEvent::Exit(_) => ChatAction::Quit,
+            AppEvent::SwitchToWorkbench => ChatAction::FocusCode,
             AppEvent::DiffResult(text) => {
                 if let Some(chat) = self.chat_widget.as_mut() {
                     chat.on_diff_complete();
@@ -1138,7 +1249,7 @@ impl WorkbenchChatHost {
                 if let Some(chat) = self.chat_widget.as_mut() {
                     chat.handle_history_entry_response(event);
                 }
-                WorkbenchChatAction::None
+                ChatAction::None
             }
             AppEvent::LookupMessageHistoryEntry {
                 thread_id,
@@ -1154,7 +1265,7 @@ impl WorkbenchChatHost {
                         entry: None,
                     });
                 }
-                WorkbenchChatAction::None
+                ChatAction::None
             }
             AppEvent::ConsolidateAgentMessage {
                 deferred_history_cell,
@@ -1164,18 +1275,18 @@ impl WorkbenchChatHost {
                     let cell: Arc<dyn HistoryCell> = cell.into();
                     self.history_cells.push(cell);
                 }
-                WorkbenchChatAction::None
+                ChatAction::None
             }
             AppEvent::CommitTick => {
                 if let Some(chat) = self.chat_widget.as_mut() {
                     chat.on_commit_tick();
                 }
-                WorkbenchChatAction::None
+                ChatAction::None
             }
             AppEvent::RefreshRateLimits { origin } => self.refresh_rate_limits(origin),
             AppEvent::RateLimitsLoaded { origin, result } => {
                 self.apply_rate_limit_result(origin, result);
-                WorkbenchChatAction::None
+                ChatAction::None
             }
             AppEvent::OpenThreadGoalMenu { thread_id } => self.open_thread_goal_menu(thread_id),
             AppEvent::OpenThreadGoalEditor { thread_id } => self.open_thread_goal_editor(thread_id),
@@ -1192,22 +1303,22 @@ impl WorkbenchChatHost {
                 if let Some(chat) = self.chat_widget.as_mut() {
                     chat.open_skills_list();
                 }
-                WorkbenchChatAction::None
+                ChatAction::None
             }
             AppEvent::OpenManageSkillsPopup => {
                 if let Some(chat) = self.chat_widget.as_mut() {
                     chat.open_manage_skills_popup();
                 }
-                WorkbenchChatAction::None
+                ChatAction::None
             }
             AppEvent::SetSkillEnabled { path, enabled } => self.set_skill_enabled(path, enabled),
             AppEvent::SyntaxThemeSelected { name } => self.select_syntax_theme(name),
-            AppEvent::SyntaxThemePreviewed => WorkbenchChatAction::None,
-            _ => WorkbenchChatAction::None,
+            AppEvent::SyntaxThemePreviewed => ChatAction::None,
+            _ => ChatAction::None,
         }
     }
 
-    fn submit_active_thread_op(&mut self, op: AppCommand) -> WorkbenchChatAction {
+    fn submit_active_thread_op(&mut self, op: AppCommand) -> ChatAction {
         let Some(thread_id) = self.active_thread_id else {
             if matches!(op, AppCommand::UserTurn { .. }) {
                 return self.start_fresh_session(None, false);
@@ -1220,7 +1331,7 @@ impl WorkbenchChatHost {
         self.submit_thread_op(thread_id, op)
     }
 
-    fn submit_thread_op(&mut self, thread_id: ThreadId, op: AppCommand) -> WorkbenchChatAction {
+    fn submit_thread_op(&mut self, thread_id: ThreadId, op: AppCommand) -> ChatAction {
         if let Some(action) = self.try_resolve_pending_request(&op) {
             return action;
         }
@@ -1241,14 +1352,14 @@ impl WorkbenchChatHost {
         {
             chat.add_error_message("chat worker is not ready".to_string());
         }
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
     fn sync_override_turn_context_settings(
         &mut self,
         thread_id: ThreadId,
         op: &AppCommand,
-    ) -> WorkbenchChatAction {
+    ) -> ChatAction {
         let AppCommand::OverrideTurnContext {
             cwd,
             approval_policy,
@@ -1264,7 +1375,7 @@ impl WorkbenchChatHost {
             personality,
         } = op
         else {
-            return WorkbenchChatAction::None;
+            return ChatAction::None;
         };
 
         let params = ThreadSettingsUpdateParams {
@@ -1284,29 +1395,29 @@ impl WorkbenchChatHost {
             ..ThreadSettingsUpdateParams::default()
         };
         if !thread_settings_update_has_changes(&params) {
-            return WorkbenchChatAction::None;
+            return ChatAction::None;
         }
 
         self.send_worker(WorkerCommand::SyncSettings(params));
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
-    fn open_thread_goal_menu(&mut self, thread_id: ThreadId) -> WorkbenchChatAction {
+    fn open_thread_goal_menu(&mut self, thread_id: ThreadId) -> ChatAction {
         if Some(thread_id) != self.active_thread_id {
-            return WorkbenchChatAction::None;
+            return ChatAction::None;
         }
         self.send_worker(WorkerCommand::OpenGoalMenu { thread_id });
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
-    fn open_thread_goal_editor(&mut self, thread_id: Option<ThreadId>) -> WorkbenchChatAction {
-        if let Some(thread_id) = thread_id {
-            if Some(thread_id) != self.active_thread_id {
-                return WorkbenchChatAction::None;
-            }
+    fn open_thread_goal_editor(&mut self, thread_id: Option<ThreadId>) -> ChatAction {
+        if let Some(thread_id) = thread_id
+            && Some(thread_id) != self.active_thread_id
+        {
+            return ChatAction::None;
         }
         self.send_worker(WorkerCommand::OpenGoalEditor { thread_id });
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
     fn set_thread_goal_objective(
@@ -1314,36 +1425,36 @@ impl WorkbenchChatHost {
         thread_id: ThreadId,
         objective: String,
         mode: ThreadGoalSetMode,
-    ) -> WorkbenchChatAction {
+    ) -> ChatAction {
         if Some(thread_id) != self.active_thread_id {
-            return WorkbenchChatAction::None;
+            return ChatAction::None;
         }
         self.send_worker(WorkerCommand::SetGoalObjective {
             thread_id,
             objective,
             mode,
         });
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
     fn set_thread_goal_status(
         &mut self,
         thread_id: ThreadId,
         status: ThreadGoalStatus,
-    ) -> WorkbenchChatAction {
+    ) -> ChatAction {
         if Some(thread_id) != self.active_thread_id {
-            return WorkbenchChatAction::None;
+            return ChatAction::None;
         }
         self.send_worker(WorkerCommand::SetGoalStatus { thread_id, status });
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
-    fn clear_thread_goal(&mut self, thread_id: ThreadId) -> WorkbenchChatAction {
+    fn clear_thread_goal(&mut self, thread_id: ThreadId) -> ChatAction {
         if Some(thread_id) != self.active_thread_id {
-            return WorkbenchChatAction::None;
+            return ChatAction::None;
         }
         self.send_worker(WorkerCommand::ClearGoal { thread_id });
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
     fn show_replace_thread_goal_confirmation(&mut self, thread_id: ThreadId, objective: String) {
@@ -1490,14 +1601,14 @@ impl WorkbenchChatHost {
         }
     }
 
-    fn set_skill_enabled(&mut self, path: AbsolutePathBuf, enabled: bool) -> WorkbenchChatAction {
+    fn set_skill_enabled(&mut self, path: AbsolutePathBuf, enabled: bool) -> ChatAction {
         self.send_worker(WorkerCommand::SetSkillEnabled { path, enabled });
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
-    fn refresh_rate_limits(&mut self, origin: RateLimitRefreshOrigin) -> WorkbenchChatAction {
+    fn refresh_rate_limits(&mut self, origin: RateLimitRefreshOrigin) -> ChatAction {
         self.send_worker(WorkerCommand::RefreshRateLimits { origin });
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
     fn apply_rate_limit_result(
@@ -1518,25 +1629,21 @@ impl WorkbenchChatHost {
             }
             Err(err) => {
                 self.status = format!("chat: rate limits unavailable: {err}");
-                if let Some(chat) = self.chat_widget.as_mut() {
-                    if let RateLimitRefreshOrigin::StatusCommand { request_id } = origin {
-                        chat.finish_status_rate_limit_refresh(request_id);
-                    }
+                if let Some(chat) = self.chat_widget.as_mut()
+                    && let RateLimitRefreshOrigin::StatusCommand { request_id } = origin
+                {
+                    chat.finish_status_rate_limit_refresh(request_id);
                 }
             }
         }
     }
 
-    fn submit_list_skills(
-        &mut self,
-        cwds: Vec<PathBuf>,
-        force_reload: bool,
-    ) -> WorkbenchChatAction {
+    fn submit_list_skills(&mut self, cwds: Vec<PathBuf>, force_reload: bool) -> ChatAction {
         self.send_worker(WorkerCommand::ListSkills { cwds, force_reload });
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
-    fn try_resolve_pending_request(&mut self, op: &AppCommand) -> Option<WorkbenchChatAction> {
+    fn try_resolve_pending_request(&mut self, op: &AppCommand) -> Option<ChatAction> {
         match self.pending_requests.take_resolution(op).transpose() {
             Ok(Some((request_id, result))) => {
                 self.send_worker(WorkerCommand::ResolveRequest { request_id, result });
@@ -1549,16 +1656,16 @@ impl WorkbenchChatHost {
                 return Some(self.drain_app_events());
             }
         }
-        Some(WorkbenchChatAction::None)
+        Some(ChatAction::None)
     }
 
-    fn resume_session_by_id_or_name(&mut self, id_or_name: String) -> WorkbenchChatAction {
+    fn resume_session_by_id_or_name(&mut self, id_or_name: String) -> ChatAction {
         if let Ok(thread_id) = ThreadId::from_string(&id_or_name) {
             return self.resume_session(thread_id);
         }
         self.status = format!("chat: looking up {id_or_name}");
         self.send_worker(WorkerCommand::ResumeByIdOrName(id_or_name));
-        WorkbenchChatAction::None
+        ChatAction::None
     }
 
     fn reload_sessions(&mut self) {
@@ -1566,7 +1673,7 @@ impl WorkbenchChatHost {
         self.send_worker(WorkerCommand::ReloadSessions);
     }
 
-    fn select_syntax_theme(&mut self, name: String) -> WorkbenchChatAction {
+    fn select_syntax_theme(&mut self, name: String) -> ChatAction {
         if let Some(context) = self.context.as_mut() {
             context.config.tui_theme = Some(name.clone());
         }
@@ -1580,12 +1687,12 @@ impl WorkbenchChatHost {
         if let Some(theme) = crate::agent::resolve_theme_by_name(&name, home) {
             crate::agent::set_syntax_theme(theme);
         }
-        if !self.send_worker(WorkerCommand::SelectSyntaxTheme { name: name.clone() }) {
-            if let Some(chat) = self.chat_widget.as_mut() {
-                chat.add_error_message("chat worker is not ready to save theme".to_string());
-            }
+        if !self.send_worker(WorkerCommand::SelectSyntaxTheme { name: name.clone() })
+            && let Some(chat) = self.chat_widget.as_mut()
+        {
+            chat.add_error_message("chat worker is not ready to save theme".to_string());
         }
-        WorkbenchChatAction::ThemeSelected(name)
+        ChatAction::ThemeSelected(name)
     }
 }
 
@@ -1613,7 +1720,7 @@ impl PendingRequests {
                     .entry(params.turn_id.clone())
                     .or_default()
                     .push_back(PendingUserInputRequest {
-                        item_id: params.item_id.clone(),
+                        _item_id: params.item_id.clone(),
                         request_id: request_id.clone(),
                     });
             }
@@ -1723,10 +1830,22 @@ struct Startup {
 
 async fn start_worker(
     root: PathBuf,
+    mut initial_config: Option<Config>,
+    mut app_server: Option<AppServerSession>,
+    preserve_ui_state: bool,
     app_event_tx: AppEventSender,
     event_tx: UnboundedSender<WorkerEvent>,
 ) {
-    let startup = match start_host(root, app_event_tx).await {
+    if preserve_ui_state
+        && let (Some(app_server), Some(config)) = (app_server.take(), initial_config.take())
+    {
+        let (command_tx, command_rx) = unbounded_channel();
+        let _ = event_tx.send(WorkerEvent::ConnectionResumed { command_tx });
+        run_worker(app_server, config, command_rx, event_tx).await;
+        return;
+    }
+
+    let startup = match start_host(root, initial_config, app_server, app_event_tx).await {
         Ok(startup) => startup,
         Err(err) => {
             let _ = event_tx.send(WorkerEvent::StartupFailed(format!("{err:#}")));
@@ -1772,6 +1891,10 @@ async fn run_worker(
                         let _ = app_server.shutdown().await;
                         return;
                     }
+                    Some(WorkerCommand::Suspend { response_tx }) => {
+                        let _ = response_tx.send(app_server);
+                        return;
+                    }
                     Some(command) => {
                         handle_worker_command(command, &mut app_server, &mut config, &event_tx).await;
                     }
@@ -1789,6 +1912,9 @@ async fn handle_worker_command(
 ) {
     match command {
         WorkerCommand::Shutdown => {}
+        WorkerCommand::Suspend { .. } => {
+            unreachable!("suspend commands are handled by the worker event loop")
+        }
         WorkerCommand::StartFresh {
             initial_text,
             replace_widget,
@@ -2028,41 +2154,54 @@ async fn lookup_session_by_exact_name(
         .and_then(session_row_from_thread))
 }
 
-async fn start_host(root: PathBuf, app_event_tx: AppEventSender) -> Result<Startup> {
-    let config = ConfigBuilder::default()
-        .harness_overrides(ConfigOverrides {
-            cwd: Some(root),
-            peregrine_self_exe: std::env::current_exe().ok(),
-            ..ConfigOverrides::default()
-        })
-        .loader_overrides(LoaderOverrides::default())
-        .strict_config(false)
-        .cloud_requirements(CloudRequirementsLoader::default())
-        .build()
-        .await
-        .wrap_err("failed to load agent config for workbench chat")?;
+async fn start_host(
+    root: PathBuf,
+    initial_config: Option<Config>,
+    existing_app_server: Option<AppServerSession>,
+    app_event_tx: AppEventSender,
+) -> Result<Startup> {
+    let config = match initial_config {
+        Some(config) => config,
+        None => ConfigBuilder::default()
+            .harness_overrides(ConfigOverrides {
+                cwd: Some(root),
+                peregrine_self_exe: std::env::current_exe().ok(),
+                ..ConfigOverrides::default()
+            })
+            .loader_overrides(LoaderOverrides::default())
+            .strict_config(false)
+            .cloud_requirements(CloudRequirementsLoader::default())
+            .build()
+            .await
+            .wrap_err("failed to load agent config for workbench chat")?,
+    };
 
-    let arg0_paths = crate::agent_arg0_dispatch_paths()
-        .wrap_err("failed to resolve Peregrine executable paths")?;
-    let local_runtime_paths = ExecServerRuntimePaths::from_optional_paths(
-        arg0_paths.codex_self_exe.clone(),
-        arg0_paths.codex_linux_sandbox_exe.clone(),
-    )
-    .wrap_err("failed to build exec-server runtime paths")?;
-    let environment_manager = EnvironmentManager::from_env(Some(local_runtime_paths))
-        .await
-        .map(Arc::new)
-        .map_err(color_eyre::Report::from)
-        .wrap_err("failed to load workbench chat environment manager")?;
-    let mut app_server = super::start_app_server_for_picker(
-        &config,
-        &AppServerTarget::Embedded,
-        arg0_paths,
-        None,
-        environment_manager,
-    )
-    .await
-    .wrap_err("failed to start embedded app server for workbench chat")?;
+    let mut app_server = match existing_app_server {
+        Some(app_server) => app_server,
+        None => {
+            let arg0_paths = crate::agent_arg0_dispatch_paths()
+                .wrap_err("failed to resolve Peregrine executable paths")?;
+            let local_runtime_paths = ExecServerRuntimePaths::from_optional_paths(
+                arg0_paths.codex_self_exe.clone(),
+                arg0_paths.codex_linux_sandbox_exe.clone(),
+            )
+            .wrap_err("failed to build exec-server runtime paths")?;
+            let environment_manager = EnvironmentManager::from_env(Some(local_runtime_paths))
+                .await
+                .map(Arc::new)
+                .map_err(color_eyre::Report::from)
+                .wrap_err("failed to load workbench chat environment manager")?;
+            crate::agent::start_app_server_for_picker(
+                &config,
+                &AppServerTarget::Embedded,
+                arg0_paths,
+                None,
+                environment_manager,
+            )
+            .await
+            .wrap_err("failed to start embedded app server for workbench chat")?
+        }
+    };
     let bootstrap = app_server
         .bootstrap(&config)
         .await
@@ -2101,6 +2240,15 @@ fn chat_context(
         status_line_invalid_items_warned: Arc::new(AtomicBool::new(false)),
         terminal_title_invalid_items_warned: Arc::new(AtomicBool::new(false)),
     }
+}
+
+fn enabled_mcp_server_names(config: &Config) -> Vec<String> {
+    config
+        .mcp_servers
+        .get()
+        .iter()
+        .filter_map(|(name, server)| server.enabled.then_some(name.clone()))
+        .collect()
 }
 
 fn new_session_telemetry(context: &ChatContext) -> SessionTelemetry {
@@ -2308,20 +2456,20 @@ enum SessionListKeyAction {
     PassToComposer,
 }
 
-fn combine_action(current: WorkbenchChatAction, next: WorkbenchChatAction) -> WorkbenchChatAction {
+impl Drop for ChatController {
+    fn drop(&mut self) {
+        self.shutdown();
+    }
+}
+
+fn combine_action(current: ChatAction, next: ChatAction) -> ChatAction {
     match (current, next) {
-        (WorkbenchChatAction::Quit, _) | (_, WorkbenchChatAction::Quit) => {
-            WorkbenchChatAction::Quit
-        }
-        (WorkbenchChatAction::FocusCode, _) | (_, WorkbenchChatAction::FocusCode) => {
-            WorkbenchChatAction::FocusCode
-        }
-        (WorkbenchChatAction::ThemeSelected(_), WorkbenchChatAction::ThemeSelected(name))
-        | (WorkbenchChatAction::None, WorkbenchChatAction::ThemeSelected(name))
-        | (WorkbenchChatAction::ThemeSelected(name), WorkbenchChatAction::None) => {
-            WorkbenchChatAction::ThemeSelected(name)
-        }
-        _ => WorkbenchChatAction::None,
+        (ChatAction::Quit, _) | (_, ChatAction::Quit) => ChatAction::Quit,
+        (ChatAction::FocusCode, _) | (_, ChatAction::FocusCode) => ChatAction::FocusCode,
+        (ChatAction::ThemeSelected(_), ChatAction::ThemeSelected(name))
+        | (ChatAction::None, ChatAction::ThemeSelected(name))
+        | (ChatAction::ThemeSelected(name), ChatAction::None) => ChatAction::ThemeSelected(name),
+        _ => ChatAction::None,
     }
 }
 

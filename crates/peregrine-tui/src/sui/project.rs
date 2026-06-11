@@ -1,9 +1,9 @@
 use crate::{
     output::{CliDiagnostic, CliDiagnosticSeverity},
+    session::fetch_modules,
     sui::args::{BytecodeArgs, VerifyArgs},
 };
-use peregrine_move_model::MoveModule;
-use peregrine_static_analysis::{MovePackage, discover_move_project_fast};
+use peregrine_mcp_protocol::{MoveSourceSummary, PackageSummary};
 use std::{
     ffi::OsStr,
     path::{Component, Path, PathBuf},
@@ -73,53 +73,30 @@ pub fn formal_targets(
     context: &CliContext,
     args: &VerifyArgs,
 ) -> Result<Vec<FormalTarget>, CliDiagnostic> {
-    let project = discover_move_project_fast(&context.project_root);
-    let Some(package) = project
-        .packages
-        .iter()
-        .find(|package| normalize_path_label(Path::new(&package.path)) == context.package_path)
-    else {
-        return Err(CliDiagnostic::error(
-            "verify",
-            format!(
-                "Could not discover package `{}` under {}.",
-                context.package_path,
-                context.project_root.display()
-            ),
-        ));
-    };
-
-    require_package_source_modules("verify", package)?;
-
-    let requested_modules = args
+    let modules = args
         .modules
         .iter()
         .map(|module| module.trim())
         .filter(|module| !module.is_empty())
+        .map(str::to_string)
         .collect::<Vec<_>>();
-    let requested_file = args
+    let file = args
         .file
         .as_deref()
         .map(normalize_requested_file)
         .filter(|file| !file.is_empty());
-
-    let targets = package
-        .modules
-        .iter()
-        .filter(|module| {
-            requested_file.as_deref().map_or(true, |file| {
-                normalize_path_label(Path::new(&module.file_path)) == file
-            })
-        })
-        .filter(|module| {
-            requested_modules.is_empty()
-                || requested_modules
-                    .iter()
-                    .any(|requested| module_matches(requested, module))
-        })
+    let (_, _, modules) = fetch_modules(
+        &context.project_root,
+        &context.package_path,
+        modules,
+        file.clone(),
+    )
+    .map_err(|error| CliDiagnostic::error("mcp:peregrine", error))?;
+    let targets = modules
+        .into_iter()
         .map(|module| FormalTarget {
-            file_path: module.file_path.clone(),
-            module_name: module.name.clone(),
+            file_path: module.file_path,
+            module_name: module.module_name,
         })
         .collect::<Vec<_>>();
 
@@ -130,7 +107,7 @@ pub fn formal_targets(
             code: Some("NoFormalTargets".to_string()),
             message: "No Move modules matched the requested formal verification target."
                 .to_string(),
-            file: requested_file,
+            file,
             span: None,
         });
     }
@@ -174,41 +151,66 @@ pub fn bytecode_targets(
     requested_module: Option<&str>,
     requested_file: Option<&str>,
 ) -> Result<Vec<BytecodeTarget>, CliDiagnostic> {
-    let project = discover_move_project_fast(&context.project_root);
-    let Some(package) = project
-        .packages
-        .iter()
-        .find(|package| normalize_path_label(Path::new(&package.path)) == context.package_path)
-    else {
-        return Err(CliDiagnostic::error(
-            "bytecode",
-            format!(
-                "Could not discover package `{}` under {}.",
-                context.package_path,
-                context.project_root.display()
-            ),
-        ));
-    };
+    let modules = requested_module
+        .map(|module| vec![module.to_string()])
+        .unwrap_or_default();
+    let (package, source, modules) = fetch_modules(
+        &context.project_root,
+        &context.package_path,
+        modules,
+        requested_file.map(str::to_string),
+    )
+    .map_err(|error| CliDiagnostic::error("mcp:peregrine", error))?;
+    require_package_source_modules(&package, &source)?;
 
-    require_package_source_modules("bytecode", package)?;
-
-    Ok(package
-        .modules
-        .iter()
-        .filter(|module| {
-            requested_file.map_or(true, |file| {
-                normalize_path_label(Path::new(&module.file_path)) == file
-            })
-        })
-        .filter(|module| {
-            requested_module.map_or(true, |requested| module_matches(requested, module))
-        })
+    Ok(modules
+        .into_iter()
         .map(|module| BytecodeTarget {
-            file_path: module.file_path.clone(),
-            module_name: module.name.clone(),
             source_path: context.project_root.join(&module.file_path),
+            file_path: module.file_path,
+            module_name: module.module_name,
         })
         .collect())
+}
+
+fn require_package_source_modules(
+    package: &PackageSummary,
+    source: &MoveSourceSummary,
+) -> Result<(), CliDiagnostic> {
+    if source.has_source_modules {
+        return Ok(());
+    }
+
+    let code = if source.source_file_count == 0 {
+        "NoMoveSources"
+    } else {
+        "NoMoveSourceModules"
+    };
+    let message = if source.source_file_count == 0 {
+        format!(
+            "Move package `{}` ({}) contains a Move.toml manifest but no Move source files under sources/. Call graph, type graph, bytecode, CFG, signatures, and verification require parseable source modules.",
+            package.package_name, package.package_path
+        )
+    } else {
+        let noun = if source.source_file_count == 1 {
+            "file"
+        } else {
+            "files"
+        };
+        format!(
+            "Move package `{}` ({}) contains {} Move source {noun}, but no parseable Move modules were found. The source may be commented out or invalid. Call graph, type graph, bytecode, CFG, signatures, and verification require parseable source modules.",
+            package.package_name, package.package_path, source.source_file_count
+        )
+    };
+
+    Err(CliDiagnostic {
+        severity: CliDiagnosticSeverity::Error,
+        source: "bytecode".to_string(),
+        code: Some(code.to_string()),
+        message,
+        file: Some(source.manifest_path.clone()),
+        span: None,
+    })
 }
 
 fn no_bytecode_target(requested_file: Option<String>) -> CliDiagnostic {
@@ -228,54 +230,6 @@ pub fn resolve_output_path(workspace_root: &Path, output: Option<&Path>) -> Path
         Some(path) => workspace_root.join(path),
         None => workspace_root.to_path_buf(),
     }
-}
-
-pub fn require_package_source_modules(
-    source: &str,
-    package: &MovePackage,
-) -> Result<(), CliDiagnostic> {
-    if package.has_source_modules {
-        return Ok(());
-    }
-
-    Err(CliDiagnostic {
-        severity: CliDiagnosticSeverity::Error,
-        source: source.to_string(),
-        code: Some(if package.source_file_count == 0 {
-            "NoMoveSources".to_string()
-        } else {
-            "NoMoveSourceModules".to_string()
-        }),
-        message: move_source_unavailable_message(package),
-        file: Some(package.manifest_path.clone()),
-        span: None,
-    })
-}
-
-pub fn move_source_unavailable_message(package: &MovePackage) -> String {
-    let path = if package.path.is_empty() {
-        "."
-    } else {
-        package.path.as_str()
-    };
-
-    if package.source_file_count == 0 {
-        return format!(
-            "Move package `{}` ({path}) contains a Move.toml manifest but no Move source files under sources/. Call graph, type graph, bytecode, CFG, signatures, and verification require parseable source modules.",
-            package.name
-        );
-    }
-
-    format!(
-        "Move package `{}` ({path}) contains {} Move source {}, but no parseable Move modules were found. The source may be commented out or invalid. Call graph, type graph, bytecode, CFG, signatures, and verification require parseable source modules.",
-        package.name,
-        package.source_file_count,
-        if package.source_file_count == 1 {
-            "file"
-        } else {
-            "files"
-        }
-    )
 }
 
 fn resolve_package_root(project_root: &Path, package_path: &str) -> Result<PathBuf, CliDiagnostic> {
@@ -304,7 +258,7 @@ fn resolve_package_root(project_root: &Path, package_path: &str) -> Result<PathB
     let package_root = package_root.canonicalize().map_err(|error| {
         CliDiagnostic::error(
             "project",
-            format!("Could not read package path {}: {error}", package_path),
+            format!("Could not read package path {package_path}: {error}"),
         )
     })?;
 
@@ -360,17 +314,6 @@ fn normalize_path_label(path: impl AsRef<Path>) -> String {
         .map(OsStr::to_string_lossy)
         .collect::<Vec<_>>()
         .join("/")
-}
-
-fn module_matches(requested: &str, module: &MoveModule) -> bool {
-    if requested == module.name {
-        return true;
-    }
-
-    module
-        .address
-        .as_deref()
-        .is_some_and(|address| requested == format!("{address}::{}", module.name))
 }
 
 #[cfg(test)]

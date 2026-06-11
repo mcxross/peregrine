@@ -3,58 +3,38 @@ use crate::{
         CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, EXIT_SUCCESS,
         EXIT_WORKFLOW_FAILED, elapsed_ms,
     },
-    sui::{args::ImportPackageArgs, project::resolve_output_path},
+    session::McpToolClient,
+    sui::args::ImportPackageArgs,
 };
-use peregrine_import_engine::sui::{
-    BuildVerification, BuildableImportArtifact, BuildableImportRequest, EngineDiagnostic,
-    EngineDiagnosticSeverity, ImportEngine, ImportEngineConfig, default_import_root,
+use peregrine_mcp_protocol::{
+    ImportDiagnostic, ImportDiagnosticSeverity, ImportPackageArgs as McpImportPackageArgs,
+    ImportPackageResponse, tool_name,
 };
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::Path, time::Instant};
 
 pub fn run_import_package(workspace_root: &Path, args: &ImportPackageArgs) -> CliStep {
     let started_at = Instant::now();
-    let import_root = match args.output.as_deref() {
-        Some(output) => resolve_output_path(workspace_root, Some(output)),
-        None => match default_import_root(workspace_root, args.network.id(), &args.package_id) {
-            Ok(path) => path,
-            Err(error) => {
-                return CliStep::failed(
-                    "import-package",
-                    started_at,
-                    CliDiagnostic::error("import-package", error),
-                );
-            }
-        },
-    };
-    let request = BuildableImportRequest {
+    let request = McpImportPackageArgs {
+        project_root: Some(workspace_root.display().to_string()),
         network_id: args.network.id().to_string(),
         graph_ql_url: args.network.graph_ql_url().to_string(),
         package_id: args.package_id.clone(),
-        import_root: import_root.clone(),
-        generate_buildable: !args.raw_only,
-    };
-    let engine = ImportEngine::new(ImportEngineConfig {
-        max_dependency_depth: args.max_dependency_depth,
-        max_dependency_packages: args.max_dependency_packages,
-        build_verification: BuildVerification::Disabled,
-    });
-    let runtime = match tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(runtime) => runtime,
-        Err(error) => {
-            return CliStep::failed(
-                "import-package",
-                started_at,
-                CliDiagnostic::error("runtime", error.to_string()),
-            );
-        }
+        output_path: args
+            .output
+            .as_deref()
+            .map(|path| path.display().to_string()),
+        raw_only: args.raw_only,
+        max_dependency_depth: Some(args.max_dependency_depth),
+        max_dependency_packages: Some(args.max_dependency_packages),
     };
 
-    match runtime.block_on(engine.import_buildable_package(request)) {
-        Ok(artifact) => import_success_step(started_at, args, import_root, artifact),
+    match McpToolClient::call_blocking::<_, ImportPackageResponse>(
+        workspace_root,
+        tool_name::IMPORT_PACKAGE,
+        &request,
+    ) {
+        Ok(response) => import_success_step(started_at, args, response),
         Err(error) => CliStep::failed(
             "import-package",
             started_at,
@@ -66,13 +46,13 @@ pub fn run_import_package(workspace_root: &Path, args: &ImportPackageArgs) -> Cl
 fn import_success_step(
     started_at: Instant,
     args: &ImportPackageArgs,
-    import_root: std::path::PathBuf,
-    artifact: BuildableImportArtifact,
+    response: ImportPackageResponse,
 ) -> CliStep {
+    let artifact = response.artifact;
     let diagnostics = artifact
         .diagnostics
         .iter()
-        .map(map_engine_diagnostic)
+        .map(map_import_diagnostic)
         .collect::<Vec<_>>();
     let has_error = diagnostics
         .iter()
@@ -113,7 +93,7 @@ fn import_success_step(
             ),
             (
                 "importRoot".to_string(),
-                Value::String(import_root.display().to_string()),
+                Value::String(response.import_root),
             ),
             ("generateBuildable".to_string(), json!(!args.raw_only)),
             (
@@ -131,12 +111,12 @@ fn import_success_step(
     }
 }
 
-fn map_engine_diagnostic(diagnostic: &EngineDiagnostic) -> CliDiagnostic {
+fn map_import_diagnostic(diagnostic: &ImportDiagnostic) -> CliDiagnostic {
     CliDiagnostic {
         severity: match diagnostic.severity {
-            EngineDiagnosticSeverity::Info => CliDiagnosticSeverity::Info,
-            EngineDiagnosticSeverity::Warning => CliDiagnosticSeverity::Warning,
-            EngineDiagnosticSeverity::Error => CliDiagnosticSeverity::Error,
+            ImportDiagnosticSeverity::Info => CliDiagnosticSeverity::Info,
+            ImportDiagnosticSeverity::Warning => CliDiagnosticSeverity::Warning,
+            ImportDiagnosticSeverity::Error => CliDiagnosticSeverity::Error,
         },
         source: format!("import:{}", diagnostic.stage),
         code: None,

@@ -81,11 +81,12 @@ once_cell = { workspace = true }
 peregrine-api = { workspace = true }
 peregrine-app-server-protocol = { workspace = true }
 peregrine-config = { workspace = true }
+peregrine-helper-protocol = { workspace = true }
 peregrine-memories-read = { workspace = true }
+peregrine-mcp-protocol = { workspace = true }
 peregrine-model-provider = { workspace = true }
 peregrine-anthropic = { workspace = true }
 peregrine-provider-registry = { workspace = true }
-peregrine-security-tools = { workspace = true }
 peregrine-types = { workspace = true }
 peregrine-utils-home-dir = { workspace = true }
 rand = { workspace = true }

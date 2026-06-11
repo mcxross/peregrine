@@ -1,29 +1,25 @@
 use crate::{
-    helper_args::BUNDLED_SUI_HELPER_ARG,
     output::{CliDiagnostic, CliStatus, CliStep, EXIT_WORKFLOW_FAILED, elapsed_ms},
-    sui::{
-        args::NewPackageArgs,
-        runners::process::{command_step, run_peregrine_child_in},
-    },
+    session::McpToolClient,
+    sui::{args::NewPackageArgs, runners::process::mcp_command_step},
 };
-use peregrine_adapters::sui::{SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings};
+use peregrine_mcp_protocol::{CreatePackageArgs, tool_name};
 use serde_json::Value;
-use std::{collections::BTreeMap, ffi::OsString, path::Path, time::Instant};
+use std::{collections::BTreeMap, path::Path, time::Instant};
 
 pub fn run_new_package(workspace_root: &Path, args: &NewPackageArgs) -> CliStep {
     let started_at = Instant::now();
-    let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
-    let command = match adapter.move_new_command(&args.package_name) {
-        Ok(command) => command,
+    let package_name = match peregrine_mcp_protocol::validate_package_name(&args.package_name) {
+        Ok(package_name) => package_name,
         Err(error) => {
             return CliStep::failed(
                 "new-package",
                 started_at,
-                CliDiagnostic::error("sui-adapter", error.to_string()),
+                CliDiagnostic::error("sui-adapter", error),
             );
         }
     };
-    let target_root = workspace_root.join(&command.project_name);
+    let target_root = workspace_root.join(package_name);
 
     if target_root.exists() {
         return CliStep::failed(
@@ -36,25 +32,30 @@ pub fn run_new_package(workspace_root: &Path, args: &NewPackageArgs) -> CliStep 
         );
     }
 
-    let helper_args = std::iter::once(OsString::from(BUNDLED_SUI_HELPER_ARG))
-        .chain(command.bundled_args())
-        .collect::<Vec<_>>();
+    let result = McpToolClient::call_blocking::<_, peregrine_mcp_protocol::CommandResult>(
+        workspace_root,
+        tool_name::CREATE_PACKAGE,
+        &CreatePackageArgs {
+            project_root: None,
+            package_name: package_name.to_string(),
+            timeout_ms: None,
+        },
+    );
 
-    match run_peregrine_child_in(helper_args, Some(workspace_root)) {
-        Ok(output) => {
-            let mut step = command_step(
+    match result {
+        Ok(result) => {
+            let mut step = mcp_command_step(
                 "new-package",
                 started_at,
-                Some(command.display),
-                output,
+                result,
                 BTreeMap::from([
                     (
                         "execution".to_string(),
-                        Value::String("bundled-sui".to_string()),
+                        Value::String("mcp:peregrine".to_string()),
                     ),
                     (
                         "packageName".to_string(),
-                        Value::String(command.project_name.clone()),
+                        Value::String(package_name.to_string()),
                     ),
                     (
                         "packageRoot".to_string(),
@@ -81,7 +82,7 @@ pub fn run_new_package(workspace_root: &Path, args: &NewPackageArgs) -> CliStep 
         Err(error) => CliStep::failed(
             "new-package",
             started_at,
-            CliDiagnostic::error("new-package", error),
+            CliDiagnostic::error("mcp:peregrine", error),
         ),
     }
 }

@@ -1,15 +1,16 @@
 use super::{
     common::{DIM, EDGE, FUNCTION, HEADER, KIND, MODULE, RESET, graph_step, requested_modules},
     dot::{DotEdgeStyle, dot_edge_attrs, dot_id, dot_label},
-    project::{module_matches, selected_source_package},
+    project::module_matches,
 };
 use crate::{
     output::{CliDiagnostic, CliStep},
+    session::McpToolClient,
     sui::{args::CallGraphArgs, project::CliContext},
 };
-use peregrine_move_graphs::{
-    MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode, MoveUnresolvedCall,
-    discover_move_project_graphs_for_package,
+use peregrine_mcp_protocol::{
+    GraphsResponse, MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode, MoveUnresolvedCall,
+    PackageArgs, tool_name,
 };
 use serde_json::json;
 use std::{
@@ -19,13 +20,24 @@ use std::{
 
 pub fn run_call_graph(context: &CliContext, args: &CallGraphArgs) -> CliStep {
     let started_at = Instant::now();
-    if let Err(error) = selected_source_package(context, "call-graph") {
-        return CliStep::failed("call-graph", started_at, error);
-    }
-
-    let graph =
-        discover_move_project_graphs_for_package(&context.project_root, &context.package_path)
-            .call_graph;
+    let response = match McpToolClient::call_blocking::<_, GraphsResponse>(
+        &context.project_root,
+        tool_name::GRAPHS,
+        &PackageArgs {
+            project_root: Some(context.project_root.display().to_string()),
+            package_path: Some(context.package_path.clone()),
+        },
+    ) {
+        Ok(response) => response,
+        Err(error) => {
+            return CliStep::failed(
+                "call-graph",
+                started_at,
+                CliDiagnostic::error("mcp:peregrine", error),
+            );
+        }
+    };
+    let graph = response.graphs.call_graph;
     let graph = filter_call_graph(graph, args);
 
     if graph.nodes.is_empty() {

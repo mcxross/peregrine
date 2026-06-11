@@ -593,7 +593,7 @@ impl std::str::FromStr for ThemeName {
         let normalized: String = s
             .to_lowercase()
             .chars()
-            .filter(|character| character.is_ascii_alphanumeric())
+            .filter(char::is_ascii_alphanumeric)
             .collect();
 
         match normalized.as_str() {

@@ -1,20 +1,15 @@
 use crate::{
-    helper_args::FORMAL_VERIFICATION_HELPER_ARG,
     output::{CliDiagnostic, CliStep},
+    session::McpToolClient,
     sui::{
         args::VerifyArgs,
         project::{CliContext, FormalTarget, formal_targets},
-        runners::process::{command_step, run_peregrine_child},
+        runners::process::mcp_command_step,
     },
 };
-use peregrine_adapters::sui::{
-    SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiFormalVerificationOptions,
-};
-use peregrine_dynamic_analysis::sui::formal_verification::{
-    FormalVerificationOptions, formal_verification_manifest,
-};
+use peregrine_mcp_protocol::{FormalVerifyArgs, PackageArgs, tool_name};
 use serde_json::{Value, json};
-use std::{collections::BTreeMap, ffi::OsString, time::Instant};
+use std::{collections::BTreeMap, time::Instant};
 
 pub fn run_verify(context: &CliContext, args: &VerifyArgs) -> Vec<CliStep> {
     let targets = match formal_targets(context, args) {
@@ -30,73 +25,45 @@ pub fn run_verify(context: &CliContext, args: &VerifyArgs) -> Vec<CliStep> {
 
 fn run_verify_target(context: &CliContext, args: &VerifyArgs, target: FormalTarget) -> CliStep {
     let started_at = Instant::now();
-    let options = FormalVerificationOptions {
-        module_name: target.module_name.clone(),
-        file_path: target.file_path.clone(),
-        timeout_seconds: Some(args.timeout_seconds),
-        verbose: true,
-        trace: args.trace,
-        keep_temp: args.keep_temp,
-    };
-    let manifest = match formal_verification_manifest(
+    let result = McpToolClient::call_blocking::<_, peregrine_mcp_protocol::CommandResult>(
         &context.project_root,
-        &context.package_path,
-        &options,
-    ) {
-        Ok(manifest) => manifest,
-        Err(error) => {
-            return CliStep::failed(
-                format!("verify:{}", target.module_name),
-                started_at,
-                CliDiagnostic::error("verify", error.to_string()),
-            );
-        }
-    };
-    let adapter = SuiAdapter::new(SuiAdapterSettings::default(), SuiAdapterEnvironment::new());
-    let command = adapter.formal_verification_command(&SuiFormalVerificationOptions {
-        module_name: target.module_name.clone(),
-        file_path: target.file_path.clone(),
-        timeout_seconds: Some(args.timeout_seconds),
-        verbose: true,
-        trace: args.trace,
-        keep_temp: args.keep_temp,
-    });
-    let output = run_peregrine_child([
-        OsString::from(FORMAL_VERIFICATION_HELPER_ARG),
-        context.project_root.as_os_str().to_os_string(),
-        OsString::from(&context.package_path),
-        OsString::from(&target.file_path),
-        OsString::from(&target.module_name),
-        OsString::from(args.timeout_seconds.to_string()),
-    ]);
+        tool_name::FORMAL_VERIFY,
+        &FormalVerifyArgs {
+            package: PackageArgs {
+                project_root: None,
+                package_path: Some(context.package_path.clone()),
+            },
+            file_path: target.file_path.clone(),
+            module_name: target.module_name.clone(),
+            timeout_seconds: Some(args.timeout_seconds),
+            trace: args.trace,
+            keep_temp: args.keep_temp,
+        },
+    );
 
-    match output {
-        Ok(output) => command_step(
+    match result {
+        Ok(result) => mcp_command_step(
             format!("verify:{}", target.module_name),
             started_at,
-            Some(command.display),
-            output,
+            result,
             BTreeMap::from([
                 (
                     "packageRoot".to_string(),
-                    Value::String(manifest.package_root.display().to_string()),
+                    Value::String(context.package_root.display().to_string()),
                 ),
-                ("file".to_string(), Value::String(manifest.file_path)),
-                ("module".to_string(), Value::String(manifest.module_name)),
-                (
-                    "timeoutSeconds".to_string(),
-                    json!(manifest.timeout_seconds),
-                ),
+                ("file".to_string(), Value::String(target.file_path)),
+                ("module".to_string(), Value::String(target.module_name)),
+                ("timeoutSeconds".to_string(), json!(args.timeout_seconds)),
                 (
                     "execution".to_string(),
-                    Value::String("bundled-sui-prover".to_string()),
+                    Value::String("mcp:peregrine".to_string()),
                 ),
             ]),
         ),
         Err(error) => CliStep::failed(
             format!("verify:{}", target.module_name),
             started_at,
-            CliDiagnostic::error("verify", error),
+            CliDiagnostic::error("mcp:peregrine", error),
         ),
     }
 }

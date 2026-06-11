@@ -117,6 +117,26 @@ pub(super) fn command_step(
     }
 }
 
+pub(super) fn mcp_command_step(
+    name: impl Into<String>,
+    started_at: Instant,
+    result: peregrine_mcp_protocol::CommandResult,
+    mut metadata: BTreeMap<String, Value>,
+) -> CliStep {
+    metadata.insert("truncated".to_string(), Value::Bool(result.truncated));
+    command_step(
+        name,
+        started_at,
+        Some(result.command),
+        ChildOutput {
+            status: result.exit_code,
+            stdout: result.stdout,
+            stderr: result.stderr,
+        },
+        metadata,
+    )
+}
+
 fn command_failure_message(output: &ChildOutput) -> String {
     output
         .stderr

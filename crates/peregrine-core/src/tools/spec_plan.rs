@@ -15,14 +15,9 @@ use crate::tools::handlers::ListMcpResourcesHandler;
 use crate::tools::handlers::McpHandler;
 use crate::tools::handlers::PlanHandler;
 use crate::tools::handlers::ReadMcpResourceHandler;
-use crate::tools::handlers::ReadToolHandler;
 use crate::tools::handlers::RequestPermissionsHandler;
 use crate::tools::handlers::RequestPluginInstallHandler;
 use crate::tools::handlers::RequestUserInputHandler;
-use crate::tools::handlers::SecurityFormalVerifyHandler;
-use crate::tools::handlers::SecurityMovyFuzzHandler;
-use crate::tools::handlers::SecurityReadToolKind;
-use crate::tools::handlers::SecuritySuiCommandHandler;
 use crate::tools::handlers::ShellCommandHandler;
 use crate::tools::handlers::ShellCommandHandlerOptions;
 use crate::tools::handlers::TestSyncHandler;
@@ -79,7 +74,6 @@ use codex_tools::default_namespace_description;
 use codex_tools::request_user_input_available_modes;
 use codex_tools::shell_command_backend_for_features;
 use codex_tools::shell_type_for_model_and_features;
-use peregrine_security_tools::{SuiSecurityToolsMode, contains_move_manifest};
 use peregrine_types::dynamic_tools::DynamicToolSpec;
 use peregrine_types::openai_models::ConfigShellToolType;
 use peregrine_types::openai_models::InputModality;
@@ -529,60 +523,12 @@ fn add_tool_sources(context: &CoreToolPlanContext<'_>, planned_tools: &mut Plann
     add_shell_tools(context, planned_tools);
     add_mcp_resource_tools(context, planned_tools);
     add_core_utility_tools(context, planned_tools);
-    add_security_tools(context, planned_tools);
     add_collaboration_tools(context, planned_tools);
     add_mcp_runtime_tools(context, planned_tools);
     add_dynamic_tools(context, planned_tools);
     add_extension_tools(context, planned_tools);
     for spec in hosted_model_tool_specs(context) {
         planned_tools.add_hosted_spec(spec);
-    }
-}
-
-fn add_security_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mut PlannedTools) {
-    let turn_context = context.turn_context;
-    if !sui_security_tools_enabled(turn_context) {
-        return;
-    }
-
-    let exposure = if search_tool_enabled(turn_context) && namespace_tools_enabled(turn_context) {
-        ToolExposure::Deferred
-    } else {
-        ToolExposure::Direct
-    };
-    for kind in [
-        SecurityReadToolKind::StaticRuleCatalog,
-        SecurityReadToolKind::StaticAnalyzePackage,
-        SecurityReadToolKind::ScannerReport,
-        SecurityReadToolKind::PackageInsights,
-        SecurityReadToolKind::Graphs,
-        SecurityReadToolKind::FunctionStateGraph,
-        SecurityReadToolKind::BytecodeView,
-        SecurityReadToolKind::BytecodeDecompile,
-    ] {
-        planned_tools.add_with_exposure(ReadToolHandler::new(kind), exposure);
-    }
-    planned_tools.add_with_exposure(SecuritySuiCommandHandler, exposure);
-    planned_tools.add_with_exposure(SecurityMovyFuzzHandler, exposure);
-    planned_tools.add_with_exposure(SecurityFormalVerifyHandler, exposure);
-}
-
-fn sui_security_tools_enabled(turn_context: &TurnContext) -> bool {
-    let Some(primary_environment) = turn_context.environments.primary() else {
-        return false;
-    };
-
-    match turn_context.config.sui_security_tools.mode {
-        SuiSecurityToolsMode::Disabled => false,
-        SuiSecurityToolsMode::Always => true,
-        SuiSecurityToolsMode::Auto => {
-            contains_move_manifest(primary_environment.cwd.as_path())
-                || turn_context
-                    .config
-                    .workspace_roots
-                    .iter()
-                    .any(|root| contains_move_manifest(root.as_path()))
-        }
     }
 }
 

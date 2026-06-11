@@ -1,5 +1,6 @@
 use crate::{
     output::{CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, EXIT_WORKFLOW_FAILED},
+    session::McpToolClient,
     sui::{
         args::NewPackageArgs,
         project::{CliContext, resolve_context},
@@ -9,12 +10,10 @@ use crate::{
 use codex_exec_server::LOCAL_FS;
 use codex_git_utils::resolve_root_git_project_for_trust;
 use peregrine_config::LoaderOverrides;
-use peregrine_move_model::MovePackageModel;
-use peregrine_scanner::{
-    core::{PackageScanner, ScanInput, ScannerDiagnosticSeverity, ScannerOutput, SourceMode},
-    sui::tests::{TestsScanReport, TestsScanner},
+use peregrine_mcp_protocol::{
+    PackageArgs, ScannerDiagnosticSeverity, ScannerSourceMode, TestScannerArgs, TestScannerReport,
+    TestScannerResponse, tool_name,
 };
-use peregrine_static_analysis::{MovePackage, discover_move_project_fast};
 use peregrine_types::config_types::TrustLevel;
 use serde_json::json;
 use std::{
@@ -207,7 +206,7 @@ fn run_test_scanners(
     context: &CliContext,
     compiler_output_available: bool,
 ) -> PackageScannerReport {
-    let heuristic = scan_tests_with_mode(context, SourceMode::SourceOnly, true);
+    let heuristic = scan_tests_with_mode(context, ScannerSourceMode::SourceOnly);
     let heuristic_unit_tests = unit_test_result(&heuristic);
     let heuristic_movy_invariant_tests = movy_invariant_result(&heuristic);
     let heuristic_fuzz_tests = fuzz_test_result(&heuristic);
@@ -233,7 +232,7 @@ fn run_test_scanners(
         };
     }
 
-    let compiler = scan_tests_with_mode(context, SourceMode::BestAvailable, false);
+    let compiler = scan_tests_with_mode(context, ScannerSourceMode::BestAvailable);
 
     PackageScannerReport {
         compiler_unit_tests: unit_test_result(&compiler),
@@ -247,9 +246,9 @@ fn run_test_scanners(
     }
 }
 
-fn unit_test_result(scan: &Result<TestsScanReport, String>) -> ScannerResult {
+fn unit_test_result(scan: &Result<TestScannerReport, String>) -> ScannerResult {
     match scan {
-        Ok(report) if report.has_unit_tests => ScannerResult::Found {
+        Ok(report) if report.unit_test_count > 0 => ScannerResult::Found {
             count: report.unit_test_count,
         },
         Ok(_) => ScannerResult::NotFound,
@@ -259,9 +258,9 @@ fn unit_test_result(scan: &Result<TestsScanReport, String>) -> ScannerResult {
     }
 }
 
-fn movy_invariant_result(scan: &Result<TestsScanReport, String>) -> ScannerResult {
+fn movy_invariant_result(scan: &Result<TestScannerReport, String>) -> ScannerResult {
     match scan {
-        Ok(report) if report.has_movy_invariant_tests => ScannerResult::Found {
+        Ok(report) if report.movy_invariant_test_count > 0 => ScannerResult::Found {
             count: report.movy_invariant_test_count,
         },
         Ok(_) => ScannerResult::NotFound,
@@ -271,29 +270,21 @@ fn movy_invariant_result(scan: &Result<TestsScanReport, String>) -> ScannerResul
     }
 }
 
-fn fuzz_test_result(scan: &Result<TestsScanReport, String>) -> ScannerResult {
+fn fuzz_test_result(scan: &Result<TestScannerReport, String>) -> ScannerResult {
     match scan {
-        Ok(report) => {
-            let count = report
-                .unit_tests
-                .iter()
-                .filter(|finding| finding.is_random_test)
-                .count();
-            if count > 0 {
-                ScannerResult::Found { count }
-            } else {
-                ScannerResult::NotFound
-            }
-        }
+        Ok(report) if report.random_test_count > 0 => ScannerResult::Found {
+            count: report.random_test_count,
+        },
+        Ok(_) => ScannerResult::NotFound,
         Err(message) => ScannerResult::Failed {
             message: message.clone(),
         },
     }
 }
 
-fn formal_verification_result(scan: &Result<TestsScanReport, String>) -> ScannerResult {
+fn formal_verification_result(scan: &Result<TestScannerReport, String>) -> ScannerResult {
     match scan {
-        Ok(report) if report.has_formal_prover_specs => ScannerResult::Found {
+        Ok(report) if report.formal_prover_spec_count > 0 => ScannerResult::Found {
             count: report.formal_prover_spec_count,
         },
         Ok(_) => ScannerResult::NotFound,
@@ -305,86 +296,29 @@ fn formal_verification_result(scan: &Result<TestsScanReport, String>) -> Scanner
 
 fn scan_tests_with_mode(
     context: &CliContext,
-    source_mode: SourceMode,
-    force_source_model: bool,
-) -> Result<TestsScanReport, String> {
-    let mut model = selected_package_model(context)?;
-    if force_source_model {
-        model.modules.clear();
-    }
-    let build_root = context.package_root.join("build").join(&model.name);
-    let input = ScanInput {
-        package_model: &model,
-        package_root: Some(context.package_root.clone()),
-        build_root: Some(build_root),
+    source_mode: ScannerSourceMode,
+) -> Result<TestScannerReport, String> {
+    let request = TestScannerArgs {
+        package: PackageArgs {
+            project_root: Some(context.project_root.display().to_string()),
+            package_path: Some(context.package_path.clone()),
+        },
         source_mode,
     };
-
-    match TestsScanner.scan(&input) {
-        ScannerOutput::Tests(report) => {
-            if let Some(error) = report
-                .diagnostics
-                .iter()
-                .find(|diagnostic| diagnostic.severity == ScannerDiagnosticSeverity::Error)
-            {
-                Err(error.message.clone())
-            } else {
-                Ok(report)
-            }
-        }
-        ScannerOutput::Objects(_) => {
-            Err("tests scanner returned an object scan report".to_string())
-        }
-    }
-}
-
-fn selected_package_model(context: &CliContext) -> Result<MovePackageModel, String> {
-    let project = discover_move_project_fast(&context.project_root);
-    let package = project
-        .packages
-        .into_iter()
-        .find(|package| package_path_matches(&package.path, &context.package_path))
-        .ok_or_else(|| {
-            format!(
-                "Could not discover package `{}` under {}.",
-                context.package_path,
-                context.project_root.display()
-            )
-        })?;
-
-    Ok(move_package_to_model(package))
-}
-
-fn move_package_to_model(package: MovePackage) -> MovePackageModel {
-    MovePackageModel {
-        name: package.name,
-        path: package.path,
-        manifest_path: package.manifest_path,
-        has_source_files: package.has_source_files,
-        has_source_modules: package.has_source_modules,
-        source_file_count: package.source_file_count,
-        modules: package.modules,
-    }
-}
-
-fn package_path_matches(discovered_path: &str, requested_path: &str) -> bool {
-    normalize_package_path(discovered_path) == normalize_package_path(requested_path)
-}
-
-fn normalize_package_path(path: &str) -> String {
-    let trimmed = path.trim();
-    if trimmed.is_empty() || trimmed == "." {
-        ".".to_string()
+    let response = McpToolClient::call_blocking::<_, TestScannerResponse>(
+        &context.project_root,
+        tool_name::TEST_SCANNER_REPORT,
+        &request,
+    )?;
+    if let Some(error) = response
+        .report
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.severity == ScannerDiagnosticSeverity::Error)
+    {
+        Err(error.message.clone())
     } else {
-        Path::new(trimmed)
-            .components()
-            .filter_map(|component| match component {
-                std::path::Component::Normal(value) => Some(value.to_string_lossy().into_owned()),
-                std::path::Component::CurDir => None,
-                other => Some(other.as_os_str().to_string_lossy().into_owned()),
-            })
-            .collect::<Vec<_>>()
-            .join("/")
+        Ok(response.report)
     }
 }
 
