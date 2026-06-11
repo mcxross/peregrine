@@ -26,7 +26,7 @@ crates/*/Cargo.lock
 *.sw?
 .idea
 .vscode
-AGENT.md
+AGENTS.md
 .superstack
 docs
 ARCHITECTURE.md
@@ -36,3 +36,4 @@ ARCHITECTURE.md
 # Local vendored knowledge corpora. Keep manifests and retrieval architecture in git,
 # but avoid committing copied external documentation until the storage architecture is settled.
 knowledge/sui-move/source/
+.peregrine-dev
