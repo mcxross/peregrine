@@ -16,7 +16,9 @@ use peregrine_app_server_protocol::{
     ApprovalsReviewer as AppServerApprovalsReviewer, ClientRequest,
     CommandExecutionRequestApprovalResponse, FileChangeRequestApprovalResponse,
     GetAccountRateLimitsResponse, McpServerElicitationRequestResponse, McpServerStatus,
-    McpServerStatusDetail, PermissionsRequestApprovalResponse, RateLimitSnapshot, RequestId,
+    McpServerStatusDetail, ModelProviderListParams, ModelProviderListResponse,
+    ModelProviderModelsListParams, ModelProviderModelsListResponse, ModelProviderSelectParams,
+    ModelProviderSelectResponse, PermissionsRequestApprovalResponse, RateLimitSnapshot, RequestId,
     RequestId as AppServerRequestId, ServerNotification, ServerRequest, SkillsListParams,
     SkillsListResponse, Thread, ThreadGoal, ThreadGoalClearResponse, ThreadGoalGetResponse,
     ThreadGoalSetResponse, ThreadGoalStatus, ThreadListCwdFilter, ThreadListParams,
@@ -58,6 +60,7 @@ use crate::agent::tui::FrameRequester;
 use uuid::Uuid;
 
 mod mcp_inventory;
+mod provider;
 #[cfg(test)]
 mod tests;
 
@@ -163,6 +166,15 @@ enum WorkerCommand {
         detail: McpServerStatusDetail,
         thread_id: Option<ThreadId>,
     },
+    LoadProviders,
+    LoadProviderModels {
+        provider_id: String,
+        provider_display_name: String,
+    },
+    SelectProvider {
+        provider_id: String,
+        model: Option<String>,
+    },
     OpenGoalMenu {
         thread_id: ThreadId,
     },
@@ -228,6 +240,13 @@ enum WorkerEvent {
         thread_id: Option<ThreadId>,
         result: std::result::Result<Vec<McpServerStatus>, String>,
     },
+    ProvidersLoaded(std::result::Result<ModelProviderListResponse, String>),
+    ProviderModelsLoaded {
+        provider_id: String,
+        provider_display_name: String,
+        result: std::result::Result<ModelProviderModelsListResponse, String>,
+    },
+    ProviderSelected(std::result::Result<ModelProviderSelectResponse, String>),
     GoalMenu {
         thread_id: ThreadId,
         result: std::result::Result<ThreadGoalGetResponse, String>,
@@ -1037,6 +1056,22 @@ impl ChatController {
                 self.apply_mcp_inventory_result(result, detail, thread_id);
                 self.drain_app_events()
             }
+            WorkerEvent::ProvidersLoaded(result) => {
+                self.apply_provider_list_result(result);
+                self.drain_app_events()
+            }
+            WorkerEvent::ProviderModelsLoaded {
+                provider_id,
+                provider_display_name,
+                result,
+            } => {
+                self.apply_provider_models_result(provider_id, provider_display_name, result);
+                self.drain_app_events()
+            }
+            WorkerEvent::ProviderSelected(result) => {
+                self.apply_provider_selection_result(result);
+                self.drain_app_events()
+            }
             WorkerEvent::GoalMenu { thread_id, result } => {
                 if Some(thread_id) == self.active_thread_id {
                     self.apply_goal_menu_result(result);
@@ -1319,6 +1354,30 @@ impl ChatController {
             } => {
                 self.apply_mcp_inventory_result(result, detail, thread_id);
                 ChatAction::None
+            }
+            AppEvent::OpenProviderPicker => self.open_provider_picker(),
+            AppEvent::OpenProviderPopup { providers } => {
+                if let Some(chat) = self.chat_widget.as_mut() {
+                    chat.open_provider_popup(providers);
+                }
+                ChatAction::None
+            }
+            AppEvent::OpenProviderModelPicker {
+                provider_id,
+                provider_display_name,
+            } => self.open_provider_model_picker(provider_id, provider_display_name),
+            AppEvent::OpenProviderModelPopup {
+                provider_id,
+                provider_display_name,
+                models,
+            } => {
+                if let Some(chat) = self.chat_widget.as_mut() {
+                    chat.open_provider_model_popup(provider_id, provider_display_name, models);
+                }
+                ChatAction::None
+            }
+            AppEvent::PersistProviderSelection { provider_id, model } => {
+                self.persist_provider_selection(provider_id, model)
             }
             AppEvent::OpenThreadGoalMenu { thread_id } => self.open_thread_goal_menu(thread_id),
             AppEvent::OpenThreadGoalEditor { thread_id } => self.open_thread_goal_editor(thread_id),
@@ -2046,6 +2105,72 @@ async fn handle_worker_command(
                     result,
                 });
             });
+        }
+        WorkerCommand::LoadProviders => {
+            let request_handle = app_server.request_handle();
+            let event_tx = event_tx.clone();
+            tokio::spawn(async move {
+                let request_id =
+                    RequestId::String(format!("workbench-provider-list-{}", Uuid::new_v4()));
+                let result = request_handle
+                    .request_typed::<ModelProviderListResponse>(ClientRequest::ModelProviderList {
+                        request_id,
+                        params: ModelProviderListParams {},
+                    })
+                    .await
+                    .map_err(report_string);
+                let _ = event_tx.send(WorkerEvent::ProvidersLoaded(result));
+            });
+        }
+        WorkerCommand::LoadProviderModels {
+            provider_id,
+            provider_display_name,
+        } => {
+            let request_handle = app_server.request_handle();
+            let event_tx = event_tx.clone();
+            tokio::spawn(async move {
+                let request_id =
+                    RequestId::String(format!("workbench-provider-models-{}", Uuid::new_v4()));
+                let result = request_handle
+                    .request_typed::<ModelProviderModelsListResponse>(
+                        ClientRequest::ModelProviderModelsList {
+                            request_id,
+                            params: ModelProviderModelsListParams {
+                                provider_id: provider_id.clone(),
+                            },
+                        },
+                    )
+                    .await
+                    .map_err(report_string);
+                let _ = event_tx.send(WorkerEvent::ProviderModelsLoaded {
+                    provider_id,
+                    provider_display_name,
+                    result,
+                });
+            });
+        }
+        WorkerCommand::SelectProvider { provider_id, model } => {
+            let request_id =
+                RequestId::String(format!("workbench-provider-select-{}", Uuid::new_v4()));
+            let result = app_server
+                .request_handle()
+                .request_typed::<ModelProviderSelectResponse>(ClientRequest::ModelProviderSelect {
+                    request_id,
+                    params: ModelProviderSelectParams {
+                        provider_id: provider_id.clone(),
+                        model,
+                    },
+                })
+                .await
+                .map_err(report_string);
+            if let Ok(response) = result.as_ref() {
+                provider::apply_provider_selection_to_config(
+                    config,
+                    &response.selected_provider,
+                    response.model.as_deref(),
+                );
+            }
+            let _ = event_tx.send(WorkerEvent::ProviderSelected(result));
         }
         WorkerCommand::OpenGoalMenu { thread_id } => {
             let result = app_server
