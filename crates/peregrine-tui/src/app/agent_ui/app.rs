@@ -113,8 +113,6 @@ use peregrine_app_server_protocol::FeedbackUploadParams;
 use peregrine_app_server_protocol::FeedbackUploadResponse;
 use peregrine_app_server_protocol::GetAccountRateLimitsResponse;
 use peregrine_app_server_protocol::HooksListEntry;
-use peregrine_app_server_protocol::ListMcpServerStatusParams;
-use peregrine_app_server_protocol::ListMcpServerStatusResponse;
 #[cfg(test)]
 use peregrine_app_server_protocol::McpAuthStatus;
 use peregrine_app_server_protocol::McpServerStatus;

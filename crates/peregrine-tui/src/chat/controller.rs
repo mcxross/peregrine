@@ -15,8 +15,8 @@ use peregrine_app_server_client::AppServerEvent;
 use peregrine_app_server_protocol::{
     ApprovalsReviewer as AppServerApprovalsReviewer, ClientRequest,
     CommandExecutionRequestApprovalResponse, FileChangeRequestApprovalResponse,
-    GetAccountRateLimitsResponse, McpServerElicitationRequestResponse,
-    PermissionsRequestApprovalResponse, RateLimitSnapshot, RequestId,
+    GetAccountRateLimitsResponse, McpServerElicitationRequestResponse, McpServerStatus,
+    McpServerStatusDetail, PermissionsRequestApprovalResponse, RateLimitSnapshot, RequestId,
     RequestId as AppServerRequestId, ServerNotification, ServerRequest, SkillsListParams,
     SkillsListResponse, Thread, ThreadGoal, ThreadGoalClearResponse, ThreadGoalGetResponse,
     ThreadGoalSetResponse, ThreadGoalStatus, ThreadListCwdFilter, ThreadListParams,
@@ -56,6 +56,10 @@ use crate::agent::resume_source_kinds;
 use crate::agent::status::StatusAccountDisplay;
 use crate::agent::tui::FrameRequester;
 use uuid::Uuid;
+
+mod mcp_inventory;
+#[cfg(test)]
+mod tests;
 
 const SESSION_PAGE_SIZE: u32 = 25;
 const APP_SERVER_EVENT_DRAIN_LIMIT: usize = 32;
@@ -155,6 +159,10 @@ enum WorkerCommand {
     RefreshRateLimits {
         origin: RateLimitRefreshOrigin,
     },
+    FetchMcpInventory {
+        detail: McpServerStatusDetail,
+        thread_id: Option<ThreadId>,
+    },
     OpenGoalMenu {
         thread_id: ThreadId,
     },
@@ -214,6 +222,11 @@ enum WorkerEvent {
     RateLimitsLoaded {
         origin: RateLimitRefreshOrigin,
         result: std::result::Result<Vec<RateLimitSnapshot>, String>,
+    },
+    McpInventoryLoaded {
+        detail: McpServerStatusDetail,
+        thread_id: Option<ThreadId>,
+        result: std::result::Result<Vec<McpServerStatus>, String>,
     },
     GoalMenu {
         thread_id: ThreadId,
@@ -1016,6 +1029,14 @@ impl ChatController {
                 self.apply_rate_limit_result(origin, result);
                 self.drain_app_events()
             }
+            WorkerEvent::McpInventoryLoaded {
+                detail,
+                thread_id,
+                result,
+            } => {
+                self.apply_mcp_inventory_result(result, detail, thread_id);
+                self.drain_app_events()
+            }
             WorkerEvent::GoalMenu { thread_id, result } => {
                 if Some(thread_id) == self.active_thread_id {
                     self.apply_goal_menu_result(result);
@@ -1286,6 +1307,17 @@ impl ChatController {
             AppEvent::RefreshRateLimits { origin } => self.refresh_rate_limits(origin),
             AppEvent::RateLimitsLoaded { origin, result } => {
                 self.apply_rate_limit_result(origin, result);
+                ChatAction::None
+            }
+            AppEvent::FetchMcpInventory { detail, thread_id } => {
+                self.fetch_mcp_inventory(detail, thread_id)
+            }
+            AppEvent::McpInventoryLoaded {
+                result,
+                detail,
+                thread_id,
+            } => {
+                self.apply_mcp_inventory_result(result, detail, thread_id);
                 ChatAction::None
             }
             AppEvent::OpenThreadGoalMenu { thread_id } => self.open_thread_goal_menu(thread_id),
@@ -1996,6 +2028,24 @@ async fn handle_worker_command(
             .await
             .map_err(report_string);
             let _ = event_tx.send(WorkerEvent::RateLimitsLoaded { origin, result });
+        }
+        WorkerCommand::FetchMcpInventory { detail, thread_id } => {
+            let request_handle = app_server.request_handle();
+            let event_tx = event_tx.clone();
+            tokio::spawn(async move {
+                let result = crate::session::fetch_all_mcp_server_statuses(
+                    request_handle,
+                    detail,
+                    thread_id,
+                )
+                .await
+                .map_err(report_string);
+                let _ = event_tx.send(WorkerEvent::McpInventoryLoaded {
+                    detail,
+                    thread_id,
+                    result,
+                });
+            });
         }
         WorkerCommand::OpenGoalMenu { thread_id } => {
             let result = app_server

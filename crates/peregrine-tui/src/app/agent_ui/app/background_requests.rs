@@ -34,9 +34,13 @@ impl App {
         let app_event_tx = self.app_event_tx.clone();
         let request_thread_id = self.mcp_inventory_request_thread_id(thread_id);
         tokio::spawn(async move {
-            let result = fetch_all_mcp_server_statuses(request_handle, detail, request_thread_id)
-                .await
-                .map_err(|err| err.to_string());
+            let result = crate::session::fetch_all_mcp_server_statuses(
+                request_handle,
+                detail,
+                request_thread_id,
+            )
+            .await
+            .map_err(|err| err.to_string());
             app_event_tx.send(AppEvent::McpInventoryLoaded {
                 result,
                 detail,
@@ -595,40 +599,6 @@ impl App {
             overlay.replace_cells(self.transcript_cells.clone());
         }
     }
-}
-
-pub(super) async fn fetch_all_mcp_server_statuses(
-    request_handle: AppServerRequestHandle,
-    detail: McpServerStatusDetail,
-    thread_id: Option<ThreadId>,
-) -> Result<Vec<McpServerStatus>> {
-    let mut cursor = None;
-    let mut statuses = Vec::new();
-    let thread_id = thread_id.map(|id| id.to_string());
-
-    loop {
-        let request_id = RequestId::String(format!("mcp-inventory-{}", Uuid::new_v4()));
-        let response: ListMcpServerStatusResponse = request_handle
-            .request_typed(ClientRequest::McpServerStatusList {
-                request_id,
-                params: ListMcpServerStatusParams {
-                    cursor: cursor.clone(),
-                    limit: Some(100),
-                    detail: Some(detail),
-                    thread_id: thread_id.clone(),
-                },
-            })
-            .await
-            .wrap_err("mcpServerStatus/list failed in TUI")?;
-        statuses.extend(response.data);
-        if let Some(next_cursor) = response.next_cursor {
-            cursor = Some(next_cursor);
-        } else {
-            break;
-        }
-    }
-
-    Ok(statuses)
 }
 
 pub(super) async fn fetch_account_rate_limits(
