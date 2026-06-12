@@ -1,4 +1,57 @@
 use super::*;
+use crate::agent::chatwidget::tests::make_chatwidget_manual;
+
+#[test]
+fn embedded_chat_tick_flushes_typed_characters_in_order() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("runtime");
+    let (chat_widget, _app_events, _ops) =
+        runtime.block_on(make_chatwidget_manual(/*model_override*/ None));
+    let mut controller = ChatController::default();
+    controller.runtime = Some(runtime);
+    controller.mode = HostMode::Chat;
+    controller.chat_widget = Some(chat_widget);
+    let root = Path::new("/tmp");
+
+    controller.handle_key(root, KeyEvent::new(KeyCode::Char('/'), KeyModifiers::NONE));
+    assert_eq!(
+        controller
+            .chat_widget
+            .as_ref()
+            .expect("chat widget")
+            .composer_text_with_pending(),
+        ""
+    );
+
+    std::thread::sleep(Duration::from_millis(20));
+    controller.tick(root);
+
+    assert_eq!(
+        controller
+            .chat_widget
+            .as_ref()
+            .expect("chat widget")
+            .composer_text_with_pending(),
+        "/"
+    );
+
+    for ch in ['m', 'c', 'p'] {
+        controller.handle_key(root, KeyEvent::new(KeyCode::Char(ch), KeyModifiers::NONE));
+    }
+    std::thread::sleep(Duration::from_millis(20));
+    controller.tick(root);
+
+    assert_eq!(
+        controller
+            .chat_widget
+            .as_ref()
+            .expect("chat widget")
+            .composer_text_with_pending(),
+        "/mcp"
+    );
+}
 
 #[test]
 fn mcp_inventory_request_is_forwarded_to_workbench_worker() {

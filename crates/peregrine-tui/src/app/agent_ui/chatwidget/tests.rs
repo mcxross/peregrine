@@ -219,6 +219,7 @@ mod goal_menu;
 mod goal_validation;
 mod guardian;
 mod helpers;
+pub(crate) use helpers::make_chatwidget_manual;
 mod history_replay;
 mod mcp_startup;
 mod permissions;

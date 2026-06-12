@@ -368,6 +368,7 @@ impl ChatController {
 
         if let Some(chat) = self.chat_widget.as_mut() {
             let _guard = self.runtime.as_ref().map(|runtime| runtime.enter());
+            chat.flush_paste_burst_if_due();
             chat.pre_draw_tick();
         }
 

@@ -320,10 +320,18 @@ impl ChatWidget {
         self.refresh_plan_mode_nudge();
     }
 
+    pub(crate) fn flush_paste_burst_if_due(&mut self) -> bool {
+        if !self.bottom_pane.flush_paste_burst_if_due() {
+            return false;
+        }
+
+        self.refresh_plan_mode_nudge();
+        true
+    }
+
     // Returns true if caller should skip rendering this frame (a future frame is scheduled).
     pub(crate) fn handle_paste_burst_tick(&mut self, frame_requester: FrameRequester) -> bool {
-        if self.bottom_pane.flush_paste_burst_if_due() {
-            self.refresh_plan_mode_nudge();
+        if self.flush_paste_burst_if_due() {
             // A paste just flushed; request an immediate redraw and skip this frame.
             self.request_redraw();
             true
