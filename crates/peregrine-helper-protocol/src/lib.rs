@@ -73,6 +73,10 @@ pub fn resolve_helper_executable() -> Result<PathBuf, String> {
     resolve_helper_executable_from(&current_exe, std::env::var_os(HELPER_ENV_VAR))
 }
 
+pub fn resolve_helper_executable_for_current_exe(current_exe: &Path) -> Result<PathBuf, String> {
+    resolve_helper_executable_from(current_exe, std::env::var_os(HELPER_ENV_VAR))
+}
+
 fn resolve_helper_executable_from(
     current_exe: &Path,
     env_override: Option<OsString>,

@@ -525,6 +525,7 @@ async fn mcp_and_tool_search_follow_direct_and_deferred_tool_exposure() {
     )
     .await;
     direct_mcp.assert_visible_contains(&[
+        "list_mcp_servers",
         "list_mcp_resources",
         "list_mcp_resource_templates",
         "read_mcp_resource",
@@ -558,6 +559,7 @@ async fn mcp_and_tool_search_follow_direct_and_deferred_tool_exposure() {
     .await;
     missing_deferred_tools.assert_visible_lacks(&["tool_search"]);
     missing_deferred_tools.assert_visible_lacks(&[
+        "list_mcp_servers",
         "list_mcp_resources",
         "list_mcp_resource_templates",
         "read_mcp_resource",

@@ -58,6 +58,7 @@ pub use list_available_plugins_to_install::ListAvailablePluginsToInstallHandler;
 pub use mcp::McpHandler;
 pub use mcp_resource::ListMcpResourceTemplatesHandler;
 pub use mcp_resource::ListMcpResourcesHandler;
+pub use mcp_resource::ListMcpServersHandler;
 pub use mcp_resource::ReadMcpResourceHandler;
 use peregrine_types::models::AdditionalPermissionProfile;
 use peregrine_types::protocol::AskForApproval;

@@ -1,7 +1,31 @@
 use super::*;
+use codex_mcp::ToolInfo;
 use pretty_assertions::assert_eq;
 use rmcp::model::AnnotateAble;
 use serde_json::json;
+use std::sync::Arc;
+
+fn tool_info(server_name: &str, namespace: &str, tool_name: &str) -> ToolInfo {
+    ToolInfo {
+        server_name: server_name.to_string(),
+        supports_parallel_tool_calls: false,
+        server_origin: None,
+        callable_name: tool_name.to_string(),
+        callable_namespace: namespace.to_string(),
+        namespace_description: None,
+        tool: rmcp::model::Tool::new(
+            tool_name.to_string(),
+            format!("{tool_name} test tool"),
+            Arc::new(rmcp::model::object(json!({
+                "type": "object",
+                "properties": {},
+            }))),
+        ),
+        connector_id: None,
+        connector_name: None,
+        plugin_display_names: Vec::new(),
+    }
+}
 
 fn resource(uri: &str, name: &str) -> Resource {
     rmcp::model::RawResource {
@@ -37,6 +61,102 @@ fn resource_with_server_serializes_server_field() {
     assert_eq!(value["server"], json!("test"));
     assert_eq!(value["uri"], json!("memo://id"));
     assert_eq!(value["name"], json!("memo"));
+}
+
+#[test]
+fn mcp_server_inventory_groups_and_sorts_live_tools() {
+    let payload = ListMcpServersPayload::from_tools(
+        vec![
+            tool_info("beta", "mcp__beta", "search"),
+            tool_info("alpha", "mcp__alpha", "write"),
+            tool_info("alpha", "mcp__alpha", "read"),
+        ],
+        None,
+        0,
+        100,
+    )
+    .expect("build inventory");
+
+    assert_eq!(
+        payload,
+        ListMcpServersPayload {
+            servers: vec![
+                McpServerInventoryEntry {
+                    name: "alpha".to_string(),
+                    tools: vec![
+                        McpToolInventoryEntry {
+                            name: "read".to_string(),
+                            callable_name: "read".to_string(),
+                            namespace: "mcp__alpha".to_string(),
+                        },
+                        McpToolInventoryEntry {
+                            name: "write".to_string(),
+                            callable_name: "write".to_string(),
+                            namespace: "mcp__alpha".to_string(),
+                        },
+                    ],
+                },
+                McpServerInventoryEntry {
+                    name: "beta".to_string(),
+                    tools: vec![McpToolInventoryEntry {
+                        name: "search".to_string(),
+                        callable_name: "search".to_string(),
+                        namespace: "mcp__beta".to_string(),
+                    }],
+                },
+            ],
+            server_count: 2,
+            tool_count: 3,
+            next_cursor: None,
+        }
+    );
+}
+
+#[test]
+fn mcp_server_inventory_filters_and_paginates_tools() {
+    let tools = vec![
+        tool_info("alpha", "mcp__alpha", "read"),
+        tool_info("alpha", "mcp__alpha", "write"),
+        tool_info("beta", "mcp__beta", "search"),
+    ];
+
+    let first_page =
+        ListMcpServersPayload::from_tools(tools.clone(), Some("alpha"), 0, 1).expect("first page");
+    assert_eq!(
+        first_page,
+        ListMcpServersPayload {
+            servers: vec![McpServerInventoryEntry {
+                name: "alpha".to_string(),
+                tools: vec![McpToolInventoryEntry {
+                    name: "read".to_string(),
+                    callable_name: "read".to_string(),
+                    namespace: "mcp__alpha".to_string(),
+                }],
+            }],
+            server_count: 1,
+            tool_count: 2,
+            next_cursor: Some("1".to_string()),
+        }
+    );
+
+    let second_page =
+        ListMcpServersPayload::from_tools(tools, Some("alpha"), 1, 1).expect("second page");
+    assert_eq!(
+        second_page,
+        ListMcpServersPayload {
+            servers: vec![McpServerInventoryEntry {
+                name: "alpha".to_string(),
+                tools: vec![McpToolInventoryEntry {
+                    name: "write".to_string(),
+                    callable_name: "write".to_string(),
+                    namespace: "mcp__alpha".to_string(),
+                }],
+            }],
+            server_count: 1,
+            tool_count: 2,
+            next_cursor: None,
+        }
+    );
 }
 
 #[test]

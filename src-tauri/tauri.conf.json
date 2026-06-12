@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "xyz.mcxross.peregrine",
   "build": {
-    "beforeDevCommand": "bun run dev",
+    "beforeDevCommand": "bun run prepare:sidecars && bun run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run build",
+    "beforeBuildCommand": "bun run prepare:sidecars -- --release && bun run build",
     "frontendDist": "../dist"
   },
   "app": {

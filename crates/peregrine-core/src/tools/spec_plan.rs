@@ -12,6 +12,7 @@ use crate::tools::handlers::GetGoalHandler;
 use crate::tools::handlers::ListAvailablePluginsToInstallHandler;
 use crate::tools::handlers::ListMcpResourceTemplatesHandler;
 use crate::tools::handlers::ListMcpResourcesHandler;
+use crate::tools::handlers::ListMcpServersHandler;
 use crate::tools::handlers::McpHandler;
 use crate::tools::handlers::PlanHandler;
 use crate::tools::handlers::ReadMcpResourceHandler;
@@ -582,6 +583,7 @@ fn add_shell_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mut Planne
 
 fn add_mcp_resource_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mut PlannedTools) {
     if context.mcp_tools.is_some() {
+        planned_tools.add(ListMcpServersHandler);
         planned_tools.add(ListMcpResourcesHandler);
         planned_tools.add(ListMcpResourceTemplatesHandler);
         planned_tools.add(ReadMcpResourceHandler);

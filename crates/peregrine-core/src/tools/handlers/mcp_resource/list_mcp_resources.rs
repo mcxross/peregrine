@@ -14,6 +14,7 @@ use peregrine_types::protocol::McpInvocation;
 
 use rmcp::model::PaginatedRequestParams;
 
+use super::HOST_MCP_SERVER_LABEL;
 use super::ListResourcesArgs;
 use super::ListResourcesPayload;
 use super::call_tool_result_from_content;
@@ -72,7 +73,9 @@ impl ToolExecutor<ToolInvocation> for ListMcpResourcesHandler {
         let cursor = normalize_optional_string(cursor);
 
         let invocation = McpInvocation {
-            server: server.clone().unwrap_or_else(|| "codex".to_string()),
+            server: server
+                .clone()
+                .unwrap_or_else(|| HOST_MCP_SERVER_LABEL.to_string()),
             tool: "list_mcp_resources".to_string(),
             arguments: arguments.clone(),
         };

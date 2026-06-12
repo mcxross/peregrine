@@ -1,7 +1,10 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
+use codex_mcp::ToolInfo;
+use codex_mcp::tool_is_model_visible;
 use peregrine_types::items::McpToolCallError;
 use peregrine_types::items::McpToolCallItem;
 use peregrine_types::items::McpToolCallStatus;
@@ -25,11 +28,27 @@ use peregrine_types::protocol::McpInvocation;
 
 mod list_mcp_resource_templates;
 mod list_mcp_resources;
+mod list_mcp_servers;
 mod read_mcp_resource;
 
 pub use list_mcp_resource_templates::ListMcpResourceTemplatesHandler;
 pub use list_mcp_resources::ListMcpResourcesHandler;
+pub use list_mcp_servers::ListMcpServersHandler;
 pub use read_mcp_resource::ReadMcpResourceHandler;
+
+const DEFAULT_MCP_INVENTORY_LIMIT: usize = 100;
+const HOST_MCP_SERVER_LABEL: &str = "peregrine";
+const MAX_MCP_INVENTORY_LIMIT: usize = 200;
+
+#[derive(Debug, Deserialize, Default)]
+struct ListMcpServersArgs {
+    #[serde(default)]
+    server: Option<String>,
+    #[serde(default)]
+    cursor: Option<String>,
+    #[serde(default)]
+    limit: Option<usize>,
+}
 
 #[derive(Debug, Deserialize, Default)]
 struct ListResourcesArgs {
@@ -53,6 +72,83 @@ struct ListResourceTemplatesArgs {
 struct ReadResourceArgs {
     server: String,
     uri: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct McpToolInventoryEntry {
+    name: String,
+    callable_name: String,
+    namespace: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+struct McpServerInventoryEntry {
+    name: String,
+    tools: Vec<McpToolInventoryEntry>,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct ListMcpServersPayload {
+    servers: Vec<McpServerInventoryEntry>,
+    server_count: usize,
+    tool_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    next_cursor: Option<String>,
+}
+
+impl ListMcpServersPayload {
+    fn from_tools(
+        tools: Vec<ToolInfo>,
+        server_filter: Option<&str>,
+        start: usize,
+        limit: usize,
+    ) -> Result<Self, FunctionCallError> {
+        let mut tools = tools
+            .into_iter()
+            .filter(tool_is_model_visible)
+            .filter(|tool| server_filter.is_none_or(|server| tool.server_name == server))
+            .collect::<Vec<_>>();
+        tools.sort_by(|left, right| {
+            (&left.server_name, &left.tool.name).cmp(&(&right.server_name, &right.tool.name))
+        });
+
+        let tool_count = tools.len();
+        if start > tool_count {
+            return Err(FunctionCallError::RespondToModel(format!(
+                "cursor {start} exceeds total MCP tools {tool_count}"
+            )));
+        }
+        let server_count = tools
+            .iter()
+            .map(|tool| tool.server_name.as_str())
+            .collect::<HashSet<_>>()
+            .len();
+        let end = start.saturating_add(limit).min(tool_count);
+        let mut servers = Vec::<McpServerInventoryEntry>::new();
+        for tool in &tools[start..end] {
+            let entry = McpToolInventoryEntry {
+                name: tool.tool.name.to_string(),
+                callable_name: tool.callable_name.clone(),
+                namespace: tool.callable_namespace.clone(),
+            };
+            match servers.last_mut() {
+                Some(server) if server.name == tool.server_name => server.tools.push(entry),
+                _ => servers.push(McpServerInventoryEntry {
+                    name: tool.server_name.clone(),
+                    tools: vec![entry],
+                }),
+            }
+        }
+
+        Ok(Self {
+            servers,
+            server_count,
+            tool_count,
+            next_cursor: (end < tool_count).then(|| end.to_string()),
+        })
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -275,9 +371,7 @@ where
     T: Serialize,
 {
     let content = serde_json::to_string(&payload).map_err(|err| {
-        FunctionCallError::RespondToModel(format!(
-            "failed to serialize MCP resource response: {err}"
-        ))
+        FunctionCallError::RespondToModel(format!("failed to serialize MCP response: {err}"))
     })?;
 
     Ok(FunctionToolOutput::from_text(content, Some(true)))
