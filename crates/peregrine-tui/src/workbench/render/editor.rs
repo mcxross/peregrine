@@ -168,22 +168,4 @@ impl App {
         }
     }
 
-    pub(crate) fn render_input(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        let inner_width = area.width.saturating_sub(2) as usize;
-        self.input.set_viewport_width(inner_width);
-        let paragraph = Paragraph::new(self.input.text.as_str())
-            .style(self.base_style())
-            .block(self.panel_block("Input", self.focus == FocusPane::Input))
-            .scroll((0, usize_to_u16_saturating(self.input.scroll)));
-        frame.render_widget(paragraph, area);
-
-        if self.focus == FocusPane::Input {
-            let col = self.input.cursor.saturating_sub(self.input.scroll);
-            if self.input.cursor >= self.input.scroll && col < inner_width {
-                let x = usize_to_u16_saturating(col);
-                frame.set_cursor_position(Position::new(area.x + 1 + x, area.y + 1));
-            }
-        }
-    }
-
 }

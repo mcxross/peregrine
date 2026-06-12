@@ -38,7 +38,7 @@ impl App {
                 FocusPane::Explorer => self.handle_explorer_key(key),
                 FocusPane::Tabs => self.handle_tabs_key(key),
                 FocusPane::Editor => self.handle_editor_key(key),
-                FocusPane::Input => self.handle_input_key(key),
+                FocusPane::Input => self.handle_editor_key(key),
             },
         }
     }

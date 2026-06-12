@@ -1,6 +1,6 @@
 use super::{
-    BytecodeCacheEntry, BytecodeLoadResult, BytecodePane, BytecodeTargetKey, CommandInput,
-    EditorBuffer, EditorMode, EditorRenderCache, Explorer, FocusPane, GraphLoadResult, GraphPanes,
+    BytecodeCacheEntry, BytecodeLoadResult, BytecodePane, BytecodeTargetKey, EditorBuffer,
+    EditorMode, EditorRenderCache, Explorer, FocusPane, GraphLoadResult, GraphPanes,
     StartupTaskResult, VimState, WorkbenchExit, WorkbenchLayout, WorkbenchStartupState,
     WorkbenchTab, AppMode,
 };
@@ -37,7 +37,6 @@ pub struct App {
     pub(crate) graphs: GraphPanes,
     pub(crate) graph_loader_rx: Option<(WorkbenchTab, mpsc::Receiver<GraphLoadResult>)>,
     pub(crate) chat: chat::ChatController,
-    pub(crate) input: CommandInput,
     pub(crate) startup: WorkbenchStartupState,
     pub(crate) startup_task_rx: Option<mpsc::Receiver<StartupTaskResult>>,
     pub(crate) package_load_report: Option<PackageLoadReport>,

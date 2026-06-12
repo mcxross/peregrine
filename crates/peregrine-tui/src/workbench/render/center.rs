@@ -23,29 +23,13 @@ use crate::tabs::{tab_hit_areas, TabNav};
 impl App {
     pub(crate) fn render_center(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let palette = self.palette();
-        let rows = if self.active_tab == WorkbenchTab::Chat {
-            Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(3), Constraint::Min(3)])
-                .split(area)
-        } else {
-            Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(3),
-                    Constraint::Min(3),
-                    Constraint::Length(3),
-                ])
-                .split(area)
-        };
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(3)])
+            .split(area);
 
         self.layout.tabs = rows[0];
         self.layout.editor = rows[1];
-        self.layout.input = if self.active_tab == WorkbenchTab::Chat {
-            Rect::default()
-        } else {
-            rows[2]
-        };
         self.layout.tab_hit_areas = tab_hit_areas(&WORKBENCH_TAB_LABELS, rows[0])
             .into_iter()
             .zip(WorkbenchTab::ALL)
@@ -71,9 +55,6 @@ impl App {
             }
         }
 
-        if self.active_tab != WorkbenchTab::Chat {
-            self.render_input(frame, rows[2]);
-        }
     }
 
 }

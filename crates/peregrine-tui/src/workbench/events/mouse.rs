@@ -73,19 +73,6 @@ impl App {
             return;
         }
 
-        if rect_contains(self.layout.input, x, y) {
-            self.set_focus(FocusPane::Input);
-            match direction {
-                ScrollDirection::Left => self
-                    .input
-                    .scroll_horizontal(false, MOUSE_HORIZONTAL_SCROLL_STEP),
-                ScrollDirection::Right => self
-                    .input
-                    .scroll_horizontal(true, MOUSE_HORIZONTAL_SCROLL_STEP),
-                ScrollDirection::Up | ScrollDirection::Down => {}
-            }
-            return;
-        }
     }
 
     pub(crate) fn scroll_explorer(&mut self, direction: ScrollDirection) {
@@ -197,10 +184,6 @@ impl App {
             return;
         }
 
-        if rect_contains(self.layout.input, x, y) {
-            self.handle_input_click(x);
-            return;
-        }
     }
 
     pub(crate) fn clicked_tab(&self, x: u16, y: u16) -> Option<WorkbenchTab> {
@@ -251,15 +234,6 @@ impl App {
                     usize::from(x.saturating_sub(text_area.x)),
                 );
             }
-        }
-    }
-
-    pub(crate) fn handle_input_click(&mut self, x: u16) {
-        self.set_focus(FocusPane::Input);
-        let inner = inner_rect(self.layout.input);
-        if x >= inner.x {
-            self.input
-                .set_cursor_column(usize::from(x.saturating_sub(inner.x)));
         }
     }
 

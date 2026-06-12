@@ -5,12 +5,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub const WORKBENCH_CANCELED: &str = "Workbench navigation canceled";
 pub const WORKBENCH_UNBOUND: &str = "Workbench navigation key is not bound";
 
-const FOCUS_ORDER: [FocusPane; 4] = [
-    FocusPane::Explorer,
-    FocusPane::Editor,
-    FocusPane::Input,
-    FocusPane::Tabs,
-];
+const FOCUS_ORDER: [FocusPane; 3] = [FocusPane::Explorer, FocusPane::Editor, FocusPane::Tabs];
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Navigation {
@@ -94,6 +89,7 @@ pub enum NavigationCommand {
     NextTheme,
     Focus(FocusPane),
     FocusCodeEditor,
+    SwitchToAgent,
     FocusNext,
     FocusPrevious,
     MoveFocus(FocusDirection),
@@ -141,7 +137,7 @@ pub fn move_focus(current: FocusPane, direction: FocusDirection) -> FocusPane {
         },
         FocusDirection::Down => match current {
             FocusPane::Tabs => FocusPane::Editor,
-            FocusPane::Editor => FocusPane::Input,
+            FocusPane::Editor => FocusPane::Editor,
             other => other,
         },
     }
@@ -201,7 +197,7 @@ fn workbench_command(key: KeyEvent) -> NavigationCommand {
             KeyBindEvent::WorkbenchFocusExplorer => NavigationCommand::Focus(FocusPane::Explorer),
             KeyBindEvent::WorkbenchFocusTabs => NavigationCommand::Focus(FocusPane::Tabs),
             KeyBindEvent::WorkbenchFocusCodeEditor => NavigationCommand::FocusCodeEditor,
-            KeyBindEvent::WorkbenchFocusInput => NavigationCommand::Focus(FocusPane::Input),
+            KeyBindEvent::WorkbenchSwitchToAgent => NavigationCommand::SwitchToAgent,
             KeyBindEvent::WorkbenchToggleEditorMode => NavigationCommand::ToggleEditorMode,
             KeyBindEvent::WorkbenchPreviousTheme => NavigationCommand::PreviousTheme,
             KeyBindEvent::WorkbenchNextTheme => NavigationCommand::NextTheme,
@@ -272,7 +268,9 @@ fn dispatch_key(key: KeyEvent) -> Vec<KeyBindEvent> {
         (KeyCode::Char('c'), KeyModifiers::NONE) => {
             events.push(KeyBindEvent::WorkbenchFocusCodeEditor)
         }
-        (KeyCode::Char('i'), KeyModifiers::NONE) => events.push(KeyBindEvent::WorkbenchFocusInput),
+        (KeyCode::Char('a'), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchSwitchToAgent)
+        }
         (KeyCode::Char('m'), KeyModifiers::NONE) => {
             events.push(KeyBindEvent::WorkbenchToggleEditorMode)
         }
@@ -315,7 +313,7 @@ mod tests {
         keybinds::init_default_keybindings().expect("keybindings");
         let mut navigation = Navigation::default();
         let first = navigation.translate(ctrl('w'), FocusPane::Editor);
-        let second = navigation.translate(key(KeyCode::Char('i')), FocusPane::Editor);
+        let second = navigation.translate(key(KeyCode::Char('a')), FocusPane::Editor);
 
         assert_eq!(
             first,
@@ -323,7 +321,7 @@ mod tests {
         );
         assert_eq!(
             second,
-            NavigationIntent::Command(NavigationCommand::Focus(FocusPane::Input))
+            NavigationIntent::Command(NavigationCommand::SwitchToAgent)
         );
     }
 
@@ -405,7 +403,7 @@ mod tests {
         );
         assert_eq!(
             move_focus(FocusPane::Editor, FocusDirection::Down),
-            FocusPane::Input
+            FocusPane::Editor
         );
         assert_eq!(
             move_focus(FocusPane::Editor, FocusDirection::Right),
@@ -425,8 +423,8 @@ mod tests {
             vec![KeyBindEvent::BeginWorkbenchNavigation]
         );
         assert_eq!(
-            dispatch_key(key(KeyCode::Char('i'))),
-            vec![KeyBindEvent::WorkbenchFocusInput]
+            dispatch_key(key(KeyCode::Char('a'))),
+            vec![KeyBindEvent::WorkbenchSwitchToAgent]
         );
     }
 

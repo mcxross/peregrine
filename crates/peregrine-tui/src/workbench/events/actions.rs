@@ -43,6 +43,11 @@ impl App {
             NavigationCommand::NextTheme => self.next_theme(),
             NavigationCommand::Focus(pane) => self.set_focus(pane),
             NavigationCommand::FocusCodeEditor => self.focus_code_editor(),
+            NavigationCommand::SwitchToAgent => {
+                self.mode = AppMode::Agent;
+                self.status = String::from("Switching to agent mode");
+                self.exit = Some(WorkbenchExit::SwitchToAgent);
+            }
             NavigationCommand::FocusNext => self.set_focus(self.next_focus_pane()),
             NavigationCommand::FocusPrevious => {
                 self.set_focus(self.previous_focus_pane());
@@ -309,29 +314,6 @@ impl App {
         }
     }
 
-    pub(crate) fn handle_input_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => self.set_focus(FocusPane::Editor),
-            KeyCode::Enter => self.dispatch_command_input(),
-            _ => self.input.handle_key(key),
-        }
-    }
-
-    pub(crate) fn dispatch_command_input(&mut self) {
-        let text = self.input.take_text();
-        match text.trim() {
-            "" => {}
-            ":agent" | "agent" => {
-                self.mode = AppMode::Agent;
-                self.status = String::from("Switching to agent mode");
-                self.exit = Some(WorkbenchExit::SwitchToAgent);
-            }
-            command => {
-                self.status = format!("Unknown command: {command}");
-            }
-        }
-    }
-
     pub(crate) fn focus_code_editor(&mut self) {
         self.standard_editor_editing = false;
         self.active_tab = WorkbenchTab::Code;
@@ -353,7 +335,11 @@ impl App {
     }
 
     pub(crate) fn set_focus(&mut self, pane: FocusPane) {
-        let focus = pane;
+        let focus = if pane == FocusPane::Input && self.active_tab != WorkbenchTab::Chat {
+            FocusPane::Editor
+        } else {
+            pane
+        };
         if focus != FocusPane::Editor || self.active_tab != WorkbenchTab::Code {
             self.standard_editor_editing = false;
         }

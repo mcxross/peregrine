@@ -118,7 +118,6 @@ impl App {
             graphs: GraphPanes::default(),
             graph_loader_rx: None,
             chat,
-            input: CommandInput::default(),
             startup: WorkbenchStartupState::Workbench,
             startup_task_rx: None,
             package_load_report: None,
@@ -383,7 +382,6 @@ impl App {
         self.explorer =
             Explorer::new(root).map_err(|error| format!("Could not open project root: {error}"))?;
         self.editor = EditorBuffer::new_empty();
-        self.input = CommandInput::default();
         self.chat.shutdown();
         self.chat = self
             .application_config

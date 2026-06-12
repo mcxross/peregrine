@@ -24,7 +24,7 @@ pub enum KeyBindEvent {
     WorkbenchFocusExplorer,
     WorkbenchFocusTabs,
     WorkbenchFocusCodeEditor,
-    WorkbenchFocusInput,
+    WorkbenchSwitchToAgent,
     WorkbenchToggleEditorMode,
     WorkbenchPreviousTheme,
     WorkbenchNextTheme,
@@ -46,6 +46,6 @@ pub fn default_hint() -> String {
 }
 
 pub fn workbench_hint() -> String {
-    "Ctrl-W then arrows/hjkl move, e explorer, t tabs, c code, i input, 1-6 views, m mode"
+    "Ctrl-W then arrows/hjkl move, e explorer, t tabs, c code, a agent, 1-6 views, m mode"
         .to_string()
 }

@@ -209,6 +209,5 @@ pub(crate) struct WorkbenchLayout {
     pub(crate) tabs: Rect,
     pub(crate) tab_hit_areas: Vec<(WorkbenchTab, Rect)>,
     pub(crate) editor: Rect,
-    pub(crate) input: Rect,
     pub(crate) bottom_bar: Rect,
 }

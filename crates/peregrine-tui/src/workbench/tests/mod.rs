@@ -734,7 +734,7 @@ fn navigation_moves_between_workbench_sections() {
     assert_eq!(app.focus, FocusPane::Editor);
 
     workbench_nav(&mut app, KeyCode::Char('j'));
-    assert_eq!(app.focus, FocusPane::Input);
+    assert_eq!(app.focus, FocusPane::Editor);
 
     workbench_nav(&mut app, KeyCode::Char('l'));
     assert_eq!(app.focus, FocusPane::Editor);
@@ -826,7 +826,7 @@ fn standard_editor_view_navigation_does_not_type() {
     app.focus = FocusPane::Editor;
 
     app.handle_key_event(key(KeyCode::Char('j')));
-    assert_eq!(app.focus, FocusPane::Input);
+    assert_eq!(app.focus, FocusPane::Editor);
     assert_eq!(app.editor.text(), "");
 
     app.focus = FocusPane::Editor;
@@ -909,7 +909,7 @@ fn mouse_clicking_editor_focuses_without_entering_edit_mode() {
 
     assert!(!app.standard_editor_editing);
     assert_eq!(app.editor.text(), "");
-    assert_eq!(app.focus, FocusPane::Input);
+    assert_eq!(app.focus, FocusPane::Editor);
 }
 
 #[test]
@@ -935,7 +935,7 @@ fn mouse_scroll_pans_editor_vertically_and_horizontally() {
     let temp = tempfile::tempdir().expect("temp dir");
     let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
     app.focus = FocusPane::Editor;
-    app.editor.lines = (0..24)
+    app.editor.lines = (0..40)
         .map(|index| format!("line {index:02} {}", "x".repeat(96)))
         .collect();
 
@@ -973,24 +973,6 @@ fn mouse_scroll_explorer_moves_selection() {
 
     assert_eq!(app.focus, FocusPane::Explorer);
     assert_eq!(app.explorer.selected(), MOUSE_VERTICAL_SCROLL_STEP);
-}
-
-#[test]
-fn mouse_scroll_and_click_input_accounts_for_horizontal_offset() {
-    let temp = tempfile::tempdir().expect("temp dir");
-    let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
-    app.input.text = "x".repeat(96);
-    let backend = TestBackend::new(80, 24);
-    let mut terminal = Terminal::new(backend).expect("terminal");
-    terminal.draw(|frame| app.render(frame)).expect("draw");
-    let input = inner_rect(app.layout.input);
-
-    app.handle_mouse_event(scroll_right(input.x, input.y));
-    assert_eq!(app.focus, FocusPane::Input);
-    assert_eq!(app.input.scroll, MOUSE_HORIZONTAL_SCROLL_STEP);
-
-    app.handle_mouse_event(left_click(input.x + 3, input.y));
-    assert_eq!(app.input.cursor, app.input.scroll + 3);
 }
 
 #[test]
@@ -1125,12 +1107,12 @@ fn workbench_prefix_selects_tabs_and_toggles_mode() {
 fn global_tab_shortcuts_preserve_current_focus() {
     let temp = tempfile::tempdir().expect("temp dir");
     let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
-    app.focus = FocusPane::Input;
+    app.focus = FocusPane::Editor;
 
     app.handle_key_event(key_with_modifiers(KeyCode::Char('4'), KeyModifiers::ALT));
 
     assert_eq!(app.active_tab, WorkbenchTab::CallGraph);
-    assert_eq!(app.focus, FocusPane::Input);
+    assert_eq!(app.focus, FocusPane::Editor);
 }
 
 #[test]
@@ -1188,18 +1170,14 @@ fn global_quit_shortcuts_set_workbench_quit_exit() {
 }
 
 #[test]
-fn workbench_agent_command_switches_to_agent_exit() {
+fn workbench_navigation_switches_to_agent_exit() {
     let temp = tempfile::tempdir().expect("temp dir");
     let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
 
-    app.focus = FocusPane::Input;
-    app.input.text = ":agent".to_string();
-    app.input.cursor = app.input.text.len();
-    app.handle_key_event(key(KeyCode::Enter));
+    workbench_nav(&mut app, KeyCode::Char('a'));
 
     assert_eq!(app.mode, AppMode::Agent);
     assert_eq!(app.exit, Some(WorkbenchExit::SwitchToAgent));
-    assert_eq!(app.input.text, "");
 }
 
 #[test]
@@ -1218,7 +1196,7 @@ fn render_smoke_test_contains_workbench_regions() {
     assert!(rendered.contains("▸"));
     assert!(rendered.contains("bytecode"));
     assert!(rendered.contains("call graph"));
-    assert!(rendered.contains("Input"));
+    assert!(!rendered.contains("Input"));
     assert!(rendered.contains("package: no status yet"));
     assert!(rendered.contains("standard"));
     assert!(!rendered.contains("app mode"));
