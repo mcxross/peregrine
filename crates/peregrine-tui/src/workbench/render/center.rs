@@ -51,7 +51,7 @@ impl App {
             }
             WorkbenchTab::Chat => {
                 self.chat
-                    .render(frame, rows[1], self.focus == FocusPane::Input);
+                    .render(frame, rows[1], self.focus == FocusPane::Input, palette);
             }
         }
 

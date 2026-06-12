@@ -725,6 +725,34 @@ fn chat_theme_selection_updates_workbench_theme() {
 }
 
 #[test]
+fn workbench_chat_host_uses_active_theme_palette() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let theme = Theme::new(ThemeName::BytecodeEmber);
+    let palette = theme.palette();
+    let mut app =
+        App::new_with_theme(temp.path(), EditorMode::Standard, theme).expect("app");
+    app.active_tab = WorkbenchTab::Chat;
+    app.focus = FocusPane::Input;
+    let backend = TestBackend::new(120, 30);
+    let mut terminal = Terminal::new(backend).expect("terminal");
+
+    terminal.draw(|frame| app.render(frame)).expect("draw");
+
+    let chat = app.layout.editor;
+    let buffer = terminal.backend().buffer();
+    let border_style = buffer[(chat.x, chat.y)].style();
+    let body_style = buffer[(chat.x + 1, chat.y + 1)].style();
+    assert_eq!(
+        (border_style.fg, border_style.bg),
+        (Some(palette.accent), Some(palette.bg))
+    );
+    assert_eq!(
+        (body_style.fg, body_style.bg),
+        (Some(palette.muted), Some(palette.bg))
+    );
+}
+
+#[test]
 fn navigation_moves_between_workbench_sections() {
     let temp = tempfile::tempdir().expect("temp dir");
     let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");

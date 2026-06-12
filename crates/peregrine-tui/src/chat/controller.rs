@@ -28,7 +28,7 @@ use peregrine_config::{CloudRequirementsLoader, LoaderOverrides};
 use peregrine_types::ThreadId;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Position, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use tokio::sync::broadcast;
@@ -57,6 +57,7 @@ use crate::agent::model_catalog::ModelCatalog;
 use crate::agent::resume_source_kinds;
 use crate::agent::status::StatusAccountDisplay;
 use crate::agent::tui::FrameRequester;
+use crate::theme::ThemePalette;
 use uuid::Uuid;
 
 mod mcp_inventory;
@@ -474,13 +475,20 @@ impl ChatController {
         }
     }
 
-    pub(crate) fn render(&mut self, frame: &mut Frame<'_>, area: Rect, focused: bool) {
+    pub(crate) fn render(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        focused: bool,
+        palette: ThemePalette,
+    ) {
+        frame.buffer_mut().set_style(area, chat_base_style(palette));
         match self.mode {
             HostMode::Idle | HostMode::Loading | HostMode::Error => {
-                self.render_message(frame, area, focused);
+                self.render_message(frame, area, focused, palette);
             }
-            HostMode::Sessions => self.render_sessions(frame, area, focused),
-            HostMode::Chat => self.render_chat(frame, area, focused),
+            HostMode::Sessions => self.render_sessions(frame, area, focused, palette),
+            HostMode::Chat => self.render_chat(frame, area, focused, palette),
         }
     }
 
@@ -565,7 +573,13 @@ impl ChatController {
         self.runtime = Some(runtime);
     }
 
-    fn render_message(&self, frame: &mut Frame<'_>, area: Rect, focused: bool) {
+    fn render_message(
+        &self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        focused: bool,
+        palette: ThemePalette,
+    ) {
         let body = match self.mode {
             HostMode::Idle => "Open chat to load previous sessions.",
             HostMode::Loading => "Loading previous chat sessions...",
@@ -573,31 +587,43 @@ impl ChatController {
             HostMode::Sessions | HostMode::Chat => "",
         };
         let paragraph = Paragraph::new(body)
-            .style(Style::default().fg(Color::Gray))
-            .block(chat_block(self.chat_title(), focused))
+            .style(chat_muted_style(palette))
+            .block(chat_block(self.chat_title(), focused, palette))
             .wrap(Wrap { trim: false });
         frame.render_widget(paragraph, area);
     }
 
-    fn render_sessions(&mut self, frame: &mut Frame<'_>, area: Rect, focused: bool) {
+    fn render_sessions(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        focused: bool,
+        palette: ThemePalette,
+    ) {
         let rows = self.chat_rows(area);
-        self.render_session_list(frame, rows[0], focused);
-        self.render_composer(frame, rows[1], focused);
+        self.render_session_list(frame, rows[0], focused, palette);
+        self.render_composer(frame, rows[1], focused, palette);
     }
 
-    fn render_session_list(&mut self, frame: &mut Frame<'_>, area: Rect, focused: bool) {
+    fn render_session_list(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        focused: bool,
+        palette: ThemePalette,
+    ) {
         if self.sessions.is_empty() {
             let lines = vec![
                 Line::from("No previous chats for this project."),
                 Line::from(""),
                 Line::styled(
                     "Type a prompt below to start a fresh chat.",
-                    Style::default().fg(Color::DarkGray),
+                    chat_muted_style(palette),
                 ),
             ];
             let paragraph = Paragraph::new(lines)
-                .style(Style::default().fg(Color::Gray))
-                .block(chat_block(self.chat_title(), focused));
+                .style(chat_base_style(palette))
+                .block(chat_block(self.chat_title(), focused, palette));
             frame.render_widget(paragraph, area);
             return;
         }
@@ -611,12 +637,12 @@ impl ChatController {
                     Line::from(vec![
                         Span::styled(
                             format_updated_at(session.updated_at),
-                            Style::default().fg(Color::DarkGray),
+                            chat_muted_style(palette),
                         ),
                         Span::raw("  "),
                         Span::styled(
                             session.cwd.display().to_string(),
-                            Style::default().fg(Color::Gray),
+                            chat_base_style(palette),
                         ),
                     ]),
                 ])
@@ -624,29 +650,36 @@ impl ChatController {
             .collect::<Vec<_>>();
         let mut state = ListState::default().with_selected(Some(self.selected_session));
         let list = List::new(items)
-            .block(chat_block(self.chat_title(), focused))
-            .style(Style::default().fg(Color::Gray))
+            .block(chat_block(self.chat_title(), focused, palette))
+            .style(chat_base_style(palette))
             .highlight_symbol("> ")
-            .highlight_style(
-                Style::default()
-                    .fg(Color::White)
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD),
-            );
+            .highlight_style(chat_selection_style(palette));
         frame.render_stateful_widget(list, area, &mut state);
         self.session_list_offset = state.offset();
     }
 
-    fn render_chat(&mut self, frame: &mut Frame<'_>, area: Rect, focused: bool) {
+    fn render_chat(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        focused: bool,
+        palette: ThemePalette,
+    ) {
         let rows = self.chat_rows(area);
-        self.render_transcript(frame, rows[0], focused);
-        self.render_composer_popup_overlay(frame, rows[0]);
-        self.render_composer(frame, rows[1], focused);
+        self.render_transcript(frame, rows[0], focused, palette);
+        self.render_composer_popup_overlay(frame, rows[0], palette);
+        self.render_composer(frame, rows[1], focused, palette);
     }
 
-    fn render_transcript(&mut self, frame: &mut Frame<'_>, area: Rect, focused: bool) {
+    fn render_transcript(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        focused: bool,
+        palette: ThemePalette,
+    ) {
         let Some(chat) = self.chat_widget.as_ref() else {
-            self.render_message(frame, area, focused);
+            self.render_message(frame, area, focused, palette);
             return;
         };
         let lines = chat.embedded_transcript_lines(&self.history_cells, area.width);
@@ -655,8 +688,8 @@ impl ChatController {
         self.transcript_scroll = self.transcript_scroll.min(max_scroll);
         let scroll = max_scroll.saturating_sub(self.transcript_scroll);
         let paragraph = Paragraph::new(lines)
-            .style(Style::default().fg(Color::Gray))
-            .block(chat_block(self.chat_title(), focused))
+            .style(chat_base_style(palette))
+            .block(chat_block(self.chat_title(), focused, palette))
             .scroll((u16_saturating(scroll), 0))
             .wrap(Wrap { trim: false });
         frame.render_widget(paragraph, area);
@@ -671,18 +704,30 @@ impl ChatController {
             .unwrap_or_else(|| "model".to_string())
     }
 
-    fn render_composer(&mut self, frame: &mut Frame<'_>, area: Rect, focused: bool) {
+    fn render_composer(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        focused: bool,
+        palette: ThemePalette,
+    ) {
         let Some(chat) = self.chat_widget.as_mut() else {
             return;
         };
         let _guard = self.runtime.as_ref().map(|runtime| runtime.enter());
+        frame.buffer_mut().set_style(area, chat_base_style(palette));
         chat.render_embedded_bottom_with_popup_overlay(area, frame.buffer_mut());
         if focused && let Some((x, y)) = chat.embedded_bottom_cursor_pos_with_popup_overlay(area) {
             frame.set_cursor_position(Position::new(x, y));
         }
     }
 
-    fn render_composer_popup_overlay(&mut self, frame: &mut Frame<'_>, area: Rect) {
+    fn render_composer_popup_overlay(
+        &mut self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        palette: ThemePalette,
+    ) {
         let Some(chat) = self.chat_widget.as_ref() else {
             return;
         };
@@ -710,6 +755,9 @@ impl ChatController {
             height,
         };
         frame.render_widget(Clear, popup_area);
+        frame
+            .buffer_mut()
+            .set_style(popup_area, chat_base_style(palette));
         chat.render_embedded_bottom_popup_overlay(popup_area, frame.buffer_mut());
     }
 
@@ -2657,16 +2705,45 @@ fn combine_action(current: ChatAction, next: ChatAction) -> ChatAction {
     }
 }
 
-fn chat_block(title: impl Into<String>, focused: bool) -> Block<'static> {
+fn chat_base_style(palette: ThemePalette) -> Style {
+    Style::default().fg(palette.fg).bg(palette.bg)
+}
+
+fn chat_muted_style(palette: ThemePalette) -> Style {
+    Style::default().fg(palette.muted).bg(palette.bg)
+}
+
+fn chat_selection_style(palette: ThemePalette) -> Style {
+    Style::default()
+        .fg(palette.fg)
+        .bg(palette.selection)
+        .add_modifier(Modifier::BOLD)
+}
+
+fn chat_block(
+    title: impl Into<String>,
+    focused: bool,
+    palette: ThemePalette,
+) -> Block<'static> {
     let border = if focused {
-        Color::Cyan
+        palette.accent
     } else {
-        Color::DarkGray
+        palette.graph.edge
     };
+    let title_style = Style::default()
+        .fg(if focused { palette.accent } else { palette.fg })
+        .bg(palette.bg)
+        .add_modifier(if focused {
+            Modifier::BOLD
+        } else {
+            Modifier::empty()
+        });
     Block::default()
         .borders(Borders::ALL)
         .title(title.into())
-        .border_style(Style::default().fg(border))
+        .style(chat_base_style(palette))
+        .border_style(Style::default().fg(border).bg(palette.bg))
+        .title_style(title_style)
 }
 
 fn format_updated_at(timestamp: i64) -> String {

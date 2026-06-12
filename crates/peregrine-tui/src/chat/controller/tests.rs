@@ -1,5 +1,8 @@
 use super::*;
 use crate::agent::chatwidget::tests::make_chatwidget_manual;
+use crate::theme::ThemeName;
+use ratatui::Terminal;
+use ratatui::backend::TestBackend;
 
 #[test]
 fn embedded_chat_tick_flushes_typed_characters_in_order() {
@@ -51,6 +54,37 @@ fn embedded_chat_tick_flushes_typed_characters_in_order() {
             .composer_text_with_pending(),
         "/mcp"
     );
+}
+
+#[test]
+fn session_history_uses_active_workbench_palette() {
+    let palette = ThemeName::BytecodeEmber.palette();
+    let mut controller = ChatController::default();
+    controller.mode = HostMode::Sessions;
+    controller.sessions = vec![SessionRow {
+        thread_id: ThreadId::new(),
+        title: "themed session".to_string(),
+        cwd: PathBuf::from("/workspace"),
+        updated_at: 0,
+    }];
+    let mut terminal = Terminal::new(TestBackend::new(60, 8)).expect("terminal");
+
+    terminal
+        .draw(|frame| controller.render(frame, frame.area(), true, palette))
+        .expect("draw");
+
+    let buffer = terminal.backend().buffer();
+    let border_style = buffer[(0, 0)].style();
+    let selected_style = buffer[(3, 1)].style();
+    assert_eq!(
+        (border_style.fg, border_style.bg),
+        (Some(palette.accent), Some(palette.bg))
+    );
+    assert_eq!(
+        (selected_style.fg, selected_style.bg),
+        (Some(palette.fg), Some(palette.selection))
+    );
+    assert!(selected_style.add_modifier.contains(Modifier::BOLD));
 }
 
 #[test]

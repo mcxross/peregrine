@@ -129,7 +129,9 @@ mod tests {
             let backend = TestBackend::new(area.width, area.height);
             let mut terminal = Terminal::new(backend).expect("terminal");
             terminal
-                .draw(|frame| controller.render(frame, area, true))
+                .draw(|frame| {
+                    controller.render(frame, area, true, ThemePalette::default());
+                })
                 .expect("draw");
             let expected_index = controller.session_list_offset;
             let expected_thread_id = thread_ids[expected_index];
