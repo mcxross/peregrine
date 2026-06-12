@@ -1,0 +1,10 @@
+---
+source: crates/peregrine-tui/src/app/agent_ui/app/tests.rs
+assertion_line: 3018
+expression: snapshot
+---
+Main [default] | 00000000-0000-0000-0000-000000000123
+Robie [explorer] | 00000000-0000-0000-0000-000000000123
+Robie | 00000000-0000-0000-0000-000000000123
+[explorer] | 00000000-0000-0000-0000-000000000123
+Agent | 00000000-0000-0000-0000-000000000123

@@ -1,0 +1,7 @@
+---
+source: crates/peregrine-tui/src/app/agent_ui/app/tests.rs
+assertion_line: 187
+expression: rendered
+---
+⚠ `--dangerously-bypass-hook-trust` is enabled. Enabled hooks may run without
+  review for this invocation.
