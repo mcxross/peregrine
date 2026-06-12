@@ -1,8 +1,31 @@
 use super::*;
 use crate::agent::chatwidget::tests::make_chatwidget_manual;
+use crate::agent::start_embedded_app_server_for_picker;
 use crate::theme::ThemeName;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+
+#[test]
+fn releasing_mode_runtime_keeps_handed_off_app_server_alive() -> color_eyre::Result<()> {
+    let peregrine_home = tempfile::tempdir()?;
+    let shared_runtime = Arc::new(crate::build_agent_runtime()?);
+    let config = shared_runtime.block_on(
+        ConfigBuilder::default()
+            .peregrine_home(peregrine_home.path().to_path_buf())
+            .harness_overrides(ConfigOverrides {
+                cwd: Some(peregrine_home.path().to_path_buf()),
+                ..ConfigOverrides::default()
+            })
+            .build(),
+    )?;
+    let mut app_server = shared_runtime.block_on(start_embedded_app_server_for_picker(&config))?;
+
+    shutdown_owned_runtime(shared_runtime.clone());
+
+    shared_runtime.block_on(app_server.read_account())?;
+    shared_runtime.block_on(app_server.shutdown())?;
+    Ok(())
+}
 
 #[test]
 fn embedded_chat_tick_flushes_typed_characters_in_order() {
@@ -13,7 +36,7 @@ fn embedded_chat_tick_flushes_typed_characters_in_order() {
     let (chat_widget, _app_events, _ops) =
         runtime.block_on(make_chatwidget_manual(/*model_override*/ None));
     let mut controller = ChatController::default();
-    controller.runtime = Some(runtime);
+    controller.runtime = Some(Arc::new(runtime));
     controller.mode = HostMode::Chat;
     controller.chat_widget = Some(chat_widget);
     let root = Path::new("/tmp");

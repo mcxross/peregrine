@@ -4,12 +4,15 @@ use crate::args;
 use codex_arg0::Arg0DispatchPaths;
 use peregrine_config::LoaderOverrides;
 use std::io;
+use std::sync::Arc;
+use tokio::runtime::Runtime;
 
 pub fn run_agent(
     mut agent_args: args::AgentArgs,
     resume_thread_id: Option<peregrine_types::ThreadId>,
     app_server: Option<agent::app_server_session::AppServerSession>,
     shared_config: Option<agent::legacy_core::config::Config>,
+    async_runtime: Option<Arc<Runtime>>,
 ) -> io::Result<AgentExit> {
     let mut inner = agent_args.inner;
     inner.resume_session_id = resume_thread_id.map(|thread_id| thread_id.to_string());
@@ -18,8 +21,11 @@ pub fn run_agent(
         .raw_overrides
         .splice(0..0, agent_args.config_overrides.raw_overrides.drain(..));
 
-    let runtime = build_agent_runtime()?;
-    let result = runtime.block_on(agent::run_main_with_session(
+    let async_runtime = match async_runtime {
+        Some(async_runtime) => async_runtime,
+        None => Arc::new(build_agent_runtime()?),
+    };
+    let result = async_runtime.block_on(agent::run_main_with_session(
         inner,
         agent_arg0_dispatch_paths()?,
         LoaderOverrides::default(),
@@ -32,6 +38,7 @@ pub fn run_agent(
         agent::ExitReason::SwitchToWorkbench => Ok(AgentExit::SwitchToWorkbench {
             thread_id: result.exit_info.thread_id,
             app_server: result.app_server,
+            async_runtime,
         }),
         agent::ExitReason::UserRequested => Ok(AgentExit::Quit(0)),
         agent::ExitReason::Fatal(message) => {
@@ -54,5 +61,6 @@ pub enum AgentExit {
     SwitchToWorkbench {
         thread_id: Option<peregrine_types::ThreadId>,
         app_server: Option<agent::app_server_session::AppServerSession>,
+        async_runtime: Arc<Runtime>,
     },
 }

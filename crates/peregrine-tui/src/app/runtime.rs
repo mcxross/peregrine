@@ -6,6 +6,7 @@ use peregrine_config::LoaderOverrides;
 use std::io;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tokio::runtime::Runtime;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct UiRuntimeConfig {
@@ -35,21 +36,31 @@ pub(crate) struct ApplicationRuntime {
     config: Arc<Config>,
     ui: UiRuntimeConfig,
     theme: ThemeState,
+    async_runtime: Arc<Runtime>,
     app_server: Arc<Mutex<Option<AppServerSession>>>,
 }
 
 impl ApplicationRuntime {
     pub(crate) fn load(root: PathBuf) -> io::Result<Self> {
-        let config = build_config(root, None)?;
-        Ok(Self::from_config(config))
+        let async_runtime = Arc::new(build_agent_runtime()?);
+        Self::load_with_async_runtime(root, None, async_runtime)
     }
 
     pub(crate) fn load_from_home(root: PathBuf, peregrine_home: PathBuf) -> io::Result<Self> {
-        let config = build_config(root, Some(peregrine_home))?;
-        Ok(Self::from_config(config))
+        let async_runtime = Arc::new(build_agent_runtime()?);
+        Self::load_with_async_runtime(root, Some(peregrine_home), async_runtime)
     }
 
-    fn from_config(config: Config) -> Self {
+    pub(crate) fn load_with_async_runtime(
+        root: PathBuf,
+        peregrine_home: Option<PathBuf>,
+        async_runtime: Arc<Runtime>,
+    ) -> io::Result<Self> {
+        let config = build_config(root, peregrine_home, &async_runtime)?;
+        Ok(Self::from_config(config, async_runtime))
+    }
+
+    fn from_config(config: Config, async_runtime: Arc<Runtime>) -> Self {
         let ui = UiRuntimeConfig::from_config(&config);
         let theme = shared_theme_state();
         theme.set(ui.theme.name);
@@ -57,6 +68,7 @@ impl ApplicationRuntime {
             config: Arc::new(config),
             ui,
             theme,
+            async_runtime,
             app_server: Arc::new(Mutex::new(None)),
         }
     }
@@ -71,6 +83,10 @@ impl ApplicationRuntime {
 
     pub(crate) fn theme(&self) -> ThemeState {
         self.theme.clone()
+    }
+
+    pub(crate) fn async_runtime(&self) -> Arc<Runtime> {
+        self.async_runtime.clone()
     }
 
     pub(crate) fn take_app_server(&self) -> Option<AppServerSession> {
@@ -93,7 +109,11 @@ impl ApplicationRuntime {
     }
 }
 
-fn build_config(root: PathBuf, peregrine_home: Option<PathBuf>) -> io::Result<Config> {
+fn build_config(
+    root: PathBuf,
+    peregrine_home: Option<PathBuf>,
+    async_runtime: &Runtime,
+) -> io::Result<Config> {
     let mut builder = ConfigBuilder::default()
         .harness_overrides(ConfigOverrides {
             cwd: Some(root),
@@ -104,5 +124,5 @@ fn build_config(root: PathBuf, peregrine_home: Option<PathBuf>) -> io::Result<Co
     if let Some(peregrine_home) = peregrine_home {
         builder = builder.peregrine_home(peregrine_home);
     }
-    build_agent_runtime()?.block_on(builder.build())
+    async_runtime.block_on(builder.build())
 }

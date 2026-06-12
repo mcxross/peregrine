@@ -1,5 +1,6 @@
 use super::cli::{is_helper_arg, run_external_helper, run_security_cli};
-use super::{run_agent, run_mode_shell, AgentExit};
+use super::shell::run_mode_shell_with_async_runtime;
+use super::{AgentExit, run_agent, run_mode_shell};
 use crate::args;
 use clap::Parser;
 use std::ffi::OsString;
@@ -41,9 +42,13 @@ where
     match command {
         None => run_mode_shell(workbench_root, None),
         Some(args::ApplicationCommand::Agent(agent_args)) => {
-            match run_agent(agent_args, None, None, None)? {
+            match run_agent(agent_args, None, None, None, None)? {
                 AgentExit::Quit(code) => Ok(code),
-                AgentExit::SwitchToWorkbench { app_server, .. } => run_mode_shell(None, app_server),
+                AgentExit::SwitchToWorkbench {
+                    app_server,
+                    async_runtime,
+                    ..
+                } => run_mode_shell_with_async_runtime(None, app_server, Some(async_runtime)),
             }
         }
         Some(args::ApplicationCommand::Security(command)) => Ok(run_security_cli(args::Cli {

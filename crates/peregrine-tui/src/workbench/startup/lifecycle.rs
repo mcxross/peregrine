@@ -40,11 +40,27 @@ impl App {
     }
 
     pub fn from_launch_dir(root: Option<PathBuf>) -> io::Result<Self> {
+        Self::from_launch_dir_with_async_runtime(root, None)
+    }
+
+    pub(crate) fn from_launch_dir_with_async_runtime(
+        root: Option<PathBuf>,
+        async_runtime: Option<std::sync::Arc<tokio::runtime::Runtime>>,
+    ) -> io::Result<Self> {
         let root = match root {
             Some(root) => root,
             None => std::env::current_dir()?,
         };
-        let runtime = app::ApplicationRuntime::load(root.clone())?;
+        let runtime = match async_runtime {
+            Some(async_runtime) => {
+                app::ApplicationRuntime::load_with_async_runtime(
+                    root.clone(),
+                    /*peregrine_home*/ None,
+                    async_runtime,
+                )?
+            }
+            None => app::ApplicationRuntime::load(root.clone())?,
+        };
         let trust_resolution = resolve_trust_for_directory(&root)?;
         let mut app = Self::new_with_runtime(root, runtime)?;
         app.configure_launch_startup(trust_resolution);

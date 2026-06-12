@@ -80,7 +80,7 @@ mod tests {
         let (chat_widget, _app_events, _ops) =
             runtime.block_on(make_chatwidget_manual(/*model_override*/ None));
         let mut controller = ChatController::default();
-        controller.runtime = Some(runtime);
+        controller.runtime = Some(Arc::new(runtime));
         controller.mode = HostMode::Chat;
         controller.chat_widget = Some(chat_widget);
 

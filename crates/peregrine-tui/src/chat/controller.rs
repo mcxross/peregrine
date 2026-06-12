@@ -288,7 +288,7 @@ enum WorkerEvent {
 pub(crate) struct ChatController {
     initial_config: Option<Config>,
     application_runtime: Option<crate::app::ApplicationRuntime>,
-    runtime: Option<tokio::runtime::Runtime>,
+    runtime: Option<Arc<tokio::runtime::Runtime>>,
     mode: HostMode,
     status: String,
     worker_tx: Option<UnboundedSender<WorkerCommand>>,
@@ -499,7 +499,7 @@ impl ChatController {
         if let Some(worker_tx) = self.worker_tx.take() {
             let _ = worker_tx.send(WorkerCommand::Shutdown);
         }
-        runtime.shutdown_timeout(Duration::from_millis(250));
+        shutdown_owned_runtime(runtime);
     }
 
     pub(crate) fn suspend(&mut self) -> std::io::Result<()> {
@@ -507,7 +507,7 @@ impl ChatController {
             return Ok(());
         };
         let Some(worker_tx) = self.worker_tx.take() else {
-            runtime.shutdown_timeout(Duration::from_millis(250));
+            shutdown_owned_runtime(runtime);
             return Ok(());
         };
         let (response_tx, response_rx) = std::sync::mpsc::sync_channel(1);
@@ -517,11 +517,11 @@ impl ChatController {
         let app_server = response_rx
             .recv_timeout(Duration::from_secs(2))
             .map_err(|_| std::io::Error::other("timed out suspending workbench chat"))?;
-        runtime.shutdown_timeout(Duration::from_millis(250));
         self.worker_event_rx = None;
         if let Some(application_runtime) = &self.application_runtime {
             application_runtime.store_app_server(app_server);
         }
+        shutdown_owned_runtime(runtime);
         Ok(())
     }
 
@@ -535,13 +535,16 @@ impl ChatController {
             self.mode = HostMode::Loading;
             self.status = "chat: loading sessions".to_string();
         }
-        let runtime = match crate::build_agent_runtime() {
-            Ok(runtime) => runtime,
-            Err(err) => {
-                self.mode = HostMode::Error;
-                self.status = format!("chat: runtime failed: {err}");
-                return;
-            }
+        let runtime = match self.application_runtime.as_ref() {
+            Some(application_runtime) => application_runtime.async_runtime(),
+            None => match crate::build_agent_runtime() {
+                Ok(runtime) => Arc::new(runtime),
+                Err(err) => {
+                    self.mode = HostMode::Error;
+                    self.status = format!("chat: runtime failed: {err}");
+                    return;
+                }
+            },
         };
         let (worker_event_tx, worker_event_rx) = unbounded_channel();
         let app_event_tx = match self.context.as_ref() {
@@ -640,10 +643,7 @@ impl ChatController {
                             chat_muted_style(palette),
                         ),
                         Span::raw("  "),
-                        Span::styled(
-                            session.cwd.display().to_string(),
-                            chat_base_style(palette),
-                        ),
+                        Span::styled(session.cwd.display().to_string(), chat_base_style(palette)),
                     ]),
                 ])
             })
@@ -2694,6 +2694,12 @@ impl Drop for ChatController {
     }
 }
 
+fn shutdown_owned_runtime(runtime: Arc<tokio::runtime::Runtime>) {
+    if let Ok(runtime) = Arc::try_unwrap(runtime) {
+        runtime.shutdown_timeout(Duration::from_millis(250));
+    }
+}
+
 fn combine_action(current: ChatAction, next: ChatAction) -> ChatAction {
     match (current, next) {
         (ChatAction::Quit, _) | (_, ChatAction::Quit) => ChatAction::Quit,
@@ -2720,11 +2726,7 @@ fn chat_selection_style(palette: ThemePalette) -> Style {
         .add_modifier(Modifier::BOLD)
 }
 
-fn chat_block(
-    title: impl Into<String>,
-    focused: bool,
-    palette: ThemePalette,
-) -> Block<'static> {
+fn chat_block(title: impl Into<String>, focused: bool, palette: ThemePalette) -> Block<'static> {
     let border = if focused {
         palette.accent
     } else {
