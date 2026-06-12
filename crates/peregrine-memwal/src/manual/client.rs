@@ -309,7 +309,7 @@ impl MemWalManual {
     }
 
     async fn account_shared_version(&self) -> Result<u64, MemWalError> {
-        let request = GetObjectRequest::new(&self.account_id.into())
+        let request = GetObjectRequest::new(&self.account_id)
             .with_read_mask(FieldMask::from_paths(["owner"]));
         let response = self
             .rpc_client
@@ -331,45 +331,23 @@ impl MemWalManual {
 fn default_seal_servers(network: SuiNetwork) -> Vec<SealServerConfig> {
     match network {
         SuiNetwork::Mainnet => vec![
-            SealServerConfig {
-                object_id: "0x145540d931f182fef76467dd8074c9839aea126852d90d18e1556fcbbd1208b6"
-                    .parse()
-                    .expect("mainnet seal server"),
-                weight: 1,
-                aggregator_url: None,
-                api_key_name: None,
-                api_key: None,
-            },
-            SealServerConfig {
-                object_id: "0xe0eb52eba9261b96e895bbb4deca10dcd64fbc626a1133017adcd5131353fd10"
-                    .parse()
-                    .expect("mainnet seal server"),
-                weight: 1,
-                aggregator_url: None,
-                api_key_name: None,
-                api_key: None,
-            },
+            seal_server("0x145540d931f182fef76467dd8074c9839aea126852d90d18e1556fcbbd1208b6"),
+            seal_server("0xe0eb52eba9261b96e895bbb4deca10dcd64fbc626a1133017adcd5131353fd10"),
         ],
         SuiNetwork::Testnet => vec![
-            SealServerConfig {
-                object_id: "0x73d05d62c18d9374e3ea529e8e0ed6161da1a141a94d3f76ae3fe4e99356db75"
-                    .parse()
-                    .expect("testnet seal server"),
-                weight: 1,
-                aggregator_url: None,
-                api_key_name: None,
-                api_key: None,
-            },
-            SealServerConfig {
-                object_id: "0xf5d14a81a982144ae441cd7d64b09027f116a468bd36e7eca494f750591623c8"
-                    .parse()
-                    .expect("testnet seal server"),
-                weight: 1,
-                aggregator_url: None,
-                api_key_name: None,
-                api_key: None,
-            },
+            seal_server("0x73d05d62c18d9374e3ea529e8e0ed6161da1a141a94d3f76ae3fe4e99356db75"),
+            seal_server("0xf5d14a81a982144ae441cd7d64b09027f116a468bd36e7eca494f750591623c8"),
         ],
+    }
+}
+
+fn seal_server(object_id: &'static str) -> SealServerConfig {
+    SealServerConfig {
+        object_id: sui_sdk_types::Address::from_static(object_id),
+        weight: 1,
+        aggregator_url: None,
+        api_key_name: None,
+        api_key: None,
     }
 }
 

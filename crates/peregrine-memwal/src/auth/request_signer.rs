@@ -83,19 +83,18 @@ mod tests {
 
     use super::RequestSigner;
     use crate::auth::DelegateKey;
+    use crate::error::MemWalError;
 
     #[test]
-    fn get_request_signs_empty_body() {
+    fn get_request_signs_empty_body() -> Result<(), MemWalError> {
         let delegate_key = DelegateKey::from_hex(
             "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
-        )
-        .expect("delegate key");
-        let signer = RequestSigner::new(delegate_key, "0x2".parse().expect("object id"));
+        )?;
+        let signer = RequestSigner::new(delegate_key, sui_sdk_types::Address::from_static("0x2"));
 
-        let headers = signer
-            .signed_headers(&Method::GET, "/api/remember/abc", &[])
-            .expect("headers");
+        let headers = signer.signed_headers(&Method::GET, "/api/remember/abc", &[])?;
         assert!(headers.contains_key("x-signature"));
         assert!(headers.contains_key("x-public-key"));
+        Ok(())
     }
 }

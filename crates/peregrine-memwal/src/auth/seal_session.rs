@@ -62,9 +62,13 @@ impl SealSessionManager {
     pub(crate) fn for_delegate_key(
         delegate_key: crate::auth::DelegateKey,
         config: &RelayerConfig,
-    ) -> Self {
-        let signer = Arc::new(Ed25519Signer::from_delegate_key(delegate_key));
-        Self::new(config.package_id, config.sui_rpc_url.clone(), signer)
+    ) -> Result<Self, MemWalError> {
+        let signer = Arc::new(Ed25519Signer::from_delegate_key(delegate_key)?);
+        Ok(Self::new(
+            config.package_id,
+            config.sui_rpc_url.clone(),
+            signer,
+        ))
     }
 
     pub(crate) fn new(
@@ -83,7 +87,7 @@ impl SealSessionManager {
 
     async fn build_session(&self) -> Result<String, MemWalError> {
         let rpc = sui_rpc::Client::new(self.rpc_url.as_str())?;
-        let request = sui_rpc::proto::sui::rpc::v2::GetObjectRequest::new(&self.package_id.into());
+        let request = sui_rpc::proto::sui::rpc::v2::GetObjectRequest::new(&self.package_id);
         let response = rpc
             .clone()
             .ledger_client()
@@ -101,8 +105,8 @@ impl SealSessionManager {
         }
 
         let creation_time_ms = Utc::now().timestamp_millis() as u64;
-        let ephemeral = Ed25519Signer::generate();
-        let public_key_bytes = ephemeral.public_key_bytes();
+        let ephemeral = Ed25519Signer::generate()?;
+        let public_key_bytes = ephemeral.public_key_bytes()?;
         let public_key_base64 = base64::engine::general_purpose::STANDARD.encode(public_key_bytes);
         let timestamp = Utc
             .timestamp_millis_opt(creation_time_ms as i64)
@@ -141,13 +145,12 @@ impl SealHeaderProvider for SealSessionManager {
             loop {
                 let wait = {
                     let mut state = self.state.lock().await;
-                    if let Some(cached) = &state.cached {
-                        if cached.expires_at
-                            - chrono::Duration::from_std(SESSION_REFRESH_EARLY).expect("duration")
+                    if let Some(cached) = &state.cached
+                        && cached.expires_at
+                            - chrono::TimeDelta::seconds(SESSION_REFRESH_EARLY.as_secs() as i64)
                             > Utc::now()
-                        {
-                            return Ok(cached.header_value.clone());
-                        }
+                    {
+                        return Ok(cached.header_value.clone());
                     }
 
                     if state.building {
@@ -187,7 +190,7 @@ mod tests {
     use super::ExportedSessionKey;
 
     #[test]
-    fn exported_session_json_uses_expected_keys() {
+    fn exported_session_json_uses_expected_keys() -> Result<(), Box<dyn std::error::Error>> {
         let encoded = crate::utils::encode_base64_json(&ExportedSessionKey {
             address: "0x1".to_owned(),
             package_id: "0x2".to_owned(),
@@ -196,13 +199,11 @@ mod tests {
             ttl_min: 5,
             personal_message_signature: Some("sig".to_owned()),
             session_key: "suiprivkey".to_owned(),
-        })
-        .expect("encode");
-        let decoded = base64::engine::general_purpose::STANDARD
-            .decode(encoded)
-            .expect("decode");
-        let json = String::from_utf8(decoded).expect("utf8");
+        })?;
+        let decoded = base64::engine::general_purpose::STANDARD.decode(encoded)?;
+        let json = String::from_utf8(decoded)?;
         assert!(json.contains("\"packageId\":\"0x2\""));
         assert!(json.contains("\"personalMessageSignature\":\"sig\""));
+        Ok(())
     }
 }

@@ -71,7 +71,7 @@ impl MemWal {
         let session_manager = Arc::new(SealSessionManager::for_delegate_key(
             config.delegate_key.clone(),
             &public_config,
-        ));
+        )?);
 
         Ok(Self {
             transport,

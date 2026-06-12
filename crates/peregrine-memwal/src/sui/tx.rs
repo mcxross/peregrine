@@ -60,15 +60,11 @@ pub(crate) fn create_account_builder(
     let mut builder = TransactionBuilder::new();
     builder.set_sender(sender);
 
-    let registry = builder.object(
-        ObjectInput::new(registry_id.into())
-            .as_shared()
-            .with_mutable(true),
-    );
+    let registry = builder.object(ObjectInput::new(registry_id).as_shared().with_mutable(true));
     let clock = builder.object(ObjectInput::new(CLOCK_ID).as_shared().with_mutable(false));
     builder.move_call(
         Function::new(
-            package_id.into(),
+            package_id,
             Identifier::from_static("account"),
             Identifier::from_static("create_account"),
         ),
@@ -89,11 +85,7 @@ pub(crate) fn add_delegate_key_builder(
     let mut builder = TransactionBuilder::new();
     builder.set_sender(sender);
 
-    let account = builder.object(
-        ObjectInput::new(account_id.into())
-            .as_shared()
-            .with_mutable(true),
-    );
+    let account = builder.object(ObjectInput::new(account_id).as_shared().with_mutable(true));
     let public_key = builder.pure(public_key);
     let delegate_address = builder.pure(&delegate_address);
     let label = builder.pure(&label.to_owned());
@@ -101,7 +93,7 @@ pub(crate) fn add_delegate_key_builder(
 
     builder.move_call(
         Function::new(
-            package_id.into(),
+            package_id,
             Identifier::from_static("account"),
             Identifier::from_static("add_delegate_key"),
         ),
@@ -120,16 +112,12 @@ pub(crate) fn remove_delegate_key_builder(
     let mut builder = TransactionBuilder::new();
     builder.set_sender(sender);
 
-    let account = builder.object(
-        ObjectInput::new(account_id.into())
-            .as_shared()
-            .with_mutable(true),
-    );
+    let account = builder.object(ObjectInput::new(account_id).as_shared().with_mutable(true));
     let public_key = builder.pure(public_key);
 
     builder.move_call(
         Function::new(
-            package_id.into(),
+            package_id,
             Identifier::from_static("account"),
             Identifier::from_static("remove_delegate_key"),
         ),

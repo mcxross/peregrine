@@ -69,12 +69,14 @@ impl DelegateKey {
 #[cfg(test)]
 mod tests {
     use super::DelegateKey;
+    use crate::error::MemWalError;
 
     #[test]
-    fn delegate_key_round_trip_hex() {
+    fn delegate_key_round_trip_hex() -> Result<(), MemWalError> {
         let key = DelegateKey::generate();
         let hex = key.to_hex();
-        let reparsed = DelegateKey::from_hex(&hex).expect("reparse");
+        let reparsed = DelegateKey::from_hex(&hex)?;
         assert_eq!(key.public_key_hex(), reparsed.public_key_hex());
+        Ok(())
     }
 }

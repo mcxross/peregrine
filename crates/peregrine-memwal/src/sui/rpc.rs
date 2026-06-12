@@ -186,13 +186,13 @@ pub(crate) fn build_seal_approve_ptb(
     let inputs = vec![
         Input::Pure(bcs::to_bytes(&approval_id)?),
         Input::Shared(SharedInput::new(
-            account_id.into(),
+            account_id,
             account_initial_shared_version,
             false,
         )),
     ];
     let command = Command::MoveCall(MoveCall {
-        package: package_id.into(),
+        package: package_id,
         module: Identifier::from_str("account")
             .map_err(|error| MemWalError::config(error.to_string()))?,
         function: Identifier::from_str("seal_approve")

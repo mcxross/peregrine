@@ -42,7 +42,7 @@ impl Clone for Ed25519Signer {
 }
 
 impl Ed25519Signer {
-    pub fn generate() -> Self {
+    pub fn generate() -> Result<Self, MemWalError> {
         Self::from_bytes(rand::random())
     }
 
@@ -54,36 +54,34 @@ impl Ed25519Signer {
         })
     }
 
-    pub fn from_bytes(bytes: [u8; 32]) -> Self {
-        let suiprivkey = Ed25519PrivateKey::new(bytes)
-            .to_suiprivkey()
-            .expect("ed25519 suiprivkey encoding");
-        Self {
-            suiprivkey: Zeroizing::new(suiprivkey),
-        }
+    pub fn from_bytes(bytes: [u8; 32]) -> Result<Self, MemWalError> {
+        Self::from_private_key(Ed25519PrivateKey::new(bytes))
     }
 
-    pub fn from_delegate_key(delegate_key: DelegateKey) -> Self {
-        let suiprivkey = delegate_key
-            .private_key()
-            .to_suiprivkey()
-            .expect("delegate key suiprivkey encoding");
-        Self {
-            suiprivkey: Zeroizing::new(suiprivkey),
-        }
+    pub fn from_delegate_key(delegate_key: DelegateKey) -> Result<Self, MemWalError> {
+        Self::from_private_key(delegate_key.private_key())
     }
 
     pub fn to_suiprivkey(&self) -> Result<String, MemWalError> {
         Ok(self.suiprivkey.to_string())
     }
 
-    pub fn public_key_bytes(&self) -> [u8; 32] {
-        self.public_key().expect("ed25519 key").into_inner()
+    pub fn public_key_bytes(&self) -> Result<[u8; 32], MemWalError> {
+        self.public_key().map(Ed25519PublicKey::into_inner)
     }
 
     fn private_key(&self) -> Result<Ed25519PrivateKey, MemWalError> {
         Ed25519PrivateKey::from_suiprivkey(&self.suiprivkey)
             .map_err(|error| MemWalError::signer(error.to_string()))
+    }
+
+    fn from_private_key(private_key: Ed25519PrivateKey) -> Result<Self, MemWalError> {
+        let suiprivkey = private_key
+            .to_suiprivkey()
+            .map_err(|error| MemWalError::signer(error.to_string()))?;
+        Ok(Self {
+            suiprivkey: Zeroizing::new(suiprivkey),
+        })
     }
 }
 
@@ -169,15 +167,14 @@ impl seal_sdk_rs::signer::Signer for SealSignerAdapter {
 mod tests {
     use super::Ed25519Signer;
     use super::MemWalSigner;
+    use crate::error::MemWalError;
 
     #[test]
-    fn suiprivkey_round_trip() {
-        let signer = Ed25519Signer::generate();
-        let encoded = signer.to_suiprivkey().expect("encode");
-        let decoded = Ed25519Signer::from_suiprivkey(&encoded).expect("decode");
-        assert_eq!(
-            signer.public_key().expect("public key"),
-            decoded.public_key().expect("public key")
-        );
+    fn suiprivkey_round_trip() -> Result<(), MemWalError> {
+        let signer = Ed25519Signer::generate()?;
+        let encoded = signer.to_suiprivkey()?;
+        let decoded = Ed25519Signer::from_suiprivkey(&encoded)?;
+        assert_eq!(signer.public_key()?, decoded.public_key()?);
+        Ok(())
     }
 }
