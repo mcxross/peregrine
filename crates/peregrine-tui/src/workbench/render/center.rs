@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 
-use crate::tabs::{tab_hit_areas, TabNav};
+use crate::tabs::{TabNav, tab_hit_areas};
 
 impl App {
     pub(crate) fn render_center(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -29,7 +29,6 @@ impl App {
             .split(area);
 
         self.layout.tabs = rows[0];
-        self.layout.editor = rows[1];
         self.layout.tab_hit_areas = tab_hit_areas(&WORKBENCH_TAB_LABELS, rows[0])
             .into_iter()
             .zip(WorkbenchTab::ALL)
@@ -44,7 +43,16 @@ impl App {
         frame.render_widget(tabs, rows[0]);
 
         match self.active_tab {
-            WorkbenchTab::Code => self.render_editor(frame, rows[1]),
+            WorkbenchTab::Code => {
+                let code_rows = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([Constraint::Length(1), Constraint::Min(2)])
+                    .split(rows[1]);
+                self.layout.file_tabs = code_rows[0];
+                self.layout.editor = code_rows[1];
+                self.render_file_tabs(frame, code_rows[0]);
+                self.render_editor(frame, code_rows[1]);
+            }
             WorkbenchTab::Bytecode => self.render_bytecode(frame, rows[1]),
             WorkbenchTab::Cfg | WorkbenchTab::CallGraph | WorkbenchTab::TypeGraph => {
                 self.render_graph(frame, rows[1], self.active_tab)
@@ -54,7 +62,10 @@ impl App {
                     .render(frame, rows[1], self.focus == FocusPane::Input, palette);
             }
         }
-
+        if self.active_tab != WorkbenchTab::Code {
+            self.layout.file_tabs = Rect::default();
+            self.layout.file_tab_hit_areas.clear();
+            self.layout.editor = rows[1];
+        }
     }
-
 }

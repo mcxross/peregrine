@@ -20,6 +20,20 @@ use std::thread;
 
 impl App {
     pub(crate) fn handle_mouse_event(&mut self, mouse: MouseEvent) {
+        if self.pending_close.is_some() {
+            if matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
+                && let Some(choice) =
+                    self.layout
+                        .close_dialog_hit_areas
+                        .iter()
+                        .find_map(|(choice, area)| {
+                            rect_contains(*area, mouse.column, mouse.row).then_some(*choice)
+                        })
+            {
+                self.resolve_close_choice(choice);
+            }
+            return;
+        }
         if !self.startup.is_workbench() {
             return;
         }
@@ -45,6 +59,19 @@ impl App {
     }
 
     pub(crate) fn handle_scroll(&mut self, x: u16, y: u16, direction: ScrollDirection) {
+        if rect_contains(self.layout.file_tabs, x, y) {
+            self.set_focus(FocusPane::FileTabs);
+            match direction {
+                ScrollDirection::Up | ScrollDirection::Left => {
+                    self.editor.page_left(self.layout.file_tabs.width)
+                }
+                ScrollDirection::Down | ScrollDirection::Right => {
+                    self.editor.page_right(self.layout.file_tabs.width)
+                }
+            }
+            return;
+        }
+
         if rect_contains(self.layout.explorer, x, y) {
             self.set_focus(FocusPane::Explorer);
             self.scroll_explorer(direction);
@@ -72,7 +99,6 @@ impl App {
             }
             return;
         }
-
     }
 
     pub(crate) fn scroll_explorer(&mut self, direction: ScrollDirection) {
@@ -159,6 +185,21 @@ impl App {
     }
 
     pub(crate) fn handle_left_click(&mut self, x: u16, y: u16) {
+        if let Some(target) = self.clicked_file_tab(x, y) {
+            self.set_focus(FocusPane::FileTabs);
+            match target {
+                FileTabHitTarget::Previous => {
+                    self.editor.page_left(self.layout.file_tabs.width);
+                }
+                FileTabHitTarget::Activate(id) => self.activate_document(id),
+                FileTabHitTarget::Close(id) => self.request_close_document(id),
+                FileTabHitTarget::Next => {
+                    self.editor.page_right(self.layout.file_tabs.width);
+                }
+            }
+            return;
+        }
+
         if let Some(tab) = self.clicked_tab(x, y) {
             self.set_active_tab(tab);
             if tab == WorkbenchTab::Chat {
@@ -183,7 +224,6 @@ impl App {
             self.handle_editor_click(x, y);
             return;
         }
-
     }
 
     pub(crate) fn clicked_tab(&self, x: u16, y: u16) -> Option<WorkbenchTab> {
@@ -191,6 +231,13 @@ impl App {
             .tab_hit_areas
             .iter()
             .find_map(|(tab, area)| rect_contains(*area, x, y).then_some(*tab))
+    }
+
+    pub(crate) fn clicked_file_tab(&self, x: u16, y: u16) -> Option<FileTabHitTarget> {
+        self.layout
+            .file_tab_hit_areas
+            .iter()
+            .find_map(|hit| rect_contains(hit.area, x, y).then_some(hit.target))
     }
 
     pub(crate) fn handle_explorer_click(&mut self, x: u16, y: u16) {
@@ -236,5 +283,4 @@ impl App {
             }
         }
     }
-
 }

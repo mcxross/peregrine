@@ -22,6 +22,10 @@ use std::thread;
 
 impl App {
     pub fn handle_key_event(&mut self, key: KeyEvent) {
+        if self.pending_close.is_some() {
+            self.handle_close_confirmation_key(key);
+            return;
+        }
         if !self.startup.is_workbench() {
             self.handle_startup_key(key);
             return;
@@ -37,6 +41,7 @@ impl App {
             NavigationIntent::PassThrough => match self.focus {
                 FocusPane::Explorer => self.handle_explorer_key(key),
                 FocusPane::Tabs => self.handle_tabs_key(key),
+                FocusPane::FileTabs => self.handle_file_tabs_key(key),
                 FocusPane::Editor => self.handle_editor_key(key),
                 FocusPane::Input => self.handle_editor_key(key),
             },
@@ -219,5 +224,4 @@ impl App {
             }
         }
     }
-
 }

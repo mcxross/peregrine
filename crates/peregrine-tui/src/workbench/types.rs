@@ -23,6 +23,7 @@ impl Default for AppMode {
 pub enum FocusPane {
     Explorer,
     Tabs,
+    FileTabs,
     Editor,
     Input,
 }
@@ -203,11 +204,78 @@ pub(crate) enum ScrollDirection {
     Right,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FileTabHitTarget {
+    Previous,
+    Activate(crate::workbench::DocumentId),
+    Close(crate::workbench::DocumentId),
+    Next,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CloseChoice {
+    Save,
+    Discard,
+    Cancel,
+}
+
+impl CloseChoice {
+    pub(crate) const ALL: [Self; 3] = [Self::Save, Self::Discard, Self::Cancel];
+
+    pub(crate) fn next(self) -> Self {
+        match self {
+            Self::Save => Self::Discard,
+            Self::Discard => Self::Cancel,
+            Self::Cancel => Self::Save,
+        }
+    }
+
+    pub(crate) fn previous(self) -> Self {
+        match self {
+            Self::Save => Self::Cancel,
+            Self::Discard => Self::Save,
+            Self::Cancel => Self::Discard,
+        }
+    }
+
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Save => "Save",
+            Self::Discard => "Discard",
+            Self::Cancel => "Cancel",
+        }
+    }
+
+    pub(crate) fn shortcut(self) -> &'static str {
+        match self {
+            Self::Save => "S",
+            Self::Discard => "D",
+            Self::Cancel => "C",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CloseConfirmation {
+    pub(crate) document_id: crate::workbench::DocumentId,
+    pub(crate) selected: CloseChoice,
+    pub(crate) error: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FileTabHitArea {
+    pub(crate) target: FileTabHitTarget,
+    pub(crate) area: Rect,
+}
+
 #[derive(Debug, Default, Clone)]
 pub(crate) struct WorkbenchLayout {
     pub(crate) explorer: Rect,
     pub(crate) tabs: Rect,
     pub(crate) tab_hit_areas: Vec<(WorkbenchTab, Rect)>,
+    pub(crate) file_tabs: Rect,
+    pub(crate) file_tab_hit_areas: Vec<FileTabHitArea>,
+    pub(crate) close_dialog_hit_areas: Vec<(CloseChoice, Rect)>,
     pub(crate) editor: Rect,
     pub(crate) bottom_bar: Rect,
 }

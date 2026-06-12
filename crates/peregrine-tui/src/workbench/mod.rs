@@ -29,14 +29,18 @@ pub use settings::{
 pub use types::{AppMode, EditorMode, FocusPane, VimState, WorkbenchExit, WorkbenchTab};
 
 pub(crate) use constants::*;
-pub(crate) use editor::{EditorRenderCache, PendingVimCommand};
+pub(crate) use editor::{
+    DocumentId, DocumentInteractionState, EditorRenderCache, EditorWorkspace,
+    FILE_TAB_CONTROL_WIDTH, PendingVimCommand, VisibleFileTab,
+};
 pub(crate) use explorer::ExplorerAction;
 pub(crate) use graphs::{
     GraphDocument, GraphLoadResult, GraphPane, GraphPanes, WorkbenchGraphContext,
 };
 pub(crate) use types::{
-    InvalidPackageAction, InvalidPackagePrompt, PackageLoadRunningState, PackageNamePrompt,
-    ScrollDirection, StartupTaskResult, TrustAction, TrustPostAction, TrustPrompt, WorkbenchLayout,
+    CloseChoice, CloseConfirmation, FileTabHitArea, FileTabHitTarget, InvalidPackageAction,
+    InvalidPackagePrompt, PackageLoadRunningState, PackageNamePrompt, ScrollDirection,
+    StartupTaskResult, TrustAction, TrustPostAction, TrustPrompt, WorkbenchLayout,
     WorkbenchStartupState,
 };
 

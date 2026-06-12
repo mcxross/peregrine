@@ -1,6 +1,6 @@
 use super::super::App;
-use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::Frame;
+use ratatui::layout::{Constraint, Direction, Layout};
 
 impl App {
     pub fn render(&mut self, frame: &mut Frame<'_>) {
@@ -26,5 +26,6 @@ impl App {
         self.render_explorer(frame, columns[0]);
         self.render_center(frame, columns[1]);
         self.render_bottom_bar(frame, rows[1]);
+        self.render_close_confirmation(frame);
     }
 }

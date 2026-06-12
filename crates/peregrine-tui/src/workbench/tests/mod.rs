@@ -1,39 +1,37 @@
 use super::{
-    load_editor_mode_from_home, load_theme_from_home, App, AppMode, CommandInput, EditorBuffer,
-    EditorMode, Explorer, FocusPane, TuiSettings, VimState, WorkbenchExit, WorkbenchTab,
+    App, AppMode, CommandInput, EditorBuffer, EditorMode, Explorer, FocusPane, TuiSettings,
+    VimState, WorkbenchExit, WorkbenchTab, load_editor_mode_from_home, load_theme_from_home,
 };
 use crate::bootstrap::is_helper_arg;
 use crate::chat;
+use crate::helper_args;
 use crate::navigation::{Navigation, NavigationCommand};
 use crate::output::{CliStatus, CliStep};
-use crate::helper_args;
 use crate::sui::package_loader::{
-    failed_startup_step, PackageCreateReport, PackageInspection, PackageLoadReport,
-    PackageScannerReport, ScannerResult, WorkbenchTrustResolution,
+    PackageCreateReport, PackageInspection, PackageLoadReport, PackageScannerReport, ScannerResult,
+    WorkbenchTrustResolution, failed_startup_step,
 };
-use crate::workbench::status::package_load_status_lines;
-use crate::workbench::{filter_type_graph, render_type_graph_text};
 use crate::sui::project::{BytecodeTarget, CliContext};
 use crate::theme::{Theme, ThemeName, ThemePalette};
 use crate::workbench::prelude::*;
+use crate::workbench::status::package_load_status_lines;
+use crate::workbench::{filter_type_graph, render_type_graph_text};
 use crate::workbench_render::{is_markdown_path, render_workbench_document};
 use peregrine_config::CONFIG_TOML_FILE;
 use peregrine_mcp_protocol::{
-    BytecodeViewResponse, GraphsResponse, MoveBytecodeModuleView, MoveTypeGraph,
-    MoveTypeGraphEdge, MoveTypeGraphNode, MoveUnresolvedType, PackageArgs as McpPackageArgs,
-    tool_name,
+    BytecodeViewResponse, GraphsResponse, MoveBytecodeModuleView, MoveTypeGraph, MoveTypeGraphEdge,
+    MoveTypeGraphNode, MoveUnresolvedType, PackageArgs as McpPackageArgs, tool_name,
 };
+use ratatui::Frame;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{
-    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent,
-    MouseEventKind,
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
-use ratatui::Frame;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
@@ -402,7 +400,7 @@ fn explorer_toggles_directory_expansion() {
 }
 
 #[test]
-fn app_blocks_opening_another_file_when_dirty() {
+fn app_preserves_dirty_file_when_opening_another_file() {
     let temp = tempfile::tempdir().expect("temp dir");
     let first = temp.path().join("first.move");
     let second = temp.path().join("second.move");
@@ -414,8 +412,164 @@ fn app_blocks_opening_another_file_when_dirty() {
     app.editor.insert_char('!');
     app.open_file(second.clone());
 
-    assert_eq!(app.editor.path.as_ref(), Some(&first));
-    assert!(app.status.contains("Unsaved changes"));
+    assert_eq!(
+        app.editor.path.as_ref(),
+        Some(&second.canonicalize().unwrap())
+    );
+    assert_eq!(app.editor.len(), 2);
+    app.select_previous_document();
+    assert_eq!(
+        app.editor.path.as_ref(),
+        Some(&first.canonicalize().unwrap())
+    );
+    assert!(app.editor.dirty);
+    assert_eq!(app.editor.text(), "!first");
+}
+
+#[test]
+fn dirty_file_close_requires_confirmation() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let file = temp.path().join("main.move");
+    fs::write(&file, "module demo::main {}").expect("write file");
+    let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+    app.open_file(file);
+    app.editor.insert_char('!');
+    let document_id = app.editor.active_id().expect("active document");
+
+    app.request_close_document(document_id);
+    assert!(app.pending_close.is_some());
+    assert_eq!(app.editor.len(), 1);
+
+    app.resolve_close_choice(CloseChoice::Cancel);
+    assert!(app.pending_close.is_none());
+    assert_eq!(app.editor.len(), 1);
+
+    app.request_close_document(document_id);
+    app.resolve_close_choice(CloseChoice::Discard);
+    assert!(app.pending_close.is_none());
+    assert_eq!(app.editor.len(), 0);
+}
+
+#[test]
+fn dirty_file_close_can_save_before_closing() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let file = temp.path().join("main.move");
+    fs::write(&file, "module demo::main {}").expect("write file");
+    let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+    app.open_file(file.clone());
+    app.editor.insert_char('!');
+    let document_id = app.editor.active_id().expect("active document");
+
+    app.request_close_document(document_id);
+    app.resolve_close_choice(CloseChoice::Save);
+
+    assert_eq!(app.editor.len(), 0);
+    assert_eq!(
+        fs::read_to_string(file).expect("read saved file"),
+        "!module demo::main {}"
+    );
+}
+
+#[test]
+fn dirty_file_close_save_failure_keeps_document_and_dialog() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let source_dir = temp.path().join("sources");
+    let file = source_dir.join("main.move");
+    fs::create_dir(&source_dir).expect("create source dir");
+    fs::write(&file, "module demo::main {}").expect("write file");
+    let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+    app.open_file(file.clone());
+    app.editor.insert_char('!');
+    let document_id = app.editor.active_id().expect("active document");
+    fs::remove_file(&file).expect("remove file");
+    fs::remove_dir(&source_dir).expect("remove source dir");
+
+    app.request_close_document(document_id);
+    app.resolve_close_choice(CloseChoice::Save);
+
+    assert_eq!(app.editor.len(), 1);
+    assert!(app.editor.dirty);
+    assert_eq!(
+        app.pending_close
+            .as_ref()
+            .and_then(|confirmation| confirmation.error.as_deref()),
+        Some("Save failed: No such file or directory (os error 2)")
+    );
+}
+
+#[test]
+fn code_view_renders_distinct_flat_file_tabs() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let file = temp.path().join("main.move");
+    fs::write(&file, "module demo::main {}").expect("write file");
+    let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+    app.open_file(file);
+    app.set_focus(FocusPane::FileTabs);
+    let backend = TestBackend::new(100, 28);
+    let mut terminal = Terminal::new(backend).expect("terminal");
+
+    terminal.draw(|frame| app.render(frame)).expect("draw");
+
+    assert_eq!(app.layout.tabs.height, 3);
+    assert_eq!(app.layout.file_tabs.height, 1);
+    let row = (app.layout.file_tabs.x..app.layout.file_tabs.right())
+        .map(|x| {
+            terminal.backend().buffer()[(x, app.layout.file_tabs.y)]
+                .symbol()
+                .to_string()
+        })
+        .collect::<String>();
+    assert!(row.contains("main.move"));
+    assert!(row.contains('×'));
+    assert!(row.contains('│'));
+    assert!(
+        (app.layout.file_tabs.x..app.layout.file_tabs.right()).any(|x| {
+            terminal.backend().buffer()[(x, app.layout.file_tabs.y)]
+                .style()
+                .add_modifier
+                .contains(Modifier::UNDERLINED)
+        })
+    );
+}
+
+#[test]
+fn mouse_can_activate_and_close_file_tabs() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let first = temp.path().join("first.move");
+    let second = temp.path().join("second.move");
+    fs::write(&first, "first").expect("write first");
+    fs::write(&second, "second").expect("write second");
+    let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+    app.open_file(first.clone());
+    let first_id = app.editor.active_id().expect("first id");
+    app.open_file(second);
+    let backend = TestBackend::new(100, 28);
+    let mut terminal = Terminal::new(backend).expect("terminal");
+    terminal.draw(|frame| app.render(frame)).expect("draw");
+
+    let activate = app
+        .layout
+        .file_tab_hit_areas
+        .iter()
+        .find(|hit| hit.target == FileTabHitTarget::Activate(first_id))
+        .expect("first activate area")
+        .area;
+    app.handle_mouse_event(left_click(activate.x, activate.y));
+    assert_eq!(
+        app.editor.path.as_ref(),
+        Some(&first.canonicalize().unwrap())
+    );
+
+    terminal.draw(|frame| app.render(frame)).expect("redraw");
+    let close = app
+        .layout
+        .file_tab_hit_areas
+        .iter()
+        .find(|hit| hit.target == FileTabHitTarget::Close(first_id))
+        .expect("first close area")
+        .area;
+    app.handle_mouse_event(left_click(close.x, close.y));
+    assert_eq!(app.editor.len(), 1);
 }
 
 #[test]
@@ -629,8 +783,8 @@ fn markdown_preview_switches_to_raw_source_in_standard_editing() {
     let temp = tempfile::tempdir().unwrap_or_else(|error| panic!("temp dir: {error}"));
     let file = temp.path().join("README.md");
     fs::write(&file, "# Title\n\nbody").unwrap_or_else(|error| panic!("write file: {error}"));
-    let mut app = App::new(temp.path(), EditorMode::Standard)
-        .unwrap_or_else(|error| panic!("app: {error}"));
+    let mut app =
+        App::new(temp.path(), EditorMode::Standard).unwrap_or_else(|error| panic!("app: {error}"));
     app.open_file(file);
     app.focus = FocusPane::Editor;
 
@@ -700,8 +854,8 @@ fn theme_change_invalidates_editor_render_cache() {
     let file = temp.path().join("sources.move");
     fs::write(&file, "module demo::m { public fun ping() {} }")
         .unwrap_or_else(|error| panic!("write file: {error}"));
-    let mut app = App::new(temp.path(), EditorMode::Standard)
-        .unwrap_or_else(|error| panic!("app: {error}"));
+    let mut app =
+        App::new(temp.path(), EditorMode::Standard).unwrap_or_else(|error| panic!("app: {error}"));
     app.open_file(file);
 
     let source = app.editor.text();
@@ -729,8 +883,7 @@ fn workbench_chat_host_uses_active_theme_palette() {
     let temp = tempfile::tempdir().expect("temp dir");
     let theme = Theme::new(ThemeName::BytecodeEmber);
     let palette = theme.palette();
-    let mut app =
-        App::new_with_theme(temp.path(), EditorMode::Standard, theme).expect("app");
+    let mut app = App::new_with_theme(temp.path(), EditorMode::Standard, theme).expect("app");
     app.active_tab = WorkbenchTab::Chat;
     app.focus = FocusPane::Input;
     let backend = TestBackend::new(120, 30);
@@ -774,6 +927,8 @@ fn navigation_moves_between_workbench_sections() {
     assert_eq!(app.focus, FocusPane::Editor);
 
     workbench_nav(&mut app, KeyCode::Char('k'));
+    assert_eq!(app.focus, FocusPane::FileTabs);
+    workbench_nav(&mut app, KeyCode::Char('k'));
     assert_eq!(app.focus, FocusPane::Tabs);
 
     workbench_nav(&mut app, KeyCode::Char('h'));
@@ -791,6 +946,8 @@ fn tab_bar_focus_changes_active_workbench_tab() {
     assert_eq!(app.active_tab, WorkbenchTab::Bytecode);
     app.handle_key_event(key(KeyCode::Left));
     assert_eq!(app.active_tab, WorkbenchTab::Code);
+    app.handle_key_event(key(KeyCode::Enter));
+    assert_eq!(app.focus, FocusPane::FileTabs);
     app.handle_key_event(key(KeyCode::Enter));
     assert_eq!(app.focus, FocusPane::Editor);
 }
@@ -1129,6 +1286,18 @@ fn workbench_prefix_selects_tabs_and_toggles_mode() {
 
     workbench_nav(&mut app, KeyCode::Char('m'));
     assert_eq!(app.editor_mode, EditorMode::Vim);
+}
+
+#[test]
+fn workbench_prefix_focuses_file_tabs_from_another_view() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
+    app.set_active_tab(WorkbenchTab::Bytecode);
+
+    workbench_nav(&mut app, KeyCode::Char('f'));
+
+    assert_eq!(app.active_tab, WorkbenchTab::Code);
+    assert_eq!(app.focus, FocusPane::FileTabs);
 }
 
 #[test]

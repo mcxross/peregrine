@@ -5,7 +5,12 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub const WORKBENCH_CANCELED: &str = "Workbench navigation canceled";
 pub const WORKBENCH_UNBOUND: &str = "Workbench navigation key is not bound";
 
-const FOCUS_ORDER: [FocusPane; 3] = [FocusPane::Explorer, FocusPane::Editor, FocusPane::Tabs];
+const FOCUS_ORDER: [FocusPane; 4] = [
+    FocusPane::Explorer,
+    FocusPane::FileTabs,
+    FocusPane::Editor,
+    FocusPane::Tabs,
+];
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Navigation {
@@ -123,20 +128,26 @@ pub fn previous_focus(current: FocusPane) -> FocusPane {
 pub fn move_focus(current: FocusPane, direction: FocusDirection) -> FocusPane {
     match direction {
         FocusDirection::Left => match current {
-            FocusPane::Tabs | FocusPane::Editor | FocusPane::Input => FocusPane::Explorer,
+            FocusPane::Tabs | FocusPane::FileTabs | FocusPane::Editor | FocusPane::Input => {
+                FocusPane::Explorer
+            }
             FocusPane::Explorer => FocusPane::Explorer,
         },
         FocusDirection::Right => match current {
             FocusPane::Explorer => FocusPane::Editor,
-            FocusPane::Tabs | FocusPane::Editor | FocusPane::Input => FocusPane::Editor,
+            FocusPane::Tabs | FocusPane::FileTabs | FocusPane::Editor | FocusPane::Input => {
+                FocusPane::Editor
+            }
         },
         FocusDirection::Up => match current {
             FocusPane::Input => FocusPane::Editor,
-            FocusPane::Editor => FocusPane::Tabs,
+            FocusPane::Editor => FocusPane::FileTabs,
+            FocusPane::FileTabs => FocusPane::Tabs,
             other => other,
         },
         FocusDirection::Down => match current {
-            FocusPane::Tabs => FocusPane::Editor,
+            FocusPane::Tabs => FocusPane::FileTabs,
+            FocusPane::FileTabs => FocusPane::Editor,
             FocusPane::Editor => FocusPane::Editor,
             other => other,
         },
@@ -196,6 +207,7 @@ fn workbench_command(key: KeyEvent) -> NavigationCommand {
             }
             KeyBindEvent::WorkbenchFocusExplorer => NavigationCommand::Focus(FocusPane::Explorer),
             KeyBindEvent::WorkbenchFocusTabs => NavigationCommand::Focus(FocusPane::Tabs),
+            KeyBindEvent::WorkbenchFocusFileTabs => NavigationCommand::Focus(FocusPane::FileTabs),
             KeyBindEvent::WorkbenchFocusCodeEditor => NavigationCommand::FocusCodeEditor,
             KeyBindEvent::WorkbenchSwitchToAgent => NavigationCommand::SwitchToAgent,
             KeyBindEvent::WorkbenchToggleEditorMode => NavigationCommand::ToggleEditorMode,
@@ -265,6 +277,9 @@ fn dispatch_key(key: KeyEvent) -> Vec<KeyBindEvent> {
             events.push(KeyBindEvent::WorkbenchFocusExplorer)
         }
         (KeyCode::Char('t'), KeyModifiers::NONE) => events.push(KeyBindEvent::WorkbenchFocusTabs),
+        (KeyCode::Char('f'), KeyModifiers::NONE) => {
+            events.push(KeyBindEvent::WorkbenchFocusFileTabs)
+        }
         (KeyCode::Char('c'), KeyModifiers::NONE) => {
             events.push(KeyBindEvent::WorkbenchFocusCodeEditor)
         }
@@ -343,6 +358,18 @@ mod tests {
     }
 
     #[test]
+    fn workbench_chord_focuses_file_tabs() {
+        keybinds::init_default_keybindings().expect("keybindings");
+        let mut navigation = Navigation::default();
+        navigation.translate(ctrl('w'), FocusPane::Editor);
+
+        assert_eq!(
+            navigation.translate(key(KeyCode::Char('f')), FocusPane::Editor),
+            NavigationIntent::Command(NavigationCommand::Focus(FocusPane::FileTabs))
+        );
+    }
+
+    #[test]
     fn alt_six_selects_chat_tab() {
         keybinds::init_default_keybindings().expect("keybindings");
         let mut navigation = Navigation::default();
@@ -411,7 +438,19 @@ mod tests {
         );
         assert_eq!(
             move_focus(FocusPane::Editor, FocusDirection::Up),
+            FocusPane::FileTabs
+        );
+        assert_eq!(
+            move_focus(FocusPane::FileTabs, FocusDirection::Up),
             FocusPane::Tabs
+        );
+        assert_eq!(
+            move_focus(FocusPane::Tabs, FocusDirection::Down),
+            FocusPane::FileTabs
+        );
+        assert_eq!(
+            move_focus(FocusPane::FileTabs, FocusDirection::Down),
+            FocusPane::Editor
         );
     }
 

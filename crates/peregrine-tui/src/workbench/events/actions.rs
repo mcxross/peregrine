@@ -1,23 +1,10 @@
-use crate::workbench::prelude::*;
 use crate::workbench::PendingVimCommand;
+use crate::workbench::prelude::*;
 
-use crate::chat;
 use crate::keybinds;
-use crate::navigation::{self, NavigationCommand, NavigationIntent};
-use ratatui::crossterm::event::{
-    self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent,
-    MouseEventKind,
-};
-use ratatui::layout::{Constraint, Direction, Layout, Position, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
-use ratatui::{DefaultTerminal, Frame};
-use std::collections::HashMap;
-use std::io;
-use std::path::{Path, PathBuf};
-use std::sync::mpsc;
-use std::thread;
+use crate::navigation::{self, NavigationCommand};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use std::path::PathBuf;
 
 impl App {
     pub(crate) fn apply_navigation_command(&mut self, command: NavigationCommand) {
@@ -41,6 +28,10 @@ impl App {
             NavigationCommand::ToggleEditorMode => self.toggle_editor_mode(),
             NavigationCommand::PreviousTheme => self.previous_theme(),
             NavigationCommand::NextTheme => self.next_theme(),
+            NavigationCommand::Focus(FocusPane::FileTabs) => {
+                self.active_tab = WorkbenchTab::Code;
+                self.set_focus(FocusPane::FileTabs);
+            }
             NavigationCommand::Focus(pane) => self.set_focus(pane),
             NavigationCommand::FocusCodeEditor => self.focus_code_editor(),
             NavigationCommand::SwitchToAgent => {
@@ -53,7 +44,7 @@ impl App {
                 self.set_focus(self.previous_focus_pane());
             }
             NavigationCommand::MoveFocus(direction) => {
-                self.set_focus(navigation::move_focus(self.focus, direction));
+                self.set_focus(self.move_focus_pane(direction));
             }
             NavigationCommand::SelectTab(tab) => {
                 self.set_active_tab(tab);
@@ -87,7 +78,13 @@ impl App {
         match key.code {
             KeyCode::Left | KeyCode::Char('h') => self.previous_tab(),
             KeyCode::Right | KeyCode::Char('l') => self.next_tab(),
-            KeyCode::Down | KeyCode::Enter | KeyCode::Esc => self.set_focus(FocusPane::Editor),
+            KeyCode::Down | KeyCode::Enter | KeyCode::Esc => {
+                self.set_focus(if self.active_tab == WorkbenchTab::Code {
+                    FocusPane::FileTabs
+                } else {
+                    FocusPane::Editor
+                });
+            }
             _ => {}
         }
     }
@@ -335,23 +332,15 @@ impl App {
     }
 
     pub(crate) fn set_focus(&mut self, pane: FocusPane) {
-        let focus = if pane == FocusPane::Input && self.active_tab != WorkbenchTab::Chat {
-            FocusPane::Editor
-        } else {
-            pane
+        let focus = match pane {
+            FocusPane::Input if self.active_tab != WorkbenchTab::Chat => FocusPane::Editor,
+            FocusPane::FileTabs if self.active_tab != WorkbenchTab::Code => FocusPane::Editor,
+            other => other,
         };
         if focus != FocusPane::Editor || self.active_tab != WorkbenchTab::Code {
             self.standard_editor_editing = false;
         }
         self.focus = focus;
-    }
-
-    pub(crate) fn next_focus_pane(&self) -> FocusPane {
-        navigation::next_focus(self.focus)
-    }
-
-    pub(crate) fn previous_focus_pane(&self) -> FocusPane {
-        navigation::previous_focus(self.focus)
     }
 
     pub(crate) fn next_tab(&mut self) {
@@ -425,18 +414,18 @@ impl App {
     }
 
     pub(crate) fn open_file(&mut self, path: PathBuf) {
-        if self.editor.dirty && self.editor.path.as_ref() != Some(&path) {
-            self.status = String::from("Unsaved changes: Ctrl-S to save or Ctrl-R to reload first");
-            return;
-        }
-
-        match self.editor.open_file(&path) {
-            Ok(()) => {
+        let interaction = self.current_document_interaction();
+        match self.editor.open_file(&path, interaction) {
+            Ok(activation) => {
+                self.apply_document_interaction(activation.interaction);
                 self.invalidate_workbench_views();
                 self.active_tab = WorkbenchTab::Code;
-                self.standard_editor_editing = false;
                 self.set_focus(FocusPane::Editor);
-                self.status = format!("Opened {}", path.display());
+                self.status = if activation.opened {
+                    format!("Opened {}", path.display())
+                } else {
+                    format!("Activated {}", path.display())
+                };
             }
             Err(error) => {
                 self.status = format!("Could not open {}: {error}", path.display());
@@ -485,5 +474,4 @@ impl App {
         self.graph_loader_rx = None;
         self.graphs.invalidate();
     }
-
 }

@@ -102,6 +102,7 @@ impl App {
         application_runtime: Option<app::ApplicationRuntime>,
     ) -> io::Result<Self> {
         keybinds::init_default_keybindings()?;
+        let root = root.as_ref().to_path_buf();
         let theme_generation = theme.generation();
         let application_config = application_runtime
             .as_ref()
@@ -124,9 +125,10 @@ impl App {
             theme,
             theme_generation,
             navigation: Navigation::default(),
-            explorer: Explorer::new(root)?,
-            editor: EditorBuffer::new_empty(),
+            explorer: Explorer::new(&root)?,
+            editor: EditorWorkspace::new(&root),
             editor_render_cache: None,
+            pending_close: None,
             bytecode: BytecodePane::default(),
             bytecode_cache: HashMap::new(),
             bytecode_loader_rx: None,
@@ -397,7 +399,8 @@ impl App {
     pub(crate) fn switch_workbench_root(&mut self, root: &Path) -> Result<(), String> {
         self.explorer =
             Explorer::new(root).map_err(|error| format!("Could not open project root: {error}"))?;
-        self.editor = EditorBuffer::new_empty();
+        self.editor = EditorWorkspace::new(root);
+        self.pending_close = None;
         self.chat.shutdown();
         self.chat = self
             .application_config

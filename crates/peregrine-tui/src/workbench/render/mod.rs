@@ -1,7 +1,9 @@
 mod bottom_bar;
 mod center;
+mod close_dialog;
 mod editor;
 mod explorer;
+mod file_tabs;
 mod graph;
 mod orchestration;
 mod theme;

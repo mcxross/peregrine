@@ -1,8 +1,8 @@
 use super::{
-    BytecodeCacheEntry, BytecodeLoadResult, BytecodePane, BytecodeTargetKey, EditorBuffer,
-    EditorMode, EditorRenderCache, Explorer, FocusPane, GraphLoadResult, GraphPanes,
-    StartupTaskResult, VimState, WorkbenchExit, WorkbenchLayout, WorkbenchStartupState,
-    WorkbenchTab, AppMode,
+    AppMode, BytecodeCacheEntry, BytecodeLoadResult, BytecodePane, BytecodeTargetKey,
+    CloseConfirmation, EditorMode, EditorRenderCache, EditorWorkspace, Explorer, FocusPane,
+    GraphLoadResult, GraphPanes, StartupTaskResult, VimState, WorkbenchExit, WorkbenchLayout,
+    WorkbenchStartupState, WorkbenchTab,
 };
 use crate::agent;
 use crate::app;
@@ -28,8 +28,9 @@ pub struct App {
     pub(crate) theme_generation: u64,
     pub(crate) navigation: Navigation,
     pub(crate) explorer: Explorer,
-    pub(crate) editor: EditorBuffer,
+    pub(crate) editor: EditorWorkspace,
     pub(crate) editor_render_cache: Option<EditorRenderCache>,
+    pub(crate) pending_close: Option<CloseConfirmation>,
     pub(crate) bytecode: BytecodePane,
     pub(crate) bytecode_cache: HashMap<BytecodeTargetKey, BytecodeCacheEntry>,
     pub(crate) bytecode_loader_rx: Option<mpsc::Receiver<BytecodeLoadResult>>,
