@@ -235,7 +235,8 @@ impl App {
     pub(crate) fn handle_editor_click(&mut self, x: u16, y: u16) {
         if self.active_tab == WorkbenchTab::Chat {
             self.set_focus(FocusPane::Input);
-            let _ = (x, y);
+            let action = self.chat.handle_left_click(self.layout.editor, x, y);
+            self.apply_chat_action(action);
             return;
         }
         self.set_focus(FocusPane::Editor);

@@ -60,6 +60,7 @@ use crate::agent::tui::FrameRequester;
 use uuid::Uuid;
 
 mod mcp_inventory;
+mod navigation;
 mod provider;
 #[cfg(test)]
 mod tests;
@@ -297,6 +298,7 @@ pub(crate) struct ChatController {
     history_cells: Vec<Arc<dyn HistoryCell>>,
     sessions: Vec<SessionRow>,
     selected_session: usize,
+    session_list_offset: usize,
     active_thread_id: Option<ThreadId>,
     active_turn_id: Option<String>,
     session_request_pending: bool,
@@ -321,6 +323,7 @@ impl Default for ChatController {
             history_cells: Vec::new(),
             sessions: Vec::new(),
             selected_session: 0,
+            session_list_offset: 0,
             active_thread_id: None,
             active_turn_id: None,
             session_request_pending: false,
@@ -387,6 +390,10 @@ impl ChatController {
 
     pub(crate) fn handle_key(&mut self, root: &Path, key: KeyEvent) -> ChatAction {
         self.ensure_started(root);
+        if self.should_open_session_history(key) {
+            self.open_session_history();
+            return ChatAction::None;
+        }
         let mut action = ChatAction::None;
         if matches!(self.mode, HostMode::Sessions) {
             match session_list_key_action(key) {
@@ -578,7 +585,7 @@ impl ChatController {
         self.render_composer(frame, rows[1], focused);
     }
 
-    fn render_session_list(&self, frame: &mut Frame<'_>, area: Rect, focused: bool) {
+    fn render_session_list(&mut self, frame: &mut Frame<'_>, area: Rect, focused: bool) {
         if self.sessions.is_empty() {
             let lines = vec![
                 Line::from("No previous chats for this project."),
@@ -627,6 +634,7 @@ impl ChatController {
                     .add_modifier(Modifier::BOLD),
             );
         frame.render_stateful_widget(list, area, &mut state);
+        self.session_list_offset = state.offset();
     }
 
     fn render_chat(&mut self, frame: &mut Frame<'_>, area: Rect, focused: bool) {
