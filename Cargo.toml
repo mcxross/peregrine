@@ -12,6 +12,7 @@ members = [
   "crates/peregrine-move-insights",
   "crates/peregrine-move-model",
   "crates/peregrine-mcp-protocol",
+  "crates/peregrine-mcp-client",
   "crates/peregrine-mcp-server",
   "crates/peregrine-memwal",
   "crates/peregrine-package-resolution",
@@ -278,6 +279,7 @@ peregrine-move-graphs = { path = "crates/peregrine-move-graphs" }
 peregrine-move-insights = { path = "crates/peregrine-move-insights" }
 peregrine-move-model = { path = "crates/peregrine-move-model" }
 peregrine-mcp-protocol = { path = "crates/peregrine-mcp-protocol" }
+peregrine-mcp-client = { path = "crates/peregrine-mcp-client" }
 peregrine-mcp-server = { path = "crates/peregrine-mcp-server" }
 codex-network-proxy = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-ollama = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }

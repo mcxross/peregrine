@@ -527,7 +527,6 @@ fn format_network_unix_socket_permission(
 mod tests {
     use super::render_debug_config_lines;
     use super::session_all_proxy_url;
-    use crate::agent::legacy_core::config::Constrained;
     use codex_utils_absolute_path::AbsolutePathBuf;
     use peregrine_app_server_protocol::AskForApproval;
     use peregrine_app_server_protocol::ConfigLayerSource;
@@ -535,6 +534,7 @@ mod tests {
     use peregrine_config::ConfigLayerStack;
     use peregrine_config::ConfigRequirements;
     use peregrine_config::ConfigRequirementsToml;
+    use peregrine_config::Constrained;
     use peregrine_config::ConstrainedWithSource;
     use peregrine_config::FeatureRequirementsToml;
     use peregrine_config::FilesystemConstraints;

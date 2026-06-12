@@ -94,7 +94,7 @@ pub(crate) fn resolve_trust_for_directory(
 async fn resolve_trust_for_directory_async(
     root: PathBuf,
 ) -> std::io::Result<WorkbenchTrustResolution> {
-    let config = peregrine_core::config::ConfigBuilder::default()
+    let config = crate::agent::legacy_core::config::ConfigBuilder::default()
         .loader_overrides(LoaderOverrides::default())
         .fallback_cwd(Some(root))
         .build()
@@ -122,7 +122,7 @@ pub(crate) fn persist_trusted_project(
     peregrine_home: &Path,
     project_root: &Path,
 ) -> Result<(), String> {
-    peregrine_core::config::set_project_trust_level(
+    crate::agent::legacy_core::config::set_project_trust_level(
         peregrine_home,
         project_root,
         TrustLevel::Trusted,

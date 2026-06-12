@@ -60,8 +60,6 @@ use crate::agent::diff_model::FileChange;
 use crate::agent::git_action_directives::parse_assistant_markdown;
 use crate::agent::legacy_core::DEFAULT_AGENTS_MD_FILENAME;
 use crate::agent::legacy_core::config::Config;
-use crate::agent::legacy_core::config::Constrained;
-use crate::agent::legacy_core::config::ConstraintResult;
 use crate::agent::legacy_core::config::PermissionProfileSnapshot;
 #[cfg(any(target_os = "windows", test))]
 use crate::agent::legacy_core::windows_sandbox::WindowsSandboxLevelExt;
@@ -151,6 +149,8 @@ use peregrine_app_server_protocol::TurnPlanStepStatus;
 use peregrine_app_server_protocol::TurnStatus;
 use peregrine_app_server_protocol::UserInput;
 use peregrine_config::ConfigLayerStackOrdering;
+use peregrine_config::Constrained;
+use peregrine_config::ConstraintResult;
 use peregrine_config::types::ApprovalsReviewer;
 use peregrine_config::types::Notifications;
 use peregrine_config::types::WindowsSandboxModeToml;

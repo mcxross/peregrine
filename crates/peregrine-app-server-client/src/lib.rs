@@ -106,10 +106,6 @@ pub mod legacy_core {
         pub use peregrine_core::review_prompts::*;
     }
 
-    pub mod test_support {
-        pub use peregrine_core::test_support::*;
-    }
-
     pub mod util {
         pub use peregrine_core::util::*;
     }

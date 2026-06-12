@@ -18621,6 +18621,7 @@ dependencies = [
  "peregrine-app-server-protocol",
  "peregrine-config",
  "peregrine-helper-protocol",
+ "peregrine-mcp-client",
  "peregrine-mcp-protocol",
  "peregrine-memories-read",
  "peregrine-model-provider",
@@ -18733,6 +18734,22 @@ dependencies = [
  "tempfile",
  "toml 0.9.12+spec-1.1.0",
  "walkdir",
+]
+
+[[package]]
+name = "peregrine-mcp-client"
+version = "0.1.0"
+dependencies = [
+ "http 1.4.0",
+ "peregrine-config",
+ "peregrine-helper-protocol",
+ "peregrine-mcp-protocol",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]
@@ -19027,7 +19044,6 @@ dependencies = [
  "codex-utils-string",
  "codex-windows-sandbox",
  "color-eyre",
- "core_test_support",
  "cpal",
  "crossterm 0.28.1",
  "derive_more 2.1.1",
@@ -19045,8 +19061,8 @@ dependencies = [
  "peregrine-app-server-client",
  "peregrine-app-server-protocol",
  "peregrine-config",
- "peregrine-core",
  "peregrine-helper-protocol",
+ "peregrine-mcp-client",
  "peregrine-mcp-protocol",
  "peregrine-model-provider",
  "peregrine-types",

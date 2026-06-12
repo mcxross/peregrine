@@ -62,9 +62,9 @@ pathdiff = { workspace = true }
 peregrine-app-server-client = { workspace = true }
 peregrine-app-server-protocol = { workspace = true }
 peregrine-config = { workspace = true }
-peregrine-core = { workspace = true }
 peregrine-helper-protocol = { workspace = true }
 peregrine-model-provider = { workspace = true }
+peregrine-mcp-client = { workspace = true }
 peregrine-mcp-protocol = { workspace = true }
 peregrine-types = { workspace = true }
 peregrine-utils-home-dir = { workspace = true }
@@ -139,7 +139,6 @@ arboard = { workspace = true }
 
 [dev-dependencies]
 assert_matches = { workspace = true }
-core_test_support = { workspace = true }
 insta = { workspace = true }
 pretty_assertions = { workspace = true }
 serial_test = { workspace = true }

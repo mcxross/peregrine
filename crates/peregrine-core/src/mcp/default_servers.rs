@@ -1,18 +1,8 @@
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 
 use peregrine_config::codex_compat;
-use peregrine_config::{
-    DEFAULT_MCP_SERVER_ENVIRONMENT_ID, McpServerConfig, McpServerTransportConfig,
-};
-use peregrine_helper_protocol::{
-    HELPER_ENV_VAR, resolve_helper_executable, resolve_helper_executable_for_current_exe,
-};
-use peregrine_mcp_protocol::{
-    SERVER_NAME, SERVER_PATH_ENV, SUI_ADAPTER_SOURCE_ENV, SUI_CLI_PATH_ENV, SuiAdapterSettings,
-    SuiSecurityToolsMode, resolve_server_executable_from,
-};
+use peregrine_mcp_client::default_peregrine_server;
+use peregrine_mcp_protocol::{SERVER_NAME, SuiSecurityToolsMode};
 
 use super::McpServerContribution;
 use super::McpServerContributionFuture;
@@ -45,65 +35,11 @@ impl McpServerContributor for PeregrineDefaultMcpServer {
 }
 
 fn default_server_config(config: &Config) -> Option<codex_compat::McpServerConfig> {
-    let helper = config
-        .peregrine_self_exe
-        .as_deref()
-        .map(resolve_helper_executable_for_current_exe)
-        .unwrap_or_else(resolve_helper_executable)
-        .ok();
-    default_server_config_from_parts(
+    let server = default_peregrine_server(
+        config.peregrine_self_exe.as_deref(),
         &config.sui_security_tools.adapter,
-        resolve_server_executable_from(
-            config.peregrine_self_exe.as_deref(),
-            std::env::var_os(SERVER_PATH_ENV),
-            std::env::var_os("PATH"),
-        ),
-        helper,
-    )
-}
-
-fn default_server_config_from_parts(
-    adapter: &SuiAdapterSettings,
-    server_executable: std::path::PathBuf,
-    helper: Option<std::path::PathBuf>,
-) -> Option<codex_compat::McpServerConfig> {
-    let mut env = HashMap::from([(
-        SUI_ADAPTER_SOURCE_ENV.to_string(),
-        adapter.source.as_str().to_string(),
-    )]);
-    if let Some(cli_path) = adapter.cli_path.as_deref() {
-        env.insert(SUI_CLI_PATH_ENV.to_string(), cli_path.to_string());
-    }
-    if let Some(helper) = helper {
-        env.insert(
-            HELPER_ENV_VAR.to_string(),
-            helper.to_string_lossy().into_owned(),
-        );
-    }
-    let server = McpServerConfig {
-        transport: McpServerTransportConfig::Stdio {
-            command: server_executable.to_string_lossy().into_owned(),
-            args: Vec::new(),
-            env: Some(env),
-            env_vars: Vec::new(),
-            cwd: None,
-        },
-        environment_id: DEFAULT_MCP_SERVER_ENVIRONMENT_ID.to_string(),
-        enabled: true,
-        required: false,
-        supports_parallel_tool_calls: false,
-        disabled_reason: None,
-        startup_timeout_sec: Some(Duration::from_secs(20)),
-        tool_timeout_sec: None,
-        default_tools_approval_mode: None,
-        enabled_tools: None,
-        disabled_tools: None,
-        scopes: None,
-        oauth: None,
-        oauth_resource: None,
-        tools: HashMap::new(),
-    };
-    let servers = HashMap::from([(SERVER_NAME.to_string(), server)]);
+    );
+    let servers = std::collections::HashMap::from([(SERVER_NAME.to_string(), server)]);
     codex_compat::mcp_server_config_map_to_codex(&servers).remove(SERVER_NAME)
 }
 
@@ -111,6 +47,9 @@ fn default_server_config_from_parts(
 mod tests {
     use super::*;
     use codex_core_plugins::PluginsManager;
+    use peregrine_helper_protocol::HELPER_ENV_VAR;
+    use peregrine_mcp_protocol::SuiAdapterSettings;
+    use std::collections::HashMap;
     use std::fs;
     use tempfile::tempdir;
 
@@ -235,24 +174,14 @@ enabled = false
 
     #[test]
     fn explicit_server_config_overrides_the_default() {
-        let mut explicit_server = default_server_config_from_parts(
-            &SuiAdapterSettings::default(),
-            "/default/peregrine-mcp-server".into(),
-            None,
-        )
-        .expect("explicit server config");
+        let mut explicit_server = test_default_server();
         let codex_compat::McpServerTransportConfig::Stdio { command, .. } =
             &mut explicit_server.transport
         else {
             panic!("default Peregrine MCP server should use stdio");
         };
         *command = "/explicit/peregrine-mcp-server".to_string();
-        let default_server = default_server_config_from_parts(
-            &SuiAdapterSettings::default(),
-            "/default/peregrine-mcp-server".into(),
-            None,
-        )
-        .expect("default server config");
+        let default_server = test_default_server();
         let mut servers = HashMap::from([(SERVER_NAME.to_string(), explicit_server.clone())]);
 
         McpManager::apply_to_configured_servers(
@@ -280,5 +209,13 @@ enabled = false
         let servers = manager.runtime_servers(&config).await;
 
         assert!(!servers.contains_key(SERVER_NAME));
+    }
+
+    fn test_default_server() -> codex_compat::McpServerConfig {
+        let server = default_peregrine_server(None, &SuiAdapterSettings::default());
+        let servers = HashMap::from([(SERVER_NAME.to_string(), server)]);
+        codex_compat::mcp_server_config_map_to_codex(&servers)
+            .remove(SERVER_NAME)
+            .expect("default server config")
     }
 }
