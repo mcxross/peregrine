@@ -1,7 +1,7 @@
-use super::types::{Cursor, EditorSnapshot, PendingVimCommand};
 use super::super::{
-    char_len, char_to_byte_index, editable_char_modifiers, split_lines, PAGE_SIZE, UNDO_LIMIT,
+    PAGE_SIZE, UNDO_LIMIT, char_len, char_to_byte_index, editable_char_modifiers, split_lines,
 };
+use super::types::{Cursor, EditorSnapshot, PendingVimCommand};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use std::fs;
 use std::io;

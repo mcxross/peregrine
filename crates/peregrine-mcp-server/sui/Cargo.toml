@@ -1,0 +1,52 @@
+[package]
+name = "peregrine-sui-mcp-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "peregrine_sui_mcp_server"
+path = "src/lib.rs"
+doctest = false
+
+[[bin]]
+name = "peregrine-sui-mcp-server"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+peregrine-analysis = { workspace = true }
+peregrine-analysis-engine = { workspace = true }
+peregrine-sui-adapter = { workspace = true }
+peregrine-sui-bytecode = { workspace = true }
+peregrine-sui-dynamic-analysis = { workspace = true }
+peregrine-helper-protocol = { workspace = true }
+peregrine-sui-import-engine = { workspace = true }
+peregrine-sui-mcp-protocol = { workspace = true }
+peregrine-sui-move-graph = { workspace = true }
+peregrine-sui-move-insights = { workspace = true }
+peregrine-sui-move-model = { workspace = true }
+peregrine-sui-project-loader = { workspace = true }
+peregrine-sui-scanner = { workspace = true }
+peregrine-sui-static-analysis = { workspace = true }
+rmcp = { workspace = true, default-features = false, features = [
+    "server",
+    "transport-io",
+] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = [
+    "io-std",
+    "macros",
+    "process",
+    "rt-multi-thread",
+    "time",
+] }
+toml = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

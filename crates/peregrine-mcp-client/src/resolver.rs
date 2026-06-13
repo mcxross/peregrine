@@ -5,9 +5,9 @@ use peregrine_config::{
 use peregrine_helper_protocol::{
     HELPER_ENV_VAR, resolve_helper_executable, resolve_helper_executable_for_current_exe,
 };
-use peregrine_mcp_protocol::{
+use peregrine_sui_mcp_protocol::{
     SERVER_NAME, SERVER_PATH_ENV, SUI_ADAPTER_SOURCE_ENV, SUI_CLI_PATH_ENV, SuiAdapterSettings,
-    SuiAdapterSource, SuiSecurityToolsMode, resolve_server_executable_from,
+    SuiAdapterSource, SuiToolsMode, resolve_server_executable_from,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -68,7 +68,7 @@ pub fn resolve_mcp_config(options: McpClientOptions) -> io::Result<ResolvedMcpCo
     let mut servers = config.mcp_servers.into_iter().collect::<BTreeMap<_, _>>();
     let (mode, adapter) = sui_settings(config.tools);
 
-    if mode == SuiSecurityToolsMode::Disabled {
+    if mode == SuiToolsMode::Disabled {
         servers.remove(SERVER_NAME);
     } else {
         servers
@@ -128,7 +128,7 @@ pub fn default_peregrine_server(
         required: false,
         supports_parallel_tool_calls: false,
         disabled_reason: None,
-        startup_timeout_sec: Some(Duration::from_secs(20)),
+        startup_timeout_sec: Some(Duration::from_secs(60)),
         tool_timeout_sec: None,
         default_tools_approval_mode: None,
         enabled_tools: None,
@@ -152,30 +152,25 @@ fn read_user_config(peregrine_home: &Path) -> io::Result<ConfigToml> {
 
 fn sui_settings(
     tools: Option<peregrine_config::config_toml::ToolsToml>,
-) -> (SuiSecurityToolsMode, SuiAdapterSettings) {
-    let Some(sui) = tools.and_then(|tools| tools.sui_security) else {
+) -> (SuiToolsMode, SuiAdapterSettings) {
+    let Some(sui) = tools.and_then(|tools| tools.sui) else {
         return Default::default();
     };
     let mode = match sui.mode {
-        Some(peregrine_config::config_toml::SuiSecurityToolsModeToml::Always) => {
-            SuiSecurityToolsMode::Always
-        }
-        Some(peregrine_config::config_toml::SuiSecurityToolsModeToml::Disabled) => {
-            SuiSecurityToolsMode::Disabled
-        }
-        Some(peregrine_config::config_toml::SuiSecurityToolsModeToml::Auto) | None => {
-            SuiSecurityToolsMode::Auto
-        }
+        Some(peregrine_config::config_toml::SuiToolsModeToml::Always) => SuiToolsMode::Always,
+        Some(peregrine_config::config_toml::SuiToolsModeToml::Disabled) => SuiToolsMode::Disabled,
+        Some(peregrine_config::config_toml::SuiToolsModeToml::Auto) | None => SuiToolsMode::Auto,
     };
     let adapter = sui
         .adapter
         .map_or_else(SuiAdapterSettings::default, |adapter| SuiAdapterSettings {
             source: match adapter.source {
-                Some(peregrine_config::config_toml::SuiSecurityAdapterSourceToml::System) => {
+                Some(peregrine_config::config_toml::SuiAdapterSourceToml::System) => {
                     SuiAdapterSource::System
                 }
-                Some(peregrine_config::config_toml::SuiSecurityAdapterSourceToml::Bundled)
-                | None => SuiAdapterSource::Bundled,
+                Some(peregrine_config::config_toml::SuiAdapterSourceToml::Bundled) | None => {
+                    SuiAdapterSource::Bundled
+                }
             },
             cli_path: adapter.cli_path,
         });
@@ -197,7 +192,7 @@ mod tests {
 [mcp_servers.docs]
 command = "docs-server"
 
-[mcp_servers.peregrine]
+[mcp_servers.peregrine-sui]
 command = "custom-server"
 enabled = false
 "#,
@@ -210,9 +205,9 @@ enabled = false
         })?;
 
         assert_eq!(resolved.servers.len(), 2);
-        assert!(!resolved.servers["peregrine"].enabled);
+        assert!(!resolved.servers[SERVER_NAME].enabled);
         let McpServerTransportConfig::Stdio { command, .. } =
-            &resolved.servers["peregrine"].transport
+            &resolved.servers[SERVER_NAME].transport
         else {
             panic!("stdio");
         };
@@ -225,7 +220,7 @@ enabled = false
         let home = tempdir()?;
         std::fs::write(
             home.path().join(CONFIG_TOML_FILE),
-            "[tools.sui_security]\nmode = \"disabled\"\n",
+            "[tools.sui]\nmode = \"disabled\"\n",
         )?;
         let resolved = resolve_mcp_config(McpClientOptions::new(
             home.path().to_path_buf(),

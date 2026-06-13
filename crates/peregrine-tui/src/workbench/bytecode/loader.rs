@@ -70,7 +70,7 @@ impl App {
         let (tx, rx) = mpsc::channel();
 
         match thread::Builder::new()
-            .name(format!("peregrine-bytecode-{module_name}"))
+            .name(format!("peregrine-sui-bytecode-{module_name}"))
             .spawn(move || {
                 let result = BytecodeSession::load(request);
                 let _ = tx.send(BytecodeLoadResult {
@@ -214,5 +214,4 @@ impl App {
 
         Ok(BytecodeOptions::new(context, file, targets))
     }
-
 }

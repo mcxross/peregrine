@@ -8,7 +8,7 @@ use crate::{
     session::McpToolClient,
     sui::{args::ObjectGraphArgs, project::CliContext},
 };
-use peregrine_mcp_protocol::{
+use peregrine_sui_mcp_protocol::{
     GraphsResponse, MoveStateAccessGraph, MoveStateAccessGraphEdge, PackageArgs, tool_name,
 };
 use serde_json::json;
@@ -311,7 +311,7 @@ fn display_command(args: &ObjectGraphArgs) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use peregrine_mcp_protocol::MoveStateAccessGraphNode;
+    use peregrine_sui_mcp_protocol::MoveStateAccessGraphNode;
 
     #[test]
     fn object_graph_text_lists_accesses() {

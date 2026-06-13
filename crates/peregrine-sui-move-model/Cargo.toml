@@ -1,0 +1,10 @@
+[package]
+name = "peregrine-sui-move-model"
+version.workspace = true
+edition.workspace = true
+description = "Move package source model discovery for Peregrine"
+
+[dependencies]
+move-command-line-common = { workspace = true }
+move-compiler = { workspace = true }
+serde = { workspace = true }

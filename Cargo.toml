@@ -1,25 +1,27 @@
 [workspace]
 members = [
   "src-tauri",
-  "crates/peregrine-adapters",
-  "crates/peregrine-dynamic-analysis",
-  "crates/peregrine-bytecode",
+  "crates/peregrine-analysis",
+  "crates/peregrine-analysis-engine",
+  "crates/peregrine-sui-adapter",
+  "crates/peregrine-sui-dynamic-analysis",
+  "crates/peregrine-sui-bytecode",
   "crates/peregrine-helper",
   "crates/peregrine-helper-protocol",
-  "crates/peregrine-indexer",
-  "crates/peregrine-import-engine",
-  "crates/peregrine-move-graphs",
-  "crates/peregrine-move-insights",
-  "crates/peregrine-move-model",
-  "crates/peregrine-mcp-protocol",
+  "crates/peregrine-sui-indexer",
+  "crates/peregrine-sui-import-engine",
+  "crates/peregrine-sui-move-graph",
+  "crates/peregrine-sui-move-insights",
+  "crates/peregrine-sui-move-model",
+  "crates/peregrine-sui-mcp-protocol",
   "crates/peregrine-mcp-client",
-  "crates/peregrine-mcp-server",
+  "crates/peregrine-mcp-server/sui",
   "crates/peregrine-memwal",
-  "crates/peregrine-package-resolution",
-  "crates/peregrine-project-loader",
+  "crates/peregrine-sui-package-resolution",
+  "crates/peregrine-sui-project-loader",
   "crates/peregrine-plugins",
-  "crates/peregrine-scanner",
-  "crates/peregrine-static-analysis",
+  "crates/peregrine-sui-scanner",
+  "crates/peregrine-sui-static-analysis",
   "crates/peregrine-terminal",
   "crates/peregrine-tui",
   "crates/peregrine-types",
@@ -92,6 +94,8 @@ unnecessary_to_owned = "deny"
 unwrap_used = "deny"
 
 [workspace.dependencies]
+peregrine-analysis = { path = "crates/peregrine-analysis" }
+peregrine-analysis-engine = { path = "crates/peregrine-analysis-engine" }
 age = "0.11.1"
 allocative = "0.3.3"
 anemo = { git = "https://github.com/mystenlabs/anemo.git", rev = "9248f8d3951df750360308df22618e5978ad6dc0" }
@@ -205,7 +209,7 @@ os_info = "3.12.0"
 owo-colors = "4.3.0"
 path-absolutize = "3.1.1"
 pathdiff = "0.2"
-peregrine-adapters = { path = "crates/peregrine-adapters" }
+peregrine-sui-adapter = { path = "crates/peregrine-sui-adapter" }
 codex-agent-graph-store = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-agent-identity = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-analytics = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
@@ -224,7 +228,7 @@ codex-async-utils = { git = "https://github.com/openai/codex", tag = "rust-v0.13
 codex-aws-auth = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-backend-client = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-backend-openapi-models = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
-peregrine-bytecode = { path = "crates/peregrine-bytecode" }
+peregrine-sui-bytecode = { path = "crates/peregrine-sui-bytecode" }
 codex-chatgpt = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 peregrine-client = { path = "crates/peregrine-client" }
 codex-cloud-requirements = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
@@ -238,7 +242,7 @@ peregrine-core = { path = "crates/peregrine-core" }
 codex-core-api = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-core-plugins = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-core-skills = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
-peregrine-dynamic-analysis = { path = "crates/peregrine-dynamic-analysis" }
+peregrine-sui-dynamic-analysis = { path = "crates/peregrine-sui-dynamic-analysis" }
 codex-exec = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-exec-server = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-execpolicy = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
@@ -257,8 +261,8 @@ codex-guardian = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0
 codex-image-generation-extension = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 peregrine-helper-protocol = { path = "crates/peregrine-helper-protocol" }
 codex-hooks = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
-peregrine-import-engine = { path = "crates/peregrine-import-engine" }
-peregrine-indexer = { path = "crates/peregrine-indexer" }
+peregrine-sui-import-engine = { path = "crates/peregrine-sui-import-engine" }
+peregrine-sui-indexer = { path = "crates/peregrine-sui-indexer" }
 codex-install-context = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-keyring-store = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-linux-sandbox = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
@@ -275,27 +279,27 @@ codex-models-manager = { git = "https://github.com/openai/codex", tag = "rust-v0
 peregrine-model-provider = { path = "crates/peregrine-model-provider" }
 peregrine-anthropic = { path = "crates/peregrine-anthropic" }
 peregrine-provider-registry = { path = "crates/peregrine-provider-registry" }
-peregrine-move-graphs = { path = "crates/peregrine-move-graphs" }
-peregrine-move-insights = { path = "crates/peregrine-move-insights" }
-peregrine-move-model = { path = "crates/peregrine-move-model" }
-peregrine-mcp-protocol = { path = "crates/peregrine-mcp-protocol" }
+peregrine-sui-move-graph = { path = "crates/peregrine-sui-move-graph" }
+peregrine-sui-move-insights = { path = "crates/peregrine-sui-move-insights" }
+peregrine-sui-move-model = { path = "crates/peregrine-sui-move-model" }
+peregrine-sui-mcp-protocol = { path = "crates/peregrine-sui-mcp-protocol" }
 peregrine-mcp-client = { path = "crates/peregrine-mcp-client" }
-peregrine-mcp-server = { path = "crates/peregrine-mcp-server" }
+peregrine-sui-mcp-server = { path = "crates/peregrine-mcp-server/sui" }
 codex-network-proxy = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-ollama = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-otel = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
-peregrine-package-resolution = { path = "crates/peregrine-package-resolution" }
+peregrine-sui-package-resolution = { path = "crates/peregrine-sui-package-resolution" }
 codex-plugin = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 peregrine-plugins = { path = "crates/peregrine-plugins" }
 codex-process-hardening = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
-peregrine-project-loader = { path = "crates/peregrine-project-loader" }
+peregrine-sui-project-loader = { path = "crates/peregrine-sui-project-loader" }
 codex-realtime-webrtc = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-responses-api-proxy = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-rmcp-client = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-rollout = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-rollout-trace = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-sandboxing = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
-peregrine-scanner = { path = "crates/peregrine-scanner" }
+peregrine-sui-scanner = { path = "crates/peregrine-sui-scanner" }
 codex-secrets = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-shell-command = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-shell-escalation = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
@@ -303,7 +307,7 @@ codex-shell-escalation = { git = "https://github.com/openai/codex", tag = "rust-
 # restricted default skill bundle.
 codex-skills = { path = "crates/peregrine-skills" }
 codex-state = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
-peregrine-static-analysis = { path = "crates/peregrine-static-analysis" }
+peregrine-sui-static-analysis = { path = "crates/peregrine-sui-static-analysis" }
 codex-stdio-to-uds = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 peregrine-terminal = { path = "crates/peregrine-terminal" }
 codex-terminal-detection = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }

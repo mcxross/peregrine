@@ -48,6 +48,11 @@ cargo fmt
 cargo clippy --workspace --all-targets
 ```
 
+## Architecture
+
+See [docs/analysis-architecture.md](docs/analysis-architecture.md) for the
+chain-neutral analysis engine, Sui plugin composition, and MCP server layout.
+
 ## Validation
 
 ```bash

@@ -241,7 +241,7 @@ impl McpProcess {
         let mut process = cmd
             .kill_on_drop(true)
             .spawn()
-            .context("peregrine-mcp-server proc should start")?;
+            .context("peregrine-sui-mcp-server proc should start")?;
         let stdin = process
             .stdin
             .take()

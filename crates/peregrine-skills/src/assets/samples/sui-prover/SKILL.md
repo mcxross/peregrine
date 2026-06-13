@@ -35,7 +35,7 @@ If you need to reference Sui directly, put the specs in a separate package.
 Prefer the Rust harness tool when available:
 
 ```text
-security_sui_formal_verify({
+formal_verify({
   "package_path": ".",
   "file_path": "sources/module.move",
   "module_name": "module",

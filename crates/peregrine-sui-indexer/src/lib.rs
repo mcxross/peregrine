@@ -1,0 +1,24 @@
+pub mod adapter;
+mod analysis_input;
+pub mod compiler;
+pub mod config;
+pub mod core;
+pub mod engine;
+pub mod extractors;
+pub mod incremental;
+pub mod index_health;
+pub mod index_layers;
+pub mod llm;
+pub mod lowering;
+pub mod model;
+pub mod package_loader;
+pub mod queries;
+pub mod source_map;
+pub mod storage;
+pub mod summary_loader;
+pub mod tauri;
+pub mod tests;
+
+pub use adapter::SuiIndexerAdapter;
+pub use config::IndexerConfig;
+pub use engine::SuiMoveIndexer;

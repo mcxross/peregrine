@@ -1,5 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import {
+  constants,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  rmSync,
+} from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -8,7 +14,7 @@ const profile = release ? "release" : "debug";
 const extension = process.platform === "win32" ? ".exe" : "";
 const targetTriple = resolveTargetTriple();
 const destinationDirectory = join(root, "src-tauri", "binaries");
-const sidecars = ["peregrine-helper", "peregrine-mcp-server"];
+const sidecars = ["peregrine-helper", "peregrine-sui-mcp-server"];
 
 for (const sidecar of sidecars) {
   run("cargo", ["build", "-p", sidecar, ...(release ? ["--release"] : [])]);
@@ -26,8 +32,13 @@ for (const sidecar of sidecars) {
     throw new Error(`Expected sidecar binary at ${source}`);
   }
 
-  copyFileSync(source, destination);
+  rmSync(destination, { force: true });
+  copyFileSync(source, destination, constants.COPYFILE_FICLONE);
   console.log(`Prepared ${destination}`);
+
+  if (sidecar === "peregrine-sui-mcp-server") {
+    verifyMcpServer(destination);
+  }
 }
 
 function resolveTargetTriple() {
@@ -75,5 +86,41 @@ function run(command: string, args: string[]) {
 
   if (result.status !== 0) {
     throw new Error(`${command} ${args.join(" ")} failed with status ${result.status}`);
+  }
+}
+
+function verifyMcpServer(executable: string) {
+  const request = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: {
+        name: "peregrine-sidecar-preflight",
+        version: "1",
+      },
+    },
+  });
+  const result = spawnSync(executable, [], {
+    cwd: root,
+    input: `${request}\n`,
+    encoding: "utf8",
+    timeout: 20_000,
+    maxBuffer: 1024 * 1024,
+  });
+
+  if (result.status !== 0) {
+    throw new Error(
+      result.error?.message ||
+        result.stderr.trim() ||
+        `MCP sidecar preflight failed with status ${result.status}`,
+    );
+  }
+
+  const response = JSON.parse(result.stdout.trim());
+  if (response.id !== 1 || !response.result?.serverInfo) {
+    throw new Error("MCP sidecar preflight returned an invalid initialize response");
   }
 }

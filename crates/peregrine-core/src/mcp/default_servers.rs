@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use peregrine_config::codex_compat;
 use peregrine_mcp_client::default_peregrine_server;
-use peregrine_mcp_protocol::{SERVER_NAME, SuiSecurityToolsMode};
+use peregrine_sui_mcp_protocol::{SERVER_NAME, SuiToolsMode};
 
 use super::McpServerContribution;
 use super::McpServerContributionFuture;
@@ -18,7 +18,7 @@ struct PeregrineDefaultMcpServer;
 impl McpServerContributor for PeregrineDefaultMcpServer {
     fn contribute<'a>(&'a self, config: &'a Config) -> McpServerContributionFuture<'a> {
         Box::pin(async move {
-            if config.sui_security_tools.mode == SuiSecurityToolsMode::Disabled {
+            if config.sui_tools.mode == SuiToolsMode::Disabled {
                 return vec![McpServerContribution::Remove {
                     name: SERVER_NAME.to_string(),
                 }];
@@ -37,7 +37,7 @@ impl McpServerContributor for PeregrineDefaultMcpServer {
 fn default_server_config(config: &Config) -> Option<codex_compat::McpServerConfig> {
     let server = default_peregrine_server(
         config.peregrine_self_exe.as_deref(),
-        &config.sui_security_tools.adapter,
+        &config.sui_tools.adapter,
     );
     let servers = std::collections::HashMap::from([(SERVER_NAME.to_string(), server)]);
     codex_compat::mcp_server_config_map_to_codex(&servers).remove(SERVER_NAME)
@@ -48,7 +48,7 @@ mod tests {
     use super::*;
     use codex_core_plugins::PluginsManager;
     use peregrine_helper_protocol::HELPER_ENV_VAR;
-    use peregrine_mcp_protocol::SuiAdapterSettings;
+    use peregrine_sui_mcp_protocol::SuiAdapterSettings;
     use std::collections::HashMap;
     use std::fs;
     use tempfile::tempdir;
@@ -110,8 +110,8 @@ command = "docs-mcp-server"
         fs::write(
             peregrine_home.path().join(CONFIG_TOML_FILE),
             r#"
-[mcp_servers.peregrine]
-command = "custom-peregrine-mcp-server"
+[mcp_servers.peregrine-sui]
+command = "custom-peregrine-sui-mcp-server"
 enabled = false
 "#,
         )
@@ -135,7 +135,7 @@ enabled = false
             panic!("explicit Peregrine MCP server should use stdio");
         };
 
-        assert_eq!(command, "custom-peregrine-mcp-server");
+        assert_eq!(command, "custom-peregrine-sui-mcp-server");
         assert!(!server.enabled);
     }
 
@@ -143,7 +143,7 @@ enabled = false
     async fn default_server_uses_configured_peregrine_executable_for_sibling_lookup() {
         let directory = tempdir().expect("tempdir");
         let frontend = directory.path().join("peregrine-tui");
-        let sidecar = frontend.with_file_name(peregrine_mcp_protocol::SERVER_BINARY_NAME);
+        let sidecar = frontend.with_file_name(peregrine_sui_mcp_protocol::SERVER_BINARY_NAME);
         let helper = frontend.with_file_name(peregrine_helper_protocol::helper_binary_file_name());
         fs::write(&frontend, "").expect("write frontend");
         fs::write(&sidecar, "").expect("write sidecar");
@@ -180,7 +180,7 @@ enabled = false
         else {
             panic!("default Peregrine MCP server should use stdio");
         };
-        *command = "/explicit/peregrine-mcp-server".to_string();
+        *command = "/explicit/peregrine-sui-mcp-server".to_string();
         let default_server = test_default_server();
         let mut servers = HashMap::from([(SERVER_NAME.to_string(), explicit_server.clone())]);
 
@@ -201,7 +201,7 @@ enabled = false
     #[tokio::test]
     async fn disabled_mode_removes_the_default_server() {
         let mut config = test_config().await;
-        config.sui_security_tools.mode = SuiSecurityToolsMode::Disabled;
+        config.sui_tools.mode = SuiToolsMode::Disabled;
         let manager = McpManager::new(Arc::new(PluginsManager::new(
             config.peregrine_home.to_path_buf(),
         )));

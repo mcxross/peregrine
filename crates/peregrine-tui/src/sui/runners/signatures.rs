@@ -2,7 +2,7 @@ use crate::{
     output::{CliDiagnostic, CliDiagnosticSeverity, CliStatus, CliStep, EXIT_SUCCESS, elapsed_ms},
     sui::{args::SignaturesArgs, project::CliContext},
 };
-use peregrine_mcp_protocol::SignatureEntry;
+use peregrine_sui_mcp_protocol::SignatureEntry;
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},

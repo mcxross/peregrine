@@ -29,7 +29,9 @@ pub(crate) fn char_to_byte_index(value: &str, char_index: usize) -> usize {
         .unwrap_or(value.len())
 }
 
-pub(crate) fn styled_text_segments<const N: usize>(segments: [(&str, Style); N]) -> Vec<Line<'static>> {
+pub(crate) fn styled_text_segments<const N: usize>(
+    segments: [(&str, Style); N],
+) -> Vec<Line<'static>> {
     let mut lines = vec![Vec::new()];
     for (text, style) in segments {
         append_styled_text(&mut lines, text, style);

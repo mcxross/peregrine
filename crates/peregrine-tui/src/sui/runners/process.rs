@@ -120,7 +120,7 @@ pub(super) fn command_step(
 pub(super) fn mcp_command_step(
     name: impl Into<String>,
     started_at: Instant,
-    result: peregrine_mcp_protocol::CommandResult,
+    result: peregrine_sui_mcp_protocol::CommandResult,
     mut metadata: BTreeMap<String, Value>,
 ) -> CliStep {
     metadata.insert("truncated".to_string(), Value::Bool(result.truncated));

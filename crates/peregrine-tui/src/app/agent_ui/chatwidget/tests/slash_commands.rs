@@ -676,9 +676,8 @@ async fn bare_scan_slash_command_emits_security_goal_event() {
         "{objective}"
     );
     assert!(
-        objective.contains(
-            "They are not shell commands; never run `security_sui_*` names through the shell"
-        ),
+        objective
+            .contains("They are not shell commands; never run MCP tool names through the shell"),
         "{objective}"
     );
     assert!(

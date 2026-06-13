@@ -147,4 +147,3 @@ fn sorted_children(path: &Path) -> Vec<ChildEntry> {
     });
     children
 }
-

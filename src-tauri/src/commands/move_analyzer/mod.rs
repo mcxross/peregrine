@@ -3,7 +3,7 @@ mod process;
 mod settings;
 
 use crate::state::MoveAnalyzerCommandState;
-use peregrine_adapters::move_analyzer::{
+use peregrine_sui_adapter::move_analyzer::{
     MoveAnalyzerAdapter, MoveAnalyzerAdapterEnvironment, MoveAnalyzerAdapterSettings,
     MoveAnalyzerAdapterStatus,
 };

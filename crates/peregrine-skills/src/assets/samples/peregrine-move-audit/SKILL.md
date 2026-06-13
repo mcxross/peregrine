@@ -28,7 +28,7 @@ If the user names files or modules, audit only those files and their direct depe
 1. Read `Move.toml`, source modules, and relevant tests.
 2. Map roles, capabilities, shared objects, assets, and entry functions.
 3. Trace each critical asset/state transition from inputs to persistent state.
-4. Run available local checks when practical, such as `sui move test`, existing Peregrine analyzers, or Peregrine's bundled Sui Prover path (`security_sui_formal_verify` in the harness or `peregrine verify` in the CLI) for configured specs.
+4. Run available local checks when practical, such as `sui move test`, existing Peregrine analyzers, or Peregrine's bundled Sui Prover path (`formal_verify` in the harness or `peregrine verify` in the CLI) for configured specs.
 5. Report only actionable findings. Avoid speculative claims without a plausible exploit path.
 
 ## Output

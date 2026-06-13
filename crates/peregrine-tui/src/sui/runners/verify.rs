@@ -7,7 +7,7 @@ use crate::{
         runners::process::mcp_command_step,
     },
 };
-use peregrine_mcp_protocol::{FormalVerifyArgs, PackageArgs, tool_name};
+use peregrine_sui_mcp_protocol::{FormalVerifyArgs, PackageArgs, tool_name};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, time::Instant};
 
@@ -25,7 +25,7 @@ pub fn run_verify(context: &CliContext, args: &VerifyArgs) -> Vec<CliStep> {
 
 fn run_verify_target(context: &CliContext, args: &VerifyArgs, target: FormalTarget) -> CliStep {
     let started_at = Instant::now();
-    let result = McpToolClient::call_blocking::<_, peregrine_mcp_protocol::CommandResult>(
+    let result = McpToolClient::call_blocking::<_, peregrine_sui_mcp_protocol::CommandResult>(
         &context.project_root,
         tool_name::FORMAL_VERIFY,
         &FormalVerifyArgs {

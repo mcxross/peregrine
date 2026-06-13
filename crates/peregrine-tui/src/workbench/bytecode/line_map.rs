@@ -1,4 +1,4 @@
-use peregrine_mcp_protocol::{MoveBytecodeModuleView, MoveBytecodeSourceSpan};
+use peregrine_sui_mcp_protocol::{MoveBytecodeModuleView, MoveBytecodeSourceSpan};
 use regex::Regex;
 use std::collections::HashMap;
 

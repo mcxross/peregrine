@@ -1,0 +1,13 @@
+[package]
+name = "peregrine-analysis"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Blockchain-agnostic analysis contracts and models for Peregrine"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }

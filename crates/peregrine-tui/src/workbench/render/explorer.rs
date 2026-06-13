@@ -58,5 +58,4 @@ impl App {
             .highlight_symbol("> ");
         frame.render_stateful_widget(list, area, &mut state);
     }
-
 }

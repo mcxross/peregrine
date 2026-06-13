@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub const BYTECODE_VIEWER_HELPER_ARG: &str = "--peregrine-bytecode-viewer";
+pub const BYTECODE_VIEWER_HELPER_ARG: &str = "--peregrine-sui-bytecode-viewer";
 pub const BUNDLED_SUI_HELPER_ARG: &str = "--peregrine-bundled-sui";
 pub const FORMAL_VERIFICATION_HELPER_ARG: &str = "--peregrine-formal-verification";
 pub const HELPER_ENV_VAR: &str = "PEREGRINE_HELPER";

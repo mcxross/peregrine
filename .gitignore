@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 target/
+/src-tauri/binaries/
 crates/*/Cargo.lock
 *.local
 

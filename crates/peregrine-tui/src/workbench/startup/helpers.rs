@@ -1,8 +1,8 @@
 use crate::output::{CliStatus, CliStep};
 use crate::workbench::App;
-use regex::Regex;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::text::Line;
+use regex::Regex;
 use std::ffi::OsStr;
 use std::path::Path;
 

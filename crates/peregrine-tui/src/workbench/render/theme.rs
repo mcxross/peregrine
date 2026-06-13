@@ -74,5 +74,4 @@ impl App {
             .border_style(self.border_style(focused))
             .title_style(self.title_style(focused))
     }
-
 }

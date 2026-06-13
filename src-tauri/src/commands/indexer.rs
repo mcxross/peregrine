@@ -1,8 +1,8 @@
 use crate::state::IndexerCommandState;
-use peregrine_indexer::{
+use peregrine_sui_indexer::{
     IndexerConfig, SuiMoveIndexer,
     core::{ContextBudget, Diagnostic as IndexDiagnostic, Operation as IndexOperation},
-    sui::model::{
+    model::{
         ContextPack, FunctionContext, GraphView, IndexReport, ModuleContext, ModuleSummaryCard,
         PackageOverview, SymbolResult, TypeContext,
     },

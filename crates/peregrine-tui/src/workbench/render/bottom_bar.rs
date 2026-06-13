@@ -82,5 +82,4 @@ impl App {
             Duration::from_millis(250)
         }
     }
-
 }

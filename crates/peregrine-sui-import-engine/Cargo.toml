@@ -1,0 +1,20 @@
+[package]
+name = "peregrine-sui-import-engine"
+version.workspace = true
+edition.workspace = true
+description = "Buildable on-chain Move package import engine for Peregrine"
+
+[dependencies]
+hex = { workspace = true }
+move-binary-format = { workspace = true }
+peregrine-sui-adapter = { workspace = true }
+peregrine-sui-bytecode = { workspace = true }
+peregrine-sui-package-resolution = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true }

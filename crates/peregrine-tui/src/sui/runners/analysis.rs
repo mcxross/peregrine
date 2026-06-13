@@ -6,7 +6,7 @@ use crate::{
     session::McpToolClient,
     sui::{args::AnalyzeArgs, project::CliContext},
 };
-use peregrine_mcp_protocol::{
+use peregrine_sui_mcp_protocol::{
     AnalysisDiagnostic, AnalysisFinding, AnalysisRuleCatalog, AnalysisRuleMetric, AnalysisSeverity,
     PackageArgs, StaticAnalysisArgs, StaticAnalysisResponse, StaticRuleCatalogResponse, tool_name,
 };

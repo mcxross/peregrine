@@ -65,7 +65,7 @@ peregrine-config = { workspace = true }
 peregrine-helper-protocol = { workspace = true }
 peregrine-model-provider = { workspace = true }
 peregrine-mcp-client = { workspace = true }
-peregrine-mcp-protocol = { workspace = true }
+peregrine-sui-mcp-protocol = { workspace = true }
 peregrine-types = { workspace = true }
 peregrine-utils-home-dir = { workspace = true }
 pulldown-cmark = { workspace = true }

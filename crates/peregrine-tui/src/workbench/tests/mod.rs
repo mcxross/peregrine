@@ -18,7 +18,7 @@ use crate::workbench::status::package_load_status_lines;
 use crate::workbench::{filter_type_graph, render_type_graph_text};
 use crate::workbench_render::{is_markdown_path, render_workbench_document};
 use peregrine_config::CONFIG_TOML_FILE;
-use peregrine_mcp_protocol::{
+use peregrine_sui_mcp_protocol::{
     BytecodeViewResponse, GraphsResponse, MoveBytecodeModuleView, MoveTypeGraph, MoveTypeGraphEdge,
     MoveTypeGraphNode, MoveUnresolvedType, PackageArgs as McpPackageArgs, tool_name,
 };

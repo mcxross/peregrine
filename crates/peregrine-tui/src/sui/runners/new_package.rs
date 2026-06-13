@@ -3,13 +3,13 @@ use crate::{
     session::McpToolClient,
     sui::{args::NewPackageArgs, runners::process::mcp_command_step},
 };
-use peregrine_mcp_protocol::{CreatePackageArgs, tool_name};
+use peregrine_sui_mcp_protocol::{CreatePackageArgs, tool_name};
 use serde_json::Value;
 use std::{collections::BTreeMap, path::Path, time::Instant};
 
 pub fn run_new_package(workspace_root: &Path, args: &NewPackageArgs) -> CliStep {
     let started_at = Instant::now();
-    let package_name = match peregrine_mcp_protocol::validate_package_name(&args.package_name) {
+    let package_name = match peregrine_sui_mcp_protocol::validate_package_name(&args.package_name) {
         Ok(package_name) => package_name,
         Err(error) => {
             return CliStep::failed(
@@ -32,7 +32,7 @@ pub fn run_new_package(workspace_root: &Path, args: &NewPackageArgs) -> CliStep 
         );
     }
 
-    let result = McpToolClient::call_blocking::<_, peregrine_mcp_protocol::CommandResult>(
+    let result = McpToolClient::call_blocking::<_, peregrine_sui_mcp_protocol::CommandResult>(
         workspace_root,
         tool_name::CREATE_PACKAGE,
         &CreatePackageArgs {

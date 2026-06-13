@@ -5,21 +5,21 @@ use crate::session;
 use crate::sui;
 use crate::sui::project::CliContext;
 use crate::theme::ThemePalette;
-use peregrine_mcp_protocol::{
-    tool_name, BytecodeViewResponse, MoveBytecodeModuleView, MoveBytecodeSourceSpan,
-    PackageArgs as McpPackageArgs,
+use peregrine_sui_mcp_protocol::{
+    BytecodeViewResponse, MoveBytecodeModuleView, MoveBytecodeSourceSpan,
+    PackageArgs as McpPackageArgs, tool_name,
 };
+use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::{Constraint, Direction, Layout, Position, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Paragraph};
-use ratatui::Frame;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use super::super::{char_len, styled_text_segments, usize_to_u16_saturating, PAGE_SIZE};
+use super::super::{PAGE_SIZE, char_len, styled_text_segments, usize_to_u16_saturating};
 
 #[derive(Debug, Clone)]
 pub(crate) struct BytecodeSession {

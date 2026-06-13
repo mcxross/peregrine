@@ -1,10 +1,13 @@
 use crate::output::CliStep;
 use crate::sui::package_loader::{
-    failed_startup_step, PackageLoadReport, PackageScannerReport, ScannerResult,
+    PackageLoadReport, PackageScannerReport, ScannerResult, failed_startup_step,
 };
 use std::path::PathBuf;
 
-pub(crate) fn startup_failure_load_report(package_root: PathBuf, message: String) -> PackageLoadReport {
+pub(crate) fn startup_failure_load_report(
+    package_root: PathBuf,
+    message: String,
+) -> PackageLoadReport {
     let reason = message.clone();
     PackageLoadReport {
         package_root,

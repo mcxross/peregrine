@@ -1,4 +1,4 @@
-use peregrine_adapters::move_analyzer::MoveAnalyzerAdapterSettings;
+use peregrine_sui_adapter::move_analyzer::MoveAnalyzerAdapterSettings;
 use std::{fs, path::PathBuf};
 use tauri::Manager;
 

@@ -19,7 +19,9 @@ use std::sync::mpsc;
 use std::thread;
 
 use crate::theme::ThemeName;
-use crate::workbench_render::{is_markdown_path, render_workbench_document, RenderedWorkbenchDocument};
+use crate::workbench_render::{
+    RenderedWorkbenchDocument, is_markdown_path, render_workbench_document,
+};
 
 impl App {
     pub(crate) fn editor_text_area(&self) -> Rect {
@@ -167,5 +169,4 @@ impl App {
             }
         }
     }
-
 }

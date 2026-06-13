@@ -18,10 +18,10 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 
-use crate::sui::package_loader::WorkbenchTrustResolution;
 use super::super::{
     format_elapsed, package_load_spinner, package_load_status_spans, render_cli_step_summary,
 };
+use crate::sui::package_loader::WorkbenchTrustResolution;
 
 impl App {
     pub(crate) fn render_startup(&self, frame: &mut Frame<'_>, area: Rect) {
@@ -118,7 +118,12 @@ impl App {
         self.render_startup_message(frame, area, "Package Name", lines);
     }
 
-    pub(crate) fn render_trust_prompt(&self, frame: &mut Frame<'_>, area: Rect, prompt: &TrustPrompt) {
+    pub(crate) fn render_trust_prompt(
+        &self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        prompt: &TrustPrompt,
+    ) {
         let mut lines = vec![
             Line::styled(
                 "Project trust is required before package loading can run.",
@@ -182,5 +187,4 @@ impl App {
             Span::styled(value, self.base_style()),
         ])
     }
-
 }

@@ -6,7 +6,7 @@ use crate::{
     session::McpToolClient,
     sui::args::ImportPackageArgs,
 };
-use peregrine_mcp_protocol::{
+use peregrine_sui_mcp_protocol::{
     ImportDiagnostic, ImportDiagnosticSeverity, ImportPackageArgs as McpImportPackageArgs,
     ImportPackageResponse, tool_name,
 };

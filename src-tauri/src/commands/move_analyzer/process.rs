@@ -3,7 +3,9 @@ use crate::{
     helper_args::{MOVE_ANALYZER_HELPER_ARG, resolve_helper_executable},
     state::{MoveAnalyzerCommandState, MoveAnalyzerSession},
 };
-use peregrine_adapters::move_analyzer::{MoveAnalyzerExecutionTarget, MoveAnalyzerServerCommand};
+use peregrine_sui_adapter::move_analyzer::{
+    MoveAnalyzerExecutionTarget, MoveAnalyzerServerCommand,
+};
 use serde::Serialize;
 use serde_json::Value;
 use std::{

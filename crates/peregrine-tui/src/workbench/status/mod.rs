@@ -1,6 +1,6 @@
+use super::{App, render_cli_step_summary};
 use crate::output::{CliStatus, CliStep};
 use crate::sui::package_loader::{PackageLoadReport, PackageScannerReport, ScannerResult};
-use super::{render_cli_step_summary, App};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use std::time::{Duration, Instant};
@@ -19,7 +19,10 @@ pub(crate) fn package_load_status(report: &PackageLoadReport) -> String {
 }
 
 #[cfg(test)]
-pub(crate) fn package_load_status_lines(report: &PackageLoadReport, app: &App) -> Vec<Line<'static>> {
+pub(crate) fn package_load_status_lines(
+    report: &PackageLoadReport,
+    app: &App,
+) -> Vec<Line<'static>> {
     let build_status = TaskStatus::from_cli(report.build.status);
     let test_status = child_task_status(build_status, TaskStatus::from_cli(report.test.status));
     let unit_total = best_scanner_count(
@@ -71,7 +74,10 @@ pub(crate) fn package_load_status_lines(report: &PackageLoadReport, app: &App) -
     lines
 }
 
-pub(crate) fn package_load_status_spans(report: &PackageLoadReport, app: &App) -> Vec<Span<'static>> {
+pub(crate) fn package_load_status_spans(
+    report: &PackageLoadReport,
+    app: &App,
+) -> Vec<Span<'static>> {
     let build_status = TaskStatus::from_cli(report.build.status);
     let test_status = child_task_status(build_status, TaskStatus::from_cli(report.test.status));
     let unit_total = best_scanner_count(

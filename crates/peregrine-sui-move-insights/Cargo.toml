@@ -1,0 +1,13 @@
+[package]
+name = "peregrine-sui-move-insights"
+version.workspace = true
+edition.workspace = true
+description = "Move package overview insight models for Peregrine"
+
+[dependencies]
+peregrine-sui-move-model = { workspace = true }
+peregrine-sui-scanner = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

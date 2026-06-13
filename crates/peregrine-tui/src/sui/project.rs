@@ -3,7 +3,7 @@ use crate::{
     session::fetch_modules,
     sui::args::{BytecodeArgs, VerifyArgs},
 };
-use peregrine_mcp_protocol::{MoveSourceSummary, PackageSummary};
+use peregrine_sui_mcp_protocol::{MoveSourceSummary, PackageSummary};
 use std::{
     ffi::OsStr,
     path::{Component, Path, PathBuf},

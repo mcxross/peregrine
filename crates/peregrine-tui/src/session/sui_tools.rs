@@ -1,5 +1,5 @@
 use super::McpToolClient;
-use peregrine_mcp_protocol::{
+use peregrine_sui_mcp_protocol::{
     MAX_PAGE_SIZE, ModuleEntry, ModulesArgs, ModulesPage, MoveSourceSummary, PackageArgs,
     PackageSummary, SignatureEntry, SignaturesArgs, SignaturesPage, tool_name,
 };

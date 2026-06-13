@@ -2,7 +2,7 @@ use super::pane::GraphDocument;
 use crate::output::{CliStatus, CliStep};
 use crate::sui::args::GraphOutputArgs;
 use crate::workbench::WorkbenchTab;
-use peregrine_mcp_protocol::{
+use peregrine_sui_mcp_protocol::{
     MoveTypeGraph, MoveTypeGraphEdge, MoveTypeGraphNode, MoveUnresolvedType,
 };
 use std::cmp::Ordering;
@@ -15,7 +15,10 @@ pub(crate) fn text_graph_output_args() -> GraphOutputArgs {
     }
 }
 
-pub(crate) fn graph_step_document(tab: WorkbenchTab, step: CliStep) -> Result<GraphDocument, String> {
+pub(crate) fn graph_step_document(
+    tab: WorkbenchTab,
+    step: CliStep,
+) -> Result<GraphDocument, String> {
     if step.status != CliStatus::Passed {
         return Err(render_graph_step_error(&step));
     }

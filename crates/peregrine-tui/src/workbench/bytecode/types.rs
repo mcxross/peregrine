@@ -1,12 +1,12 @@
 use super::session::BytecodeSession;
 use crate::sui::project::{BytecodeTarget, CliContext};
 use crate::theme::ThemePalette;
+use ratatui::Frame;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
-use ratatui::Frame;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 
@@ -51,7 +51,11 @@ pub(crate) struct BytecodeOptions {
 }
 
 impl BytecodeOptions {
-    pub(crate) fn new(context: CliContext, file: Option<String>, mut targets: Vec<BytecodeTarget>) -> Self {
+    pub(crate) fn new(
+        context: CliContext,
+        file: Option<String>,
+        mut targets: Vec<BytecodeTarget>,
+    ) -> Self {
         targets.sort_by(|left, right| {
             left.file_path
                 .cmp(&right.file_path)
@@ -149,7 +153,13 @@ impl BytecodeSelector {
             .min(self.targets.len().saturating_sub(1));
     }
 
-    pub(crate) fn render(&self, frame: &mut Frame<'_>, area: Rect, palette: ThemePalette, focused: bool) {
+    pub(crate) fn render(
+        &self,
+        frame: &mut Frame<'_>,
+        area: Rect,
+        palette: ThemePalette,
+        focused: bool,
+    ) {
         let base_style = Style::default().fg(palette.fg).bg(palette.bg);
         let border_style = Style::default()
             .fg(if focused {

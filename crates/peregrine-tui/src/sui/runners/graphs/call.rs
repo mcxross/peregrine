@@ -8,7 +8,7 @@ use crate::{
     session::McpToolClient,
     sui::{args::CallGraphArgs, project::CliContext},
 };
-use peregrine_mcp_protocol::{
+use peregrine_sui_mcp_protocol::{
     GraphsResponse, MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode, MoveUnresolvedCall,
     PackageArgs, tool_name,
 };

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use peregrine_static_analysis::{
+use peregrine_sui_static_analysis::{
     AnalysisConfig, AnalysisEngine, AnalysisEngineOptions, AnalysisPluginHost, AnalysisRuleCatalog,
     AnalyzerPluginRegistry, InstalledAnalyzerPlugin, RuleConfig, Severity,
 };

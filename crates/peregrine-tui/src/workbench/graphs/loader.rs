@@ -6,7 +6,9 @@ use crate::sui::args::{CallGraphArgs, CfgArgs};
 use crate::sui::project::{bytecode_targets, resolve_context};
 use crate::sui::runners::{run_call_graph, run_cfg};
 use crate::workbench::prelude::*;
-use peregrine_mcp_protocol::{tool_name, GraphsResponse, MoveTypeGraph, PackageArgs as McpPackageArgs};
+use peregrine_sui_mcp_protocol::{
+    GraphsResponse, MoveTypeGraph, PackageArgs as McpPackageArgs, tool_name,
+};
 use std::ffi::OsStr;
 use std::path::Path;
 use std::sync::mpsc;
@@ -210,5 +212,4 @@ impl App {
             render_type_graph_text(&graph),
         ))
     }
-
 }

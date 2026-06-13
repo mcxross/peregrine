@@ -16,7 +16,7 @@ workspace = true
 http = { workspace = true }
 peregrine-config = { workspace = true }
 peregrine-helper-protocol = { workspace = true }
-peregrine-mcp-protocol = { workspace = true }
+peregrine-sui-mcp-protocol = { workspace = true }
 rmcp = { workspace = true, features = [
   "client",
   "transport-child-process",

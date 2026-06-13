@@ -10,7 +10,7 @@ use crate::{
 use codex_exec_server::LOCAL_FS;
 use codex_git_utils::resolve_root_git_project_for_trust;
 use peregrine_config::LoaderOverrides;
-use peregrine_mcp_protocol::{
+use peregrine_sui_mcp_protocol::{
     PackageArgs, ScannerDiagnosticSeverity, ScannerSourceMode, TestScannerArgs, TestScannerReport,
     TestScannerResponse, tool_name,
 };

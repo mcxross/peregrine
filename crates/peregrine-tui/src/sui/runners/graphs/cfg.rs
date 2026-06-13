@@ -8,7 +8,7 @@ use crate::{
     session::McpToolClient,
     sui::{args::CfgArgs, project::CliContext, runners::run_build},
 };
-use peregrine_mcp_protocol::{
+use peregrine_sui_mcp_protocol::{
     BytecodeViewResponse, MoveBytecodeControlFlowView, MoveBytecodeFunctionView,
     MoveBytecodeModuleView, PackageArgs, tool_name,
 };
@@ -393,7 +393,7 @@ fn display_command(args: &CfgArgs) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use peregrine_mcp_protocol::{
+    use peregrine_sui_mcp_protocol::{
         MoveBytecodeBasicBlockView, MoveBytecodeControlFlowEdgeView, MoveBytecodeInstructionView,
     };
 

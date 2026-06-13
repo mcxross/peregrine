@@ -1,0 +1,18 @@
+[package]
+name = "peregrine-sui-move-graph"
+version.workspace = true
+edition.workspace = true
+description = "Move dependency, call, type, and state graph builders for Peregrine"
+
+[dependencies]
+move-command-line-common = { workspace = true }
+move-compiler = { workspace = true }
+peregrine-analysis = { workspace = true }
+peregrine-sui-bytecode = { workspace = true }
+peregrine-sui-move-model = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }

@@ -1,16 +1,17 @@
 use crate::file_preview::{FilePreview, build_file_preview};
 use crate::validated_move_project_name;
 use base64::{Engine, engine::general_purpose};
-use peregrine_bytecode::{MoveBytecodePackageView, load_package_bytecode};
-use peregrine_move_graphs::{
-    MoveProjectGraphs, MoveStateAccessGraph, discover_move_project_graphs,
-    discover_move_project_graphs_for_package, discover_move_state_access_graph_for_function,
+use peregrine_analysis::{AnalysisRequest, AnalysisStage, AnalysisTarget, ChainId, GraphKind};
+use peregrine_sui_adapter::SuiAdapterSettings;
+use peregrine_sui_bytecode::{MoveBytecodePackageView, load_package_bytecode};
+use peregrine_sui_move_graph::{MoveProjectGraphs, MoveStateAccessGraph};
+use peregrine_sui_move_model::{MovePackageModel, build_move_package};
+use peregrine_sui_project_loader::{
+    LoadedProject, ProjectLoadMode, ProjectLoadOptions, legacy_move_project_graphs,
+    legacy_state_access_graph, legacy_static_report, load_project, run_sui_analysis_blocking,
 };
-use peregrine_move_model::{MovePackageModel, build_move_package};
-use peregrine_project_loader::{LoadedProject, ProjectLoadMode, ProjectLoadOptions, load_project};
-use peregrine_static_analysis::{
-    AnalysisConfig, AnalysisEngine, AnalysisEngineOptions, AnalysisReport,
-};
+use peregrine_sui_static_analysis::AnalysisReport;
+use serde_json::json;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -184,20 +185,20 @@ pub(crate) async fn analyze_move_package(
             return Err("Selected package does not contain a Move.toml file.".to_string());
         }
 
-        let config = AnalysisConfig::load_from_package(&package_root)?;
         let registry_root = app
             .path()
             .app_config_dir()
             .map_err(|error| format!("Could not resolve app config directory: {error}"))?;
-
-        Ok(AnalysisEngine::new().analyze_package_with_options(
-            package_root,
-            config,
-            AnalysisEngineOptions {
-                global_plugin_root: Some(registry_root),
-                ..AnalysisEngineOptions::default()
-            },
-        ))
+        let mut request = AnalysisRequest::safe(
+            ChainId::new("sui"),
+            AnalysisTarget::LocalPackage { path: package_root },
+        );
+        request.options.insert(
+            "globalPluginRoot".to_string(),
+            json!(registry_root.to_string_lossy()),
+        );
+        let report = run_sui_analysis_blocking(request, SuiAdapterSettings::default())?;
+        Ok(legacy_static_report(&report))
     })
     .await
     .map_err(|error| format!("Could not join Move analysis task: {error}"))?
@@ -268,17 +269,32 @@ fn build_move_state_access_graph(
     let root = PathBuf::from(&root_path)
         .canonicalize()
         .map_err(|error| format!("Could not read package directory {root_path}: {error}"))?;
-    let (_, package) = resolve_move_package(&root, &package_path)?;
+    let (package_root, package) = resolve_move_package(&root, &package_path)?;
 
     require_move_source_modules(&package)?;
 
-    Ok(discover_move_state_access_graph_for_function(
-        &root,
-        &package_path,
-        module_address,
-        &module_name,
-        &function_name,
-    ))
+    let mut request = AnalysisRequest::safe(
+        ChainId::new("sui"),
+        AnalysisTarget::LocalPackage { path: package_root },
+    );
+    request.stages = vec![AnalysisStage::Scan, AnalysisStage::Graph];
+    request.graph_kinds = vec![GraphKind::new(GraphKind::STATE_ACCESS)];
+    request
+        .options
+        .insert("packagePath".to_string(), json!("."));
+    request
+        .options
+        .insert("moduleName".to_string(), json!(module_name));
+    request
+        .options
+        .insert("functionName".to_string(), json!(function_name));
+    if let Some(module_address) = module_address {
+        request
+            .options
+            .insert("address".to_string(), json!(module_address));
+    }
+    let report = run_sui_analysis_blocking(request, SuiAdapterSettings::default())?;
+    legacy_state_access_graph(&report)
 }
 
 fn build_move_graphs(
@@ -289,18 +305,25 @@ fn build_move_graphs(
         .canonicalize()
         .map_err(|error| format!("Could not read package directory {root_path}: {error}"))?;
 
-    if let Some(package_path) = package_path {
-        let (_, package) = resolve_move_package(&root, &package_path)?;
+    let package_root = if let Some(package_path) = package_path {
+        let (package_root, package) = resolve_move_package(&root, &package_path)?;
 
         require_move_source_modules(&package)?;
-
-        return Ok(discover_move_project_graphs_for_package(
-            &root,
-            &package_path,
-        ));
-    }
-
-    Ok(discover_move_project_graphs(&root))
+        package_root
+    } else {
+        root
+    };
+    let mut request = AnalysisRequest::safe(
+        ChainId::new("sui"),
+        AnalysisTarget::LocalPackage { path: package_root },
+    );
+    request.stages = vec![AnalysisStage::Scan, AnalysisStage::Graph];
+    request.graph_kinds = [GraphKind::CALL, GraphKind::TYPE, GraphKind::STATE_ACCESS]
+        .into_iter()
+        .map(GraphKind::new)
+        .collect();
+    let report = run_sui_analysis_blocking(request, SuiAdapterSettings::default())?;
+    legacy_move_project_graphs(&report)
 }
 
 fn resolve_move_package(

@@ -54,8 +54,8 @@ use peregrine_config::config_toml::DEFAULT_PROJECT_DOC_MAX_BYTES;
 use peregrine_config::config_toml::ProjectConfig;
 use peregrine_config::config_toml::RealtimeAudioConfig;
 use peregrine_config::config_toml::RealtimeConfig;
-use peregrine_config::config_toml::SuiSecurityAdapterSourceToml;
-use peregrine_config::config_toml::SuiSecurityToolsModeToml;
+use peregrine_config::config_toml::SuiAdapterSourceToml;
+use peregrine_config::config_toml::SuiToolsModeToml;
 use peregrine_config::config_toml::ThreadStoreToml;
 use peregrine_config::config_toml::validate_model_providers;
 use peregrine_config::loader::load_config_layers_state;
@@ -81,11 +81,11 @@ use peregrine_config::types::TuiNotificationSettings;
 use peregrine_config::types::TuiPetAnchor;
 use peregrine_config::types::UriBasedFileOpener;
 use peregrine_config::types::WindowsSandboxModeToml;
-use peregrine_mcp_protocol::{
-    SuiAdapterSettings, SuiAdapterSource, SuiSecurityToolsConfig, SuiSecurityToolsMode,
-};
 use peregrine_memories_read::memory_root;
 use peregrine_model_provider::add_peregrine_builtin_model_providers;
+use peregrine_sui_mcp_protocol::{
+    SuiAdapterSettings, SuiAdapterSource, SuiToolsConfig, SuiToolsMode,
+};
 use peregrine_types::config_types::AltScreenMode;
 use peregrine_types::config_types::AutoCompactTokenLimitScope;
 use peregrine_types::config_types::ForcedLoginMethod;
@@ -964,7 +964,7 @@ pub struct Config {
     pub multi_agent_v2: MultiAgentV2Config,
 
     /// Settings for first-party Sui/Move security harness tools.
-    pub sui_security_tools: SuiSecurityToolsConfig,
+    pub sui_tools: SuiToolsConfig,
 
     /// Centralized feature flags; source of truth for feature gating.
     pub features: ManagedFeatures,
@@ -2326,36 +2326,33 @@ fn resolve_multi_agent_v2_config(config_toml: &ConfigToml) -> MultiAgentV2Config
     }
 }
 
-fn resolve_sui_security_tools_config(config_toml: &ConfigToml) -> SuiSecurityToolsConfig {
-    let default = SuiSecurityToolsConfig::default();
+fn resolve_sui_tools_config(config_toml: &ConfigToml) -> SuiToolsConfig {
+    let default = SuiToolsConfig::default();
     let Some(config) = config_toml
         .tools
         .as_ref()
-        .and_then(|tools| tools.sui_security.as_ref())
+        .and_then(|tools| tools.sui.as_ref())
     else {
         return default;
     };
 
-    let mode = match config.mode.unwrap_or(SuiSecurityToolsModeToml::Auto) {
-        SuiSecurityToolsModeToml::Auto => SuiSecurityToolsMode::Auto,
-        SuiSecurityToolsModeToml::Always => SuiSecurityToolsMode::Always,
-        SuiSecurityToolsModeToml::Disabled => SuiSecurityToolsMode::Disabled,
+    let mode = match config.mode.unwrap_or(SuiToolsModeToml::Auto) {
+        SuiToolsModeToml::Auto => SuiToolsMode::Auto,
+        SuiToolsModeToml::Always => SuiToolsMode::Always,
+        SuiToolsModeToml::Disabled => SuiToolsMode::Disabled,
     };
     let adapter = config
         .adapter
         .as_ref()
         .map_or_else(SuiAdapterSettings::default, |adapter| SuiAdapterSettings {
-            source: match adapter
-                .source
-                .unwrap_or(SuiSecurityAdapterSourceToml::Bundled)
-            {
-                SuiSecurityAdapterSourceToml::Bundled => SuiAdapterSource::Bundled,
-                SuiSecurityAdapterSourceToml::System => SuiAdapterSource::System,
+            source: match adapter.source.unwrap_or(SuiAdapterSourceToml::Bundled) {
+                SuiAdapterSourceToml::Bundled => SuiAdapterSource::Bundled,
+                SuiAdapterSourceToml::System => SuiAdapterSource::System,
             },
             cli_path: adapter.cli_path.clone(),
         });
 
-    SuiSecurityToolsConfig { mode, adapter }
+    SuiToolsConfig { mode, adapter }
 }
 
 fn resolve_terminal_resize_reflow_config(config_toml: &ConfigToml) -> TerminalResizeReflowConfig {
@@ -3015,7 +3012,7 @@ impl Config {
         let experimental_request_user_input_enabled =
             resolve_experimental_request_user_input_enabled(&cfg);
         let multi_agent_v2 = resolve_multi_agent_v2_config(&cfg);
-        let sui_security_tools = resolve_sui_security_tools_config(&cfg);
+        let sui_tools = resolve_sui_tools_config(&cfg);
         let apps_mcp_path_override = if features.enabled(Feature::AppsMcpPathOverride) {
             let base = apps_mcp_path_override_toml_config(cfg.features.as_ref());
             base.and_then(|config| config.path.as_ref())
@@ -3579,7 +3576,7 @@ impl Config {
             background_terminal_max_timeout,
             ghost_snapshot,
             multi_agent_v2,
-            sui_security_tools,
+            sui_tools,
             features,
             suppress_unstable_features_warning: cfg
                 .suppress_unstable_features_warning

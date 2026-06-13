@@ -51,5 +51,4 @@ impl CommandInput {
         let end = char_to_byte_index(&self.text, self.cursor + 1);
         self.text.replace_range(start..end, "");
     }
-
 }

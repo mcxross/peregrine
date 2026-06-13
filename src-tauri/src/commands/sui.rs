@@ -3,7 +3,7 @@ use crate::helper_args::{
     resolve_helper_executable,
 };
 use crate::{commands::files, validated_move_project_name};
-use peregrine_adapters::sui::{
+use peregrine_sui_adapter::{
     SuiAdapter, SuiAdapterEnvironment, SuiAdapterSettings, SuiAdapterStatus,
     SuiAddNetworkEnvRequest, SuiExecutionTarget, SuiExportPrivateKeyRequest,
     SuiExportPrivateKeyResponse, SuiFormalVerificationCommand, SuiFormalVerificationOptions,
@@ -12,10 +12,10 @@ use peregrine_adapters::sui::{
     SuiRemoveKeyRequest, SuiRemoveNetworkEnvRequest, SuiRenameKeyAliasRequest,
     SuiSetActiveAddressRequest, SuiSetActiveNetworkEnvRequest,
 };
-use peregrine_dynamic_analysis::sui::formal_verification::{
+use peregrine_sui_dynamic_analysis::formal_verification::{
     FormalVerificationOptions, formal_verification_manifest,
 };
-use peregrine_import_engine::sui::{
+use peregrine_sui_import_engine::{
     BuildVerification, BuildableImportRequest, ImportEngine, ImportEngineConfig,
     default_import_root,
 };

@@ -621,7 +621,7 @@ pub struct ToolsToml {
     )]
     pub web_search: Option<WebSearchToolConfig>,
     pub experimental_request_user_input: Option<ExperimentalRequestUserInput>,
-    pub sui_security: Option<SuiSecurityToolsToml>,
+    pub sui: Option<SuiToolsToml>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema)]
@@ -633,16 +633,16 @@ pub struct ExperimentalRequestUserInput {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema)]
 #[schemars(deny_unknown_fields)]
-pub struct SuiSecurityToolsToml {
+pub struct SuiToolsToml {
     #[serde(default)]
-    pub mode: Option<SuiSecurityToolsModeToml>,
+    pub mode: Option<SuiToolsModeToml>,
     #[serde(default)]
-    pub adapter: Option<SuiSecurityAdapterToml>,
+    pub adapter: Option<SuiAdapterToml>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub enum SuiSecurityToolsModeToml {
+pub enum SuiToolsModeToml {
     Auto,
     Always,
     Disabled,
@@ -650,14 +650,14 @@ pub enum SuiSecurityToolsModeToml {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema)]
 #[schemars(deny_unknown_fields)]
-pub struct SuiSecurityAdapterToml {
-    pub source: Option<SuiSecurityAdapterSourceToml>,
+pub struct SuiAdapterToml {
+    pub source: Option<SuiAdapterSourceToml>,
     pub cli_path: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub enum SuiSecurityAdapterSourceToml {
+pub enum SuiAdapterSourceToml {
     Bundled,
     System,
 }

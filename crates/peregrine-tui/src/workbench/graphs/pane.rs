@@ -1,5 +1,5 @@
+use super::super::{PAGE_SIZE, WorkbenchTab, char_len};
 use crate::sui::project::CliContext;
-use super::super::{char_len, WorkbenchTab, PAGE_SIZE};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 #[derive(Debug, Default)]

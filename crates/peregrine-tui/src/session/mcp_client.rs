@@ -26,7 +26,7 @@ impl McpToolClient {
         Response: DeserializeOwned,
     {
         workspace_client(workspace_root)?.handle.call_blocking(
-            peregrine_mcp_protocol::SERVER_NAME,
+            peregrine_sui_mcp_protocol::SERVER_NAME,
             tool_name,
             arguments,
         )
