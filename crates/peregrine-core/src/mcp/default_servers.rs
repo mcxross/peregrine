@@ -1,8 +1,11 @@
 use std::sync::Arc;
 
 use peregrine_config::codex_compat;
-use peregrine_mcp_client::default_peregrine_server;
+use peregrine_mcp_client::{default_peregrine_server, default_sui_move_analyzer_server};
 use peregrine_sui_mcp_protocol::{SERVER_NAME, SuiToolsMode};
+use peregrine_sui_move_analyzer_mcp_protocol::{
+    MoveAnalyzerToolsMode, SERVER_NAME as MOVE_ANALYZER_SERVER_NAME,
+};
 
 use super::McpServerContribution;
 use super::McpServerContributionFuture;
@@ -10,7 +13,38 @@ use super::McpServerContributor;
 use crate::config::Config;
 
 pub(super) fn contributors() -> Vec<Arc<dyn McpServerContributor>> {
-    vec![Arc::new(PeregrineDefaultMcpServer)]
+    vec![
+        Arc::new(PeregrineDefaultMcpServer),
+        Arc::new(SuiMoveAnalyzerDefaultMcpServer),
+    ]
+}
+
+struct SuiMoveAnalyzerDefaultMcpServer;
+
+impl McpServerContributor for SuiMoveAnalyzerDefaultMcpServer {
+    fn contribute<'a>(&'a self, config: &'a Config) -> McpServerContributionFuture<'a> {
+        Box::pin(async move {
+            if config.sui_move_analyzer_tools.mode == MoveAnalyzerToolsMode::Disabled {
+                return vec![McpServerContribution::Remove {
+                    name: MOVE_ANALYZER_SERVER_NAME.to_string(),
+                }];
+            }
+            let server = default_sui_move_analyzer_server(
+                config.peregrine_self_exe.as_deref(),
+                &config.sui_move_analyzer_tools.adapter,
+            );
+            let servers =
+                std::collections::HashMap::from([(MOVE_ANALYZER_SERVER_NAME.to_string(), server)]);
+            let config = codex_compat::mcp_server_config_map_to_codex(&servers)
+                .remove(MOVE_ANALYZER_SERVER_NAME);
+            config.map_or_else(Vec::new, |config| {
+                vec![McpServerContribution::Default {
+                    name: MOVE_ANALYZER_SERVER_NAME.to_string(),
+                    config: Box::new(config),
+                }]
+            })
+        })
+    }
 }
 
 struct PeregrineDefaultMcpServer;
@@ -69,8 +103,12 @@ mod tests {
         let server = servers
             .get(SERVER_NAME)
             .expect("default Peregrine MCP server");
+        let analyzer = servers
+            .get(MOVE_ANALYZER_SERVER_NAME)
+            .expect("default Sui Move Analyzer MCP server");
 
         assert!(server.enabled);
+        assert!(analyzer.enabled);
     }
 
     #[tokio::test]
@@ -209,6 +247,21 @@ enabled = false
         let servers = manager.runtime_servers(&config).await;
 
         assert!(!servers.contains_key(SERVER_NAME));
+        assert!(servers.contains_key(MOVE_ANALYZER_SERVER_NAME));
+    }
+
+    #[tokio::test]
+    async fn disabled_move_analyzer_mode_keeps_the_sui_server() {
+        let mut config = test_config().await;
+        config.sui_move_analyzer_tools.mode = MoveAnalyzerToolsMode::Disabled;
+        let manager = McpManager::new(Arc::new(PluginsManager::new(
+            config.peregrine_home.to_path_buf(),
+        )));
+
+        let servers = manager.runtime_servers(&config).await;
+
+        assert!(servers.contains_key(SERVER_NAME));
+        assert!(!servers.contains_key(MOVE_ANALYZER_SERVER_NAME));
     }
 
     fn test_default_server() -> codex_compat::McpServerConfig {

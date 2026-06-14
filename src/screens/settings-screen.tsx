@@ -72,9 +72,9 @@ import {
   type SuiKeyState,
 } from "@peregrine/desktop-runtime";
 import {
-  checkMoveAnalyzerAdapter,
-  getMoveAnalyzerAdapterSettings,
-  saveMoveAnalyzerAdapterSettings,
+  checkSuiMoveAnalyzerAdapter,
+  getSuiMoveAnalyzerSettings,
+  saveSuiMoveAnalyzerSettings,
   type MoveAnalyzerAdapterSettings,
   type MoveAnalyzerAdapterSource,
   type MoveAnalyzerAdapterStatus,
@@ -142,7 +142,7 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
   const [isSavingSuiSettings, setIsSavingSuiSettings] = React.useState(false);
   const [moveAnalyzerSettings, setMoveAnalyzerSettings] = React.useState<MoveAnalyzerAdapterSettings>({
     binaryPath: null,
-    source: "bundledLibrary",
+    source: "bundled",
   });
   const [moveAnalyzerBinaryPathInput, setMoveAnalyzerBinaryPathInput] = React.useState("");
   const [moveAnalyzerStatus, setMoveAnalyzerStatus] = React.useState<MoveAnalyzerAdapterStatus | null>(null);
@@ -189,7 +189,7 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
   React.useEffect(() => {
     let isMounted = true;
 
-    Promise.all([getMoveAnalyzerAdapterSettings(), checkMoveAnalyzerAdapter()])
+    Promise.all([getSuiMoveAnalyzerSettings(), checkSuiMoveAnalyzerAdapter()])
       .then(([settings, status]) => {
         if (!isMounted) {
           return;
@@ -340,7 +340,7 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
 
       const nextSettings: MoveAnalyzerAdapterSettings = {
         ...moveAnalyzerSettings,
-        binaryPath: source === "bundledLibrary" ? null : moveAnalyzerSettings.binaryPath ?? null,
+        binaryPath: source === "bundled" ? null : moveAnalyzerSettings.binaryPath ?? null,
         source,
       };
       setMoveAnalyzerSettings(nextSettings);
@@ -348,8 +348,8 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
       setMoveAnalyzerSettingsError(null);
 
       try {
-        const savedSettings = await saveMoveAnalyzerAdapterSettings(nextSettings);
-        const status = await checkMoveAnalyzerAdapter();
+        const savedSettings = await saveSuiMoveAnalyzerSettings(nextSettings);
+        const status = await checkSuiMoveAnalyzerAdapter();
 
         setMoveAnalyzerSettings(savedSettings);
         setMoveAnalyzerBinaryPathInput(savedSettings.binaryPath ?? "");
@@ -381,8 +381,8 @@ export function SettingsScreen({ activeMovePackage = null, onBack, packageTree =
       setMoveAnalyzerSettingsError(null);
 
       try {
-        const savedSettings = await saveMoveAnalyzerAdapterSettings(nextSettings);
-        const status = await checkMoveAnalyzerAdapter();
+        const savedSettings = await saveSuiMoveAnalyzerSettings(nextSettings);
+        const status = await checkSuiMoveAnalyzerAdapter();
 
         setMoveAnalyzerSettings(savedSettings);
         setMoveAnalyzerBinaryPathInput(savedSettings.binaryPath ?? "");

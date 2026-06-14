@@ -6,7 +6,7 @@ mod state;
 
 use state::AgentServerCommandState;
 use state::IndexerCommandState;
-use state::MoveAnalyzerCommandState;
+use state::MoveAnalyzerMcpState;
 
 pub(crate) fn validated_move_project_name(project_name: &str) -> Result<String, String> {
     let project_name = project_name.trim();
@@ -44,7 +44,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(IndexerCommandState::default())
         .manage(AgentServerCommandState::default())
-        .manage(MoveAnalyzerCommandState::default())
+        .manage(MoveAnalyzerMcpState::default())
         .manage(peregrine_terminal::TerminalManager::default())
         .invoke_handler(tauri::generate_handler![
             commands::indexer::greet,
@@ -101,12 +101,16 @@ pub fn run() {
             commands::sui::check_sui_adapter,
             commands::sui::get_sui_adapter_settings,
             commands::sui::save_sui_adapter_settings,
-            commands::move_analyzer::check_move_analyzer_adapter,
-            commands::move_analyzer::get_move_analyzer_adapter_settings,
-            commands::move_analyzer::save_move_analyzer_adapter_settings,
-            commands::move_analyzer::start_move_analyzer_server,
-            commands::move_analyzer::send_move_analyzer_message,
-            commands::move_analyzer::stop_move_analyzer_server,
+            commands::move_analyzer::check_sui_move_analyzer_adapter,
+            commands::move_analyzer::get_sui_move_analyzer_settings,
+            commands::move_analyzer::save_sui_move_analyzer_settings,
+            commands::move_analyzer::sui_move_analyzer_status,
+            commands::move_analyzer::sui_move_analyzer_diagnostics,
+            commands::move_analyzer::sui_move_analyzer_completion,
+            commands::move_analyzer::sui_move_analyzer_hover,
+            commands::move_analyzer::sui_move_analyzer_definition,
+            commands::move_analyzer::sui_move_analyzer_references,
+            commands::move_analyzer::sui_move_analyzer_rename,
             commands::sui::load_sui_key_state,
             commands::sui::load_sui_network_state,
             commands::sui::add_sui_network_env,

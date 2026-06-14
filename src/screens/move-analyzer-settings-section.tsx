@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const moveAnalyzerSourceOptions: { value: MoveAnalyzerAdapterSource; label: string }[] = [
-  { value: "bundledLibrary", label: "Bundled library" },
+  { value: "bundled", label: "Bundled library" },
   { value: "system", label: "User installed" },
 ];
 
@@ -73,7 +73,7 @@ export function MoveAnalyzerSettingsSection({
         <div className="border-t border-border/70">
           <div className="grid gap-2 px-4 py-3.5 text-xs text-muted-foreground">
             <ToolSourceStatusRow
-              active={effectiveSource === "bundledLibrary"}
+              active={effectiveSource === "bundled"}
               label="Bundled library"
               path={status?.bundled.path ?? null}
               version={status?.bundled.version ?? null}
@@ -227,5 +227,5 @@ function ToolSourceStatusRow({
 }
 
 function moveAnalyzerSourceLabel(source: MoveAnalyzerAdapterSource) {
-  return source === "bundledLibrary" ? "Bundled library" : "User installed";
+  return source === "bundled" ? "Bundled library" : "User installed";
 }

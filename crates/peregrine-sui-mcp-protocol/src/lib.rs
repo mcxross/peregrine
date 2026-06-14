@@ -104,6 +104,9 @@ pub fn resolve_server_executable_from(
             }
         }
     }
+    if let Some(current_exe) = current_exe {
+        return current_exe.with_file_name(server_binary_file_name());
+    }
     PathBuf::from(SERVER_BINARY_NAME)
 }
 
@@ -1163,6 +1166,11 @@ mod tests {
         assert_eq!(
             resolve_server_executable_from(Some(&current), None, Some(path)),
             path_server
+        );
+        fs::remove_file(&path_server)?;
+        assert_eq!(
+            resolve_server_executable_from(Some(&current), None, None),
+            sibling
         );
         Ok(())
     }

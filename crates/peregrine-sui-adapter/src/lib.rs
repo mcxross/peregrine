@@ -8,7 +8,6 @@ mod environment;
 mod error;
 mod formal;
 mod keys;
-pub mod move_analyzer;
 mod settings;
 mod status;
 mod system;
@@ -30,12 +29,6 @@ pub use keys::{
     SuiKeyAccount, SuiKeyConfigStatus, SuiKeyDiagnostic, SuiKeyDiagnosticLevel, SuiKeyManager,
     SuiKeyState, SuiNetworkEnv, SuiNetworkState, SuiRemoveKeyRequest, SuiRemoveNetworkEnvRequest,
     SuiRenameKeyAliasRequest, SuiSetActiveAddressRequest, SuiSetActiveNetworkEnvRequest,
-};
-pub use move_analyzer::{
-    MoveAnalyzerAdapter, MoveAnalyzerAdapterEnvironment, MoveAnalyzerAdapterError,
-    MoveAnalyzerAdapterSettings, MoveAnalyzerAdapterSource, MoveAnalyzerAdapterSourceStatus,
-    MoveAnalyzerAdapterStatus, MoveAnalyzerExecutionTarget, MoveAnalyzerServerCommand,
-    run_bundled_move_analyzer_stdio,
 };
 pub use settings::{SuiAdapterSettings, SuiAdapterSource};
 pub use status::{SuiAdapterSourceStatus, SuiAdapterStatus};

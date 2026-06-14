@@ -2642,6 +2642,89 @@
       },
       "type": "object"
     },
+    "SuiAdapterSourceToml": {
+      "enum": [
+        "bundled",
+        "system"
+      ],
+      "type": "string"
+    },
+    "SuiAdapterToml": {
+      "additionalProperties": false,
+      "properties": {
+        "cli_path": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/definitions/SuiAdapterSourceToml"
+        }
+      },
+      "type": "object"
+    },
+    "SuiMoveAnalyzerAdapterToml": {
+      "additionalProperties": false,
+      "properties": {
+        "binary_path": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/definitions/SuiAdapterSourceToml"
+        }
+      },
+      "type": "object"
+    },
+    "SuiMoveAnalyzerToolsToml": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/SuiMoveAnalyzerAdapterToml"
+            }
+          ],
+          "default": null
+        },
+        "mode": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/SuiToolsModeToml"
+            }
+          ],
+          "default": null
+        }
+      },
+      "type": "object"
+    },
+    "SuiToolsModeToml": {
+      "enum": [
+        "auto",
+        "always",
+        "disabled"
+      ],
+      "type": "string"
+    },
+    "SuiToolsToml": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/SuiAdapterToml"
+            }
+          ],
+          "default": null
+        },
+        "mode": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/SuiToolsModeToml"
+            }
+          ],
+          "default": null
+        }
+      },
+      "type": "object"
+    },
     "ThreadStoreToml": {
       "oneOf": [
         {
@@ -2724,6 +2807,12 @@
       "properties": {
         "experimental_request_user_input": {
           "$ref": "#/definitions/ExperimentalRequestUserInput"
+        },
+        "sui": {
+          "$ref": "#/definitions/SuiToolsToml"
+        },
+        "sui_move_analyzer": {
+          "$ref": "#/definitions/SuiMoveAnalyzerToolsToml"
         },
         "web_search": {
           "allOf": [

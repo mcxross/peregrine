@@ -1,8 +1,7 @@
+use peregrine_mcp_client::McpClientRuntime;
 use std::{
     collections::{HashMap, HashSet},
-    io::Write,
     path::PathBuf,
-    process::Child,
     sync::{Arc, Mutex},
 };
 
@@ -15,14 +14,8 @@ pub(crate) struct IndexerCommandState {
 }
 
 #[derive(Default)]
-pub(crate) struct MoveAnalyzerCommandState {
-    pub(crate) sessions: Mutex<HashMap<String, MoveAnalyzerSession>>,
-}
-
-pub(crate) struct MoveAnalyzerSession {
-    pub(crate) child: Arc<Mutex<Child>>,
-    pub(crate) root_path: String,
-    pub(crate) stdin: Arc<Mutex<Box<dyn Write + Send>>>,
+pub(crate) struct MoveAnalyzerMcpState {
+    pub(crate) runtimes: Mutex<HashMap<PathBuf, Arc<McpClientRuntime>>>,
 }
 
 #[derive(Clone, Default)]

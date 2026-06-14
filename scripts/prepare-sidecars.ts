@@ -1,126 +1,126 @@
-import { spawnSync } from "node:child_process";
 import {
+  chmodSync,
   constants,
   copyFileSync,
-  existsSync,
   mkdirSync,
+  readFileSync,
+  renameSync,
   rmSync,
 } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
+import {
+  platformBinaryName,
+  resolveRustHostTriple,
+  run,
+  sha256,
+  sidecars,
+  verifySidecars,
+} from "./sidecars";
 
 const root = process.cwd();
 const release = process.argv.includes("--release");
+const includeTui = process.argv.includes("--include-tui");
 const profile = release ? "release" : "debug";
-const extension = process.platform === "win32" ? ".exe" : "";
-const targetTriple = resolveTargetTriple();
-const destinationDirectory = join(root, "src-tauri", "binaries");
-const sidecars = ["peregrine-helper", "peregrine-sui-mcp-server"];
-
-for (const sidecar of sidecars) {
-  run("cargo", ["build", "-p", sidecar, ...(release ? ["--release"] : [])]);
+const explicitTarget =
+  argumentValue("--target") ??
+  process.env.PEREGRINE_TARGET_TRIPLE ??
+  process.env.CARGO_BUILD_TARGET ??
+  process.env.TAURI_ENV_TARGET_TRIPLE;
+const hostTriple = resolveRustHostTriple(root);
+const targetTriple = explicitTarget ?? hostTriple;
+if (targetTriple !== hostTriple) {
+  throw new Error(
+    `Sidecar packaging requires a native build so every executable can be preflighted. Host is ${hostTriple}, requested target is ${targetTriple}. Build the bundle on the target platform.`,
+  );
 }
+const targetDirectory = resolveTargetDirectory();
+const cargoOutputDirectory = explicitTarget
+  ? join(targetDirectory, targetTriple, profile)
+  : join(targetDirectory, profile);
+const destinationDirectory = join(root, "src-tauri", "binaries");
+
+validateTauriExternalBins();
+
+const cargoArgs = ["build", "--locked"];
+for (const sidecar of sidecars) {
+  cargoArgs.push("-p", sidecar.packageName);
+}
+if (includeTui) {
+  cargoArgs.push("-p", "peregrine-tui", "--bin", "peregrine-tui");
+}
+if (release) {
+  cargoArgs.push("--release");
+}
+if (explicitTarget) {
+  cargoArgs.push("--target", targetTriple);
+}
+run("cargo", cargoArgs, root);
 
 mkdirSync(destinationDirectory, { recursive: true });
+const prepared = new Map<string, string>();
 for (const sidecar of sidecars) {
-  const source = join(root, "target", profile, `${sidecar}${extension}`);
+  const fileName = platformBinaryName(sidecar.binaryName);
+  const source = join(cargoOutputDirectory, fileName);
   const destination = join(
     destinationDirectory,
-    `${sidecar}-${targetTriple}${extension}`,
+    platformBinaryName(`${sidecar.binaryName}-${targetTriple}`),
   );
+  const temporaryDestination = `${destination}.tmp`;
 
-  if (!existsSync(source)) {
-    throw new Error(`Expected sidecar binary at ${source}`);
+  rmSync(temporaryDestination, { force: true });
+  copyFileSync(source, temporaryDestination, constants.COPYFILE_FICLONE);
+  if (process.platform !== "win32") {
+    chmodSync(temporaryDestination, 0o755);
   }
-
   rmSync(destination, { force: true });
-  copyFileSync(source, destination, constants.COPYFILE_FICLONE);
+  renameSync(temporaryDestination, destination);
+  if ((await sha256(source)) !== (await sha256(destination))) {
+    throw new Error(`Sidecar copy verification failed for ${sidecar.binaryName}`);
+  }
+  prepared.set(sidecar.binaryName, destination);
   console.log(`Prepared ${destination}`);
-
-  if (sidecar === "peregrine-sui-mcp-server") {
-    verifyMcpServer(destination);
-  }
 }
 
-function resolveTargetTriple() {
-  const hostTuple = spawnSync("rustc", ["--print", "host-tuple"], {
-    cwd: root,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+verifySidecars(prepared);
+console.log(`Verified ${sidecars.length} isolated Peregrine sidecars.`);
 
-  if (hostTuple.status === 0) {
-    const triple = hostTuple.stdout.trim();
-
-    if (triple) {
-      return triple;
-    }
+function resolveTargetDirectory() {
+  const configured = process.env.CARGO_TARGET_DIR;
+  if (!configured) {
+    return join(root, "target");
   }
-
-  const version = spawnSync("rustc", ["-Vv"], {
-    cwd: root,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-
-  if (version.status !== 0) {
-    throw new Error(version.stderr.trim() || "Could not resolve Rust host target triple.");
-  }
-
-  const hostLine = version.stdout
-    .split(/\r?\n/)
-    .find((line) => line.startsWith("host:"));
-  const triple = hostLine?.replace("host:", "").trim();
-
-  if (!triple) {
-    throw new Error("Could not parse Rust host target triple.");
-  }
-
-  return triple;
+  return isAbsolute(configured) ? configured : resolve(root, configured);
 }
 
-function run(command: string, args: string[]) {
-  const result = spawnSync(command, args, {
-    cwd: root,
-    stdio: "inherit",
-  });
-
-  if (result.status !== 0) {
-    throw new Error(`${command} ${args.join(" ")} failed with status ${result.status}`);
+function argumentValue(name: string) {
+  const equalsArgument = process.argv.find((argument) =>
+    argument.startsWith(`${name}=`),
+  );
+  if (equalsArgument) {
+    return equalsArgument.slice(name.length + 1);
   }
+  const index = process.argv.indexOf(name);
+  if (index < 0) {
+    return undefined;
+  }
+  const value = process.argv[index + 1];
+  if (!value || value.startsWith("--")) {
+    throw new Error(`${name} requires a target triple`);
+  }
+  return value;
 }
 
-function verifyMcpServer(executable: string) {
-  const request = JSON.stringify({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "initialize",
-    params: {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: {
-        name: "peregrine-sidecar-preflight",
-        version: "1",
-      },
-    },
-  });
-  const result = spawnSync(executable, [], {
-    cwd: root,
-    input: `${request}\n`,
-    encoding: "utf8",
-    timeout: 20_000,
-    maxBuffer: 1024 * 1024,
-  });
-
-  if (result.status !== 0) {
+function validateTauriExternalBins() {
+  const config = JSON.parse(
+    readFileSync(join(root, "src-tauri", "tauri.conf.json"), "utf8"),
+  );
+  const configured = config.bundle?.externalBin?.map((entry: string) =>
+    entry.replace(/^binaries\//, ""),
+  );
+  const expected = sidecars.map((sidecar) => sidecar.binaryName);
+  if (JSON.stringify(configured) !== JSON.stringify(expected)) {
     throw new Error(
-      result.error?.message ||
-        result.stderr.trim() ||
-        `MCP sidecar preflight failed with status ${result.status}`,
+      `Tauri externalBin does not match the sidecar manifest:\nexpected ${JSON.stringify(expected)}\nactual   ${JSON.stringify(configured)}`,
     );
-  }
-
-  const response = JSON.parse(result.stdout.trim());
-  if (response.id !== 1 || !response.result?.serverInfo) {
-    throw new Error("MCP sidecar preflight returned an invalid initialize response");
   }
 }

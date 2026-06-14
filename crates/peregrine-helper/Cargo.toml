@@ -3,6 +3,11 @@ name = "peregrine-helper"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+name = "peregrine_helper"
+path = "src/lib.rs"
+doctest = false
+
 [[bin]]
 name = "peregrine-helper"
 path = "src/main.rs"
@@ -14,6 +19,7 @@ move-package-alt-compilation = { workspace = true }
 peregrine-analysis = { workspace = true }
 peregrine-sui-project-loader = { workspace = true }
 peregrine-sui-adapter = { workspace = true }
+peregrine-sui-move-analyzer = { workspace = true, features = ["bundled"] }
 peregrine-helper-protocol = { workspace = true }
 serde_json = { workspace = true }
 sui-package-alt = { workspace = true }

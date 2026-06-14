@@ -1,7 +1,7 @@
 use super::{
     MoveAnalyzerAdapterEnvironment, MoveAnalyzerAdapterError, MoveAnalyzerAdapterSettings,
     MoveAnalyzerAdapterSource, MoveAnalyzerAdapterSourceStatus, MoveAnalyzerAdapterStatus,
-    MoveAnalyzerExecutionTarget, MoveAnalyzerServerCommand, bundled, system,
+    MoveAnalyzerExecutionTarget, MoveAnalyzerServerCommand, system,
 };
 
 pub struct MoveAnalyzerAdapter {
@@ -25,7 +25,7 @@ impl MoveAnalyzerAdapter {
     }
 
     pub fn status(&self) -> MoveAnalyzerAdapterStatus {
-        let bundled = bundled::status();
+        let bundled = bundled_status();
         let system = self.system_status();
         let preferred_source = if self.settings.configured_binary_path().is_some() {
             MoveAnalyzerAdapterSource::System
@@ -89,5 +89,15 @@ impl MoveAnalyzerAdapter {
                     .to_string()
             }
         }
+    }
+}
+
+fn bundled_status() -> MoveAnalyzerAdapterSourceStatus {
+    MoveAnalyzerAdapterSourceStatus {
+        source: MoveAnalyzerAdapterSource::BundledLibrary,
+        available: true,
+        version: None,
+        path: None,
+        error: None,
     }
 }

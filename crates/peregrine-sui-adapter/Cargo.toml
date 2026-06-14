@@ -46,8 +46,6 @@ bip32 = { workspace = true }
 clap = { workspace = true }
 dirs = { workspace = true }
 fastcrypto = { workspace = true }
-move-analyzer = { workspace = true }
-move-compiler = { workspace = true }
 peregrine-analysis = { workspace = true }
 peregrine-sui-package-resolution = { workspace = true }
 serde = { workspace = true }
@@ -55,7 +53,6 @@ serde_json = { workspace = true }
 sui = { workspace = true }
 sui-config = { workspace = true }
 sui-keys = { workspace = true }
-sui-package-alt = { workspace = true }
 sui-sdk = { workspace = true }
 sui-types = { workspace = true }
 tiny-bip39 = { workspace = true }

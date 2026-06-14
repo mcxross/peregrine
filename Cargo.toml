@@ -13,9 +13,12 @@ members = [
   "crates/peregrine-sui-move-graph",
   "crates/peregrine-sui-move-insights",
   "crates/peregrine-sui-move-model",
+  "crates/peregrine-sui-move-analyzer",
   "crates/peregrine-sui-mcp-protocol",
+  "crates/peregrine-sui-move-analyzer-mcp-protocol",
   "crates/peregrine-mcp-client",
   "crates/peregrine-mcp-server/sui",
+  "crates/peregrine-mcp-server/sui-move-analyzer",
   "crates/peregrine-memwal",
   "crates/peregrine-sui-package-resolution",
   "crates/peregrine-sui-project-loader",
@@ -282,9 +285,10 @@ peregrine-provider-registry = { path = "crates/peregrine-provider-registry" }
 peregrine-sui-move-graph = { path = "crates/peregrine-sui-move-graph" }
 peregrine-sui-move-insights = { path = "crates/peregrine-sui-move-insights" }
 peregrine-sui-move-model = { path = "crates/peregrine-sui-move-model" }
+peregrine-sui-move-analyzer = { path = "crates/peregrine-sui-move-analyzer" }
 peregrine-sui-mcp-protocol = { path = "crates/peregrine-sui-mcp-protocol" }
+peregrine-sui-move-analyzer-mcp-protocol = { path = "crates/peregrine-sui-move-analyzer-mcp-protocol" }
 peregrine-mcp-client = { path = "crates/peregrine-mcp-client" }
-peregrine-sui-mcp-server = { path = "crates/peregrine-mcp-server/sui" }
 codex-network-proxy = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-ollama = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-otel = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }

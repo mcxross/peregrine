@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{
-    ffi::OsString,
+    ffi::{OsStr, OsString},
     path::{Path, PathBuf},
 };
 
@@ -11,6 +11,19 @@ pub const HELPER_ENV_VAR: &str = "PEREGRINE_HELPER";
 pub const JSON_PROTOCOL_HELPER_ARG: &str = "--peregrine-helper-json";
 pub const MOVE_ANALYZER_HELPER_ARG: &str = "--peregrine-move-analyzer";
 pub const MOVY_FUZZ_HELPER_ARG: &str = "--peregrine-movy-fuzz";
+
+pub fn is_helper_mode_arg(arg: &OsStr) -> bool {
+    [
+        BUNDLED_SUI_HELPER_ARG,
+        BYTECODE_VIEWER_HELPER_ARG,
+        FORMAL_VERIFICATION_HELPER_ARG,
+        JSON_PROTOCOL_HELPER_ARG,
+        MOVE_ANALYZER_HELPER_ARG,
+        MOVY_FUZZ_HELPER_ARG,
+    ]
+    .into_iter()
+    .any(|mode| arg == OsStr::new(mode))
+}
 
 #[derive(Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "kind")]
@@ -157,7 +170,7 @@ mod tests {
     }
 
     #[test]
-    fn helper_path_resolution_does_not_return_current_executable() {
+    fn helper_path_resolution_rejects_current_executable_override() {
         let directory = tempdir().expect("tempdir");
         let current = directory.path().join(helper_binary_file_name());
         fs::write(&current, "").expect("write current");
@@ -169,13 +182,13 @@ mod tests {
     }
 
     #[test]
-    fn required_helper_path_resolution_does_not_fall_back_to_current_executable() {
+    fn helper_path_resolution_does_not_implicitly_use_current_executable() {
         let directory = tempdir().expect("tempdir");
         let current = directory.path().join(helper_binary_file_name());
         fs::write(&current, "").expect("write current");
 
-        let error = resolve_helper_executable_from(&current, Some(current.clone().into()))
-            .expect_err("current executable must not be used as its own helper");
+        let error = resolve_helper_executable_from(&current, None)
+            .expect_err("current executable must not be an implicit helper");
 
         assert!(error.contains("Peregrine helper is unavailable"));
     }

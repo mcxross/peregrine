@@ -86,6 +86,10 @@ use peregrine_model_provider::add_peregrine_builtin_model_providers;
 use peregrine_sui_mcp_protocol::{
     SuiAdapterSettings, SuiAdapterSource, SuiToolsConfig, SuiToolsMode,
 };
+use peregrine_sui_move_analyzer_mcp_protocol::{
+    MoveAnalyzerAdapterSettings, MoveAnalyzerAdapterSource, MoveAnalyzerToolsConfig,
+    MoveAnalyzerToolsMode,
+};
 use peregrine_types::config_types::AltScreenMode;
 use peregrine_types::config_types::AutoCompactTokenLimitScope;
 use peregrine_types::config_types::ForcedLoginMethod;
@@ -965,6 +969,9 @@ pub struct Config {
 
     /// Settings for first-party Sui/Move security harness tools.
     pub sui_tools: SuiToolsConfig,
+
+    /// Settings for the first-party Sui Move Analyzer MCP server.
+    pub sui_move_analyzer_tools: MoveAnalyzerToolsConfig,
 
     /// Centralized feature flags; source of truth for feature gating.
     pub features: ManagedFeatures,
@@ -2355,6 +2362,36 @@ fn resolve_sui_tools_config(config_toml: &ConfigToml) -> SuiToolsConfig {
     SuiToolsConfig { mode, adapter }
 }
 
+fn resolve_sui_move_analyzer_tools_config(config_toml: &ConfigToml) -> MoveAnalyzerToolsConfig {
+    let default = MoveAnalyzerToolsConfig::default();
+    let Some(config) = config_toml
+        .tools
+        .as_ref()
+        .and_then(|tools| tools.sui_move_analyzer.as_ref())
+    else {
+        return default;
+    };
+    let mode = match config.mode.unwrap_or(SuiToolsModeToml::Auto) {
+        SuiToolsModeToml::Auto => MoveAnalyzerToolsMode::Auto,
+        SuiToolsModeToml::Always => MoveAnalyzerToolsMode::Always,
+        SuiToolsModeToml::Disabled => MoveAnalyzerToolsMode::Disabled,
+    };
+    let adapter =
+        config
+            .adapter
+            .as_ref()
+            .map_or_else(MoveAnalyzerAdapterSettings::default, |adapter| {
+                MoveAnalyzerAdapterSettings {
+                    source: match adapter.source.unwrap_or(SuiAdapterSourceToml::Bundled) {
+                        SuiAdapterSourceToml::Bundled => MoveAnalyzerAdapterSource::Bundled,
+                        SuiAdapterSourceToml::System => MoveAnalyzerAdapterSource::System,
+                    },
+                    binary_path: adapter.binary_path.clone(),
+                }
+            });
+    MoveAnalyzerToolsConfig { mode, adapter }
+}
+
 fn resolve_terminal_resize_reflow_config(config_toml: &ConfigToml) -> TerminalResizeReflowConfig {
     let Some(tui) = config_toml.tui.as_ref() else {
         return TerminalResizeReflowConfig::default();
@@ -3013,6 +3050,7 @@ impl Config {
             resolve_experimental_request_user_input_enabled(&cfg);
         let multi_agent_v2 = resolve_multi_agent_v2_config(&cfg);
         let sui_tools = resolve_sui_tools_config(&cfg);
+        let sui_move_analyzer_tools = resolve_sui_move_analyzer_tools_config(&cfg);
         let apps_mcp_path_override = if features.enabled(Feature::AppsMcpPathOverride) {
             let base = apps_mcp_path_override_toml_config(cfg.features.as_ref());
             base.and_then(|config| config.path.as_ref())
@@ -3577,6 +3615,7 @@ impl Config {
             ghost_snapshot,
             multi_agent_v2,
             sui_tools,
+            sui_move_analyzer_tools,
             features,
             suppress_unstable_features_warning: cfg
                 .suppress_unstable_features_warning

@@ -10,8 +10,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "dev:desktop": "tauri dev",
+    "build:desktop": "tauri build && bun scripts/verify-desktop-bundle.ts",
+    "dev:tui": "bun run prepare:sidecars && cargo run -p peregrine-tui --",
+    "build:tui": "bun scripts/prepare-sidecars.ts --release --include-tui",
     "measure:perf": "bun scripts/measure-performance.ts",
     "prepare:sidecars": "bun scripts/prepare-sidecars.ts",
+    "verify:desktop-bundle": "bun scripts/verify-desktop-bundle.ts",
     "test": "bun test packages/desktop-runtime/test",
     "preview": "vite preview",
     "tauri": "tauri"

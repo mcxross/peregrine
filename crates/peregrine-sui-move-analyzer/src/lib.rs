@@ -1,10 +1,11 @@
-//! Move Analyzer adapter boundary.
+//! Sui Move Analyzer execution boundary.
 //!
 //! `adapter` chooses the active execution target, `system` discovers user
 //! installed binaries, and `bundled` exposes the linked Sui-flavored language
 //! server entrypoint used by Peregrine helper processes.
 
 mod adapter;
+#[cfg(feature = "bundled")]
 mod bundled;
 mod command;
 mod environment;
@@ -17,6 +18,7 @@ mod system;
 mod tests;
 
 pub use adapter::MoveAnalyzerAdapter;
+#[cfg(feature = "bundled")]
 pub use bundled::run_stdio as run_bundled_move_analyzer_stdio;
 pub use command::{MoveAnalyzerExecutionTarget, MoveAnalyzerServerCommand};
 pub use environment::MoveAnalyzerAdapterEnvironment;

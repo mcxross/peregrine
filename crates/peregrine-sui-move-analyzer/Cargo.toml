@@ -1,0 +1,28 @@
+[package]
+name = "peregrine-sui-move-analyzer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sui Move Analyzer execution adapter"
+
+[lib]
+name = "peregrine_sui_move_analyzer"
+path = "src/lib.rs"
+doctest = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+bundled = [
+    "dep:move-analyzer",
+    "dep:move-compiler",
+    "dep:sui-package-alt",
+]
+
+[dependencies]
+move-analyzer = { workspace = true, optional = true }
+move-compiler = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"] }
+sui-package-alt = { workspace = true, optional = true }

@@ -622,6 +622,7 @@ pub struct ToolsToml {
     pub web_search: Option<WebSearchToolConfig>,
     pub experimental_request_user_input: Option<ExperimentalRequestUserInput>,
     pub sui: Option<SuiToolsToml>,
+    pub sui_move_analyzer: Option<SuiMoveAnalyzerToolsToml>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema)]
@@ -660,6 +661,22 @@ pub struct SuiAdapterToml {
 pub enum SuiAdapterSourceToml {
     Bundled,
     System,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct SuiMoveAnalyzerToolsToml {
+    #[serde(default)]
+    pub mode: Option<SuiToolsModeToml>,
+    #[serde(default)]
+    pub adapter: Option<SuiMoveAnalyzerAdapterToml>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct SuiMoveAnalyzerAdapterToml {
+    pub source: Option<SuiAdapterSourceToml>,
+    pub binary_path: Option<String>,
 }
 
 #[derive(Deserialize)]

@@ -85,6 +85,7 @@ peregrine-helper-protocol = { workspace = true }
 peregrine-memories-read = { workspace = true }
 peregrine-mcp-client = { workspace = true }
 peregrine-sui-mcp-protocol = { workspace = true }
+peregrine-sui-move-analyzer-mcp-protocol = { workspace = true }
 peregrine-model-provider = { workspace = true }
 peregrine-anthropic = { workspace = true }
 peregrine-provider-registry = { workspace = true }

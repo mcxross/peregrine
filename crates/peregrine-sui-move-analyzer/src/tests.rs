@@ -12,14 +12,6 @@ fn default_settings_prefer_bundled_library_source() {
 }
 
 #[test]
-fn legacy_binary_source_settings_are_accepted() {
-    let settings: MoveAnalyzerAdapterSettings =
-        serde_json::from_str(r#"{"binarySource":"system"}"#).expect("settings");
-
-    assert_eq!(settings.source, MoveAnalyzerAdapterSource::System);
-}
-
-#[test]
 fn bundled_status_is_available() {
     let adapter = MoveAnalyzerAdapter::new(
         MoveAnalyzerAdapterSettings::default(),

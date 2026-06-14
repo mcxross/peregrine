@@ -3,17 +3,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveAnalyzerAdapterSettings {
-    #[serde(
-        default = "default_move_analyzer_adapter_source",
-        alias = "binarySource"
-    )]
+    #[serde(default = "default_move_analyzer_adapter_source")]
     pub source: MoveAnalyzerAdapterSource,
-    #[serde(
-        default,
-        alias = "binaryPath",
-        alias = "moveAnalyzerPath",
-        alias = "serverPath"
-    )]
+    #[serde(default)]
     pub binary_path: Option<String>,
 }
 

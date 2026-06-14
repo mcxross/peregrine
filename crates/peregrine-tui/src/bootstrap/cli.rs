@@ -4,14 +4,10 @@ use crate::output;
 use crate::session;
 use crate::workflow;
 use clap::Parser;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 
 pub fn is_helper_arg(arg: &OsString) -> bool {
-    arg.as_os_str() == OsStr::new(helper_args::BUNDLED_SUI_HELPER_ARG)
-        || arg.as_os_str() == OsStr::new(helper_args::BYTECODE_VIEWER_HELPER_ARG)
-        || arg.as_os_str() == OsStr::new(helper_args::MOVY_FUZZ_HELPER_ARG)
-        || arg.as_os_str() == OsStr::new(helper_args::FORMAL_VERIFICATION_HELPER_ARG)
-        || arg.as_os_str() == OsStr::new(helper_args::MOVE_ANALYZER_HELPER_ARG)
+    peregrine_helper_protocol::is_helper_mode_arg(arg)
 }
 
 pub fn run_cli_or_helper_from_args<I>(args: I) -> i32

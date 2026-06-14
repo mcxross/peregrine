@@ -35,7 +35,8 @@
     "active": true,
     "externalBin": [
       "binaries/peregrine-helper",
-      "binaries/peregrine-sui-mcp-server"
+      "binaries/peregrine-sui-mcp-server",
+      "binaries/peregrine-sui-move-analyzer-mcp-server"
     ],
     "targets": "all",
     "icon": [

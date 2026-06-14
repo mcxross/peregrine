@@ -1,12 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-const MOVE_ANALYZER_ADAPTER_SETTINGS_CHANGED_EVENT = "move-analyzer-adapter-settings-changed";
-const MOVE_ANALYZER_MESSAGE_EVENT = "move-analyzer-message";
-const MOVE_ANALYZER_EXIT_EVENT = "move-analyzer-exit";
-const MOVE_ANALYZER_STDERR_EVENT = "move-analyzer-stderr";
+import type {
+  MoveAnalyzerCompletionContext,
+  MoveAnalyzerCompletionList,
+  MoveAnalyzerDiagnostic,
+  MoveAnalyzerHover,
+  MoveAnalyzerPosition,
+  MoveAnalyzerResolvedLocation,
+  MoveAnalyzerWorkspaceEdit,
+} from "./types";
 
-export type MoveAnalyzerAdapterSource = "bundledLibrary" | "system";
+const CONFIG_CHANGED_EVENT = "sui-move-analyzer-config-changed";
+
+export type MoveAnalyzerAdapterSource = "bundled" | "system";
 
 export type MoveAnalyzerAdapterSettings = {
   binaryPath?: string | null;
@@ -32,85 +39,131 @@ export type MoveAnalyzerAdapterSourceStatus = {
   error: string | null;
 };
 
-export type MoveAnalyzerServerSession = {
-  sessionId: string;
-  rootPath: string;
-  command: string;
+export type MoveAnalyzerDocument = {
+  path: string;
+  source?: string | null;
 };
 
-export type MoveAnalyzerMessageEvent = {
-  sessionId: string;
-  message: JsonRpcMessage;
+type DiagnosticsResponse = {
+  diagnostics: MoveAnalyzerDiagnostic[];
+  fresh: boolean;
+  path: string;
+  warnings: string[];
 };
 
-export type MoveAnalyzerExitEvent = {
-  sessionId: string;
-  status: number | null;
-  error: string | null;
+type CompletionResponse = {
+  completion: MoveAnalyzerCompletionList | null;
+  path: string;
 };
 
-export type MoveAnalyzerStderrEvent = {
-  sessionId: string;
-  chunk: string;
+type HoverResponse = {
+  hover: MoveAnalyzerHover | null;
+  path: string;
 };
 
-export type JsonRpcMessage = {
-  id?: number | string | null;
-  jsonrpc?: "2.0";
-  method?: string;
-  params?: unknown;
-  result?: unknown;
-  error?: unknown;
+type LocationsResponse = {
+  locations: MoveAnalyzerResolvedLocation[];
+  path: string;
 };
 
-export async function checkMoveAnalyzerAdapter() {
-  return invoke<MoveAnalyzerAdapterStatus>("check_move_analyzer_adapter");
+type RenameResponse = {
+  edit: MoveAnalyzerWorkspaceEdit | null;
+  path: string;
+};
+
+export function checkSuiMoveAnalyzerAdapter() {
+  return invoke<MoveAnalyzerAdapterStatus>("check_sui_move_analyzer_adapter");
 }
 
-export async function getMoveAnalyzerAdapterSettings() {
-  return invoke<MoveAnalyzerAdapterSettings>("get_move_analyzer_adapter_settings");
+export function getSuiMoveAnalyzerSettings() {
+  return invoke<MoveAnalyzerAdapterSettings>("get_sui_move_analyzer_settings");
 }
 
-export async function saveMoveAnalyzerAdapterSettings(settings: MoveAnalyzerAdapterSettings) {
-  return invoke<MoveAnalyzerAdapterSettings>("save_move_analyzer_adapter_settings", { settings });
+export function saveSuiMoveAnalyzerSettings(settings: MoveAnalyzerAdapterSettings) {
+  return invoke<MoveAnalyzerAdapterSettings>("save_sui_move_analyzer_settings", { settings });
 }
 
-export async function startMoveAnalyzerServer(rootPath: string) {
-  return invoke<MoveAnalyzerServerSession>("start_move_analyzer_server", { rootPath });
+export function getSuiMoveAnalyzerStatus(rootPath: string) {
+  return invoke<MoveAnalyzerAdapterStatus>("sui_move_analyzer_status", { rootPath });
 }
 
-export async function sendMoveAnalyzerMessage(sessionId: string, message: JsonRpcMessage) {
-  return invoke<void>("send_move_analyzer_message", { sessionId, message });
-}
-
-export async function stopMoveAnalyzerServer(sessionId: string) {
-  return invoke<void>("stop_move_analyzer_server", { sessionId });
-}
-
-export async function listenMoveAnalyzerAdapterSettingsChanged(
-  onSettingsChanged: (settings: MoveAnalyzerAdapterSettings) => void,
+export function getSuiMoveAnalyzerDiagnostics(
+  rootPath: string,
+  document: MoveAnalyzerDocument,
 ) {
-  return listen<MoveAnalyzerAdapterSettings>(
-    MOVE_ANALYZER_ADAPTER_SETTINGS_CHANGED_EVENT,
-    (event) => onSettingsChanged(event.payload),
-  );
+  return invoke<DiagnosticsResponse>("sui_move_analyzer_diagnostics", {
+    document,
+    rootPath,
+  });
 }
 
-export async function listenMoveAnalyzerMessages(
-  onMessage: (event: MoveAnalyzerMessageEvent) => void,
+export async function getSuiMoveAnalyzerCompletion(
+  rootPath: string,
+  document: MoveAnalyzerDocument,
+  position: MoveAnalyzerPosition,
+  context?: MoveAnalyzerCompletionContext,
 ) {
-  return listen<MoveAnalyzerMessageEvent>(MOVE_ANALYZER_MESSAGE_EVENT, (event) => onMessage(event.payload));
+  const response = await invoke<CompletionResponse>("sui_move_analyzer_completion", {
+    request: {
+      ...document,
+      context: context ?? null,
+      position,
+    },
+    rootPath,
+  });
+  return response.completion;
 }
 
-export async function listenMoveAnalyzerExit(
-  onExit: (event: MoveAnalyzerExitEvent) => void,
+export async function getSuiMoveAnalyzerHover(
+  rootPath: string,
+  document: MoveAnalyzerDocument,
+  position: MoveAnalyzerPosition,
 ) {
-  return listen<MoveAnalyzerExitEvent>(MOVE_ANALYZER_EXIT_EVENT, (event) => onExit(event.payload));
+  const response = await invoke<HoverResponse>("sui_move_analyzer_hover", {
+    request: { ...document, position },
+    rootPath,
+  });
+  return response.hover;
 }
 
-export async function listenMoveAnalyzerStderr(
-  onStderr: (event: MoveAnalyzerStderrEvent) => void,
+export async function getSuiMoveAnalyzerDefinition(
+  rootPath: string,
+  document: MoveAnalyzerDocument,
+  position: MoveAnalyzerPosition,
 ) {
-  return listen<MoveAnalyzerStderrEvent>(MOVE_ANALYZER_STDERR_EVENT, (event) => onStderr(event.payload));
+  const response = await invoke<LocationsResponse>("sui_move_analyzer_definition", {
+    request: { ...document, position },
+    rootPath,
+  });
+  return response.locations;
+}
+
+export async function getSuiMoveAnalyzerReferences(
+  rootPath: string,
+  document: MoveAnalyzerDocument,
+  position: MoveAnalyzerPosition,
+) {
+  const response = await invoke<LocationsResponse>("sui_move_analyzer_references", {
+    request: { ...document, position },
+    rootPath,
+  });
+  return response.locations;
+}
+
+export async function getSuiMoveAnalyzerRename(
+  rootPath: string,
+  document: MoveAnalyzerDocument,
+  position: MoveAnalyzerPosition,
+  newName: string,
+) {
+  const response = await invoke<RenameResponse>("sui_move_analyzer_rename", {
+    request: { ...document, newName, position },
+    rootPath,
+  });
+  return response.edit;
+}
+
+export function listenSuiMoveAnalyzerConfigChanged(onChanged: () => void) {
+  return listen(CONFIG_CHANGED_EVENT, onChanged);
 }
 
