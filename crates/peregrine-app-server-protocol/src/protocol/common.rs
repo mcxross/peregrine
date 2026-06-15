@@ -509,6 +509,60 @@ client_request_definitions! {
         serialization: thread_id(params.thread_id),
         response: v2::ThreadGoalClearResponse,
     },
+    #[experimental("audit/preflight")]
+    AuditPreflight => "audit/preflight" {
+        params: v2::AuditPreflightParams,
+        serialization: global_shared_read("audit"),
+        response: v2::AuditPreflightResponse,
+    },
+    #[experimental("auditPlan/store")]
+    AuditPlanStore => "auditPlan/store" {
+        params: v2::AuditPlanStoreParams,
+        serialization: global("audit"),
+        response: v2::AuditPlanStoreResponse,
+    },
+    #[experimental("audit/start")]
+    AuditStart => "audit/start" {
+        params: v2::AuditStartParams,
+        serialization: global("audit"),
+        response: v2::AuditStartResponse,
+    },
+    #[experimental("audit/read")]
+    AuditRead => "audit/read" {
+        params: v2::AuditReadParams,
+        serialization: global_shared_read("audit"),
+        response: v2::AuditReadResponse,
+    },
+    #[experimental("audit/list")]
+    AuditList => "audit/list" {
+        params: v2::AuditListParams,
+        serialization: global_shared_read("audit"),
+        response: v2::AuditListResponse,
+    },
+    #[experimental("audit/pause")]
+    AuditPause => "audit/pause" {
+        params: v2::AuditLifecycleParams,
+        serialization: global("audit"),
+        response: v2::AuditPauseResponse,
+    },
+    #[experimental("audit/resume")]
+    AuditResume => "audit/resume" {
+        params: v2::AuditLifecycleParams,
+        serialization: global("audit"),
+        response: v2::AuditResumeResponse,
+    },
+    #[experimental("audit/cancel")]
+    AuditCancel => "audit/cancel" {
+        params: v2::AuditLifecycleParams,
+        serialization: global("audit"),
+        response: v2::AuditCancelResponse,
+    },
+    #[experimental("audit/delete")]
+    AuditDelete => "audit/delete" {
+        params: v2::AuditLifecycleParams,
+        serialization: global("audit"),
+        response: v2::AuditDeleteResponse,
+    },
     ThreadMetadataUpdate => "thread/metadata/update" {
         params: v2::ThreadMetadataUpdateParams,
         serialization: thread_id(params.thread_id),
@@ -1498,6 +1552,10 @@ server_notification_definitions! {
     ThreadNameUpdated => "thread/name/updated" (v2::ThreadNameUpdatedNotification),
     ThreadGoalUpdated => "thread/goal/updated" (v2::ThreadGoalUpdatedNotification),
     ThreadGoalCleared => "thread/goal/cleared" (v2::ThreadGoalClearedNotification),
+    #[experimental("audit/updated")]
+    AuditUpdated => "audit/updated" (v2::AuditUpdatedNotification),
+    #[experimental("audit/diagnostic")]
+    AuditDiagnostic => "audit/diagnostic" (v2::AuditDiagnosticNotification),
     #[experimental("thread/settings/updated")]
     ThreadSettingsUpdated => "thread/settings/updated" (v2::ThreadSettingsUpdatedNotification),
     ThreadTokenUsageUpdated => "thread/tokenUsage/updated" (v2::ThreadTokenUsageUpdatedNotification),

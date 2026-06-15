@@ -1,0 +1,21 @@
+[package]
+name = "peregrine-sui-security-adapter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sui implementation of Peregrine's blockchain-neutral audit adapter"
+
+[lints]
+workspace = true
+
+[dependencies]
+peregrine-security-tools = { workspace = true }
+peregrine-sui-adapter = { workspace = true }
+peregrine-sui-import-engine = { workspace = true }
+peregrine-types = { workspace = true }
+serde_json = { workspace = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }

@@ -56,6 +56,50 @@ impl ThreadGoalRequestProcessor {
             .map(|()| None)
     }
 
+    pub(crate) async fn create_goal_for_running_thread(
+        &self,
+        thread_id: ThreadId,
+        thread: &PeregrineThread,
+        objective: &str,
+        token_budget: Option<i64>,
+    ) -> Result<String, JSONRPCErrorError> {
+        if !self.config.features.enabled(Feature::Goals) {
+            return Err(invalid_request("goals feature is disabled"));
+        }
+        validate_thread_goal_objective(objective).map_err(invalid_request)?;
+        validate_goal_budget(token_budget).map_err(invalid_request)?;
+        thread.ensure_rollout_materialized().await;
+        let state_db = thread
+            .state_db()
+            .or_else(|| self.state_db.clone())
+            .ok_or_else(|| internal_error("goal persistence is unavailable"))?;
+        thread.prepare_external_goal_mutation().await;
+        let goal = state_db
+            .thread_goals()
+            .replace_thread_goal(
+                thread_id,
+                objective,
+                codex_state::ThreadGoalStatus::Active,
+                token_budget,
+            )
+            .await
+            .map_err(|error| internal_error(format!("failed to create audit goal: {error}")))?;
+        if let Err(error) = state_db
+            .set_thread_preview_if_empty(thread_id, goal.objective.as_str())
+            .await
+        {
+            warn!("failed to set audit coordinator thread preview: {error}");
+        }
+        let goal_id = goal.goal_id.clone();
+        thread
+            .apply_external_goal_set(ExternalGoalSet {
+                goal,
+                previous_status: ExternalGoalPreviousStatus::NewGoal,
+            })
+            .await;
+        Ok(goal_id)
+    }
+
     pub(crate) async fn emit_resume_goal_snapshot_and_continue(
         &self,
         thread_id: ThreadId,

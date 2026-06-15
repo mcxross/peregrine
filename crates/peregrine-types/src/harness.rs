@@ -285,16 +285,23 @@ pub enum AuditStageId {
     SemanticGraphs,
     Classification,
     ThreatModel,
+    AttackSurface,
     FunctionRiskMap,
     Invariants,
     StaticAnalysis,
     GraphAnalysis,
     BytecodeReview,
     AttackHypotheses,
+    VerificationPlanning,
     TargetedTests,
     DynamicAnalysis,
     InvariantStress,
+    SymbolicExecution,
+    EconomicSimulation,
     ExploitConfirmation,
+    AdversarialReview,
+    EvidenceAggregation,
+    FindingValidation,
     SeverityRanking,
     Remediation,
     RegressionTests,
@@ -311,6 +318,246 @@ pub enum AuditStageStatus {
     Succeeded,
     Failed,
     Skipped,
+    Blocked,
+    Unavailable,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum AuditTarget {
+    LocalPackage {
+        chain_id: String,
+        path: String,
+        #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+        metadata: Metadata,
+    },
+    RemotePackage {
+        chain_id: String,
+        network_id: String,
+        package_ref: String,
+        source_uri: Option<String>,
+        state_ref: Option<String>,
+        #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+        metadata: Metadata,
+    },
+}
+
+impl AuditTarget {
+    pub fn chain_id(&self) -> &str {
+        match self {
+            Self::LocalPackage { chain_id, .. } | Self::RemotePackage { chain_id, .. } => chain_id,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditProfile {
+    pub model_token_budget: i64,
+    pub wall_time_seconds: i64,
+    pub max_hypotheses: u32,
+    pub max_dependency_depth: u32,
+    pub max_dependency_packages: u32,
+}
+
+impl Default for AuditProfile {
+    fn default() -> Self {
+        Self {
+            model_token_budget: 500_000,
+            wall_time_seconds: 4 * 60 * 60,
+            max_hypotheses: 500,
+            max_dependency_depth: 3,
+            max_dependency_packages: 64,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AuditRunStatus {
+    Pending,
+    Running,
+    Paused,
+    Completed,
+    CompletedWithGaps,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AuditWorkItemStatus {
+    Pending,
+    Claimed,
+    Completed,
+    Failed,
+    Blocked,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum VerificationMethod {
+    StaticAnalysis,
+    GraphAnalysis,
+    BytecodeAnalysis,
+    GeneratedTest,
+    Fuzzing,
+    SymbolicExecution,
+    FormalVerification,
+    EconomicSimulation,
+    ExploitReplay,
+    HumanReview,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AuditEvidenceAttestation {
+    ModelSubmitted,
+    RouterCaptured,
+    AdapterReplay,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditEvidence {
+    pub id: String,
+    pub audit_run_id: String,
+    pub work_item_id: Option<String>,
+    pub verification_method: VerificationMethod,
+    pub provider_id: String,
+    pub adapter_id: Option<String>,
+    pub tool_name: String,
+    pub tool_version: Option<String>,
+    pub input_hash: String,
+    pub source_precision: SourcePrecision,
+    pub attestation: AuditEvidenceAttestation,
+    pub summary: String,
+    pub observation: String,
+    pub execution_trace_ref: Option<String>,
+    pub artifact_refs: Vec<String>,
+    pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditCapabilityBinding {
+    pub capability: String,
+    pub provider_id: String,
+    pub adapter_id: Option<String>,
+    pub tool_name: Option<String>,
+    pub available: bool,
+    pub diagnostic: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditCoverageGap {
+    pub capability: String,
+    pub stage: AuditStageId,
+    pub reason: String,
+    pub required: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditWorkItem {
+    pub id: String,
+    pub stage: AuditStageId,
+    pub status: AuditWorkItemStatus,
+    pub title: String,
+    pub claimed_by: Option<String>,
+    pub attempts: u32,
+    pub evidence_refs: Vec<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExploitIntent {
+    pub id: String,
+    pub hypothesis_id: String,
+    pub summary: String,
+    pub entrypoints: Vec<String>,
+    pub expected_violation: String,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub parameters: Metadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExploitBundle {
+    pub id: String,
+    pub adapter_id: String,
+    pub intent_id: String,
+    pub format: String,
+    pub artifact_refs: Vec<String>,
+    pub replayable: bool,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditPlan {
+    pub schema_version: u8,
+    pub id: String,
+    pub fingerprint: String,
+    pub target: AuditTarget,
+    pub profile: AuditProfile,
+    pub stages: Vec<AuditStageId>,
+    pub required_capabilities: Vec<String>,
+    pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditRun {
+    pub schema_version: u8,
+    pub id: String,
+    pub plan_fingerprint: String,
+    pub target: AuditTarget,
+    pub profile: AuditProfile,
+    pub status: AuditRunStatus,
+    pub current_stage: AuditStageId,
+    pub coordinator_thread_id: Option<String>,
+    pub goal_id: Option<String>,
+    pub adapter_id: Option<String>,
+    pub capabilities: Vec<AuditCapabilityBinding>,
+    pub coverage_gaps: Vec<AuditCoverageGap>,
+    pub work_items: Vec<AuditWorkItem>,
+    pub evidence_refs: Vec<String>,
+    pub artifact_refs: Vec<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditReport {
+    pub schema_version: u8,
+    pub audit_run_id: String,
+    pub status: AuditRunStatus,
+    pub findings: Vec<FindingCandidate>,
+    pub coverage_gaps: Vec<AuditCoverageGap>,
+    pub evidence_refs: Vec<String>,
+    pub generated_at: i64,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -461,6 +708,24 @@ mod tests {
         assert_eq!(
             json!(AuditFixState::PartiallyFixed),
             json!("partiallyFixed")
+        );
+        assert_eq!(
+            json!(AuditTarget::RemotePackage {
+                chain_id: "sui".to_string(),
+                network_id: "mainnet".to_string(),
+                package_ref: "0x1".to_string(),
+                source_uri: Some("https://example.invalid/graphql".to_string()),
+                state_ref: Some("123".to_string()),
+                metadata: Metadata::new(),
+            }),
+            json!({
+                "type": "remotePackage",
+                "chainId": "sui",
+                "networkId": "mainnet",
+                "packageRef": "0x1",
+                "sourceUri": "https://example.invalid/graphql",
+                "stateRef": "123",
+            })
         );
     }
 

@@ -3,7 +3,10 @@ members = [
   "src-tauri",
   "crates/peregrine-analysis",
   "crates/peregrine-analysis-engine",
+  "crates/peregrine-audit-store",
+  "crates/peregrine-security-tools",
   "crates/peregrine-sui-adapter",
+  "crates/peregrine-sui-security-adapter",
   "crates/peregrine-sui-dynamic-analysis",
   "crates/peregrine-sui-bytecode",
   "crates/peregrine-helper",
@@ -99,6 +102,8 @@ unwrap_used = "deny"
 [workspace.dependencies]
 peregrine-analysis = { path = "crates/peregrine-analysis" }
 peregrine-analysis-engine = { path = "crates/peregrine-analysis-engine" }
+peregrine-audit-store = { path = "crates/peregrine-audit-store" }
+peregrine-security-tools = { path = "crates/peregrine-security-tools" }
 age = "0.11.1"
 allocative = "0.3.3"
 anemo = { git = "https://github.com/mystenlabs/anemo.git", rev = "9248f8d3951df750360308df22618e5978ad6dc0" }
@@ -213,6 +218,7 @@ owo-colors = "4.3.0"
 path-absolutize = "3.1.1"
 pathdiff = "0.2"
 peregrine-sui-adapter = { path = "crates/peregrine-sui-adapter" }
+peregrine-sui-security-adapter = { path = "crates/peregrine-sui-security-adapter" }
 codex-agent-graph-store = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-agent-identity = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-analytics = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }

@@ -458,6 +458,8 @@ use peregrine_app_server_protocol::ServerRequest;
 
 mod account_processor;
 mod apps_processor;
+mod audit_processor;
+mod audit_support;
 mod catalog_processor;
 mod command_exec_processor;
 mod config_processor;
@@ -481,6 +483,7 @@ mod windows_sandbox_processor;
 
 pub(crate) use account_processor::AccountRequestProcessor;
 pub(crate) use apps_processor::AppsRequestProcessor;
+pub(crate) use audit_processor::AuditRequestProcessor;
 pub(crate) use catalog_processor::CatalogRequestProcessor;
 pub(crate) use command_exec_processor::CommandExecRequestProcessor;
 pub(crate) use config_processor::ConfigRequestProcessor;

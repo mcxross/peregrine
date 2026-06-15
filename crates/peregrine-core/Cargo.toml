@@ -80,6 +80,7 @@ libc = { workspace = true }
 once_cell = { workspace = true }
 peregrine-api = { workspace = true }
 peregrine-app-server-protocol = { workspace = true }
+peregrine-audit-store = { workspace = true }
 peregrine-config = { workspace = true }
 peregrine-helper-protocol = { workspace = true }
 peregrine-memories-read = { workspace = true }

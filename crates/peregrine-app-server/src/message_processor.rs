@@ -18,6 +18,7 @@ use crate::outgoing_message::OutgoingMessageSender;
 use crate::outgoing_message::RequestContext;
 use crate::request_processors::AccountRequestProcessor;
 use crate::request_processors::AppsRequestProcessor;
+use crate::request_processors::AuditRequestProcessor;
 use crate::request_processors::CatalogRequestProcessor;
 use crate::request_processors::CommandExecRequestProcessor;
 use crate::request_processors::ConfigRequestProcessor;
@@ -77,6 +78,8 @@ use peregrine_app_server_protocol::ServerRequestPayload;
 use peregrine_app_server_protocol::experimental_required_message;
 use peregrine_core::ThreadManager;
 use peregrine_core::config::Config;
+use peregrine_security_tools::AuditAdapterRegistry;
+use peregrine_sui_security_adapter::SuiSecurityAdapter;
 use peregrine_types::ThreadId;
 use peregrine_types::protocol::SessionSource;
 use peregrine_types::protocol::W3cTraceContext;
@@ -164,6 +167,7 @@ pub(crate) struct MessageProcessor {
     skills_watcher: Arc<SkillsWatcher>,
     account_processor: AccountRequestProcessor,
     apps_processor: AppsRequestProcessor,
+    audit_processor: AuditRequestProcessor,
     catalog_processor: CatalogRequestProcessor,
     command_exec_processor: CommandExecRequestProcessor,
     process_exec_processor: ProcessExecRequestProcessor,
@@ -418,6 +422,16 @@ impl MessageProcessor {
             thread_state_manager.clone(),
             state_db.clone(),
         );
+        let mut audit_adapters = AuditAdapterRegistry::default();
+        audit_adapters.register(Arc::new(SuiSecurityAdapter::default()));
+        let audit_processor = AuditRequestProcessor::new(
+            Arc::clone(&thread_manager),
+            thread_goal_processor.clone(),
+            outgoing.clone(),
+            Arc::clone(&config),
+            state_db.clone(),
+            Arc::new(audit_adapters),
+        );
         let thread_processor = ThreadRequestProcessor::new(
             auth_manager.clone(),
             Arc::clone(&thread_manager),
@@ -492,6 +506,7 @@ impl MessageProcessor {
             skills_watcher,
             account_processor,
             apps_processor,
+            audit_processor,
             catalog_processor,
             command_exec_processor,
             process_exec_processor,
@@ -1059,6 +1074,51 @@ impl MessageProcessor {
                         .thread_goal_clear(request_id.clone(), params)
                         .await
                 }
+                ClientRequest::AuditPreflight { params, .. } => self
+                    .audit_processor
+                    .preflight(params)
+                    .await
+                    .map(|response| Some(response.into())),
+                ClientRequest::AuditPlanStore { params, .. } => self
+                    .audit_processor
+                    .store_plan(params)
+                    .await
+                    .map(|response| Some(response.into())),
+                ClientRequest::AuditStart { params, .. } => self
+                    .audit_processor
+                    .start(params)
+                    .await
+                    .map(|response| Some(response.into())),
+                ClientRequest::AuditRead { params, .. } => self
+                    .audit_processor
+                    .read(params)
+                    .await
+                    .map(|response| Some(response.into())),
+                ClientRequest::AuditList { params, .. } => self
+                    .audit_processor
+                    .list(params)
+                    .await
+                    .map(|response| Some(response.into())),
+                ClientRequest::AuditPause { params, .. } => self
+                    .audit_processor
+                    .pause(params)
+                    .await
+                    .map(|response| Some(response.into())),
+                ClientRequest::AuditResume { params, .. } => self
+                    .audit_processor
+                    .resume(params)
+                    .await
+                    .map(|response| Some(response.into())),
+                ClientRequest::AuditCancel { params, .. } => self
+                    .audit_processor
+                    .cancel(params)
+                    .await
+                    .map(|response| Some(response.into())),
+                ClientRequest::AuditDelete { params, .. } => self
+                    .audit_processor
+                    .delete(params)
+                    .await
+                    .map(|response| Some(response.into())),
                 ClientRequest::ThreadMetadataUpdate { params, .. } => {
                     self.thread_processor.thread_metadata_update(params).await
                 }

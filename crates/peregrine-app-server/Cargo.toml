@@ -74,11 +74,14 @@ codex-web-search-extension = { workspace = true }
 futures = { workspace = true }
 peregrine-app-server-protocol = { workspace = true }
 peregrine-app-server-transport = { workspace = true }
+peregrine-audit-store = { workspace = true }
 peregrine-config = { workspace = true }
 peregrine-core = { workspace = true }
 peregrine-memories-write = { workspace = true }
 peregrine-model-provider = { workspace = true }
 peregrine-provider-registry = { workspace = true }
+peregrine-security-tools = { workspace = true }
+peregrine-sui-security-adapter = { workspace = true }
 peregrine-types = { workspace = true }
 reqwest = { workspace = true, features = ["rustls-tls"] }
 serde = { workspace = true, features = ["derive"] }

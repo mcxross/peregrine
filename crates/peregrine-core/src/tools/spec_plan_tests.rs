@@ -515,6 +515,34 @@ async fn host_context_gates_goal_and_agent_job_tools() {
 }
 
 #[tokio::test]
+async fn audit_tools_are_scoped_to_audit_coordinator_workspaces() {
+    let tool_names = [
+        "audit_read_run",
+        "audit_claim_work",
+        "audit_record_packet",
+        "audit_record_evidence",
+        "audit_finish_work",
+    ];
+    let regular = probe(|_| {}).await;
+    regular.assert_visible_lacks(&tool_names);
+    regular.assert_registered_lacks(&tool_names);
+
+    let home = tempfile::tempdir().expect("audit home");
+    let workspace = home.path().join("audits/audit-1/workspace");
+    std::fs::create_dir_all(&workspace).expect("audit workspace");
+    let coordinator = probe(|turn| {
+        update_config(turn, |config| {
+            config.peregrine_home = home.path().abs();
+        });
+        set_turn_workspace(turn, &workspace);
+    })
+    .await;
+
+    coordinator.assert_visible_contains(&tool_names);
+    coordinator.assert_registered_contains(&tool_names);
+}
+
+#[tokio::test]
 async fn mcp_and_tool_search_follow_direct_and_deferred_tool_exposure() {
     let direct_mcp = probe_with(
         |_| {},

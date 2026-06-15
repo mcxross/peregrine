@@ -18230,11 +18230,14 @@ dependencies = [
  "opentelemetry_sdk 0.31.0",
  "peregrine-app-server-protocol",
  "peregrine-app-server-transport",
+ "peregrine-audit-store",
  "peregrine-config",
  "peregrine-core",
  "peregrine-memories-write",
  "peregrine-model-provider",
  "peregrine-provider-registry",
+ "peregrine-security-tools",
+ "peregrine-sui-security-adapter",
  "peregrine-types",
  "pretty_assertions",
  "reqwest 0.12.28",
@@ -18405,6 +18408,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "peregrine-audit-store"
+version = "0.1.0"
+dependencies = [
+ "peregrine-security-tools",
+ "peregrine-types",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
 name = "peregrine-client"
 version = "0.1.0"
 dependencies = [
@@ -18565,6 +18583,7 @@ dependencies = [
  "peregrine-anthropic",
  "peregrine-api",
  "peregrine-app-server-protocol",
+ "peregrine-audit-store",
  "peregrine-config",
  "peregrine-helper-protocol",
  "peregrine-mcp-client",
@@ -18775,6 +18794,17 @@ dependencies = [
  "codex-model-provider-info",
  "peregrine-anthropic",
  "peregrine-model-provider",
+]
+
+[[package]]
+name = "peregrine-security-tools"
+version = "0.1.0"
+dependencies = [
+ "peregrine-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -19053,6 +19083,20 @@ dependencies = [
  "serde_json",
  "tempfile",
  "toml 0.9.12+spec-1.1.0",
+ "walkdir",
+]
+
+[[package]]
+name = "peregrine-sui-security-adapter"
+version = "0.1.0"
+dependencies = [
+ "peregrine-security-tools",
+ "peregrine-sui-adapter",
+ "peregrine-sui-import-engine",
+ "peregrine-types",
+ "serde_json",
+ "tempfile",
+ "tokio",
  "walkdir",
 ]
 

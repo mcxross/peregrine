@@ -1,0 +1,460 @@
+use crate::error_code::internal_error;
+use crate::error_code::invalid_request;
+use crate::outgoing_message::OutgoingMessageSender;
+use crate::request_processors::ThreadGoalRequestProcessor;
+use crate::request_processors::audit_support::coverage_gaps;
+use crate::request_processors::audit_support::default_required_capabilities;
+use crate::request_processors::audit_support::parse_coordinator_thread_id;
+use crate::request_processors::audit_support::profile_from_params;
+use crate::request_processors::audit_support::serialize;
+use crate::request_processors::audit_support::target_from_params;
+use crate::request_processors::audit_support::validate_profile;
+use codex_features::Feature;
+use codex_rollout::StateDbHandle;
+use codex_utils_absolute_path::AbsolutePathBuf;
+use peregrine_app_server_protocol::{
+    AuditCancelResponse, AuditDeleteResponse, AuditDiagnosticNotification, AuditLifecycleParams,
+    AuditListParams, AuditListResponse, AuditPauseResponse, AuditPlanStoreParams,
+    AuditPlanStoreResponse, AuditPreflightParams, AuditPreflightResponse, AuditReadParams,
+    AuditReadResponse, AuditResumeResponse, AuditStartParams, AuditStartResponse,
+    AuditUpdatedNotification, JSONRPCErrorError, ServerNotification,
+};
+use peregrine_audit_store::AuditStore;
+use peregrine_core::config::Config;
+use peregrine_core::context::AuditRunContextFragment;
+use peregrine_core::context::ContextualUserFragment;
+use peregrine_core::{ExternalGoalPreviousStatus, ExternalGoalSet, PeregrineThread, ThreadManager};
+use peregrine_security_tools::{
+    AuditAdapterRegistry, AuditWorkspace, create_audit_work_items, default_audit_stages,
+};
+use peregrine_types::{AuditPlan, AuditProfile, AuditRun, AuditRunStatus, AuditStageId, Metadata};
+use std::sync::Arc;
+use time::OffsetDateTime;
+use uuid::Uuid;
+
+#[derive(Clone)]
+pub(crate) struct AuditRequestProcessor {
+    store: Result<Arc<AuditStore>, String>,
+    adapters: Arc<AuditAdapterRegistry>,
+    thread_manager: Arc<ThreadManager>,
+    thread_goal_processor: ThreadGoalRequestProcessor,
+    outgoing: Arc<OutgoingMessageSender>,
+    config: Arc<Config>,
+    state_db: Option<StateDbHandle>,
+}
+
+impl AuditRequestProcessor {
+    pub(crate) fn new(
+        thread_manager: Arc<ThreadManager>,
+        thread_goal_processor: ThreadGoalRequestProcessor,
+        outgoing: Arc<OutgoingMessageSender>,
+        config: Arc<Config>,
+        state_db: Option<StateDbHandle>,
+        adapters: Arc<AuditAdapterRegistry>,
+    ) -> Self {
+        let store = AuditStore::open(&config.peregrine_home)
+            .map(Arc::new)
+            .map_err(|error| error.to_string());
+        Self {
+            store,
+            adapters,
+            thread_manager,
+            thread_goal_processor,
+            outgoing,
+            config,
+            state_db,
+        }
+    }
+
+    pub(crate) async fn preflight(
+        &self,
+        params: AuditPreflightParams,
+    ) -> Result<AuditPreflightResponse, JSONRPCErrorError> {
+        let target = target_from_params(params.target);
+        let adapter = self
+            .adapters
+            .get(target.chain_id())
+            .map_err(|error| invalid_request(error.to_string()))?;
+        let preflight = adapter
+            .preflight(&target)
+            .await
+            .map_err(|error| invalid_request(error.to_string()))?;
+        let profile = params
+            .profile
+            .map_or_else(AuditProfile::default, profile_from_params);
+        validate_profile(&profile)?;
+        let now = OffsetDateTime::now_utc().unix_timestamp();
+        let plan = AuditPlan {
+            schema_version: 1,
+            id: Uuid::now_v7().to_string(),
+            fingerprint: String::new(),
+            target: preflight.normalized_target,
+            profile,
+            stages: default_audit_stages(),
+            required_capabilities: default_required_capabilities(),
+            created_at: now,
+            metadata: Metadata::new(),
+        };
+        let diagnostics = preflight
+            .diagnostics
+            .into_iter()
+            .map(|diagnostic| diagnostic.message)
+            .collect();
+        Ok(AuditPreflightResponse {
+            plan: serialize(&plan)?,
+            diagnostics,
+        })
+    }
+
+    pub(crate) async fn store_plan(
+        &self,
+        params: AuditPlanStoreParams,
+    ) -> Result<AuditPlanStoreResponse, JSONRPCErrorError> {
+        let plan: AuditPlan = serde_json::from_value(params.plan)
+            .map_err(|error| invalid_request(format!("invalid audit plan: {error}")))?;
+        validate_profile(&plan.profile)?;
+        let plan = self
+            .store()?
+            .store_plan(plan)
+            .map_err(|error| internal_error(error.to_string()))?;
+        Ok(AuditPlanStoreResponse {
+            fingerprint: plan.fingerprint.clone(),
+            plan: serialize(&plan)?,
+        })
+    }
+
+    pub(crate) async fn start(
+        &self,
+        params: AuditStartParams,
+    ) -> Result<AuditStartResponse, JSONRPCErrorError> {
+        if !self.config.features.enabled(Feature::Goals) {
+            return Err(invalid_request("goals feature is disabled"));
+        }
+        let store = self.store()?;
+        let plan = store
+            .read_plan(&params.fingerprint)
+            .map_err(|error| internal_error(error.to_string()))?
+            .ok_or_else(|| invalid_request("audit plan fingerprint was not found"))?;
+        if plan.fingerprint != params.fingerprint {
+            return Err(invalid_request("audit plan fingerprint mismatch"));
+        }
+        validate_profile(&plan.profile)?;
+        let adapter = self
+            .adapters
+            .get(plan.target.chain_id())
+            .map_err(|error| invalid_request(error.to_string()))?;
+        let preflight = adapter
+            .preflight(&plan.target)
+            .await
+            .map_err(|error| invalid_request(error.to_string()))?;
+        let audit_id = Uuid::now_v7().to_string();
+        let workspace = store
+            .create_workspace(&audit_id)
+            .map_err(|error| internal_error(error.to_string()))?;
+        let acquired = adapter
+            .acquire(&preflight.normalized_target, &plan.profile, &workspace)
+            .await
+            .map_err(|error| invalid_request(error.to_string()))?;
+        let capabilities = preflight.capabilities;
+        let coverage_gaps = coverage_gaps(&plan, &capabilities);
+        let now = OffsetDateTime::now_utc().unix_timestamp();
+        let work_items = create_audit_work_items(&audit_id, &plan.stages, now);
+        let mut metadata = Metadata::new();
+        metadata.insert("acquiredTarget".to_string(), serialize(&acquired)?);
+        let mut run = AuditRun {
+            schema_version: 1,
+            id: audit_id,
+            plan_fingerprint: plan.fingerprint.clone(),
+            target: preflight.normalized_target,
+            profile: plan.profile,
+            status: AuditRunStatus::Running,
+            current_stage: plan
+                .stages
+                .first()
+                .cloned()
+                .unwrap_or(AuditStageId::AuditSession),
+            coordinator_thread_id: None,
+            goal_id: None,
+            adapter_id: Some(adapter.adapter_id().to_string()),
+            capabilities,
+            coverage_gaps,
+            work_items,
+            evidence_refs: Vec::new(),
+            artifact_refs: vec![acquired.manifest_ref],
+            created_at: now,
+            updated_at: now,
+            metadata,
+        };
+        let thread = self.start_coordinator(&workspace).await?;
+        run.coordinator_thread_id = Some(thread.thread_id.to_string());
+        store
+            .create_run(&run)
+            .map_err(|error| internal_error(error.to_string()))?;
+        thread
+            .thread
+            .inject_response_items(vec![ContextualUserFragment::into(
+                AuditRunContextFragment::from_run(&run),
+            )])
+            .await
+            .map_err(|error| internal_error(format!("failed to inject audit context: {error}")))?;
+        let objective = format!(
+            "Complete audit {} using its persisted stage plan; only complete after a terminal audit report exists.",
+            run.id
+        );
+        let goal_id = self
+            .thread_goal_processor
+            .create_goal_for_running_thread(
+                thread.thread_id,
+                thread.thread.as_ref(),
+                &objective,
+                Some(run.profile.model_token_budget),
+            )
+            .await?;
+        run.goal_id = Some(goal_id);
+        run.updated_at = OffsetDateTime::now_utc().unix_timestamp();
+        store
+            .update_run(&run)
+            .map_err(|error| internal_error(error.to_string()))?;
+        self.emit_updated(&run).await?;
+        for gap in &run.coverage_gaps {
+            self.outgoing
+                .send_server_notification(ServerNotification::AuditDiagnostic(
+                    AuditDiagnosticNotification {
+                        audit_id: Some(run.id.clone()),
+                        message: format!("{} unavailable: {}", gap.capability, gap.reason),
+                    },
+                ))
+                .await;
+        }
+        Ok(AuditStartResponse {
+            run: serialize(&run)?,
+        })
+    }
+
+    pub(crate) async fn read(
+        &self,
+        params: AuditReadParams,
+    ) -> Result<AuditReadResponse, JSONRPCErrorError> {
+        let run = self.read_run(&params.audit_id)?;
+        Ok(AuditReadResponse {
+            run: serialize(&run)?,
+        })
+    }
+
+    pub(crate) async fn list(
+        &self,
+        params: AuditListParams,
+    ) -> Result<AuditListResponse, JSONRPCErrorError> {
+        if params.cursor.is_some() {
+            return Err(invalid_request(
+                "audit list cursors are not implemented yet",
+            ));
+        }
+        let data = self
+            .store()?
+            .list_runs(params.limit.unwrap_or(50))
+            .map_err(|error| internal_error(error.to_string()))?
+            .iter()
+            .map(serialize)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(AuditListResponse {
+            data,
+            next_cursor: None,
+        })
+    }
+
+    pub(crate) async fn pause(
+        &self,
+        params: AuditLifecycleParams,
+    ) -> Result<AuditPauseResponse, JSONRPCErrorError> {
+        let run = self
+            .transition(params.audit_id, AuditRunStatus::Paused)
+            .await?;
+        Ok(AuditPauseResponse {
+            run: serialize(&run)?,
+        })
+    }
+
+    pub(crate) async fn resume(
+        &self,
+        params: AuditLifecycleParams,
+    ) -> Result<AuditResumeResponse, JSONRPCErrorError> {
+        let run = self
+            .transition(params.audit_id, AuditRunStatus::Running)
+            .await?;
+        Ok(AuditResumeResponse {
+            run: serialize(&run)?,
+        })
+    }
+
+    pub(crate) async fn cancel(
+        &self,
+        params: AuditLifecycleParams,
+    ) -> Result<AuditCancelResponse, JSONRPCErrorError> {
+        let run = self
+            .transition(params.audit_id, AuditRunStatus::Cancelled)
+            .await?;
+        Ok(AuditCancelResponse {
+            run: serialize(&run)?,
+        })
+    }
+
+    pub(crate) async fn delete(
+        &self,
+        params: AuditLifecycleParams,
+    ) -> Result<AuditDeleteResponse, JSONRPCErrorError> {
+        let run = self.read_run(&params.audit_id)?;
+        if matches!(run.status, AuditRunStatus::Running) {
+            return Err(invalid_request(
+                "pause or cancel a running audit before deletion",
+            ));
+        }
+        let deleted = self
+            .store()?
+            .delete_run(&params.audit_id)
+            .map_err(|error| internal_error(error.to_string()))?;
+        Ok(AuditDeleteResponse { deleted })
+    }
+
+    async fn start_coordinator(
+        &self,
+        workspace: &AuditWorkspace,
+    ) -> Result<peregrine_core::NewThread, JSONRPCErrorError> {
+        let mut config = self.config.as_ref().clone();
+        let cwd = AbsolutePathBuf::from_absolute_path_checked(&workspace.workspace)
+            .map_err(|error| internal_error(format!("invalid audit workspace path: {error}")))?;
+        let writable_roots = [
+            &workspace.workspace,
+            &workspace.artifacts,
+            &workspace.evidence,
+            &workspace.traces,
+            &workspace.reports,
+        ]
+        .into_iter()
+        .map(AbsolutePathBuf::from_absolute_path_checked)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| internal_error(format!("invalid audit workspace path: {error}")))?;
+        config.cwd = cwd;
+        config.permissions.set_workspace_roots(writable_roots);
+        config.ephemeral = false;
+        let instructions = "You are the coordinator for a persisted autonomous security audit. \
+Never modify immutable audit input. Use only registered tools and isolated audit workspace paths. \
+Treat generated code as a hypothesis until an isolated exploit replay produces evidence. \
+Do not confirm findings without two independent verification classes and successful replay.";
+        config.developer_instructions = Some(match config.developer_instructions {
+            Some(existing) => format!("{existing}\n\n{instructions}"),
+            None => instructions.to_string(),
+        });
+        self.thread_manager
+            .start_thread(config)
+            .await
+            .map_err(|error| internal_error(format!("failed to start audit coordinator: {error}")))
+    }
+
+    async fn transition(
+        &self,
+        audit_id: String,
+        next_status: AuditRunStatus,
+    ) -> Result<AuditRun, JSONRPCErrorError> {
+        let mut run = self.read_run(&audit_id)?;
+        let thread = self.running_coordinator(&run).await?;
+        let goal_status = match next_status {
+            AuditRunStatus::Running => codex_state::ThreadGoalStatus::Active,
+            AuditRunStatus::Paused => codex_state::ThreadGoalStatus::Paused,
+            AuditRunStatus::Cancelled => codex_state::ThreadGoalStatus::Blocked,
+            _ => return Err(invalid_request("unsupported audit lifecycle transition")),
+        };
+        if matches!(next_status, AuditRunStatus::Running) {
+            thread
+                .inject_response_items(vec![ContextualUserFragment::into(
+                    AuditRunContextFragment::from_run(&run),
+                )])
+                .await
+                .map_err(|error| {
+                    internal_error(format!("failed to inject audit context: {error}"))
+                })?;
+        }
+        self.update_linked_goal(&run, thread.as_ref(), goal_status)
+            .await?;
+        run.status = next_status;
+        run.updated_at = OffsetDateTime::now_utc().unix_timestamp();
+        self.store()?
+            .update_run(&run)
+            .map_err(|error| internal_error(error.to_string()))?;
+        self.emit_updated(&run).await?;
+        Ok(run)
+    }
+
+    async fn update_linked_goal(
+        &self,
+        run: &AuditRun,
+        thread: &PeregrineThread,
+        status: codex_state::ThreadGoalStatus,
+    ) -> Result<(), JSONRPCErrorError> {
+        let thread_id = parse_coordinator_thread_id(run)?;
+        let state_db = thread
+            .state_db()
+            .or_else(|| self.state_db.clone())
+            .ok_or_else(|| internal_error("goal persistence is unavailable"))?;
+        let previous = state_db
+            .thread_goals()
+            .get_thread_goal(thread_id)
+            .await
+            .map_err(|error| internal_error(error.to_string()))?
+            .ok_or_else(|| invalid_request("audit coordinator goal is missing"))?;
+        let goal = state_db
+            .thread_goals()
+            .update_thread_goal(
+                thread_id,
+                codex_state::GoalUpdate {
+                    objective: None,
+                    status: Some(status),
+                    token_budget: None,
+                    expected_goal_id: run.goal_id.clone(),
+                },
+            )
+            .await
+            .map_err(|error| internal_error(error.to_string()))?
+            .ok_or_else(|| invalid_request("audit coordinator goal is missing"))?;
+        thread
+            .apply_external_goal_set(ExternalGoalSet {
+                goal,
+                previous_status: ExternalGoalPreviousStatus::from(&previous),
+            })
+            .await;
+        Ok(())
+    }
+
+    async fn running_coordinator(
+        &self,
+        run: &AuditRun,
+    ) -> Result<Arc<PeregrineThread>, JSONRPCErrorError> {
+        self.thread_manager
+            .get_thread(parse_coordinator_thread_id(run)?)
+            .await
+            .map_err(|_| invalid_request("audit coordinator thread is not loaded"))
+    }
+
+    fn read_run(&self, audit_id: &str) -> Result<AuditRun, JSONRPCErrorError> {
+        self.store()?
+            .read_run(audit_id)
+            .map_err(|error| internal_error(error.to_string()))?
+            .ok_or_else(|| invalid_request("audit run was not found"))
+    }
+
+    fn store(&self) -> Result<&Arc<AuditStore>, JSONRPCErrorError> {
+        self.store
+            .as_ref()
+            .map_err(|error| internal_error(format!("audit store is unavailable: {error}")))
+    }
+
+    async fn emit_updated(&self, run: &AuditRun) -> Result<(), JSONRPCErrorError> {
+        self.outgoing
+            .send_server_notification(ServerNotification::AuditUpdated(AuditUpdatedNotification {
+                audit_id: run.id.clone(),
+                run: serialize(run)?,
+            }))
+            .await;
+        Ok(())
+    }
+}
