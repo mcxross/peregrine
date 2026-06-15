@@ -4,8 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "workspaces": [
-    "packages/desktop-runtime",
-    "packages/coding-agent-adapters"
+    "packages/desktop-runtime"
   ],
   "scripts": {
     "dev": "vite",
