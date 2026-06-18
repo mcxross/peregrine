@@ -7,6 +7,7 @@ members = [
   "crates/peregrine-security-tools",
   "crates/peregrine-sui-adapter",
   "crates/peregrine-sui-security-adapter",
+  "crates/peregrine-plugin/sui-move",
   "crates/peregrine-sui-dynamic-analysis",
   "crates/peregrine-sui-bytecode",
   "crates/peregrine-helper",
@@ -219,6 +220,7 @@ path-absolutize = "3.1.1"
 pathdiff = "0.2"
 peregrine-sui-adapter = { path = "crates/peregrine-sui-adapter" }
 peregrine-sui-security-adapter = { path = "crates/peregrine-sui-security-adapter" }
+peregrine-sui-move-knowledge-plugin = { path = "crates/peregrine-plugin/sui-move" }
 codex-agent-graph-store = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-agent-identity = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-analytics = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }

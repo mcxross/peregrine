@@ -623,6 +623,7 @@ pub struct ToolsToml {
     pub experimental_request_user_input: Option<ExperimentalRequestUserInput>,
     pub sui: Option<SuiToolsToml>,
     pub sui_move_analyzer: Option<SuiMoveAnalyzerToolsToml>,
+    pub sui_move_knowledge: Option<SuiMoveKnowledgeToolsToml>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema)]
@@ -677,6 +678,13 @@ pub struct SuiMoveAnalyzerToolsToml {
 pub struct SuiMoveAnalyzerAdapterToml {
     pub source: Option<SuiAdapterSourceToml>,
     pub binary_path: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct SuiMoveKnowledgeToolsToml {
+    #[serde(default)]
+    pub mode: Option<SuiToolsModeToml>,
 }
 
 #[derive(Deserialize)]

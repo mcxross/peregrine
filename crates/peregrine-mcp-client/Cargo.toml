@@ -18,6 +18,7 @@ peregrine-config = { workspace = true }
 peregrine-helper-protocol = { workspace = true }
 peregrine-sui-mcp-protocol = { workspace = true }
 peregrine-sui-move-analyzer-mcp-protocol = { workspace = true }
+peregrine-sui-move-knowledge-plugin = { workspace = true }
 rmcp = { workspace = true, features = [
   "client",
   "transport-child-process",

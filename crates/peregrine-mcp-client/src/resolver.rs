@@ -16,6 +16,11 @@ use peregrine_sui_move_analyzer_mcp_protocol::{
     SERVER_PATH_ENV as MOVE_ANALYZER_SERVER_PATH_ENV,
     resolve_server_executable_from as resolve_move_analyzer_server_executable_from,
 };
+use peregrine_sui_move_knowledge_plugin::{
+    KNOWLEDGE_ROOT_ENV, SERVER_NAME as KNOWLEDGE_SERVER_NAME,
+    SERVER_PATH_ENV as KNOWLEDGE_SERVER_PATH_ENV, install_bundled_plugin,
+    resolve_server_executable_from as resolve_knowledge_server_executable_from,
+};
 use std::{
     collections::{BTreeMap, HashMap},
     io::{self, ErrorKind},
@@ -73,8 +78,10 @@ pub struct ResolvedMcpConfig {
 pub fn resolve_mcp_config(options: McpClientOptions) -> io::Result<ResolvedMcpConfig> {
     let config = read_user_config(&options.peregrine_home)?;
     let mut servers = config.mcp_servers.into_iter().collect::<BTreeMap<_, _>>();
-    let (mode, adapter) = sui_settings(config.tools.clone());
-    let (move_analyzer_mode, move_analyzer_adapter) = move_analyzer_settings(config.tools);
+    let tools = config.tools.clone();
+    let (mode, adapter) = sui_settings(tools.clone());
+    let (move_analyzer_mode, move_analyzer_adapter) = move_analyzer_settings(tools.clone());
+    let knowledge_mode = sui_move_knowledge_settings(tools);
 
     if mode == SuiToolsMode::Disabled {
         servers.remove(SERVER_NAME);
@@ -95,11 +102,65 @@ pub fn resolve_mcp_config(options: McpClientOptions) -> io::Result<ResolvedMcpCo
                 )
             });
     }
+    if knowledge_mode == SuiToolsMode::Disabled {
+        servers.remove(KNOWLEDGE_SERVER_NAME);
+    } else if !servers.contains_key(KNOWLEDGE_SERVER_NAME) {
+        let server = default_sui_move_knowledge_server(
+            options.self_exe.as_deref(),
+            &options.peregrine_home,
+        )?;
+        servers.insert(KNOWLEDGE_SERVER_NAME.to_string(), server);
+    }
 
     Ok(ResolvedMcpConfig {
         workspace_root: options.workspace_root,
         servers,
         origin: options.origin,
+    })
+}
+
+pub fn default_sui_move_knowledge_server(
+    self_exe: Option<&Path>,
+    peregrine_home: &Path,
+) -> io::Result<McpServerConfig> {
+    let installed = install_bundled_plugin(peregrine_home).map_err(io::Error::other)?;
+    let server_executable = resolve_knowledge_server_executable_from(
+        self_exe,
+        std::env::var_os(KNOWLEDGE_SERVER_PATH_ENV),
+        std::env::var_os("PATH"),
+    );
+    let env = HashMap::from([
+        (
+            KNOWLEDGE_ROOT_ENV.to_string(),
+            installed.root.to_string_lossy().into_owned(),
+        ),
+        ("NO_COLOR".to_string(), "1".to_string()),
+        ("CLICOLOR".to_string(), "0".to_string()),
+        ("TERM".to_string(), "dumb".to_string()),
+    ]);
+
+    Ok(McpServerConfig {
+        transport: McpServerTransportConfig::Stdio {
+            command: server_executable.to_string_lossy().into_owned(),
+            args: Vec::new(),
+            env: Some(env),
+            env_vars: Vec::new(),
+            cwd: None,
+        },
+        environment_id: DEFAULT_MCP_SERVER_ENVIRONMENT_ID.to_string(),
+        enabled: true,
+        required: false,
+        supports_parallel_tool_calls: true,
+        disabled_reason: None,
+        startup_timeout_sec: Some(Duration::from_secs(60)),
+        tool_timeout_sec: Some(Duration::from_secs(30)),
+        default_tools_approval_mode: None,
+        enabled_tools: None,
+        disabled_tools: None,
+        scopes: None,
+        oauth: None,
+        oauth_resource: None,
+        tools: HashMap::new(),
     })
 }
 
@@ -292,6 +353,19 @@ fn move_analyzer_settings(
     (mode, adapter)
 }
 
+fn sui_move_knowledge_settings(
+    tools: Option<peregrine_config::config_toml::ToolsToml>,
+) -> SuiToolsMode {
+    let Some(config) = tools.and_then(|tools| tools.sui_move_knowledge) else {
+        return SuiToolsMode::Auto;
+    };
+    match config.mode {
+        Some(peregrine_config::config_toml::SuiToolsModeToml::Always) => SuiToolsMode::Always,
+        Some(peregrine_config::config_toml::SuiToolsModeToml::Disabled) => SuiToolsMode::Disabled,
+        Some(peregrine_config::config_toml::SuiToolsModeToml::Auto) | None => SuiToolsMode::Auto,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -319,7 +393,7 @@ enabled = false
             origin: McpExecutionOrigin::Workbench,
         })?;
 
-        assert_eq!(resolved.servers.len(), 3);
+        assert_eq!(resolved.servers.len(), 4);
         assert!(!resolved.servers[SERVER_NAME].enabled);
         let McpServerTransportConfig::Stdio { command, .. } =
             &resolved.servers[SERVER_NAME].transport
@@ -345,6 +419,7 @@ enabled = false
 
         assert!(!resolved.servers.contains_key(SERVER_NAME));
         assert!(resolved.servers.contains_key(MOVE_ANALYZER_SERVER_NAME));
+        assert!(resolved.servers.contains_key(KNOWLEDGE_SERVER_NAME));
         Ok(())
     }
 
@@ -364,12 +439,33 @@ enabled = false
 
         assert!(resolved.servers.contains_key(SERVER_NAME));
         assert!(!resolved.servers.contains_key(MOVE_ANALYZER_SERVER_NAME));
+        assert!(resolved.servers.contains_key(KNOWLEDGE_SERVER_NAME));
         Ok(())
     }
 
     #[test]
-    fn both_peregrine_servers_are_registered_by_default() -> Result<(), Box<dyn std::error::Error>>
-    {
+    fn disabled_knowledge_tools_remove_only_the_knowledge_server()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let home = tempdir()?;
+        std::fs::write(
+            home.path().join(CONFIG_TOML_FILE),
+            "[tools.sui_move_knowledge]\nmode = \"disabled\"\n",
+        )?;
+        let resolved = resolve_mcp_config(McpClientOptions::new(
+            home.path().to_path_buf(),
+            home.path().to_path_buf(),
+            McpExecutionOrigin::Cli,
+        ))?;
+
+        assert!(resolved.servers.contains_key(SERVER_NAME));
+        assert!(resolved.servers.contains_key(MOVE_ANALYZER_SERVER_NAME));
+        assert!(!resolved.servers.contains_key(KNOWLEDGE_SERVER_NAME));
+        Ok(())
+    }
+
+    #[test]
+    fn all_bundled_peregrine_servers_are_registered_by_default()
+    -> Result<(), Box<dyn std::error::Error>> {
         let home = tempdir()?;
         let resolved = resolve_mcp_config(McpClientOptions::new(
             home.path().to_path_buf(),
@@ -379,6 +475,7 @@ enabled = false
 
         assert!(resolved.servers.contains_key(SERVER_NAME));
         assert!(resolved.servers.contains_key(MOVE_ANALYZER_SERVER_NAME));
+        assert!(resolved.servers.contains_key(KNOWLEDGE_SERVER_NAME));
         Ok(())
     }
 
@@ -393,6 +490,8 @@ enabled = false
             Some(&frontend),
             &MoveAnalyzerAdapterSettings::default(),
         );
+        let knowledge = default_sui_move_knowledge_server(Some(&frontend), directory.path())
+            .expect("knowledge");
 
         assert_dedicated_server(
             &sui,
@@ -401,6 +500,10 @@ enabled = false
         assert_dedicated_server(
             &analyzer,
             &frontend.with_file_name(peregrine_sui_move_analyzer_mcp_protocol::SERVER_BINARY_NAME),
+        );
+        assert_dedicated_server(
+            &knowledge,
+            &frontend.with_file_name(peregrine_sui_move_knowledge_plugin::SERVER_BINARY_NAME),
         );
     }
 

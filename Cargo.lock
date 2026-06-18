@@ -18665,6 +18665,7 @@ dependencies = [
  "peregrine-helper-protocol",
  "peregrine-sui-mcp-protocol",
  "peregrine-sui-move-analyzer-mcp-protocol",
+ "peregrine-sui-move-knowledge-plugin",
  "rmcp",
  "serde",
  "serde_json",
@@ -19033,6 +19034,22 @@ dependencies = [
  "peregrine-sui-scanner",
  "serde",
  "tempfile",
+]
+
+[[package]]
+name = "peregrine-sui-move-knowledge-plugin"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bm25",
+ "include_dir",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]
