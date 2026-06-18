@@ -35,9 +35,27 @@ use peregrine_security_tools::{
 use peregrine_types::{
     AuditPlan, AuditProfile, AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus, Metadata,
 };
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use time::OffsetDateTime;
 use uuid::Uuid;
+
+type AuditContinuationFuture<'a> = Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send + 'a>>;
+
+/// Drives a persisted audit coordinator thread after lifecycle changes.
+trait AuditCoordinatorContinuation: Send + Sync {
+    fn continue_if_idle<'a>(&'a self, thread: &'a PeregrineThread) -> AuditContinuationFuture<'a>;
+}
+
+#[derive(Default)]
+struct CoreAuditCoordinatorContinuation;
+
+impl AuditCoordinatorContinuation for CoreAuditCoordinatorContinuation {
+    fn continue_if_idle<'a>(&'a self, thread: &'a PeregrineThread) -> AuditContinuationFuture<'a> {
+        Box::pin(thread.continue_active_goal_if_idle())
+    }
+}
 
 #[derive(Clone)]
 pub(crate) struct AuditRequestProcessor {
@@ -49,6 +67,7 @@ pub(crate) struct AuditRequestProcessor {
     outgoing: Arc<OutgoingMessageSender>,
     config: Arc<Config>,
     state_db: Option<StateDbHandle>,
+    coordinator_continuation: Arc<dyn AuditCoordinatorContinuation>,
 }
 
 impl AuditRequestProcessor {
@@ -73,7 +92,17 @@ impl AuditRequestProcessor {
             outgoing,
             config,
             state_db,
+            coordinator_continuation: Arc::new(CoreAuditCoordinatorContinuation),
         }
+    }
+
+    #[cfg(test)]
+    fn with_coordinator_continuation_for_tests(
+        mut self,
+        coordinator_continuation: Arc<dyn AuditCoordinatorContinuation>,
+    ) -> Self {
+        self.coordinator_continuation = coordinator_continuation;
+        self
     }
 
     pub(crate) async fn preflight(
@@ -464,7 +493,7 @@ Do not confirm findings without two independent verification classes and success
         if !matches!(run.status, AuditRunStatus::Running) {
             return;
         }
-        if let Err(error) = thread.continue_active_goal_if_idle().await {
+        if let Err(error) = self.coordinator_continuation.continue_if_idle(thread).await {
             tracing::warn!(
                 audit_id = %run.id,
                 "failed to continue audit coordinator goal: {error}"
@@ -637,3 +666,7 @@ fn content_type_for_artifact(artifact_ref: &str) -> &'static str {
 fn text_content(bytes: &[u8]) -> Option<String> {
     String::from_utf8(bytes.to_vec()).ok()
 }
+
+#[cfg(test)]
+#[path = "audit_processor_tests.rs"]
+mod tests;
