@@ -903,6 +903,21 @@ impl MessageProcessor {
                     .read(params)
                     .await
                     .map(|response| Some(response.into())),
+                ClientRequest::AgentRoleList { params, .. } => self
+                    .config_processor
+                    .agent_role_list(params)
+                    .await
+                    .map(|response| Some(response.into())),
+                ClientRequest::AgentRoleRead { params, .. } => self
+                    .config_processor
+                    .agent_role_read(params)
+                    .await
+                    .map(|response| Some(response.into())),
+                ClientRequest::AgentRoleWrite { params, .. } => self
+                    .config_processor
+                    .agent_role_write(params)
+                    .await
+                    .map(|response| Some(response.into())),
                 ClientRequest::WindowsSandboxReadiness { .. } => self
                     .windows_sandbox_processor
                     .windows_sandbox_readiness()

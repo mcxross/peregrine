@@ -727,6 +727,13 @@ impl App {
                 self.handle_audit_command(app_server, command, command_text)
                     .await;
             }
+            AppEvent::RunAgentCommand {
+                command,
+                command_text,
+            } => {
+                self.handle_agent_command(app_server, tui, command, command_text)
+                    .await;
+            }
             AppEvent::SendAddCreditsNudgeEmail { credit_type } => {
                 if self
                     .chat_widget

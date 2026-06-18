@@ -1,6 +1,8 @@
 use super::*;
 use anyhow::Result;
 use codex_utils_absolute_path::AbsolutePathBuf;
+use peregrine_app_server_protocol::AgentRoleSaveScope;
+use peregrine_app_server_protocol::AgentRoleWriteParams;
 use peregrine_app_server_protocol::AppConfig;
 use peregrine_app_server_protocol::AppToolApproval;
 use peregrine_app_server_protocol::AppsConfig;
@@ -8,9 +10,25 @@ use peregrine_app_server_protocol::AskForApproval;
 use peregrine_config::CloudRequirementsLoader;
 use peregrine_config::FeatureRequirementsToml;
 use peregrine_config::LoaderOverrides;
+use peregrine_config::config_toml::ConfigToml;
+use peregrine_config::config_toml::ProjectConfig;
+use peregrine_types::config_types::TrustLevel;
 use pretty_assertions::assert_eq;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use tempfile::tempdir;
+
+fn role_file_contents(role_name: &str) -> String {
+    format!(
+        r#"name = "{role_name}"
+description = "Security review role used by config-manager tests."
+
+developer_instructions = """
+Review security-relevant behavior and return evidence-backed conclusions.
+"""
+"#
+    )
+}
 
 #[test]
 fn toml_value_to_item_handles_nested_config_tables() {
@@ -598,6 +616,84 @@ async fn write_value_defaults_to_selected_user_config_path() {
         std::fs::read_to_string(tmp.path().join(CONFIG_TOML_FILE)).expect("read main config"),
         "model = \"gpt-main\""
     );
+}
+
+#[tokio::test]
+async fn write_agent_role_edit_creates_global_role() -> Result<()> {
+    let tmp = tempdir().expect("tempdir");
+    let service = ConfigManager::without_managed_config_for_tests(tmp.path().to_path_buf());
+
+    let response = service
+        .write_agent_role_edit(AgentRoleWriteParams {
+            name: "security-reviewer".to_string(),
+            editable_content: role_file_contents("security-reviewer"),
+            scope: AgentRoleSaveScope::Global,
+            cwd: None,
+            expected_version: None,
+            create: true,
+        })
+        .await?;
+
+    let config_path = tmp.path().join(CONFIG_TOML_FILE);
+    let role_path = tmp.path().join("agents/security-reviewer.toml");
+    assert_eq!(response.role.name, "security-reviewer");
+    assert_eq!(response.config_file, role_path.display().to_string());
+    assert_eq!(
+        std::fs::read_to_string(role_path)?,
+        role_file_contents("security-reviewer")
+    );
+    assert!(std::fs::read_to_string(config_path)?.contains(&format!(
+        "config_file = \"{}\"",
+        tmp.path().join("agents/security-reviewer.toml").display()
+    )));
+    Ok(())
+}
+
+#[tokio::test]
+async fn write_agent_role_edit_creates_local_role() -> Result<()> {
+    let tmp = tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let project = tmp.path().join("project");
+    std::fs::create_dir_all(&home)?;
+    std::fs::create_dir_all(&project)?;
+    std::fs::write(
+        home.join(CONFIG_TOML_FILE),
+        toml::to_string(&ConfigToml {
+            projects: Some(HashMap::from([(
+                project.to_string_lossy().to_string(),
+                ProjectConfig {
+                    trust_level: Some(TrustLevel::Trusted),
+                },
+            )])),
+            ..Default::default()
+        })?,
+    )?;
+
+    let service = ConfigManager::without_managed_config_for_tests(home);
+    let response = service
+        .write_agent_role_edit(AgentRoleWriteParams {
+            name: "local-reviewer".to_string(),
+            editable_content: role_file_contents("local-reviewer"),
+            scope: AgentRoleSaveScope::Local,
+            cwd: Some(project.display().to_string()),
+            expected_version: None,
+            create: true,
+        })
+        .await?;
+
+    let config_path = project.join(".peregrine").join(CONFIG_TOML_FILE);
+    let role_path = project.join(".peregrine/agents/local-reviewer.toml");
+    assert_eq!(response.role.name, "local-reviewer");
+    assert_eq!(response.config_file, role_path.display().to_string());
+    assert_eq!(
+        std::fs::read_to_string(role_path)?,
+        role_file_contents("local-reviewer")
+    );
+    assert!(
+        std::fs::read_to_string(config_path)?
+            .contains("config_file = \"./agents/local-reviewer.toml\"")
+    );
+    Ok(())
 }
 
 #[tokio::test]

@@ -6,6 +6,8 @@ mod shell;
 mod terminal;
 
 pub use agent::{AgentExit, run_agent};
+#[cfg(test)]
+pub use cli::is_helper_arg;
 pub use cli::{run_cli_from_args, run_cli_or_helper_from_args, run_security_cli};
 pub use dispatch::{run, run_from_env_args};
 pub use runtime::build_agent_runtime;

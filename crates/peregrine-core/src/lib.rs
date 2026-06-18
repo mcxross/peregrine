@@ -24,6 +24,7 @@ pub use peregrine_thread::PeregrineThreadSettingsOverrides;
 pub use peregrine_thread::ThreadConfigSnapshot;
 pub use session::turn_context::TurnContext;
 mod agent;
+pub mod agent_role_catalog;
 mod attestation;
 mod command_canonicalization;
 pub mod config;

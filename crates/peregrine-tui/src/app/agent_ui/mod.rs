@@ -89,6 +89,7 @@ fn get_default_model_for_oss_provider(provider_id: &str) -> Option<&'static str>
 
 mod additional_dirs;
 
+pub(crate) mod agent_command;
 mod app;
 mod app_backtrack;
 pub(crate) mod app_command;

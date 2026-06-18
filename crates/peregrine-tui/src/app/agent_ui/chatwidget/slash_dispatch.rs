@@ -7,6 +7,8 @@
 
 use super::goal_validation::GoalObjectiveValidationSource;
 use super::*;
+use crate::agent::agent_command::AGENT_USAGE;
+use crate::agent::agent_command::parse_agent_command;
 use crate::agent::app_event::ThreadGoalSetMode;
 use crate::agent::audit_command::AUDIT_USAGE;
 use crate::agent::audit_command::parse_audit_command;
@@ -232,6 +234,33 @@ impl ChatWidget {
                 self.add_info_message(
                     AUDIT_USAGE.to_string(),
                     Some("Examples: /audit --plan .  |  /audit .  |  /audit list".to_string()),
+                );
+                if source == SlashCommandDispatchSource::Live {
+                    self.bottom_pane.drain_pending_submission_state();
+                }
+            }
+        }
+    }
+
+    fn dispatch_agent_command(&mut self, args: &str, source: SlashCommandDispatchSource) {
+        let trimmed = args.trim();
+        match parse_agent_command(trimmed) {
+            Ok(command) => {
+                let command_text = format!("/agent {trimmed}");
+                self.app_event_tx.send(AppEvent::RunAgentCommand {
+                    command,
+                    command_text: command_text.clone(),
+                });
+                self.append_message_history_entry(command_text);
+                if source == SlashCommandDispatchSource::Live {
+                    self.bottom_pane.drain_pending_submission_state();
+                }
+            }
+            Err(message) => {
+                self.add_error_message(message);
+                self.add_info_message(
+                    AGENT_USAGE.to_string(),
+                    Some("Bare /agent still opens the active agent picker.".to_string()),
                 );
                 if source == SlashCommandDispatchSource::Live {
                     self.bottom_pane.drain_pending_submission_state();
@@ -898,6 +927,10 @@ impl ChatWidget {
             }
             SlashCommand::Audit if !trimmed.is_empty() => {
                 self.dispatch_audit_command(trimmed, source);
+                return;
+            }
+            SlashCommand::Agent if !trimmed.is_empty() => {
+                self.dispatch_agent_command(trimmed, source);
                 return;
             }
             SlashCommand::Side | SlashCommand::Btw if !trimmed.is_empty() => {

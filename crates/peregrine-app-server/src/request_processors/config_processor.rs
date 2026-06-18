@@ -13,6 +13,14 @@ use codex_features::canonical_feature_for_key;
 use codex_features::feature_for_key;
 use codex_login::AuthManager;
 use codex_model_provider_info::OPENAI_PROVIDER_ID;
+use peregrine_app_server_protocol::AgentRoleListParams;
+use peregrine_app_server_protocol::AgentRoleListResponse;
+use peregrine_app_server_protocol::AgentRoleReadParams;
+use peregrine_app_server_protocol::AgentRoleReadResponse;
+use peregrine_app_server_protocol::AgentRoleSource;
+use peregrine_app_server_protocol::AgentRoleSummary;
+use peregrine_app_server_protocol::AgentRoleWriteParams;
+use peregrine_app_server_protocol::AgentRoleWriteResponse;
 use peregrine_app_server_protocol::AppListUpdatedNotification;
 use peregrine_app_server_protocol::ClientResponsePayload;
 use peregrine_app_server_protocol::ComputerUseRequirements;
@@ -57,6 +65,8 @@ use peregrine_config::MatcherGroup as CoreMatcherGroup;
 use peregrine_config::ResidencyRequirement as CoreResidencyRequirement;
 use peregrine_config::SandboxModeRequirement as CoreSandboxModeRequirement;
 use peregrine_core::ThreadManager;
+use peregrine_core::agent_role_catalog::AgentRoleCatalogEntry;
+use peregrine_core::agent_role_catalog::AgentRoleCatalogSource as CoreAgentRoleCatalogSource;
 use peregrine_model_provider::ANTHROPIC_API_KEY_ENV_VAR;
 use peregrine_model_provider::ANTHROPIC_PROVIDER_ID;
 use peregrine_model_provider::OLLAMA_DEFAULT_MODEL;
@@ -85,6 +95,22 @@ const SUPPORTED_EXPERIMENTAL_FEATURE_ENABLEMENT: &[&str] = &[
     "tool_suggest",
     "tool_call_mcp_elicitation",
 ];
+
+fn agent_role_summary_from_catalog_entry(entry: AgentRoleCatalogEntry) -> AgentRoleSummary {
+    AgentRoleSummary {
+        name: entry.name,
+        description: entry.description,
+        source: match entry.source {
+            CoreAgentRoleCatalogSource::BuiltIn => AgentRoleSource::BuiltIn,
+            CoreAgentRoleCatalogSource::Configured => AgentRoleSource::Configured,
+        },
+        config_file: entry
+            .config_file
+            .map(|path| path.to_string_lossy().into_owned()),
+        nickname_candidates: entry.nickname_candidates,
+        overrides_built_in: entry.overrides_built_in,
+    }
+}
 
 #[derive(Clone)]
 pub(crate) struct ConfigRequestProcessor {
@@ -138,6 +164,44 @@ impl ConfigRequestProcessor {
                 );
             }
         }
+        Ok(response)
+    }
+
+    pub(crate) async fn agent_role_list(
+        &self,
+        params: AgentRoleListParams,
+    ) -> Result<AgentRoleListResponse, JSONRPCErrorError> {
+        let fallback_cwd = params.cwd.map(PathBuf::from);
+        let config = self.load_latest_config(fallback_cwd).await?;
+        Ok(AgentRoleListResponse {
+            roles: peregrine_core::agent_role_catalog::list_agent_roles(&config)
+                .into_iter()
+                .map(agent_role_summary_from_catalog_entry)
+                .collect(),
+        })
+    }
+
+    pub(crate) async fn agent_role_read(
+        &self,
+        params: AgentRoleReadParams,
+    ) -> Result<AgentRoleReadResponse, JSONRPCErrorError> {
+        self.config_manager
+            .read_agent_role_edit(params)
+            .await
+            .map_err(map_error)
+    }
+
+    pub(crate) async fn agent_role_write(
+        &self,
+        params: AgentRoleWriteParams,
+    ) -> Result<AgentRoleWriteResponse, JSONRPCErrorError> {
+        let response = self
+            .config_manager
+            .write_agent_role_edit(params)
+            .await
+            .map_err(map_error)?;
+        self.handle_config_mutation().await;
+        self.reload_user_config().await;
         Ok(response)
     }
 

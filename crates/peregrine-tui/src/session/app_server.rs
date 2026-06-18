@@ -21,6 +21,12 @@ use peregrine_app_server_client::AppServerEvent;
 use peregrine_app_server_client::AppServerRequestHandle;
 use peregrine_app_server_client::TypedRequestError;
 use peregrine_app_server_protocol::Account;
+use peregrine_app_server_protocol::AgentRoleListParams;
+use peregrine_app_server_protocol::AgentRoleListResponse;
+use peregrine_app_server_protocol::AgentRoleReadParams;
+use peregrine_app_server_protocol::AgentRoleReadResponse;
+use peregrine_app_server_protocol::AgentRoleWriteParams;
+use peregrine_app_server_protocol::AgentRoleWriteResponse;
 use peregrine_app_server_protocol::AskForApproval;
 use peregrine_app_server_protocol::AuditArtifactReadParams;
 use peregrine_app_server_protocol::AuditArtifactReadResponse;
@@ -1175,6 +1181,39 @@ impl AppServerSession {
             .request_typed(ClientRequest::SkillsList { request_id, params })
             .await
             .wrap_err("skills/list failed in TUI")
+    }
+
+    pub(crate) async fn agent_role_list(
+        &mut self,
+        params: AgentRoleListParams,
+    ) -> Result<AgentRoleListResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AgentRoleList { request_id, params })
+            .await
+            .wrap_err("agentRole/list failed in TUI")
+    }
+
+    pub(crate) async fn agent_role_read(
+        &mut self,
+        params: AgentRoleReadParams,
+    ) -> Result<AgentRoleReadResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AgentRoleRead { request_id, params })
+            .await
+            .wrap_err("agentRole/read failed in TUI")
+    }
+
+    pub(crate) async fn agent_role_write(
+        &mut self,
+        params: AgentRoleWriteParams,
+    ) -> Result<AgentRoleWriteResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AgentRoleWrite { request_id, params })
+            .await
+            .wrap_err("agentRole/write failed in TUI")
     }
 
     pub(crate) async fn reload_user_config(&mut self) -> Result<()> {

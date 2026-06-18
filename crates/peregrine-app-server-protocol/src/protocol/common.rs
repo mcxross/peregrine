@@ -1083,6 +1083,21 @@ client_request_definitions! {
         serialization: global_shared_read("config"),
         response: v2::ConfigReadResponse,
     },
+    AgentRoleList => "agentRole/list" {
+        params: v2::AgentRoleListParams,
+        serialization: global_shared_read("config"),
+        response: v2::AgentRoleListResponse,
+    },
+    AgentRoleRead => "agentRole/read" {
+        params: v2::AgentRoleReadParams,
+        serialization: global_shared_read("config"),
+        response: v2::AgentRoleReadResponse,
+    },
+    AgentRoleWrite => "agentRole/write" {
+        params: v2::AgentRoleWriteParams,
+        serialization: global("config"),
+        response: v2::AgentRoleWriteResponse,
+    },
     ExternalAgentConfigDetect => "externalAgentConfig/detect" {
         params: v2::ExternalAgentConfigDetectParams,
         serialization: global("config"),

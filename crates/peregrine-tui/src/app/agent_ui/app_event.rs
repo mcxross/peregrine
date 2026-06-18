@@ -34,6 +34,7 @@ use peregrine_app_server_protocol::ThreadGoalStatus;
 use peregrine_types::ThreadId;
 use peregrine_types::openai_models::ModelPreset;
 
+use crate::agent::agent_command::AgentCommand;
 use crate::agent::app_command::AppCommand;
 use crate::agent::app_server_session::AppServerStartedThread;
 use crate::agent::audit_command::AuditCommand;
@@ -243,6 +244,12 @@ pub(crate) enum AppEvent {
     /// Run an audit lifecycle command through the app-server protocol.
     RunAuditCommand {
         command: AuditCommand,
+        command_text: String,
+    },
+
+    /// Run an agent namespace command through the app-server protocol.
+    RunAgentCommand {
+        command: AgentCommand,
         command_text: String,
     },
 

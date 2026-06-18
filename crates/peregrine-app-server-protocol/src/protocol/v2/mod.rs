@@ -1,6 +1,7 @@
 mod shared;
 
 mod account;
+mod agent_role;
 mod apps;
 mod attestation;
 mod audit;
@@ -28,6 +29,7 @@ mod turn;
 mod windows_sandbox;
 
 pub use account::*;
+pub use agent_role::*;
 pub use apps::*;
 pub use attestation::*;
 pub use audit::*;

@@ -74,14 +74,14 @@ pub(crate) enum ConfigManagerError {
 }
 
 impl ConfigManagerError {
-    fn write(code: ConfigWriteErrorCode, message: impl Into<String>) -> Self {
+    pub(crate) fn write(code: ConfigWriteErrorCode, message: impl Into<String>) -> Self {
         Self::Write {
             code,
             message: message.into(),
         }
     }
 
-    fn io(context: &'static str, source: std::io::Error) -> Self {
+    pub(crate) fn io(context: &'static str, source: std::io::Error) -> Self {
         Self::Io { context, source }
     }
 
@@ -89,11 +89,11 @@ impl ConfigManagerError {
         Self::Json { context, source }
     }
 
-    fn toml(context: &'static str, source: toml::de::Error) -> Self {
+    pub(crate) fn toml(context: &'static str, source: toml::de::Error) -> Self {
         Self::Toml { context, source }
     }
 
-    fn anyhow(context: &'static str, source: anyhow::Error) -> Self {
+    pub(crate) fn anyhow(context: &'static str, source: anyhow::Error) -> Self {
         Self::Anyhow { context, source }
     }
 

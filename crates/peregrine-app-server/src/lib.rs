@@ -81,6 +81,7 @@ mod bespoke_event_handling;
 mod command_exec;
 mod config;
 mod config_manager;
+mod config_manager_agent_roles;
 mod config_manager_service;
 mod connection_rpc_gate;
 mod dynamic_tools;
