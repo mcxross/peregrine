@@ -255,21 +255,24 @@ impl AuditRequestProcessor {
         &self,
         params: AuditListParams,
     ) -> Result<AuditListResponse, JSONRPCErrorError> {
-        if params.cursor.is_some() {
-            return Err(invalid_request(
-                "audit list cursors are not implemented yet",
-            ));
-        }
-        let data = self
+        let offset = match params.cursor {
+            Some(cursor) => cursor
+                .parse::<u32>()
+                .map_err(|_| invalid_request(format!("invalid cursor: {cursor}")))?,
+            None => 0,
+        };
+        let page = self
             .store()?
-            .list_runs(params.limit.unwrap_or(50))
-            .map_err(|error| internal_error(error.to_string()))?
+            .list_runs_page(offset, params.limit.unwrap_or(50))
+            .map_err(|error| internal_error(error.to_string()))?;
+        let data = page
+            .runs
             .iter()
             .map(serialize)
             .collect::<Result<Vec<_>, _>>()?;
         Ok(AuditListResponse {
             data,
-            next_cursor: None,
+            next_cursor: page.next_cursor,
         })
     }
 

@@ -138,10 +138,7 @@ pub(crate) fn parse_audit_command(
             return parse_artifact_command(&tokens);
         }
         "list" => {
-            if tokens.len() == 1 {
-                return Ok(AuditCommand::List);
-            }
-            return Err("/audit list does not accept arguments yet".to_string());
+            return parse_list_command(&tokens);
         }
         "pause" => {
             return parse_lifecycle_command(&tokens, AuditLifecycleAction::Pause);
@@ -325,6 +322,36 @@ fn parse_artifact_command(tokens: &[String]) -> std::result::Result<AuditCommand
     })
 }
 
+fn parse_list_command(tokens: &[String]) -> std::result::Result<AuditCommand, String> {
+    let mut cursor = None;
+    let mut limit = None;
+    let mut index = 1;
+    while index < tokens.len() {
+        let token = &tokens[index];
+        if let Some((flag, value)) = token.split_once('=') {
+            match flag {
+                "--cursor" => cursor = Some(value.to_string()),
+                "--limit" => limit = Some(parse_u32(value, flag)?),
+                _ => return Err(format!("unknown /audit list flag: {flag}")),
+            }
+            index += 1;
+            continue;
+        }
+        match token.as_str() {
+            "--cursor" => cursor = Some(take_value(tokens, &mut index, "--cursor")?),
+            "--limit" => {
+                limit = Some(parse_u32(
+                    &take_value(tokens, &mut index, "--limit")?,
+                    "--limit",
+                )?)
+            }
+            _ => return Err(format!("unknown /audit list flag: {token}")),
+        }
+        index += 1;
+    }
+    Ok(AuditCommand::List { cursor, limit })
+}
+
 fn parse_single_arg_command<F>(
     tokens: &[String],
     arg_name: &str,
@@ -453,7 +480,18 @@ mod tests {
         );
         assert_eq!(
             parse_audit_command("list", Path::new("/tmp")).expect("parse list"),
-            AuditCommand::List
+            AuditCommand::List {
+                cursor: None,
+                limit: None,
+            }
+        );
+        assert_eq!(
+            parse_audit_command("list --cursor 25 --limit=10", Path::new("/tmp"))
+                .expect("parse paged list"),
+            AuditCommand::List {
+                cursor: Some("25".to_string()),
+                limit: Some(10),
+            }
         );
     }
 

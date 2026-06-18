@@ -43,6 +43,13 @@ pub struct AuditStore {
     connection: Mutex<Connection>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+/// A bounded page of persisted audit runs ordered by newest update first.
+pub struct AuditRunListPage {
+    pub runs: Vec<AuditRun>,
+    pub next_cursor: Option<String>,
+}
+
 impl AuditStore {
     pub fn open(peregrine_home: &Path) -> Result<Self, AuditStoreError> {
         let audits_root = peregrine_home.join("audits");
@@ -190,17 +197,42 @@ impl AuditStore {
     }
 
     pub fn list_runs(&self, limit: u32) -> Result<Vec<AuditRun>, AuditStoreError> {
+        self.list_runs_page(/*offset*/ 0, limit)
+            .map(|page| page.runs)
+    }
+
+    pub fn list_runs_page(
+        &self,
+        offset: u32,
+        limit: u32,
+    ) -> Result<AuditRunListPage, AuditStoreError> {
+        let limit = limit.clamp(1, 1_000);
+        let fetch_limit = limit + 1;
         let connection = self.connection()?;
-        let mut statement = connection
-            .prepare("SELECT body_json FROM audit_runs ORDER BY updated_at DESC LIMIT ?1")?;
-        let rows = statement.query_map([i64::from(limit.clamp(1, 1_000))], |row| {
-            row.get::<_, String>(0)
-        })?;
-        rows.map(|row| {
-            let body = row?;
-            serde_json::from_str(&body).map_err(AuditStoreError::from)
-        })
-        .collect()
+        let mut statement = connection.prepare(
+            "
+            SELECT body_json FROM audit_runs
+            ORDER BY updated_at DESC, run_id DESC
+            LIMIT ?1 OFFSET ?2
+            ",
+        )?;
+        let rows = statement
+            .query_map(params![i64::from(fetch_limit), i64::from(offset)], |row| {
+                row.get::<_, String>(0)
+            })?;
+        let mut runs = rows
+            .map(|row| {
+                let body = row?;
+                serde_json::from_str(&body).map_err(AuditStoreError::from)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let next_cursor = if runs.len() > limit as usize {
+            runs.truncate(limit as usize);
+            Some(offset.saturating_add(limit).to_string())
+        } else {
+            None
+        };
+        Ok(AuditRunListPage { runs, next_cursor })
     }
 
     pub fn delete_run(&self, run_id: &str) -> Result<bool, AuditStoreError> {
@@ -362,6 +394,70 @@ mod tests {
         );
         assert!(store.audits_root().join("audit-1/input").is_dir());
         assert_eq!(store.list_runs(10).expect("list runs"), vec![run]);
+    }
+
+    #[test]
+    fn list_runs_paginates_by_updated_at_then_id() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let plan = store.store_plan(plan()).expect("store plan");
+        let mut expected = Vec::new();
+        for (id, updated_at) in [
+            ("audit-a", 10),
+            ("audit-c", 20),
+            ("audit-b", 20),
+            ("audit-d", 5),
+        ] {
+            let run = AuditRun {
+                schema_version: 1,
+                id: id.to_string(),
+                plan_fingerprint: plan.fingerprint.clone(),
+                target: plan.target.clone(),
+                profile: plan.profile.clone(),
+                status: AuditRunStatus::Pending,
+                current_stage: AuditStageId::AuditSession,
+                coordinator_thread_id: None,
+                goal_id: None,
+                adapter_id: None,
+                capabilities: Vec::new(),
+                coverage_gaps: Vec::new(),
+                work_items: Vec::new(),
+                evidence_refs: Vec::new(),
+                artifact_refs: Vec::new(),
+                created_at: updated_at,
+                updated_at,
+                metadata: Metadata::new(),
+            };
+            store.create_run(&run).expect("create run");
+            expected.push(run);
+        }
+        expected.sort_by(|left, right| {
+            right
+                .updated_at
+                .cmp(&left.updated_at)
+                .then_with(|| right.id.cmp(&left.id))
+        });
+
+        let first_page = store
+            .list_runs_page(/*offset*/ 0, /*limit*/ 2)
+            .expect("first page");
+        assert_eq!(
+            first_page,
+            AuditRunListPage {
+                runs: expected[..2].to_vec(),
+                next_cursor: Some("2".to_string()),
+            }
+        );
+        let second_page = store
+            .list_runs_page(/*offset*/ 2, /*limit*/ 2)
+            .expect("second page");
+        assert_eq!(
+            second_page,
+            AuditRunListPage {
+                runs: expected[2..].to_vec(),
+                next_cursor: None,
+            }
+        );
     }
 
     #[test]

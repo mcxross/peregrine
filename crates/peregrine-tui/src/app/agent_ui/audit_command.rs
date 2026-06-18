@@ -17,7 +17,8 @@ pub(crate) const AUDIT_USAGE: &str = concat!(
     "/audit --remote --network <network> --package <package-ref> [--chain <id>] | ",
     "/audit start <fingerprint> | /audit read|status <auditId> | ",
     "/audit report <auditId> [--json] | /audit artifact <auditId> <ref> | ",
-    "/audit list | /audit pause|resume|cancel|delete <auditId>",
+    "/audit list [--cursor <cursor>] [--limit <n>] | ",
+    "/audit pause|resume|cancel|delete <auditId>",
 );
 
 #[derive(Debug, Clone, PartialEq)]
@@ -52,7 +53,10 @@ pub(crate) enum AuditCommand {
         audit_id: String,
         artifact_ref: String,
     },
-    List,
+    List {
+        cursor: Option<String>,
+        limit: Option<u32>,
+    },
     Lifecycle {
         action: AuditLifecycleAction,
         audit_id: String,

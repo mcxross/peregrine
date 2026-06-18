@@ -86,11 +86,11 @@ pub(crate) async fn execute_audit_command(
                 lines: artifact_output_lines(&response),
             })
         }
-        AuditCommand::List => {
+        AuditCommand::List { cursor, limit } => {
             let response = app_server
                 .audit_list(AuditListParams {
-                    cursor: None,
-                    limit: Some(DEFAULT_LIST_LIMIT),
+                    cursor,
+                    limit: Some(limit.unwrap_or(DEFAULT_LIST_LIMIT)),
                 })
                 .await?;
             Ok(AuditCommandOutput {
