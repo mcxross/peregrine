@@ -1,10 +1,14 @@
 use peregrine_security_tools::AuditWorkspace;
-use peregrine_types::{AuditPlan, AuditRun};
+use peregrine_types::{AuditPlan, AuditRun, AuditStageId, AuditStageStatus, FindingCandidate};
 use rusqlite::{Connection, OptionalExtension, params};
 use sha2::{Digest, Sha256};
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{
+        Mutex, OnceLock,
+        mpsc::{self, Receiver, Sender},
+    },
 };
 use thiserror::Error;
 
@@ -15,6 +19,24 @@ pub use operations::WorkUpdate;
 pub use report::FinalizedAuditReport;
 
 const DATABASE_FILE: &str = "audits.sqlite";
+
+static EVENT_BROKERS: OnceLock<Mutex<HashMap<PathBuf, Vec<Sender<AuditStoreEvent>>>>> =
+    OnceLock::new();
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AuditStoreEvent {
+    StageUpdated {
+        audit_id: String,
+        stage: AuditStageId,
+        status: AuditStageStatus,
+        run: AuditRun,
+    },
+    FindingUpdated {
+        audit_id: String,
+        finding: FindingCandidate,
+        report_ref: String,
+    },
+}
 
 pub struct AuditStore {
     audits_root: PathBuf,
@@ -28,6 +50,12 @@ impl AuditStore {
             action: "create audits directory",
             source,
         })?;
+        let audits_root = audits_root
+            .canonicalize()
+            .map_err(|source| AuditStoreError::Io {
+                action: "canonicalize audits directory",
+                source,
+            })?;
         let connection = Connection::open(audits_root.join(DATABASE_FILE))?;
         connection.execute_batch(
             "
@@ -63,6 +91,17 @@ impl AuditStore {
 
     pub fn audits_root(&self) -> &Path {
         &self.audits_root
+    }
+
+    pub fn subscribe_events(&self) -> Result<Receiver<AuditStoreEvent>, AuditStoreError> {
+        let (sender, receiver) = mpsc::channel();
+        let brokers = EVENT_BROKERS.get_or_init(|| Mutex::new(HashMap::new()));
+        let mut brokers = brokers.lock().map_err(|_| AuditStoreError::EventBusLock)?;
+        brokers
+            .entry(self.audits_root.clone())
+            .or_default()
+            .push(sender);
+        Ok(receiver)
     }
 
     pub fn create_workspace(&self, audit_id: &str) -> Result<AuditWorkspace, AuditStoreError> {
@@ -186,6 +225,19 @@ impl AuditStore {
             .lock()
             .map_err(|_| AuditStoreError::DatabaseLock)
     }
+
+    pub(crate) fn publish_event(&self, event: AuditStoreEvent) {
+        let Some(brokers) = EVENT_BROKERS.get() else {
+            return;
+        };
+        let Ok(mut brokers) = brokers.lock() else {
+            return;
+        };
+        let Some(senders) = brokers.get_mut(&self.audits_root) else {
+            return;
+        };
+        senders.retain(|sender| sender.send(event.clone()).is_ok());
+    }
 }
 
 pub fn fingerprint_plan(plan: &AuditPlan) -> Result<String, AuditStoreError> {
@@ -206,6 +258,8 @@ fn status_name(run: &AuditRun) -> Result<String, AuditStoreError> {
 pub enum AuditStoreError {
     #[error("audit database lock is poisoned")]
     DatabaseLock,
+    #[error("audit event bus lock is poisoned")]
+    EventBusLock,
     #[error("audit run `{0}` was not found")]
     RunNotFound(String),
     #[error("audit work item `{0}` was not found")]
@@ -251,9 +305,9 @@ mod tests {
     use peregrine_security_tools::create_audit_work_items;
     use peregrine_types::{
         AuditEvidence, AuditEvidenceAttestation, AuditProfile, AuditReport, AuditRunStatus,
-        AuditStageId, AuditTarget, AuditWorkItemStatus, EvidenceConfidence, FindingCandidate,
-        FindingCandidateSeverity, FindingCandidateStatus, Metadata, SourcePrecision,
-        ValidationPlan, VerificationMethod,
+        AuditStageId, AuditStageStatus, AuditTarget, AuditWorkItemStatus, EvidenceConfidence,
+        FindingCandidate, FindingCandidateSeverity, FindingCandidateStatus, Metadata,
+        SourcePrecision, ValidationPlan, VerificationMethod,
     };
 
     fn plan() -> AuditPlan {
@@ -367,6 +421,7 @@ mod tests {
         let home = tempfile::tempdir().expect("tempdir");
         let store = AuditStore::open(home.path()).expect("open store");
         let plan = store.store_plan(plan()).expect("store plan");
+        let events = store.subscribe_events().expect("subscribe events");
         let stages = vec![AuditStageId::BuildNormalize, AuditStageId::AttackSurface];
         let run = AuditRun {
             schema_version: 1,
@@ -394,6 +449,18 @@ mod tests {
             .claim_work("audit-work", "researcher", None, 11)
             .expect("claim work")
             .expect("pending work");
+        assert_eq!(
+            recv_event(&events),
+            AuditStoreEvent::StageUpdated {
+                audit_id: "audit-work".to_string(),
+                stage: AuditStageId::BuildNormalize,
+                status: AuditStageStatus::Running,
+                run: store
+                    .read_run("audit-work")
+                    .expect("read run")
+                    .expect("run exists"),
+            }
+        );
         let evidence = AuditEvidence {
             id: String::new(),
             audit_run_id: String::new(),
@@ -430,6 +497,15 @@ mod tests {
         assert!(update.stage_changed);
         assert_eq!(update.run.current_stage, AuditStageId::AttackSurface);
         assert_eq!(update.work_item.status, AuditWorkItemStatus::Completed);
+        assert_eq!(
+            recv_event(&events),
+            AuditStoreEvent::StageUpdated {
+                audit_id: "audit-work".to_string(),
+                stage: AuditStageId::BuildNormalize,
+                status: AuditStageStatus::Succeeded,
+                run: update.run,
+            }
+        );
     }
 
     #[test]
@@ -532,6 +608,7 @@ mod tests {
             )
             .expect("record replay evidence");
         let finding = confirmed_finding(vec![static_ref, replay_ref]);
+        let events = store.subscribe_events().expect("subscribe events");
 
         let finalized = store
             .finalize_report(
@@ -555,7 +632,24 @@ mod tests {
         )
         .expect("read report");
         let report: AuditReport = serde_json::from_str(&body).expect("report json");
-        assert_eq!(report.findings, vec![finding]);
+        assert_eq!(report.findings, vec![finding.clone()]);
+        assert_eq!(
+            recv_event(&events),
+            AuditStoreEvent::StageUpdated {
+                audit_id: "audit-report-ok".to_string(),
+                stage: AuditStageId::AuditTrace,
+                status: AuditStageStatus::Succeeded,
+                run: finalized.run,
+            }
+        );
+        assert_eq!(
+            recv_event(&events),
+            AuditStoreEvent::FindingUpdated {
+                audit_id: "audit-report-ok".to_string(),
+                finding,
+                report_ref: "reports/report.json".to_string(),
+            }
+        );
     }
 
     #[test]
@@ -688,5 +782,11 @@ mod tests {
             patch_recommendation: None,
             metadata: Metadata::new(),
         }
+    }
+
+    fn recv_event(receiver: &std::sync::mpsc::Receiver<AuditStoreEvent>) -> AuditStoreEvent {
+        receiver
+            .recv_timeout(std::time::Duration::from_secs(1))
+            .expect("audit event")
     }
 }

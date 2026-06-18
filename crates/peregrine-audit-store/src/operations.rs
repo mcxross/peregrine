@@ -1,6 +1,7 @@
-use super::{AuditStore, AuditStoreError, status_name};
+use super::{AuditStore, AuditStoreError, AuditStoreEvent, status_name};
 use peregrine_types::{
-    AuditEvidence, AuditRun, AuditRunStatus, AuditStageId, AuditWorkItem, AuditWorkItemStatus,
+    AuditEvidence, AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus, AuditWorkItem,
+    AuditWorkItemStatus,
 };
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::Serialize;
@@ -27,7 +28,7 @@ impl AuditStore {
         stage: Option<&AuditStageId>,
         now: i64,
     ) -> Result<Option<(AuditRun, AuditWorkItem)>, AuditStoreError> {
-        self.mutate_run(run_id, |run| {
+        let claimed = self.mutate_run(run_id, |run| {
             ensure_running(run)?;
             let Some(work_item) = run.work_items.iter_mut().find(|item| {
                 item.status == AuditWorkItemStatus::Pending
@@ -42,8 +43,16 @@ impl AuditStore {
             run.current_stage = work_item.stage.clone();
             run.updated_at = now;
             Ok(Some(work_item.clone()))
-        })
-        .map(|(run, work_item)| work_item.map(|work_item| (run, work_item)))
+        })?;
+        if let (run, Some(work_item)) = &claimed {
+            self.publish_event(AuditStoreEvent::StageUpdated {
+                audit_id: run.id.clone(),
+                stage: work_item.stage.clone(),
+                status: AuditStageStatus::Running,
+                run: run.clone(),
+            });
+        }
+        Ok(claimed.1.map(|work_item| (claimed.0, work_item)))
     }
 
     pub fn record_packet(
@@ -187,6 +196,12 @@ impl AuditStore {
             run.updated_at = now;
             Ok((completed, previous_stage))
         })?;
+        self.publish_event(AuditStoreEvent::StageUpdated {
+            audit_id: run.id.clone(),
+            stage: work_item.stage.clone(),
+            status: work_item_stage_status(&work_item.status),
+            run: run.clone(),
+        });
         Ok(WorkUpdate {
             stage_changed: previous_stage != run.current_stage,
             run,
@@ -335,6 +350,17 @@ fn validate_artifact_ref(artifact_ref: &str) -> Result<(), AuditStoreError> {
         return Err(AuditStoreError::InvalidArtifactPath);
     }
     Ok(())
+}
+
+fn work_item_stage_status(status: &AuditWorkItemStatus) -> AuditStageStatus {
+    match status {
+        AuditWorkItemStatus::Pending => AuditStageStatus::Pending,
+        AuditWorkItemStatus::Claimed => AuditStageStatus::Running,
+        AuditWorkItemStatus::Completed => AuditStageStatus::Succeeded,
+        AuditWorkItemStatus::Failed => AuditStageStatus::Failed,
+        AuditWorkItemStatus::Blocked => AuditStageStatus::Blocked,
+        AuditWorkItemStatus::Cancelled => AuditStageStatus::Cancelled,
+    }
 }
 
 fn ensure_running(run: &AuditRun) -> Result<(), AuditStoreError> {

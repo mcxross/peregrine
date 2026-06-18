@@ -5,6 +5,7 @@ use std::sync::OnceLock;
 use std::sync::atomic::AtomicBool;
 
 use crate::attestation::app_server_attestation_provider;
+use crate::audit_events::AuditEventForwarder;
 use crate::config_manager::ConfigManager;
 use crate::connection_rpc_gate::ConnectionRpcGate;
 use crate::error_code::invalid_request;
@@ -167,6 +168,7 @@ pub(crate) struct MessageProcessor {
     skills_watcher: Arc<SkillsWatcher>,
     account_processor: AccountRequestProcessor,
     apps_processor: AppsRequestProcessor,
+    audit_event_forwarder: Mutex<Option<AuditEventForwarder>>,
     audit_processor: AuditRequestProcessor,
     catalog_processor: CatalogRequestProcessor,
     command_exec_processor: CommandExecRequestProcessor,
@@ -432,6 +434,8 @@ impl MessageProcessor {
             state_db.clone(),
             Arc::new(audit_adapters),
         );
+        let audit_event_forwarder =
+            AuditEventForwarder::start(&config.peregrine_home, outgoing.clone());
         let thread_processor = ThreadRequestProcessor::new(
             auth_manager.clone(),
             Arc::clone(&thread_manager),
@@ -506,6 +510,7 @@ impl MessageProcessor {
             skills_watcher,
             account_processor,
             apps_processor,
+            audit_event_forwarder: Mutex::new(audit_event_forwarder),
             audit_processor,
             catalog_processor,
             command_exec_processor,
@@ -717,6 +722,9 @@ impl MessageProcessor {
 
     pub(crate) async fn drain_background_tasks(&self) {
         self.thread_processor.drain_background_tasks().await;
+        if let Some(forwarder) = self.audit_event_forwarder.lock().await.take() {
+            forwarder.shutdown().await;
+        }
     }
 
     pub(crate) async fn cancel_active_login(&self) {

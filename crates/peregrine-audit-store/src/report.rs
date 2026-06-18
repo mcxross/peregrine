@@ -1,8 +1,8 @@
-use super::{AuditStore, AuditStoreError};
+use super::{AuditStore, AuditStoreError, AuditStoreEvent};
 use peregrine_types::{
     AuditEvidence, AuditEvidenceAttestation, AuditReport, AuditRun, AuditRunStatus, AuditStageId,
-    AuditWorkItemStatus, EvidenceConfidence, FindingCandidate, FindingCandidateStatus, Metadata,
-    VerificationMethod,
+    AuditStageStatus, AuditWorkItemStatus, EvidenceConfidence, FindingCandidate,
+    FindingCandidateStatus, Metadata, VerificationMethod,
 };
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -24,6 +24,7 @@ impl AuditStore {
     ) -> Result<FinalizedAuditReport, AuditStoreError> {
         let report_ref = "reports/report.json".to_string();
         let markdown_ref = "reports/report.md".to_string();
+        let finding_events = findings.clone();
         let (run, _) = self.mutate_run(run_id, |run| {
             ensure_report_ready(run)?;
             let evidence = self.read_evidence_index(run_id, run)?;
@@ -61,6 +62,19 @@ impl AuditStore {
                 .insert("terminalReportGeneratedAt".to_string(), json!(now));
             Ok(())
         })?;
+        self.publish_event(AuditStoreEvent::StageUpdated {
+            audit_id: run.id.clone(),
+            stage: run.current_stage.clone(),
+            status: terminal_stage_status(&run.status),
+            run: run.clone(),
+        });
+        for finding in finding_events {
+            self.publish_event(AuditStoreEvent::FindingUpdated {
+                audit_id: run.id.clone(),
+                finding,
+                report_ref: report_ref.clone(),
+            });
+        }
         Ok(FinalizedAuditReport {
             run,
             report_ref,
@@ -234,6 +248,19 @@ fn complete_terminal_work(run: &mut AuditRun, now: i64) {
             work_item.status = AuditWorkItemStatus::Completed;
             work_item.updated_at = now;
         }
+    }
+}
+
+fn terminal_stage_status(status: &AuditRunStatus) -> AuditStageStatus {
+    match status {
+        AuditRunStatus::Completed | AuditRunStatus::CompletedWithGaps => {
+            AuditStageStatus::Succeeded
+        }
+        AuditRunStatus::Failed => AuditStageStatus::Failed,
+        AuditRunStatus::Cancelled => AuditStageStatus::Cancelled,
+        AuditRunStatus::Pending => AuditStageStatus::Pending,
+        AuditRunStatus::Running => AuditStageStatus::Running,
+        AuditRunStatus::Paused => AuditStageStatus::Blocked,
     }
 }
 
