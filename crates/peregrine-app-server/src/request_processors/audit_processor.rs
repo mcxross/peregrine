@@ -202,17 +202,7 @@ impl AuditRequestProcessor {
         store
             .create_run(&run)
             .map_err(|error| internal_error(error.to_string()))?;
-        thread
-            .thread
-            .inject_response_items(vec![ContextualUserFragment::into(
-                AuditRunContextFragment::from_run(&run),
-            )])
-            .await
-            .map_err(|error| internal_error(format!("failed to inject audit context: {error}")))?;
-        let objective = format!(
-            "Complete audit {} using its persisted stage plan; only complete after a terminal audit report exists.",
-            run.id
-        );
+        let objective = audit_coordinator_objective(&run.id);
         let goal_id = self
             .thread_goal_processor
             .create_goal_for_running_thread(
@@ -227,6 +217,13 @@ impl AuditRequestProcessor {
         store
             .update_run(&run)
             .map_err(|error| internal_error(error.to_string()))?;
+        thread
+            .thread
+            .inject_response_items(vec![ContextualUserFragment::into(
+                AuditRunContextFragment::from_run(&run),
+            )])
+            .await
+            .map_err(|error| internal_error(format!("failed to inject audit context: {error}")))?;
         self.emit_updated(&run).await?;
         self.emit_stage_updated(&run, AuditStageStatus::Running)
             .await?;
@@ -240,6 +237,8 @@ impl AuditRequestProcessor {
                 ))
                 .await;
         }
+        self.continue_coordinator_goal(&run, thread.thread.as_ref())
+            .await;
         Ok(AuditStartResponse {
             run: serialize(&run)?,
         })
@@ -412,6 +411,9 @@ impl AuditRequestProcessor {
         config.ephemeral = false;
         let instructions = "You are the coordinator for a persisted autonomous security audit. \
 Never modify immutable audit input. Use only registered tools and isolated audit workspace paths. \
+Start coordinator work by calling audit_read_run, then audit_claim_work. \
+For each claimed item, persist bounded stage packets with audit_record_packet, persist evidence with audit_record_evidence, and close the item with audit_finish_work. \
+Continue through the persisted stage queue until audit_finalize_report succeeds, a budget or usage limit stops the goal, or a visible diagnostic-worthy blocker prevents progress. \
 Treat generated code as a hypothesis until an isolated exploit replay produces evidence. \
 Do not confirm findings without two independent verification classes and successful replay.";
         config.developer_instructions = Some(match config.developer_instructions {
@@ -454,7 +456,28 @@ Do not confirm findings without two independent verification classes and success
         self.emit_updated(&run).await?;
         self.emit_stage_updated(&run, lifecycle_stage_status(&run.status))
             .await?;
+        self.continue_coordinator_goal(&run, thread.as_ref()).await;
         Ok(run)
+    }
+
+    async fn continue_coordinator_goal(&self, run: &AuditRun, thread: &PeregrineThread) {
+        if !matches!(run.status, AuditRunStatus::Running) {
+            return;
+        }
+        if let Err(error) = thread.continue_active_goal_if_idle().await {
+            tracing::warn!(
+                audit_id = %run.id,
+                "failed to continue audit coordinator goal: {error}"
+            );
+            self.outgoing
+                .send_server_notification(ServerNotification::AuditDiagnostic(
+                    AuditDiagnosticNotification {
+                        audit_id: Some(run.id.clone()),
+                        message: format!("audit coordinator continuation failed: {error}"),
+                    },
+                ))
+                .await;
+        }
     }
 
     async fn update_linked_goal(
@@ -586,6 +609,12 @@ fn lifecycle_stage_status(status: &AuditRunStatus) -> AuditStageStatus {
         AuditRunStatus::Failed => AuditStageStatus::Failed,
         AuditRunStatus::Cancelled => AuditStageStatus::Cancelled,
     }
+}
+
+fn audit_coordinator_objective(audit_id: &str) -> String {
+    format!(
+        "Complete audit {audit_id} using its persisted stage plan. Drive the deterministic audit queue through audit_read_run, audit_claim_work, audit_record_packet, audit_record_evidence, audit_finish_work, and audit_finalize_report. Use only ToolRouter-visible native, code-mode, and MCP capabilities. Never treat generated code, model analysis, or knowledge citations as evidence until registered tools persist normalized evidence. Only complete after a terminal audit report exists."
+    )
 }
 
 fn is_recorded_artifact_ref(run: &AuditRun, artifact_ref: &str) -> bool {
