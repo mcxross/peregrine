@@ -311,6 +311,58 @@ mod tests {
     }
 
     #[test]
+    fn read_artifact_stays_inside_audit_workspace() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let plan = store.store_plan(plan()).expect("store plan");
+        let run = AuditRun {
+            schema_version: 1,
+            id: "audit-read".to_string(),
+            plan_fingerprint: plan.fingerprint.clone(),
+            target: plan.target.clone(),
+            profile: plan.profile.clone(),
+            status: AuditRunStatus::Pending,
+            current_stage: AuditStageId::AuditSession,
+            coordinator_thread_id: None,
+            goal_id: None,
+            adapter_id: None,
+            capabilities: Vec::new(),
+            coverage_gaps: Vec::new(),
+            work_items: Vec::new(),
+            evidence_refs: Vec::new(),
+            artifact_refs: Vec::new(),
+            created_at: 10,
+            updated_at: 10,
+            metadata: Metadata::new(),
+        };
+        store.create_run(&run).expect("create run");
+        let body: &[u8] = br#"{"ok":true}"#;
+        std::fs::write(
+            store
+                .audits_root()
+                .join("audit-read")
+                .join("artifacts/example.json"),
+            body,
+        )
+        .expect("write artifact");
+
+        assert_eq!(
+            store
+                .read_artifact("audit-read", "artifacts/example.json")
+                .expect("read artifact"),
+            body
+        );
+        assert!(matches!(
+            store.read_artifact("audit-read", "../audits.sqlite"),
+            Err(AuditStoreError::InvalidArtifactPath)
+        ));
+        assert!(matches!(
+            store.read_artifact("audit-read", "/tmp/example.json"),
+            Err(AuditStoreError::InvalidArtifactPath)
+        ));
+    }
+
+    #[test]
     fn claims_records_and_finishes_work_atomically() {
         let home = tempfile::tempdir().expect("tempdir");
         let store = AuditStore::open(home.path()).expect("open store");

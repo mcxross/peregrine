@@ -175,6 +175,58 @@ pub struct AuditDeleteResponse {
     pub deleted: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase", export_to = "v2/")]
+pub enum AuditReportFormat {
+    Json,
+    Markdown,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct AuditReportReadParams {
+    pub audit_id: String,
+    #[ts(optional = nullable)]
+    pub format: Option<AuditReportFormat>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct AuditReportReadResponse {
+    pub audit_id: String,
+    pub artifact_ref: String,
+    pub format: AuditReportFormat,
+    pub content_type: String,
+    pub data_base64: String,
+    pub text: Option<String>,
+    #[ts(type = "number")]
+    pub size_bytes: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct AuditArtifactReadParams {
+    pub audit_id: String,
+    pub artifact_ref: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct AuditArtifactReadResponse {
+    pub audit_id: String,
+    pub artifact_ref: String,
+    pub content_type: String,
+    pub data_base64: String,
+    pub text: Option<String>,
+    #[ts(type = "number")]
+    pub size_bytes: u64,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export_to = "v2/")]

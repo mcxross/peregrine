@@ -9,15 +9,18 @@ use crate::request_processors::audit_support::profile_from_params;
 use crate::request_processors::audit_support::serialize;
 use crate::request_processors::audit_support::target_from_params;
 use crate::request_processors::audit_support::validate_profile;
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use codex_features::Feature;
 use codex_rollout::StateDbHandle;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use peregrine_app_server_protocol::{
-    AuditCancelResponse, AuditDeleteResponse, AuditDiagnosticNotification, AuditLifecycleParams,
-    AuditListParams, AuditListResponse, AuditPauseResponse, AuditPlanStoreParams,
-    AuditPlanStoreResponse, AuditPreflightParams, AuditPreflightResponse, AuditReadParams,
-    AuditReadResponse, AuditResumeResponse, AuditStartParams, AuditStartResponse,
-    AuditUpdatedNotification, JSONRPCErrorError, ServerNotification,
+    AuditArtifactReadParams, AuditArtifactReadResponse, AuditCancelResponse, AuditDeleteResponse,
+    AuditDiagnosticNotification, AuditLifecycleParams, AuditListParams, AuditListResponse,
+    AuditPauseResponse, AuditPlanStoreParams, AuditPlanStoreResponse, AuditPreflightParams,
+    AuditPreflightResponse, AuditReadParams, AuditReadResponse, AuditReportFormat,
+    AuditReportReadParams, AuditReportReadResponse, AuditResumeResponse, AuditStartParams,
+    AuditStartResponse, AuditUpdatedNotification, JSONRPCErrorError, ServerNotification,
 };
 use peregrine_audit_store::AuditStore;
 use peregrine_core::config::Config;
@@ -316,6 +319,54 @@ impl AuditRequestProcessor {
         Ok(AuditDeleteResponse { deleted })
     }
 
+    pub(crate) async fn read_report(
+        &self,
+        params: AuditReportReadParams,
+    ) -> Result<AuditReportReadResponse, JSONRPCErrorError> {
+        let format = params.format.unwrap_or(AuditReportFormat::Markdown);
+        let artifact_ref = match format {
+            AuditReportFormat::Json => "reports/report.json",
+            AuditReportFormat::Markdown => "reports/report.md",
+        };
+        let run = self.read_run(&params.audit_id)?;
+        if !run.artifact_refs.iter().any(|known| known == artifact_ref) {
+            return Err(invalid_request(
+                "terminal audit report is not available for this run",
+            ));
+        }
+        let artifact = self.read_artifact_bytes(&run.id, artifact_ref)?;
+        Ok(AuditReportReadResponse {
+            audit_id: run.id,
+            artifact_ref: artifact_ref.to_string(),
+            format,
+            content_type: content_type_for_artifact(artifact_ref).to_string(),
+            data_base64: STANDARD.encode(&artifact),
+            text: text_content(&artifact),
+            size_bytes: artifact.len() as u64,
+        })
+    }
+
+    pub(crate) async fn read_artifact(
+        &self,
+        params: AuditArtifactReadParams,
+    ) -> Result<AuditArtifactReadResponse, JSONRPCErrorError> {
+        let run = self.read_run(&params.audit_id)?;
+        if !is_recorded_artifact_ref(&run, &params.artifact_ref) {
+            return Err(invalid_request(
+                "audit artifact ref was not recorded on this run",
+            ));
+        }
+        let artifact = self.read_artifact_bytes(&run.id, &params.artifact_ref)?;
+        Ok(AuditArtifactReadResponse {
+            audit_id: run.id,
+            artifact_ref: params.artifact_ref.clone(),
+            content_type: content_type_for_artifact(&params.artifact_ref).to_string(),
+            data_base64: STANDARD.encode(&artifact),
+            text: text_content(&artifact),
+            size_bytes: artifact.len() as u64,
+        })
+    }
+
     async fn start_coordinator(
         &self,
         workspace: &AuditWorkspace,
@@ -442,6 +493,16 @@ Do not confirm findings without two independent verification classes and success
             .ok_or_else(|| invalid_request("audit run was not found"))
     }
 
+    fn read_artifact_bytes(
+        &self,
+        audit_id: &str,
+        artifact_ref: &str,
+    ) -> Result<Vec<u8>, JSONRPCErrorError> {
+        self.store()?
+            .read_artifact(audit_id, artifact_ref)
+            .map_err(|error| internal_error(error.to_string()))
+    }
+
     fn store(&self) -> Result<&Arc<AuditStore>, JSONRPCErrorError> {
         self.store
             .as_ref()
@@ -457,4 +518,25 @@ Do not confirm findings without two independent verification classes and success
             .await;
         Ok(())
     }
+}
+
+fn is_recorded_artifact_ref(run: &AuditRun, artifact_ref: &str) -> bool {
+    run.artifact_refs.iter().any(|known| known == artifact_ref)
+        || run.evidence_refs.iter().any(|known| known == artifact_ref)
+}
+
+fn content_type_for_artifact(artifact_ref: &str) -> &'static str {
+    if artifact_ref.ends_with(".json") {
+        "application/json"
+    } else if artifact_ref.ends_with(".md") {
+        "text/markdown"
+    } else if artifact_ref.ends_with(".txt") {
+        "text/plain"
+    } else {
+        "application/octet-stream"
+    }
+}
+
+fn text_content(bytes: &[u8]) -> Option<String> {
+    String::from_utf8(bytes.to_vec()).ok()
 }

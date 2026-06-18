@@ -563,6 +563,18 @@ client_request_definitions! {
         serialization: global("audit"),
         response: v2::AuditDeleteResponse,
     },
+    #[experimental("auditReport/read")]
+    AuditReportRead => "auditReport/read" {
+        params: v2::AuditReportReadParams,
+        serialization: global_shared_read("audit"),
+        response: v2::AuditReportReadResponse,
+    },
+    #[experimental("auditArtifact/read")]
+    AuditArtifactRead => "auditArtifact/read" {
+        params: v2::AuditArtifactReadParams,
+        serialization: global_shared_read("audit"),
+        response: v2::AuditArtifactReadResponse,
+    },
     ThreadMetadataUpdate => "thread/metadata/update" {
         params: v2::ThreadMetadataUpdateParams,
         serialization: thread_id(params.thread_id),

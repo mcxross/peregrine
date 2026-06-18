@@ -5,9 +5,9 @@ use peregrine_types::{
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::Serialize;
 use serde_json::{Value, json};
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::io::Write;
-use std::path::Path;
+use std::path::{Component, Path};
 use uuid::Uuid;
 
 const MAX_ARTIFACT_BYTES: usize = 512 * 1024;
@@ -237,6 +237,44 @@ impl AuditStore {
         self.write_bytes(path, value.as_bytes())
     }
 
+    pub fn read_artifact(
+        &self,
+        run_id: &str,
+        artifact_ref: &str,
+    ) -> Result<Vec<u8>, AuditStoreError> {
+        validate_artifact_ref(artifact_ref)?;
+        let audit_root = self
+            .audits_root
+            .join(run_id)
+            .canonicalize()
+            .map_err(|source| AuditStoreError::Io {
+                action: "resolve audit root",
+                source,
+            })?;
+        let artifact_path = audit_root.join(artifact_ref);
+        let canonical_artifact =
+            artifact_path
+                .canonicalize()
+                .map_err(|source| AuditStoreError::Io {
+                    action: "resolve audit artifact",
+                    source,
+                })?;
+        if !canonical_artifact.starts_with(&audit_root) || !canonical_artifact.is_file() {
+            return Err(AuditStoreError::InvalidArtifactPath);
+        }
+        let metadata = fs::metadata(&canonical_artifact).map_err(|source| AuditStoreError::Io {
+            action: "inspect audit artifact",
+            source,
+        })?;
+        if metadata.len() > MAX_ARTIFACT_BYTES as u64 {
+            return Err(AuditStoreError::ArtifactTooLarge(MAX_ARTIFACT_BYTES));
+        }
+        fs::read(&canonical_artifact).map_err(|source| AuditStoreError::Io {
+            action: "read audit artifact",
+            source,
+        })
+    }
+
     fn write_bytes(&self, path: &Path, bytes: &[u8]) -> Result<(), AuditStoreError> {
         if bytes.len() > MAX_ARTIFACT_BYTES {
             return Err(AuditStoreError::ArtifactTooLarge(MAX_ARTIFACT_BYTES));
@@ -284,6 +322,19 @@ impl AuditStore {
             source,
         })
     }
+}
+
+fn validate_artifact_ref(artifact_ref: &str) -> Result<(), AuditStoreError> {
+    let path = Path::new(artifact_ref);
+    if artifact_ref.is_empty()
+        || path.is_absolute()
+        || !path
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+    {
+        return Err(AuditStoreError::InvalidArtifactPath);
+    }
+    Ok(())
 }
 
 fn ensure_running(run: &AuditRun) -> Result<(), AuditStoreError> {

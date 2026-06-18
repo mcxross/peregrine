@@ -22,6 +22,8 @@ use peregrine_app_server_client::AppServerRequestHandle;
 use peregrine_app_server_client::TypedRequestError;
 use peregrine_app_server_protocol::Account;
 use peregrine_app_server_protocol::AskForApproval;
+use peregrine_app_server_protocol::AuditArtifactReadParams;
+use peregrine_app_server_protocol::AuditArtifactReadResponse;
 use peregrine_app_server_protocol::AuditCancelResponse;
 use peregrine_app_server_protocol::AuditDeleteResponse;
 use peregrine_app_server_protocol::AuditLifecycleParams;
@@ -34,6 +36,8 @@ use peregrine_app_server_protocol::AuditPreflightParams;
 use peregrine_app_server_protocol::AuditPreflightResponse;
 use peregrine_app_server_protocol::AuditReadParams;
 use peregrine_app_server_protocol::AuditReadResponse;
+use peregrine_app_server_protocol::AuditReportReadParams;
+use peregrine_app_server_protocol::AuditReportReadResponse;
 use peregrine_app_server_protocol::AuditResumeResponse;
 use peregrine_app_server_protocol::AuditStartParams;
 use peregrine_app_server_protocol::AuditStartResponse;
@@ -999,6 +1003,28 @@ impl AppServerSession {
             .request_typed(ClientRequest::AuditDelete { request_id, params })
             .await
             .wrap_err("audit/delete failed in TUI")
+    }
+
+    pub(crate) async fn audit_report_read(
+        &mut self,
+        params: AuditReportReadParams,
+    ) -> Result<AuditReportReadResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AuditReportRead { request_id, params })
+            .await
+            .wrap_err("auditReport/read failed in TUI")
+    }
+
+    pub(crate) async fn audit_artifact_read(
+        &mut self,
+        params: AuditArtifactReadParams,
+    ) -> Result<AuditArtifactReadResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AuditArtifactRead { request_id, params })
+            .await
+            .wrap_err("auditArtifact/read failed in TUI")
     }
 
     pub(crate) async fn logout_account(&mut self) -> Result<()> {

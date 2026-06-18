@@ -1119,6 +1119,16 @@ impl MessageProcessor {
                     .delete(params)
                     .await
                     .map(|response| Some(response.into())),
+                ClientRequest::AuditReportRead { params, .. } => self
+                    .audit_processor
+                    .read_report(params)
+                    .await
+                    .map(|response| Some(response.into())),
+                ClientRequest::AuditArtifactRead { params, .. } => self
+                    .audit_processor
+                    .read_artifact(params)
+                    .await
+                    .map(|response| Some(response.into())),
                 ClientRequest::ThreadMetadataUpdate { params, .. } => {
                     self.thread_processor.thread_metadata_update(params).await
                 }

@@ -834,6 +834,58 @@ fn fs_read_file_params_round_trip() {
 }
 
 #[test]
+fn audit_report_read_response_round_trips_wire_shape() {
+    let response = AuditReportReadResponse {
+        audit_id: "audit-1".to_string(),
+        artifact_ref: "reports/report.md".to_string(),
+        format: AuditReportFormat::Markdown,
+        content_type: "text/markdown".to_string(),
+        data_base64: "IyBBdWRpdAo=".to_string(),
+        text: Some("# Audit\n".to_string()),
+        size_bytes: 8,
+    };
+
+    let value = serde_json::to_value(&response).expect("serialize auditReport/read response");
+    assert_eq!(
+        value,
+        json!({
+            "auditId": "audit-1",
+            "artifactRef": "reports/report.md",
+            "format": "markdown",
+            "contentType": "text/markdown",
+            "dataBase64": "IyBBdWRpdAo=",
+            "text": "# Audit\n",
+            "sizeBytes": 8,
+        })
+    );
+
+    let decoded = serde_json::from_value::<AuditReportReadResponse>(value)
+        .expect("deserialize auditReport/read response");
+    assert_eq!(decoded, response);
+}
+
+#[test]
+fn audit_artifact_read_params_round_trip() {
+    let params = AuditArtifactReadParams {
+        audit_id: "audit-1".to_string(),
+        artifact_ref: "artifacts/example.json".to_string(),
+    };
+
+    let value = serde_json::to_value(&params).expect("serialize auditArtifact/read params");
+    assert_eq!(
+        value,
+        json!({
+            "auditId": "audit-1",
+            "artifactRef": "artifacts/example.json",
+        })
+    );
+
+    let decoded = serde_json::from_value::<AuditArtifactReadParams>(value)
+        .expect("deserialize auditArtifact/read params");
+    assert_eq!(decoded, params);
+}
+
+#[test]
 fn fs_create_directory_params_round_trip_with_default_recursive() {
     let params = FsCreateDirectoryParams {
         path: absolute_path("tmp/example"),

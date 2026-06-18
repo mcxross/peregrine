@@ -2,7 +2,7 @@ mod executor;
 mod output;
 mod parser;
 
-use peregrine_app_server_protocol::{AuditProfileParams, AuditTargetParams};
+use peregrine_app_server_protocol::{AuditProfileParams, AuditReportFormat, AuditTargetParams};
 use ratatui::text::Line;
 
 pub(crate) use executor::execute_audit_command;
@@ -13,6 +13,7 @@ pub(crate) const AUDIT_USAGE: &str = concat!(
     "Usage: /audit [--plan] <local-path> | ",
     "/audit --remote --network <network> --package <package-ref> [--chain <id>] | ",
     "/audit start <fingerprint> | /audit read|status <auditId> | ",
+    "/audit report <auditId> [--json] | /audit artifact <auditId> <ref> | ",
     "/audit list | /audit pause|resume|cancel|delete <auditId>",
 );
 
@@ -39,6 +40,14 @@ pub(crate) enum AuditCommand {
     },
     Read {
         audit_id: String,
+    },
+    Report {
+        audit_id: String,
+        format: AuditReportFormat,
+    },
+    Artifact {
+        audit_id: String,
+        artifact_ref: String,
     },
     List,
     Lifecycle {

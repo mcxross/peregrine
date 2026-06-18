@@ -1,8 +1,13 @@
-use peregrine_app_server_protocol::AuditListResponse;
+use peregrine_app_server_protocol::{
+    AuditArtifactReadResponse, AuditListResponse, AuditReportReadResponse,
+};
 use peregrine_types::harness::{AuditPlan, AuditRun, AuditRunStatus, AuditTarget};
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 use serde_json::Value as JsonValue;
+
+const MAX_CONTENT_PREVIEW_CHARS: usize = 12_000;
+const MAX_CONTENT_PREVIEW_LINES: usize = 120;
 
 pub(crate) fn audit_update_lines(audit_id: &str, run: &JsonValue) -> Vec<Line<'static>> {
     if let Some(run) = parse_run(run) {
@@ -128,6 +133,71 @@ pub(super) fn delete_output_lines(audit_id: &str, deleted: bool) -> Vec<Line<'st
             ]
             .into(),
         ]
+    }
+}
+
+pub(super) fn report_output_lines(response: &AuditReportReadResponse) -> Vec<Line<'static>> {
+    content_output_lines(
+        "Audit report",
+        &response.audit_id,
+        &response.artifact_ref,
+        &response.content_type,
+        response.size_bytes,
+        response.text.as_deref(),
+    )
+}
+
+pub(super) fn artifact_output_lines(response: &AuditArtifactReadResponse) -> Vec<Line<'static>> {
+    content_output_lines(
+        "Audit artifact",
+        &response.audit_id,
+        &response.artifact_ref,
+        &response.content_type,
+        response.size_bytes,
+        response.text.as_deref(),
+    )
+}
+
+fn content_output_lines(
+    title: &str,
+    audit_id: &str,
+    artifact_ref: &str,
+    content_type: &str,
+    size_bytes: u64,
+    text: Option<&str>,
+) -> Vec<Line<'static>> {
+    let mut lines = vec![title.to_string().green().bold().into()];
+    lines.push(kv_line("auditId", audit_id));
+    lines.push(kv_line("ref", artifact_ref));
+    lines.push(kv_line("content type", content_type));
+    lines.push(kv_line("size", &format!("{size_bytes} bytes")));
+    match text {
+        Some(text) => append_text_preview(&mut lines, text),
+        None => lines.push(
+            "content is not UTF-8; binary payload returned as base64"
+                .yellow()
+                .into(),
+        ),
+    }
+    lines
+}
+
+fn append_text_preview(lines: &mut Vec<Line<'static>>, text: &str) {
+    lines.push("content preview".dim().into());
+    let preview: String = text.chars().take(MAX_CONTENT_PREVIEW_CHARS).collect();
+    let truncated_by_chars = text.chars().nth(MAX_CONTENT_PREVIEW_CHARS).is_some();
+    let total_preview_lines = preview.lines().count();
+    for line in preview.lines().take(MAX_CONTENT_PREVIEW_LINES) {
+        lines.push(line.to_string().into());
+    }
+    if truncated_by_chars || total_preview_lines > MAX_CONTENT_PREVIEW_LINES {
+        lines.push(
+            format!(
+                "truncated preview at {MAX_CONTENT_PREVIEW_LINES} lines or {MAX_CONTENT_PREVIEW_CHARS} chars"
+            )
+            .dim()
+            .into(),
+        );
     }
 }
 

@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use peregrine_app_server_protocol::{AuditProfileParams, AuditTargetParams};
+use peregrine_app_server_protocol::{AuditProfileParams, AuditReportFormat, AuditTargetParams};
 use peregrine_types::harness::AuditProfile;
 
 use super::{AUDIT_USAGE, AuditCommand, AuditLifecycleAction, AuditTargetRequest};
@@ -130,6 +130,12 @@ pub(crate) fn parse_audit_command(
             return parse_single_arg_command(&tokens, "auditId", |audit_id| AuditCommand::Read {
                 audit_id,
             });
+        }
+        "report" => {
+            return parse_report_command(&tokens);
+        }
+        "artifact" => {
+            return parse_artifact_command(&tokens);
         }
         "list" => {
             if tokens.len() == 1 {
@@ -293,6 +299,32 @@ fn parse_lifecycle_command(
     })
 }
 
+fn parse_report_command(tokens: &[String]) -> std::result::Result<AuditCommand, String> {
+    if tokens.len() < 2 {
+        return Err("/audit report requires one auditId".to_string());
+    }
+    let audit_id = tokens[1].clone();
+    let mut format = AuditReportFormat::Markdown;
+    for token in &tokens[2..] {
+        match token.as_str() {
+            "--json" | "json" => format = AuditReportFormat::Json,
+            "--markdown" | "--md" | "markdown" | "md" => format = AuditReportFormat::Markdown,
+            _ => return Err(format!("unknown /audit report flag: {token}")),
+        }
+    }
+    Ok(AuditCommand::Report { audit_id, format })
+}
+
+fn parse_artifact_command(tokens: &[String]) -> std::result::Result<AuditCommand, String> {
+    if tokens.len() != 3 {
+        return Err("/audit artifact requires auditId and artifact ref".to_string());
+    }
+    Ok(AuditCommand::Artifact {
+        audit_id: tokens[1].clone(),
+        artifact_ref: tokens[2].clone(),
+    })
+}
+
 fn parse_single_arg_command<F>(
     tokens: &[String],
     arg_name: &str,
@@ -422,6 +454,25 @@ mod tests {
         assert_eq!(
             parse_audit_command("list", Path::new("/tmp")).expect("parse list"),
             AuditCommand::List
+        );
+    }
+
+    #[test]
+    fn parses_report_and_artifact_commands() {
+        assert_eq!(
+            parse_audit_command("report audit-1 --json", Path::new("/tmp")).expect("parse report"),
+            AuditCommand::Report {
+                audit_id: "audit-1".to_string(),
+                format: AuditReportFormat::Json,
+            }
+        );
+        assert_eq!(
+            parse_audit_command("artifact audit-1 artifacts/example.json", Path::new("/tmp"))
+                .expect("parse artifact"),
+            AuditCommand::Artifact {
+                audit_id: "audit-1".to_string(),
+                artifact_ref: "artifacts/example.json".to_string(),
+            }
         );
     }
 }
