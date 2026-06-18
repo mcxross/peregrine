@@ -203,6 +203,7 @@ mod agent_navigation;
 mod app_server_event_targets;
 mod app_server_events;
 pub(crate) mod app_server_requests;
+mod audit_actions;
 mod background_requests;
 mod config_persistence;
 mod event_dispatch;

@@ -720,6 +720,13 @@ impl App {
             AppEvent::ClearThreadGoal { thread_id } => {
                 self.clear_thread_goal(app_server, thread_id).await;
             }
+            AppEvent::RunAuditCommand {
+                command,
+                command_text,
+            } => {
+                self.handle_audit_command(app_server, command, command_text)
+                    .await;
+            }
             AppEvent::SendAddCreditsNudgeEmail { credit_type } => {
                 if self
                     .chat_widget

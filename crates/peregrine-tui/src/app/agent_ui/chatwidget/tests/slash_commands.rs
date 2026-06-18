@@ -731,6 +731,96 @@ async fn scan_slash_command_includes_inline_scope_in_security_goal() {
 }
 
 #[tokio::test]
+async fn audit_plan_slash_command_emits_audit_event() {
+    let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.set_feature_enabled(Feature::Goals, /*enabled*/ true);
+    let command = "/audit --plan ./move_pkg --tokens 123";
+
+    submit_composer_text(&mut chat, command);
+
+    let event = rx.try_recv().expect("expected audit event");
+    let AppEvent::RunAuditCommand {
+        command: audit_command,
+        command_text,
+    } = event
+    else {
+        panic!("expected RunAuditCommand, got {event:?}");
+    };
+    assert_eq!(command_text, command);
+    let crate::agent::audit_command::AuditCommand::Plan(request) = audit_command else {
+        panic!("expected audit plan command");
+    };
+    let peregrine_app_server_protocol::AuditTargetParams::LocalPackage {
+        chain_id,
+        path,
+        metadata,
+    } = request.target
+    else {
+        panic!("expected local package target");
+    };
+    assert_eq!(chain_id, "sui");
+    assert!(path.ends_with("/./move_pkg"), "{path}");
+    assert_eq!(metadata, None);
+    assert_eq!(
+        request.profile.map(|profile| profile.model_token_budget),
+        Some(123)
+    );
+    assert_no_submit_op(&mut op_rx);
+    assert_eq!(recall_latest_after_clearing(&mut chat), command);
+}
+
+#[tokio::test]
+async fn audit_start_slash_command_emits_audit_event() {
+    let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.set_feature_enabled(Feature::Goals, /*enabled*/ true);
+
+    submit_composer_text(&mut chat, "/audit start fp-123");
+
+    let event = rx.try_recv().expect("expected audit event");
+    let AppEvent::RunAuditCommand {
+        command: audit_command,
+        command_text,
+    } = event
+    else {
+        panic!("expected RunAuditCommand, got {event:?}");
+    };
+    assert_eq!(command_text, "/audit start fp-123");
+    assert_eq!(
+        audit_command,
+        crate::agent::audit_command::AuditCommand::Start {
+            fingerprint: "fp-123".to_string(),
+        }
+    );
+    assert_no_submit_op(&mut op_rx);
+}
+
+#[tokio::test]
+async fn audit_lifecycle_slash_command_emits_audit_event() {
+    let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.set_feature_enabled(Feature::Goals, /*enabled*/ true);
+
+    submit_composer_text(&mut chat, "/audit pause audit-123");
+
+    let event = rx.try_recv().expect("expected audit event");
+    let AppEvent::RunAuditCommand {
+        command: audit_command,
+        command_text,
+    } = event
+    else {
+        panic!("expected RunAuditCommand, got {event:?}");
+    };
+    assert_eq!(command_text, "/audit pause audit-123");
+    assert_eq!(
+        audit_command,
+        crate::agent::audit_command::AuditCommand::Lifecycle {
+            action: crate::agent::audit_command::AuditLifecycleAction::Pause,
+            audit_id: "audit-123".to_string(),
+        }
+    );
+    assert_no_submit_op(&mut op_rx);
+}
+
+#[tokio::test]
 async fn goal_slash_command_uses_plain_text_for_mentions() {
     let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
     chat.set_feature_enabled(Feature::Goals, /*enabled*/ true);

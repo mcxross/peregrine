@@ -51,6 +51,18 @@ impl ChatWidget {
             ServerNotification::ThreadGoalCleared(notification) => {
                 self.on_thread_goal_cleared(notification.thread_id.as_str());
             }
+            ServerNotification::AuditUpdated(notification) => {
+                self.add_plain_history_lines(crate::agent::audit_command::audit_update_lines(
+                    &notification.audit_id,
+                    &notification.run,
+                ));
+            }
+            ServerNotification::AuditDiagnostic(notification) => {
+                self.add_plain_history_lines(crate::agent::audit_command::audit_diagnostic_lines(
+                    notification.audit_id.as_deref(),
+                    &notification.message,
+                ));
+            }
             ServerNotification::ThreadSettingsUpdated(notification) => {
                 self.on_thread_settings_updated(notification);
             }

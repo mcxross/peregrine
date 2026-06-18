@@ -36,6 +36,7 @@ use peregrine_types::openai_models::ModelPreset;
 
 use crate::agent::app_command::AppCommand;
 use crate::agent::app_server_session::AppServerStartedThread;
+use crate::agent::audit_command::AuditCommand;
 use crate::agent::bottom_pane::ApprovalRequest;
 use crate::agent::bottom_pane::StatusLineItem;
 use crate::agent::bottom_pane::TerminalTitleItem;
@@ -238,6 +239,12 @@ pub(crate) enum AppEvent {
     /// Forward a command to the Agent. Using an `AppEvent` for this avoids
     /// bubbling channels through layers of widgets.
     PeregrineOp(AppCommand),
+
+    /// Run an audit lifecycle command through the app-server protocol.
+    RunAuditCommand {
+        command: AuditCommand,
+        command_text: String,
+    },
 
     /// Approve one retry of a recent auto-review denial selected in the TUI.
     ApproveRecentAutoReviewDenial {

@@ -8,6 +8,8 @@
 use super::goal_validation::GoalObjectiveValidationSource;
 use super::*;
 use crate::agent::app_event::ThreadGoalSetMode;
+use crate::agent::audit_command::AUDIT_USAGE;
+use crate::agent::audit_command::parse_audit_command;
 use crate::agent::bottom_pane::prompt_args::parse_slash_name;
 use crate::agent::bottom_pane::slash_commands::BuiltinCommandFlags;
 use crate::agent::bottom_pane::slash_commands::ServiceTierCommand;
@@ -65,7 +67,10 @@ impl ChatWidget {
     /// rule as normal text.
     pub(super) fn handle_slash_command_dispatch(&mut self, cmd: SlashCommand) {
         self.dispatch_command(cmd);
-        if matches!(cmd, SlashCommand::Goal | SlashCommand::Scan) {
+        if matches!(
+            cmd,
+            SlashCommand::Goal | SlashCommand::Scan | SlashCommand::Audit
+        ) {
             self.bottom_pane.drain_pending_submission_state();
         }
         self.bottom_pane.record_pending_slash_command_history();
@@ -197,6 +202,41 @@ impl ChatWidget {
         self.append_message_history_entry(command_text);
         if source == SlashCommandDispatchSource::Live {
             self.bottom_pane.drain_pending_submission_state();
+        }
+    }
+
+    fn dispatch_audit_command(&mut self, args: &str, source: SlashCommandDispatchSource) {
+        if !self.config.features.enabled(Feature::Goals) {
+            return;
+        }
+
+        let cwd = self
+            .current_cwd
+            .clone()
+            .unwrap_or_else(|| self.config.cwd.to_path_buf());
+        let trimmed = args.trim();
+        match parse_audit_command(trimmed, &cwd) {
+            Ok(command) => {
+                let command_text = format!("/audit {trimmed}");
+                self.app_event_tx.send(AppEvent::RunAuditCommand {
+                    command,
+                    command_text: command_text.clone(),
+                });
+                self.append_message_history_entry(command_text);
+                if source == SlashCommandDispatchSource::Live {
+                    self.bottom_pane.drain_pending_submission_state();
+                }
+            }
+            Err(message) => {
+                self.add_error_message(message);
+                self.add_info_message(
+                    AUDIT_USAGE.to_string(),
+                    Some("Examples: /audit --plan .  |  /audit .  |  /audit list".to_string()),
+                );
+                if source == SlashCommandDispatchSource::Live {
+                    self.bottom_pane.drain_pending_submission_state();
+                }
+            }
         }
     }
 
@@ -334,6 +374,12 @@ impl ChatWidget {
             }
             SlashCommand::Scan => {
                 self.dispatch_security_scan_goal(None, SlashCommandDispatchSource::Live);
+            }
+            SlashCommand::Audit => {
+                self.add_info_message(
+                    AUDIT_USAGE.to_string(),
+                    Some("Examples: /audit --plan .  |  /audit .  |  /audit list".to_string()),
+                );
             }
             SlashCommand::Side | SlashCommand::Btw => {
                 self.request_empty_side_conversation(cmd);
@@ -850,6 +896,10 @@ impl ChatWidget {
                 self.dispatch_security_scan_goal(Some(trimmed), source);
                 return;
             }
+            SlashCommand::Audit if !trimmed.is_empty() => {
+                self.dispatch_audit_command(trimmed, source);
+                return;
+            }
             SlashCommand::Side | SlashCommand::Btw if !trimmed.is_empty() => {
                 let Some(parent_thread_id) = self.thread_id else {
                     let command = cmd.command();
@@ -1063,6 +1113,7 @@ impl ChatWidget {
             | SlashCommand::Plan
             | SlashCommand::Goal
             | SlashCommand::Scan
+            | SlashCommand::Audit
             | SlashCommand::Side
             | SlashCommand::Btw
             | SlashCommand::Keymap

@@ -22,6 +22,21 @@ use peregrine_app_server_client::AppServerRequestHandle;
 use peregrine_app_server_client::TypedRequestError;
 use peregrine_app_server_protocol::Account;
 use peregrine_app_server_protocol::AskForApproval;
+use peregrine_app_server_protocol::AuditCancelResponse;
+use peregrine_app_server_protocol::AuditDeleteResponse;
+use peregrine_app_server_protocol::AuditLifecycleParams;
+use peregrine_app_server_protocol::AuditListParams;
+use peregrine_app_server_protocol::AuditListResponse;
+use peregrine_app_server_protocol::AuditPauseResponse;
+use peregrine_app_server_protocol::AuditPlanStoreParams;
+use peregrine_app_server_protocol::AuditPlanStoreResponse;
+use peregrine_app_server_protocol::AuditPreflightParams;
+use peregrine_app_server_protocol::AuditPreflightResponse;
+use peregrine_app_server_protocol::AuditReadParams;
+use peregrine_app_server_protocol::AuditReadResponse;
+use peregrine_app_server_protocol::AuditResumeResponse;
+use peregrine_app_server_protocol::AuditStartParams;
+use peregrine_app_server_protocol::AuditStartResponse;
 use peregrine_app_server_protocol::AuthMode;
 use peregrine_app_server_protocol::ClientRequest;
 use peregrine_app_server_protocol::ConfigBatchWriteParams;
@@ -882,6 +897,108 @@ impl AppServerSession {
             })
             .await
             .wrap_err("thread/goal/clear failed in TUI")
+    }
+
+    pub(crate) async fn audit_preflight(
+        &mut self,
+        params: AuditPreflightParams,
+    ) -> Result<AuditPreflightResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AuditPreflight { request_id, params })
+            .await
+            .wrap_err("audit/preflight failed in TUI")
+    }
+
+    pub(crate) async fn audit_plan_store(
+        &mut self,
+        plan: serde_json::Value,
+    ) -> Result<AuditPlanStoreResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AuditPlanStore {
+                request_id,
+                params: AuditPlanStoreParams { plan },
+            })
+            .await
+            .wrap_err("auditPlan/store failed in TUI")
+    }
+
+    pub(crate) async fn audit_start(
+        &mut self,
+        params: AuditStartParams,
+    ) -> Result<AuditStartResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AuditStart { request_id, params })
+            .await
+            .wrap_err("audit/start failed in TUI")
+    }
+
+    pub(crate) async fn audit_read(
+        &mut self,
+        params: AuditReadParams,
+    ) -> Result<AuditReadResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AuditRead { request_id, params })
+            .await
+            .wrap_err("audit/read failed in TUI")
+    }
+
+    pub(crate) async fn audit_list(
+        &mut self,
+        params: AuditListParams,
+    ) -> Result<AuditListResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AuditList { request_id, params })
+            .await
+            .wrap_err("audit/list failed in TUI")
+    }
+
+    pub(crate) async fn audit_pause(
+        &mut self,
+        params: AuditLifecycleParams,
+    ) -> Result<AuditPauseResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AuditPause { request_id, params })
+            .await
+            .wrap_err("audit/pause failed in TUI")
+    }
+
+    pub(crate) async fn audit_resume(
+        &mut self,
+        params: AuditLifecycleParams,
+    ) -> Result<AuditResumeResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AuditResume { request_id, params })
+            .await
+            .wrap_err("audit/resume failed in TUI")
+    }
+
+    pub(crate) async fn audit_cancel(
+        &mut self,
+        params: AuditLifecycleParams,
+    ) -> Result<AuditCancelResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AuditCancel { request_id, params })
+            .await
+            .wrap_err("audit/cancel failed in TUI")
+    }
+
+    pub(crate) async fn audit_delete(
+        &mut self,
+        params: AuditLifecycleParams,
+    ) -> Result<AuditDeleteResponse> {
+        let request_id = self.next_request_id();
+        self.client
+            .request_typed(ClientRequest::AuditDelete { request_id, params })
+            .await
+            .wrap_err("audit/delete failed in TUI")
     }
 
     pub(crate) async fn logout_account(&mut self) -> Result<()> {

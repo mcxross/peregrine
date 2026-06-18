@@ -38,6 +38,7 @@ pub enum SlashCommand {
     Plan,
     Goal,
     Scan,
+    Audit,
     Agent,
     Side,
     Btw,
@@ -117,6 +118,7 @@ impl SlashCommand {
             SlashCommand::Plan => "switch to Plan mode",
             SlashCommand::Goal => "set or view the goal for a long-running task",
             SlashCommand::Scan => "start a Sui Move security scan goal",
+            SlashCommand::Audit => "manage autonomous security audit runs",
             SlashCommand::Agent | SlashCommand::MultiAgents => "switch the active agent thread",
             SlashCommand::Side | SlashCommand::Btw => {
                 "start a side conversation in an ephemeral fork"
@@ -154,6 +156,7 @@ impl SlashCommand {
                 | SlashCommand::Plan
                 | SlashCommand::Goal
                 | SlashCommand::Scan
+                | SlashCommand::Audit
                 | SlashCommand::Ide
                 | SlashCommand::Keymap
                 | SlashCommand::Mcp
@@ -216,6 +219,7 @@ impl SlashCommand {
             | SlashCommand::Stop
             | SlashCommand::Goal
             | SlashCommand::Scan
+            | SlashCommand::Audit
             | SlashCommand::Mcp
             | SlashCommand::Apps
             | SlashCommand::Plugins

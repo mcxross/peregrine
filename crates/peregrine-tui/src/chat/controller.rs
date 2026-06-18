@@ -28,7 +28,7 @@ use peregrine_config::{CloudRequirementsLoader, LoaderOverrides};
 use peregrine_types::ThreadId;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Position, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use tokio::sync::broadcast;
@@ -45,6 +45,7 @@ use crate::agent::app_server_session::{
     AppServerBootstrap, AppServerSession, AppServerStartedThread, TurnPermissionsOverride,
     app_server_rate_limit_snapshots,
 };
+use crate::agent::audit_command::{AuditCommand, AuditCommandOutput, execute_audit_command};
 use crate::agent::bottom_pane::popup_consts::standard_popup_hint_line;
 use crate::agent::bottom_pane::{SelectionAction, SelectionItem, SelectionViewParams};
 use crate::agent::chatwidget::{
@@ -195,6 +196,10 @@ enum WorkerCommand {
     ClearGoal {
         thread_id: ThreadId,
     },
+    RunAuditCommand {
+        command: AuditCommand,
+        command_text: String,
+    },
     SetSkillEnabled {
         path: AbsolutePathBuf,
         enabled: bool,
@@ -273,6 +278,10 @@ enum WorkerEvent {
     GoalCleared {
         thread_id: ThreadId,
         result: std::result::Result<ThreadGoalClearResponse, String>,
+    },
+    AuditCommandFinished {
+        command_text: String,
+        result: std::result::Result<AuditCommandOutput, String>,
     },
     SkillEnabledSet {
         path: AbsolutePathBuf,
@@ -1175,6 +1184,13 @@ impl ChatController {
                 }
                 self.drain_app_events()
             }
+            WorkerEvent::AuditCommandFinished {
+                command_text,
+                result,
+            } => {
+                self.apply_audit_command_result(command_text, result);
+                self.drain_app_events()
+            }
             WorkerEvent::SkillEnabledSet {
                 path,
                 enabled,
@@ -1447,6 +1463,10 @@ impl ChatController {
                 self.set_thread_goal_status(thread_id, status)
             }
             AppEvent::ClearThreadGoal { thread_id } => self.clear_thread_goal(thread_id),
+            AppEvent::RunAuditCommand {
+                command,
+                command_text,
+            } => self.run_audit_command(command, command_text),
             AppEvent::OpenSkillsList => {
                 if let Some(chat) = self.chat_widget.as_mut() {
                     chat.open_skills_list();
@@ -1605,6 +1625,17 @@ impl ChatController {
         ChatAction::None
     }
 
+    fn run_audit_command(&mut self, command: AuditCommand, command_text: String) -> ChatAction {
+        if !self.send_worker(WorkerCommand::RunAuditCommand {
+            command,
+            command_text,
+        }) && let Some(chat) = self.chat_widget.as_mut()
+        {
+            chat.add_error_message("Audit command failed: app-server unavailable".to_string());
+        }
+        ChatAction::None
+    }
+
     fn show_replace_thread_goal_confirmation(&mut self, thread_id: ThreadId, objective: String) {
         let replace_objective = objective.clone();
         let replace_actions: Vec<SelectionAction> = vec![Box::new(move |tx| {
@@ -1746,6 +1777,21 @@ impl ChatController {
                     chat.add_error_message(thread_goal_error_message("clear", &message));
                 }
             }
+        }
+    }
+
+    fn apply_audit_command_result(
+        &mut self,
+        command_text: String,
+        result: std::result::Result<AuditCommandOutput, String>,
+    ) {
+        let Some(chat) = self.chat_widget.as_mut() else {
+            return;
+        };
+        chat.add_plain_history_lines(vec![command_text.magenta().into()]);
+        match result {
+            Ok(output) => chat.add_plain_history_lines(output.lines),
+            Err(message) => chat.add_error_message(format!("Audit command failed: {message}")),
         }
     }
 
@@ -2266,6 +2312,18 @@ async fn handle_worker_command(
                 .await
                 .map_err(report_string);
             let _ = event_tx.send(WorkerEvent::GoalCleared { thread_id, result });
+        }
+        WorkerCommand::RunAuditCommand {
+            command,
+            command_text,
+        } => {
+            let result = execute_audit_command(app_server, command)
+                .await
+                .map_err(report_string);
+            let _ = event_tx.send(WorkerEvent::AuditCommandFinished {
+                command_text,
+                result,
+            });
         }
         WorkerCommand::SetSkillEnabled { path, enabled } => {
             let request_handle = app_server.request_handle();

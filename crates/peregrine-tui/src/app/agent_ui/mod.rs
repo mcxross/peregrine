@@ -100,6 +100,7 @@ mod approval_events;
 mod ascii_animation;
 #[cfg(not(target_os = "linux"))]
 mod audio_device;
+pub(crate) mod audit_command;
 #[cfg(target_os = "linux")]
 #[allow(dead_code)]
 mod audio_device {
