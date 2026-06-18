@@ -1566,6 +1566,10 @@ server_notification_definitions! {
     ThreadGoalCleared => "thread/goal/cleared" (v2::ThreadGoalClearedNotification),
     #[experimental("audit/updated")]
     AuditUpdated => "audit/updated" (v2::AuditUpdatedNotification),
+    #[experimental("audit/stage/updated")]
+    AuditStageUpdated => "audit/stage/updated" (v2::AuditStageUpdatedNotification),
+    #[experimental("audit/finding/updated")]
+    AuditFindingUpdated => "audit/finding/updated" (v2::AuditFindingUpdatedNotification),
     #[experimental("audit/diagnostic")]
     AuditDiagnostic => "audit/diagnostic" (v2::AuditDiagnosticNotification),
     #[experimental("thread/settings/updated")]

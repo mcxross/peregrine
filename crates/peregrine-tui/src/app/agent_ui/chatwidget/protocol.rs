@@ -57,6 +57,25 @@ impl ChatWidget {
                     &notification.run,
                 ));
             }
+            ServerNotification::AuditStageUpdated(notification) => {
+                self.add_plain_history_lines(
+                    crate::agent::audit_command::audit_stage_update_lines(
+                        &notification.audit_id,
+                        &notification.stage,
+                        &notification.status,
+                    ),
+                );
+            }
+            ServerNotification::AuditFindingUpdated(notification) => {
+                self.add_plain_history_lines(
+                    crate::agent::audit_command::audit_finding_update_lines(
+                        &notification.audit_id,
+                        &notification.finding_id,
+                        &notification.finding,
+                        notification.report_ref.as_deref(),
+                    ),
+                );
+            }
             ServerNotification::AuditDiagnostic(notification) => {
                 self.add_plain_history_lines(crate::agent::audit_command::audit_diagnostic_lines(
                     notification.audit_id.as_deref(),

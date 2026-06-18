@@ -19,8 +19,9 @@ use peregrine_app_server_protocol::{
     AuditDiagnosticNotification, AuditLifecycleParams, AuditListParams, AuditListResponse,
     AuditPauseResponse, AuditPlanStoreParams, AuditPlanStoreResponse, AuditPreflightParams,
     AuditPreflightResponse, AuditReadParams, AuditReadResponse, AuditReportFormat,
-    AuditReportReadParams, AuditReportReadResponse, AuditResumeResponse, AuditStartParams,
-    AuditStartResponse, AuditUpdatedNotification, JSONRPCErrorError, ServerNotification,
+    AuditReportReadParams, AuditReportReadResponse, AuditResumeResponse,
+    AuditStageUpdatedNotification, AuditStartParams, AuditStartResponse, AuditUpdatedNotification,
+    JSONRPCErrorError, ServerNotification,
 };
 use peregrine_audit_store::AuditStore;
 use peregrine_core::config::Config;
@@ -30,7 +31,9 @@ use peregrine_core::{ExternalGoalPreviousStatus, ExternalGoalSet, PeregrineThrea
 use peregrine_security_tools::{
     AuditAdapterRegistry, AuditWorkspace, create_audit_work_items, default_audit_stages,
 };
-use peregrine_types::{AuditPlan, AuditProfile, AuditRun, AuditRunStatus, AuditStageId, Metadata};
+use peregrine_types::{
+    AuditPlan, AuditProfile, AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus, Metadata,
+};
 use std::sync::Arc;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -221,6 +224,8 @@ impl AuditRequestProcessor {
             .update_run(&run)
             .map_err(|error| internal_error(error.to_string()))?;
         self.emit_updated(&run).await?;
+        self.emit_stage_updated(&run, AuditStageStatus::Running)
+            .await?;
         for gap in &run.coverage_gaps {
             self.outgoing
                 .send_server_notification(ServerNotification::AuditDiagnostic(
@@ -435,6 +440,8 @@ Do not confirm findings without two independent verification classes and success
             .update_run(&run)
             .map_err(|error| internal_error(error.to_string()))?;
         self.emit_updated(&run).await?;
+        self.emit_stage_updated(&run, lifecycle_stage_status(&run.status))
+            .await?;
         Ok(run)
     }
 
@@ -519,6 +526,37 @@ Do not confirm findings without two independent verification classes and success
             }))
             .await;
         Ok(())
+    }
+
+    async fn emit_stage_updated(
+        &self,
+        run: &AuditRun,
+        status: AuditStageStatus,
+    ) -> Result<(), JSONRPCErrorError> {
+        self.outgoing
+            .send_server_notification(ServerNotification::AuditStageUpdated(
+                AuditStageUpdatedNotification {
+                    audit_id: run.id.clone(),
+                    stage: serialize(&run.current_stage)?,
+                    status: serialize(&status)?,
+                    run: serialize(run)?,
+                },
+            ))
+            .await;
+        Ok(())
+    }
+}
+
+fn lifecycle_stage_status(status: &AuditRunStatus) -> AuditStageStatus {
+    match status {
+        AuditRunStatus::Pending => AuditStageStatus::Pending,
+        AuditRunStatus::Running => AuditStageStatus::Running,
+        AuditRunStatus::Paused => AuditStageStatus::Blocked,
+        AuditRunStatus::Completed | AuditRunStatus::CompletedWithGaps => {
+            AuditStageStatus::Succeeded
+        }
+        AuditRunStatus::Failed => AuditStageStatus::Failed,
+        AuditRunStatus::Cancelled => AuditStageStatus::Cancelled,
     }
 }
 

@@ -6,7 +6,10 @@ use peregrine_app_server_protocol::{AuditProfileParams, AuditReportFormat, Audit
 use ratatui::text::Line;
 
 pub(crate) use executor::execute_audit_command;
-pub(crate) use output::{audit_diagnostic_lines, audit_update_lines};
+pub(crate) use output::{
+    audit_diagnostic_lines, audit_finding_update_lines, audit_stage_update_lines,
+    audit_update_lines,
+};
 pub(crate) use parser::parse_audit_command;
 
 pub(crate) const AUDIT_USAGE: &str = concat!(

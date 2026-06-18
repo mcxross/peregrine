@@ -236,6 +236,30 @@ pub struct AuditUpdatedNotification {
     pub run: JsonValue,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct AuditStageUpdatedNotification {
+    pub audit_id: String,
+    #[ts(type = "unknown")]
+    pub stage: JsonValue,
+    #[ts(type = "unknown")]
+    pub status: JsonValue,
+    #[ts(type = "unknown")]
+    pub run: JsonValue,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct AuditFindingUpdatedNotification {
+    pub audit_id: String,
+    pub finding_id: String,
+    #[ts(type = "unknown")]
+    pub finding: JsonValue,
+    pub report_ref: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export_to = "v2/")]

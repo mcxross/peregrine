@@ -146,6 +146,8 @@ pub(super) fn server_notification_thread_target(
         ServerNotification::GuardianWarning(notification) => Some(notification.thread_id.as_str()),
         ServerNotification::SkillsChanged(_)
         | ServerNotification::AuditUpdated(_)
+        | ServerNotification::AuditStageUpdated(_)
+        | ServerNotification::AuditFindingUpdated(_)
         | ServerNotification::AuditDiagnostic(_)
         | ServerNotification::McpServerStatusUpdated(_)
         | ServerNotification::McpServerOauthLoginCompleted(_)

@@ -41,6 +41,48 @@ pub(crate) fn audit_diagnostic_lines(audit_id: Option<&str>, message: &str) -> V
     vec![vec![prefix.yellow(), message.to_string().into()].into()]
 }
 
+pub(crate) fn audit_stage_update_lines(
+    audit_id: &str,
+    stage: &JsonValue,
+    status: &JsonValue,
+) -> Vec<Line<'static>> {
+    vec![
+        vec![
+            "audit ".cyan(),
+            audit_id.to_string().cyan(),
+            " stage ".into(),
+            json_label(stage).dim(),
+            " is ".into(),
+            json_label(status).green(),
+        ]
+        .into(),
+    ]
+}
+
+pub(crate) fn audit_finding_update_lines(
+    audit_id: &str,
+    finding_id: &str,
+    finding: &JsonValue,
+    report_ref: Option<&str>,
+) -> Vec<Line<'static>> {
+    let title = finding
+        .get("title")
+        .and_then(JsonValue::as_str)
+        .unwrap_or(finding_id);
+    let mut line = vec![
+        "audit ".cyan(),
+        audit_id.to_string().cyan(),
+        " finding ".into(),
+        finding_id.to_string().cyan(),
+        " updated: ".into(),
+        title.to_string().into(),
+    ];
+    if let Some(report_ref) = report_ref {
+        line.extend([" from ".dim(), report_ref.to_string().dim()]);
+    }
+    vec![line.into()]
+}
+
 pub(super) fn plan_output_lines(
     fingerprint: &str,
     plan_value: &JsonValue,
@@ -199,6 +241,13 @@ fn append_text_preview(lines: &mut Vec<Line<'static>>, text: &str) {
             .into(),
         );
     }
+}
+
+fn json_label(value: &JsonValue) -> String {
+    value
+        .as_str()
+        .map(str::to_string)
+        .unwrap_or_else(|| value.to_string())
 }
 
 fn run_summary_lines(run: &AuditRun) -> Vec<Line<'static>> {
