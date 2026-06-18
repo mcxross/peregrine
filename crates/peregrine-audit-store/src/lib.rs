@@ -9,8 +9,10 @@ use std::{
 use thiserror::Error;
 
 mod operations;
+mod report;
 
 pub use operations::WorkUpdate;
+pub use report::FinalizedAuditReport;
 
 const DATABASE_FILE: &str = "audits.sqlite";
 
@@ -221,6 +223,8 @@ pub enum AuditStoreError {
     InvalidRunState { run_id: String, status: String },
     #[error("audit work item cannot transition to {0}")]
     InvalidWorkStatus(String),
+    #[error("invalid audit report: {0}")]
+    InvalidReport(String),
     #[error("audit artifact exceeds the {0}-byte storage limit")]
     ArtifactTooLarge(usize),
     #[error("audit artifact path is outside its managed audit directory")]
@@ -246,8 +250,10 @@ mod tests {
     use super::*;
     use peregrine_security_tools::create_audit_work_items;
     use peregrine_types::{
-        AuditEvidence, AuditEvidenceAttestation, AuditProfile, AuditRunStatus, AuditStageId,
-        AuditTarget, AuditWorkItemStatus, Metadata, SourcePrecision, VerificationMethod,
+        AuditEvidence, AuditEvidenceAttestation, AuditProfile, AuditReport, AuditRunStatus,
+        AuditStageId, AuditTarget, AuditWorkItemStatus, EvidenceConfidence, FindingCandidate,
+        FindingCandidateSeverity, FindingCandidateStatus, Metadata, SourcePrecision,
+        ValidationPlan, VerificationMethod,
     };
 
     fn plan() -> AuditPlan {
@@ -375,6 +381,175 @@ mod tests {
     }
 
     #[test]
+    fn router_evidence_attaches_to_current_claimed_work() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let plan = store.store_plan(plan()).expect("store plan");
+        let stages = vec![AuditStageId::BuildNormalize];
+        let run = AuditRun {
+            schema_version: 1,
+            id: "audit-router".to_string(),
+            plan_fingerprint: plan.fingerprint,
+            target: plan.target,
+            profile: plan.profile,
+            status: AuditRunStatus::Running,
+            current_stage: stages[0].clone(),
+            coordinator_thread_id: None,
+            goal_id: None,
+            adapter_id: Some("adapter/sui".to_string()),
+            capabilities: Vec::new(),
+            coverage_gaps: Vec::new(),
+            work_items: create_audit_work_items("audit-router", &stages, 10),
+            evidence_refs: Vec::new(),
+            artifact_refs: Vec::new(),
+            created_at: 10,
+            updated_at: 10,
+            metadata: Metadata::new(),
+        };
+        store.create_run(&run).expect("create run");
+        store
+            .claim_work("audit-router", "router", None, 11)
+            .expect("claim work");
+        let evidence = AuditEvidence {
+            id: String::new(),
+            audit_run_id: String::new(),
+            work_item_id: None,
+            verification_method: VerificationMethod::StaticAnalysis,
+            provider_id: "mcp__sui".to_string(),
+            adapter_id: None,
+            tool_name: "mcp__sui__static_analysis".to_string(),
+            tool_version: None,
+            input_hash: "sha256:abc".to_string(),
+            source_precision: SourcePrecision::Summary,
+            attestation: AuditEvidenceAttestation::RouterCaptured,
+            summary: "captured".to_string(),
+            observation: "ok".to_string(),
+            execution_trace_ref: None,
+            artifact_refs: Vec::new(),
+            created_at: 12,
+            metadata: Metadata::new(),
+        };
+
+        let (run, evidence_ref) = store
+            .record_router_evidence_for_current_work("audit-router", evidence)
+            .expect("record router evidence")
+            .expect("claimed work");
+
+        assert_eq!(run.evidence_refs, vec![evidence_ref.clone()]);
+        assert_eq!(run.work_items[0].evidence_refs, vec![evidence_ref.clone()]);
+        let body =
+            std::fs::read_to_string(store.audits_root().join("audit-router").join(evidence_ref))
+                .expect("read evidence");
+        let stored: AuditEvidence = serde_json::from_str(&body).expect("evidence json");
+        assert_eq!(
+            stored.work_item_id,
+            Some("audit-router:stage:0".to_string())
+        );
+        assert_eq!(stored.adapter_id, Some("adapter/sui".to_string()));
+        assert_eq!(stored.attestation, AuditEvidenceAttestation::RouterCaptured);
+    }
+
+    #[test]
+    fn finalized_report_accepts_confirmed_finding_with_independent_replay() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let work_item_id = create_report_run(&store, "audit-report-ok");
+        store
+            .claim_work("audit-report-ok", "judge", None, 11)
+            .expect("claim work");
+        let (_, static_ref) = store
+            .record_evidence(
+                "audit-report-ok",
+                evidence(
+                    &work_item_id,
+                    VerificationMethod::StaticAnalysis,
+                    AuditEvidenceAttestation::RouterCaptured,
+                    None,
+                ),
+            )
+            .expect("record static evidence");
+        let (_, replay_ref) = store
+            .record_evidence(
+                "audit-report-ok",
+                evidence(
+                    &work_item_id,
+                    VerificationMethod::ExploitReplay,
+                    AuditEvidenceAttestation::AdapterReplay,
+                    Some("traces/replay.json"),
+                ),
+            )
+            .expect("record replay evidence");
+        let finding = confirmed_finding(vec![static_ref, replay_ref]);
+
+        let finalized = store
+            .finalize_report(
+                "audit-report-ok",
+                vec![finding.clone()],
+                Metadata::new(),
+                20,
+            )
+            .expect("finalize report");
+
+        assert_eq!(finalized.run.status, AuditRunStatus::Completed);
+        assert_eq!(
+            finalized.run.work_items[0].status,
+            AuditWorkItemStatus::Completed
+        );
+        let body = std::fs::read_to_string(
+            store
+                .audits_root()
+                .join("audit-report-ok")
+                .join("reports/report.json"),
+        )
+        .expect("read report");
+        let report: AuditReport = serde_json::from_str(&body).expect("report json");
+        assert_eq!(report.findings, vec![finding]);
+    }
+
+    #[test]
+    fn finalized_report_rejects_confirmed_finding_without_adapter_replay() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let work_item_id = create_report_run(&store, "audit-report-reject");
+        store
+            .claim_work("audit-report-reject", "judge", None, 11)
+            .expect("claim work");
+        let (_, static_ref) = store
+            .record_evidence(
+                "audit-report-reject",
+                evidence(
+                    &work_item_id,
+                    VerificationMethod::StaticAnalysis,
+                    AuditEvidenceAttestation::RouterCaptured,
+                    None,
+                ),
+            )
+            .expect("record static evidence");
+        let (_, replay_ref) = store
+            .record_evidence(
+                "audit-report-reject",
+                evidence(
+                    &work_item_id,
+                    VerificationMethod::ExploitReplay,
+                    AuditEvidenceAttestation::RouterCaptured,
+                    Some("traces/replay.json"),
+                ),
+            )
+            .expect("record replay evidence");
+
+        let error = store
+            .finalize_report(
+                "audit-report-reject",
+                vec![confirmed_finding(vec![static_ref, replay_ref])],
+                Metadata::new(),
+                20,
+            )
+            .expect_err("router replay should not confirm finding");
+
+        assert!(matches!(error, AuditStoreError::InvalidReport(_)));
+    }
+
+    #[test]
     fn fingerprint_tracks_immutable_plan_content() {
         let mut plan = plan();
         let original = fingerprint_plan(&plan).expect("fingerprint");
@@ -384,5 +559,82 @@ mod tests {
 
         plan.profile.max_hypotheses += 1;
         assert_ne!(fingerprint_plan(&plan).expect("fingerprint"), original);
+    }
+
+    fn create_report_run(store: &AuditStore, audit_id: &str) -> String {
+        let plan = store.store_plan(plan()).expect("store plan");
+        let stages = vec![AuditStageId::AuditTrace];
+        let work_items = create_audit_work_items(audit_id, &stages, 10);
+        let work_item_id = work_items[0].id.clone();
+        let run = AuditRun {
+            schema_version: 1,
+            id: audit_id.to_string(),
+            plan_fingerprint: plan.fingerprint,
+            target: plan.target,
+            profile: plan.profile,
+            status: AuditRunStatus::Running,
+            current_stage: stages[0].clone(),
+            coordinator_thread_id: None,
+            goal_id: None,
+            adapter_id: Some("adapter/sui".to_string()),
+            capabilities: Vec::new(),
+            coverage_gaps: Vec::new(),
+            work_items,
+            evidence_refs: Vec::new(),
+            artifact_refs: Vec::new(),
+            created_at: 10,
+            updated_at: 10,
+            metadata: Metadata::new(),
+        };
+        store.create_run(&run).expect("create run");
+        work_item_id
+    }
+
+    fn evidence(
+        work_item_id: &str,
+        verification_method: VerificationMethod,
+        attestation: AuditEvidenceAttestation,
+        execution_trace_ref: Option<&str>,
+    ) -> AuditEvidence {
+        AuditEvidence {
+            id: String::new(),
+            audit_run_id: String::new(),
+            work_item_id: Some(work_item_id.to_string()),
+            verification_method,
+            provider_id: "test-provider".to_string(),
+            adapter_id: Some("adapter/sui".to_string()),
+            tool_name: "test-tool".to_string(),
+            tool_version: Some("1".to_string()),
+            input_hash: "sha256:abc".to_string(),
+            source_precision: SourcePrecision::SourceMap,
+            attestation,
+            summary: "summary".to_string(),
+            observation: "observation".to_string(),
+            execution_trace_ref: execution_trace_ref.map(str::to_string),
+            artifact_refs: Vec::new(),
+            created_at: 12,
+            metadata: Metadata::new(),
+        }
+    }
+
+    fn confirmed_finding(evidence_refs: Vec<String>) -> FindingCandidate {
+        FindingCandidate {
+            id: "finding-1".to_string(),
+            title: "confirmed exploit".to_string(),
+            category: "accounting".to_string(),
+            severity: FindingCandidateSeverity::High,
+            confidence: EvidenceConfidence::Confirmed,
+            status: FindingCandidateStatus::Confirmed,
+            affected_symbols: vec!["module::entry".to_string()],
+            exploit_scenario: Some("attacker drains funds".to_string()),
+            evidence_refs,
+            validation_plan: ValidationPlan {
+                commands: Vec::new(),
+                expected_evidence: Vec::new(),
+                required: true,
+            },
+            patch_recommendation: None,
+            metadata: Metadata::new(),
+        }
     }
 }

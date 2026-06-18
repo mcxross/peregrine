@@ -7,6 +7,7 @@ pub const CLAIM_WORK_TOOL_NAME: &str = "audit_claim_work";
 pub const RECORD_PACKET_TOOL_NAME: &str = "audit_record_packet";
 pub const RECORD_EVIDENCE_TOOL_NAME: &str = "audit_record_evidence";
 pub const FINISH_WORK_TOOL_NAME: &str = "audit_finish_work";
+pub const FINALIZE_REPORT_TOOL_NAME: &str = "audit_finalize_report";
 
 pub fn read_run_tool() -> ToolSpec {
     function_tool(
@@ -182,6 +183,31 @@ pub fn finish_work_tool() -> ToolSpec {
             ),
         ]),
         vec!["work_item_id", "worker_id", "status"],
+    )
+}
+
+pub fn finalize_report_tool() -> ToolSpec {
+    function_tool(
+        FINALIZE_REPORT_TOOL_NAME,
+        "Finalize the terminal audit report. The store validates every finding against persisted evidence and rejects confirmed findings without two independent verification classes plus adapter replay evidence.",
+        BTreeMap::from([
+            (
+                "findings".to_string(),
+                JsonSchema::array(
+                    JsonSchema::object(BTreeMap::new(), None, Some(true.into())),
+                    Some("Final report findings. Confirmed findings must cite validated evidence references.".to_string()),
+                ),
+            ),
+            (
+                "metadata".to_string(),
+                JsonSchema::object(
+                    BTreeMap::new(),
+                    None,
+                    Some(true.into()),
+                ),
+            ),
+        ]),
+        vec!["findings"],
     )
 }
 

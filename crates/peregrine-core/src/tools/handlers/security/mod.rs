@@ -1,3 +1,4 @@
+mod capture;
 mod model;
 mod spec;
 
@@ -8,6 +9,7 @@ use crate::session::turn_context::TurnContext;
 use crate::tools::context::{FunctionToolOutput, ToolInvocation, ToolPayload, boxed_tool_output};
 use crate::tools::handlers::parse_arguments;
 use crate::tools::registry::{CoreToolRuntime, ToolExecutor};
+pub(crate) use capture::router_evidence_capture;
 use chrono::Utc;
 use codex_tools::{ToolName, ToolSpec};
 use peregrine_audit_store::AuditStore;
@@ -17,8 +19,8 @@ use serde_json::Value;
 use std::path::{Component, Path, PathBuf};
 
 pub use spec::{
-    CLAIM_WORK_TOOL_NAME, FINISH_WORK_TOOL_NAME, READ_RUN_TOOL_NAME, RECORD_EVIDENCE_TOOL_NAME,
-    RECORD_PACKET_TOOL_NAME,
+    CLAIM_WORK_TOOL_NAME, FINALIZE_REPORT_TOOL_NAME, FINISH_WORK_TOOL_NAME, READ_RUN_TOOL_NAME,
+    RECORD_EVIDENCE_TOOL_NAME, RECORD_PACKET_TOOL_NAME,
 };
 
 const MAX_ID_BYTES: usize = 256;
@@ -34,15 +36,17 @@ pub(crate) enum AuditToolHandler {
     RecordPacket,
     RecordEvidence,
     FinishWork,
+    FinalizeReport,
 }
 
 impl AuditToolHandler {
-    pub(crate) const ALL: [Self; 5] = [
+    pub(crate) const ALL: [Self; 6] = [
         Self::ReadRun,
         Self::ClaimWork,
         Self::RecordPacket,
         Self::RecordEvidence,
         Self::FinishWork,
+        Self::FinalizeReport,
     ];
 }
 
@@ -55,6 +59,7 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
             Self::RecordPacket => RECORD_PACKET_TOOL_NAME,
             Self::RecordEvidence => RECORD_EVIDENCE_TOOL_NAME,
             Self::FinishWork => FINISH_WORK_TOOL_NAME,
+            Self::FinalizeReport => FINALIZE_REPORT_TOOL_NAME,
         })
     }
 
@@ -65,6 +70,7 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
             Self::RecordPacket => spec::record_packet_tool(),
             Self::RecordEvidence => spec::record_evidence_tool(),
             Self::FinishWork => spec::finish_work_tool(),
+            Self::FinalizeReport => spec::finalize_report_tool(),
         }
     }
 
@@ -174,6 +180,27 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
                     remaining_pending: pending_count(&update.run),
                 })?
             }
+            Self::FinalizeReport => {
+                let args: FinalizeReportArgs = parse_arguments(&arguments)?;
+                validate_serialized_size("report findings", &args, MAX_PACKET_BYTES)?;
+                for finding in &args.findings {
+                    validate_refs(&scope, &finding.evidence_refs, "evidence")?;
+                }
+                let finalized = store
+                    .finalize_report(
+                        &scope.audit_id,
+                        args.findings,
+                        args.metadata.unwrap_or_default(),
+                        now,
+                    )
+                    .map_err(tool_error)?;
+                inject_audit_context(&session, &turn, &finalized.run).await;
+                json_output(&FinalizeReportResponse {
+                    run: RunSummary::from_run(&finalized.run),
+                    report_ref: finalized.report_ref,
+                    markdown_ref: finalized.markdown_ref,
+                })?
+            }
         };
         Ok(boxed_tool_output(output))
     }
@@ -185,13 +212,13 @@ pub(crate) fn audit_tools_enabled(turn: &TurnContext) -> bool {
     audit_scope(turn).is_some()
 }
 
-struct AuditScope {
-    peregrine_home: PathBuf,
+pub(crate) struct AuditScope {
+    pub(crate) peregrine_home: PathBuf,
     audit_root: PathBuf,
-    audit_id: String,
+    pub(crate) audit_id: String,
 }
 
-fn audit_scope(turn: &TurnContext) -> Option<AuditScope> {
+pub(crate) fn audit_scope(turn: &TurnContext) -> Option<AuditScope> {
     let cwd = turn
         .environments
         .primary()
@@ -310,4 +337,19 @@ fn pending_count(run: &AuditRun) -> usize {
         .iter()
         .filter(|item| item.status == AuditWorkItemStatus::Pending)
         .count()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn audit_tool_set_includes_terminal_report_finalizer() {
+        let names = AuditToolHandler::ALL
+            .into_iter()
+            .map(|handler| handler.tool_name().name)
+            .collect::<Vec<_>>();
+
+        assert!(names.contains(&FINALIZE_REPORT_TOOL_NAME.to_string()));
+    }
 }

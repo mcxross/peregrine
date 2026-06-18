@@ -5,7 +5,7 @@ use super::{
 use crate::function_tool::FunctionCallError;
 use peregrine_types::{
     AuditEvidence, AuditEvidenceAttestation, AuditRun, AuditRunStatus, AuditStageId, AuditWorkItem,
-    AuditWorkItemStatus, SourcePrecision, VerificationMethod,
+    AuditWorkItemStatus, FindingCandidate, Metadata, SourcePrecision, VerificationMethod,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -112,6 +112,12 @@ pub(super) struct FinishWorkArgs {
     pub(super) evidence_refs: Option<Vec<String>>,
 }
 
+#[derive(Deserialize, Serialize)]
+pub(super) struct FinalizeReportArgs {
+    pub(super) findings: Vec<FindingCandidate>,
+    pub(super) metadata: Option<Metadata>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct RunSummary {
@@ -214,4 +220,12 @@ pub(super) struct FinishWorkResponse {
     pub(super) work_item: WorkSummary,
     pub(super) current_stage: AuditStageId,
     pub(super) remaining_pending: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct FinalizeReportResponse {
+    pub(super) run: RunSummary,
+    pub(super) report_ref: String,
+    pub(super) markdown_ref: String,
 }

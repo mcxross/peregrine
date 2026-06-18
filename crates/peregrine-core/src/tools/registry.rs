@@ -20,6 +20,7 @@ use crate::tools::context::ToolOutput;
 use crate::tools::context::ToolPayload;
 use crate::tools::flat_tool_name;
 use crate::tools::handlers::multi_agents_spec::MULTI_AGENT_V1_NAMESPACE;
+use crate::tools::handlers::security::router_evidence_capture;
 use crate::tools::hook_names::HookToolName;
 use crate::tools::lifecycle::notify_tool_finish;
 use crate::tools::lifecycle::notify_tool_start;
@@ -579,6 +580,28 @@ impl ToolRegistry {
             Err(_) => false,
         };
         emit_metric_for_tool_read(&invocation, success).await;
+        let router_capture = if success {
+            let guard = response_cell.lock().await;
+            guard.as_ref().map(|result| {
+                (
+                    result.post_tool_use_payload.clone(),
+                    result.result.log_preview(),
+                )
+            })
+        } else {
+            None
+        };
+        if let Some((post_tool_use_payload, output_preview)) = router_capture
+            && let Err(err) = router_evidence_capture(
+                invocation.turn.as_ref(),
+                &tool_name,
+                &invocation.payload,
+                post_tool_use_payload.as_ref(),
+                output_preview,
+            )
+        {
+            warn!("failed to record router-captured audit evidence: {err}");
+        }
         let post_tool_use_payload = if success {
             let guard = response_cell.lock().await;
             guard

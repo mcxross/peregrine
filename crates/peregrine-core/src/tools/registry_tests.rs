@@ -1,4 +1,10 @@
 use super::*;
+use codex_utils_absolute_path::test_support::PathExt;
+use peregrine_audit_store::AuditStore;
+use peregrine_types::{
+    AuditEvidence, AuditEvidenceAttestation, AuditPlan, AuditProfile, AuditRun, AuditRunStatus,
+    AuditStageId, AuditTarget, AuditWorkItem, AuditWorkItemStatus, Metadata,
+};
 use pretty_assertions::assert_eq;
 
 struct TestHandler {
@@ -441,6 +447,113 @@ async fn dispatch_notifies_tool_lifecycle_contributors() -> anyhow::Result<()> {
         .drain(..)
         .collect::<Vec<_>>();
     assert_eq!(expected, actual);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn dispatch_records_router_captured_evidence_for_audit_work() -> anyhow::Result<()> {
+    let home = tempfile::tempdir()?;
+    let run_id = "audit-dispatch";
+    let store = AuditStore::open(home.path())?;
+    let stages = vec![AuditStageId::BuildNormalize];
+    let plan = store.store_plan(AuditPlan {
+        schema_version: 1,
+        id: "plan-dispatch".to_string(),
+        fingerprint: String::new(),
+        target: AuditTarget::LocalPackage {
+            chain_id: "sui".to_string(),
+            path: "/tmp/package".to_string(),
+            metadata: Metadata::new(),
+        },
+        profile: AuditProfile::default(),
+        stages: stages.clone(),
+        required_capabilities: Vec::new(),
+        created_at: 1,
+        metadata: Metadata::new(),
+    })?;
+    let run = AuditRun {
+        schema_version: 1,
+        id: run_id.to_string(),
+        plan_fingerprint: plan.fingerprint,
+        target: plan.target,
+        profile: plan.profile,
+        status: AuditRunStatus::Running,
+        current_stage: AuditStageId::BuildNormalize,
+        coordinator_thread_id: None,
+        goal_id: None,
+        adapter_id: Some("adapter/sui".to_string()),
+        capabilities: Vec::new(),
+        coverage_gaps: Vec::new(),
+        work_items: vec![AuditWorkItem {
+            id: format!("{run_id}:stage:0"),
+            stage: AuditStageId::BuildNormalize,
+            status: AuditWorkItemStatus::Pending,
+            title: "Complete BuildNormalize stage".to_string(),
+            claimed_by: None,
+            attempts: 0,
+            evidence_refs: Vec::new(),
+            created_at: 1,
+            updated_at: 1,
+            metadata: Metadata::new(),
+        }],
+        evidence_refs: Vec::new(),
+        artifact_refs: Vec::new(),
+        created_at: 1,
+        updated_at: 1,
+        metadata: Metadata::new(),
+    };
+    store.create_run(&run)?;
+    store.claim_work(run_id, "router", None, 2)?;
+
+    let (session, mut turn) = crate::session::tests::make_session_and_context().await;
+    let workspace = home.path().join("audits").join(run_id).join("workspace");
+    let home_path = home.path().abs();
+    let workspace = workspace.abs();
+    let mut config = (*turn.config).clone();
+    config.peregrine_home = home_path;
+    config.cwd = workspace.clone();
+    turn.config = Arc::new(config);
+    if let Some(environment) = turn.environments.turn_environments.first_mut() {
+        environment.cwd = workspace.clone();
+    }
+    #[allow(deprecated)]
+    {
+        turn.cwd = workspace;
+    }
+
+    let tool_name = codex_tools::ToolName::namespaced("mcp__sui", "static_analysis");
+    let handler = Arc::new(TestHandler {
+        tool_name: tool_name.clone(),
+    }) as Arc<dyn CoreToolRuntime>;
+    let registry = ToolRegistry::new(HashMap::from([(tool_name.clone(), handler)]));
+    registry
+        .dispatch_any(test_invocation(
+            Arc::new(session),
+            Arc::new(turn),
+            "audit-call",
+            tool_name,
+        ))
+        .await?;
+
+    let run = store.read_run(run_id)?.expect("run should exist");
+    assert_eq!(run.evidence_refs.len(), 1);
+    assert_eq!(run.work_items[0].evidence_refs, run.evidence_refs);
+    let body = std::fs::read_to_string(
+        home.path().join("audits").join(run_id).join(
+            run.evidence_refs
+                .first()
+                .expect("evidence ref should exist"),
+        ),
+    )?;
+    let evidence: AuditEvidence = serde_json::from_str(&body)?;
+    assert_eq!(
+        evidence.attestation,
+        AuditEvidenceAttestation::RouterCaptured
+    );
+    assert_eq!(evidence.work_item_id, Some(format!("{run_id}:stage:0")));
+    assert_eq!(evidence.adapter_id, Some("adapter/sui".to_string()));
+    assert_eq!(evidence.provider_id, "mcp__sui");
 
     Ok(())
 }

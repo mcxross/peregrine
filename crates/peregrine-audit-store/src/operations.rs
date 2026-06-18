@@ -103,6 +103,37 @@ impl AuditStore {
         })
     }
 
+    pub fn record_router_evidence_for_current_work(
+        &self,
+        run_id: &str,
+        mut evidence: AuditEvidence,
+    ) -> Result<Option<(AuditRun, String)>, AuditStoreError> {
+        evidence.id = Uuid::new_v4().to_string();
+        let evidence_ref = format!("evidence/{}.json", evidence.id);
+        self.mutate_run(run_id, |run| {
+            ensure_running(run)?;
+            let Some(work_item_index) = current_claimed_work_item_index(run) else {
+                return Ok(None);
+            };
+            evidence.audit_run_id = run.id.clone();
+            if evidence.adapter_id.is_none() {
+                evidence.adapter_id = run.adapter_id.clone();
+            }
+            evidence.work_item_id = Some(run.work_items[work_item_index].id.clone());
+            self.write_json(
+                &self.audits_root.join(run_id).join(&evidence_ref),
+                &evidence,
+            )?;
+            run.work_items[work_item_index]
+                .evidence_refs
+                .push(evidence_ref.clone());
+            run.evidence_refs.push(evidence_ref.clone());
+            run.updated_at = evidence.created_at;
+            Ok(Some(evidence_ref.clone()))
+        })
+        .map(|(run, evidence_ref)| evidence_ref.map(|evidence_ref| (run, evidence_ref)))
+    }
+
     pub fn finish_work(
         &self,
         run_id: &str,
@@ -163,7 +194,7 @@ impl AuditStore {
         })
     }
 
-    fn mutate_run<T>(
+    pub(crate) fn mutate_run<T>(
         &self,
         run_id: &str,
         mutate: impl FnOnce(&mut AuditRun) -> Result<T, AuditStoreError>,
@@ -193,8 +224,20 @@ impl AuditStore {
         Ok((run, result))
     }
 
-    fn write_json(&self, path: &Path, value: &impl Serialize) -> Result<(), AuditStoreError> {
+    pub(crate) fn write_json(
+        &self,
+        path: &Path,
+        value: &impl Serialize,
+    ) -> Result<(), AuditStoreError> {
         let bytes = serde_json::to_vec_pretty(value)?;
+        self.write_bytes(path, &bytes)
+    }
+
+    pub(crate) fn write_text(&self, path: &Path, value: &str) -> Result<(), AuditStoreError> {
+        self.write_bytes(path, value.as_bytes())
+    }
+
+    fn write_bytes(&self, path: &Path, bytes: &[u8]) -> Result<(), AuditStoreError> {
         if bytes.len() > MAX_ARTIFACT_BYTES {
             return Err(AuditStoreError::ArtifactTooLarge(MAX_ARTIFACT_BYTES));
         }
@@ -275,4 +318,17 @@ fn ensure_claimed_work_item<'a>(
         ));
     }
     Ok(work_item)
+}
+
+fn current_claimed_work_item_index(run: &AuditRun) -> Option<usize> {
+    run.work_items
+        .iter()
+        .position(|item| {
+            item.status == AuditWorkItemStatus::Claimed && item.stage == run.current_stage
+        })
+        .or_else(|| {
+            run.work_items
+                .iter()
+                .position(|item| item.status == AuditWorkItemStatus::Claimed)
+        })
 }
