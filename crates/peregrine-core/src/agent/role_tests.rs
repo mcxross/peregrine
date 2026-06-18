@@ -103,6 +103,38 @@ async fn apply_empty_explorer_role_preserves_current_model_and_reasoning_effort(
 }
 
 #[tokio::test]
+async fn apply_built_in_audit_role_preserves_configured_model_settings() {
+    let (_home, mut config) = test_config_with_cli_overrides(vec![
+        (
+            "model".to_string(),
+            TomlValue::String("configured-model".to_string()),
+        ),
+        (
+            "model_reasoning_effort".to_string(),
+            TomlValue::String("high".to_string()),
+        ),
+        (
+            "service_tier".to_string(),
+            TomlValue::String("priority".to_string()),
+        ),
+    ])
+    .await;
+    let before_layers = session_flags_layer_count(&config);
+
+    apply_role_to_config(&mut config, Some("audit-researcher"))
+        .await
+        .expect("audit researcher role should apply");
+
+    assert_eq!(config.model.as_deref(), Some("configured-model"));
+    assert_eq!(config.model_reasoning_effort, Some(ReasoningEffort::High));
+    assert_eq!(
+        config.service_tier,
+        Some(ServiceTier::Fast.request_value().to_string())
+    );
+    assert_eq!(session_flags_layer_count(&config), before_layers + 1);
+}
+
+#[tokio::test]
 async fn apply_role_returns_unavailable_for_missing_user_role_file() {
     let (_home, mut config) = test_config_with_cli_overrides(Vec::new()).await;
     config.agent_roles.insert(
@@ -555,7 +587,29 @@ fn spawn_tool_spec_marks_role_locked_service_tier() {
 }
 
 #[test]
-fn built_in_config_file_contents_resolves_explorer_only() {
+fn spawn_tool_spec_lists_audit_roles_without_locked_model_notes() {
+    let spec = spawn_tool_spec::build(&BTreeMap::new());
+
+    assert!(spec.contains("audit-researcher: {"));
+    assert!(spec.contains("audit-skeptic: {"));
+    assert!(spec.contains("audit-exploiter: {"));
+    assert!(spec.contains("audit-judge: {"));
+    assert!(!spec.contains("This role's model is set"));
+    assert!(!spec.contains("This role's reasoning effort is set"));
+    assert!(!spec.contains("This role's service tier is set"));
+}
+
+#[test]
+fn built_in_config_file_contents_resolves_known_roles() {
+    for role_file in [
+        "explorer.toml",
+        "audit_researcher.toml",
+        "audit_skeptic.toml",
+        "audit_exploiter.toml",
+        "audit_judge.toml",
+    ] {
+        assert!(built_in::config_file_contents(Path::new(role_file)).is_some());
+    }
     assert_eq!(
         built_in::config_file_contents(Path::new("missing.toml")),
         None

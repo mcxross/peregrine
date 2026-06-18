@@ -521,6 +521,7 @@ async fn audit_tools_are_scoped_to_audit_coordinator_workspaces() {
         "audit_claim_work",
         "audit_record_packet",
         "audit_record_evidence",
+        "audit_record_agent_conclusion",
         "audit_finish_work",
         "audit_finalize_report",
     ];

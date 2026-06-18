@@ -336,10 +336,11 @@ mod tests {
     use super::*;
     use peregrine_security_tools::create_audit_work_items;
     use peregrine_types::{
-        AuditEvidence, AuditEvidenceAttestation, AuditProfile, AuditReport, AuditRunStatus,
-        AuditStageId, AuditStageStatus, AuditTarget, AuditWorkItemStatus, EvidenceConfidence,
-        FindingCandidate, FindingCandidateSeverity, FindingCandidateStatus, Metadata,
-        SourcePrecision, ValidationPlan, VerificationMethod,
+        AuditAgentConclusion, AuditAgentConclusionStatus, AuditAgentRole, AuditEvidence,
+        AuditEvidenceAttestation, AuditProfile, AuditReport, AuditRunStatus, AuditStageId,
+        AuditStageStatus, AuditTarget, AuditWorkItemStatus, EvidenceConfidence, FindingCandidate,
+        FindingCandidateSeverity, FindingCandidateStatus, Metadata, SourcePrecision,
+        ValidationPlan, VerificationMethod,
     };
 
     fn plan() -> AuditPlan {
@@ -671,6 +672,63 @@ mod tests {
         );
         assert_eq!(stored.adapter_id, Some("adapter/sui".to_string()));
         assert_eq!(stored.attestation, AuditEvidenceAttestation::RouterCaptured);
+    }
+
+    #[test]
+    fn record_agent_conclusion_persists_role_artifact() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let work_item_id = create_report_run(&store, "audit-agent");
+        store
+            .claim_work("audit-agent", "judge", None, 11)
+            .expect("claim work");
+        let (_, evidence_ref) = store
+            .record_evidence(
+                "audit-agent",
+                evidence(
+                    &work_item_id,
+                    VerificationMethod::StaticAnalysis,
+                    AuditEvidenceAttestation::RouterCaptured,
+                    None,
+                ),
+            )
+            .expect("record evidence");
+        let conclusion = AuditAgentConclusion {
+            schema_version: 1,
+            id: "client-id-is-replaced".to_string(),
+            audit_run_id: "client-run-is-replaced".to_string(),
+            work_item_id: "client-work-is-replaced".to_string(),
+            role: AuditAgentRole::Judge,
+            agent_thread_id: Some("thread-1".to_string()),
+            status: AuditAgentConclusionStatus::Supported,
+            summary: "static evidence supports the candidate".to_string(),
+            candidate_ids: vec!["candidate-1".to_string()],
+            evidence_refs: vec![evidence_ref],
+            artifact_refs: Vec::new(),
+            created_at: 13,
+            metadata: Metadata::new(),
+        };
+
+        let (run, artifact_ref) = store
+            .record_agent_conclusion("audit-agent", &work_item_id, conclusion.clone())
+            .expect("record agent conclusion");
+        let body = store
+            .read_artifact("audit-agent", &artifact_ref)
+            .expect("read conclusion artifact");
+        let stored: AuditAgentConclusion = serde_json::from_slice(&body).expect("conclusion json");
+        let expected = AuditAgentConclusion {
+            id: stored.id.clone(),
+            audit_run_id: "audit-agent".to_string(),
+            work_item_id,
+            ..conclusion
+        };
+
+        assert_eq!(
+            artifact_ref,
+            format!("artifacts/agent-conclusions/{}.json", stored.id)
+        );
+        assert_eq!(run.artifact_refs, vec![artifact_ref]);
+        assert_eq!(stored, expected);
     }
 
     #[test]

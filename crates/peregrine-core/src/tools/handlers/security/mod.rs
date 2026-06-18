@@ -20,7 +20,7 @@ use std::path::{Component, Path, PathBuf};
 
 pub use spec::{
     CLAIM_WORK_TOOL_NAME, FINALIZE_REPORT_TOOL_NAME, FINISH_WORK_TOOL_NAME, READ_RUN_TOOL_NAME,
-    RECORD_EVIDENCE_TOOL_NAME, RECORD_PACKET_TOOL_NAME,
+    RECORD_AGENT_CONCLUSION_TOOL_NAME, RECORD_EVIDENCE_TOOL_NAME, RECORD_PACKET_TOOL_NAME,
 };
 
 const MAX_ID_BYTES: usize = 256;
@@ -35,16 +35,18 @@ pub(crate) enum AuditToolHandler {
     ClaimWork,
     RecordPacket,
     RecordEvidence,
+    RecordAgentConclusion,
     FinishWork,
     FinalizeReport,
 }
 
 impl AuditToolHandler {
-    pub(crate) const ALL: [Self; 6] = [
+    pub(crate) const ALL: [Self; 7] = [
         Self::ReadRun,
         Self::ClaimWork,
         Self::RecordPacket,
         Self::RecordEvidence,
+        Self::RecordAgentConclusion,
         Self::FinishWork,
         Self::FinalizeReport,
     ];
@@ -58,6 +60,7 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
             Self::ClaimWork => CLAIM_WORK_TOOL_NAME,
             Self::RecordPacket => RECORD_PACKET_TOOL_NAME,
             Self::RecordEvidence => RECORD_EVIDENCE_TOOL_NAME,
+            Self::RecordAgentConclusion => RECORD_AGENT_CONCLUSION_TOOL_NAME,
             Self::FinishWork => FINISH_WORK_TOOL_NAME,
             Self::FinalizeReport => FINALIZE_REPORT_TOOL_NAME,
         })
@@ -69,6 +72,7 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
             Self::ClaimWork => spec::claim_work_tool(),
             Self::RecordPacket => spec::record_packet_tool(),
             Self::RecordEvidence => spec::record_evidence_tool(),
+            Self::RecordAgentConclusion => spec::record_agent_conclusion_tool(),
             Self::FinishWork => spec::finish_work_tool(),
             Self::FinalizeReport => spec::finalize_report_tool(),
         }
@@ -154,6 +158,16 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
                     evidence_ref,
                     attestation: AuditEvidenceAttestation::ModelSubmitted,
                 })?
+            }
+            Self::RecordAgentConclusion => {
+                let args: RecordAgentConclusionArgs = parse_arguments(&arguments)?;
+                args.validate(&scope)?;
+                let work_item_id = args.work_item_id.clone();
+                let conclusion = args.into_conclusion(scope.audit_id.clone(), now);
+                let (_, artifact_ref) = store
+                    .record_agent_conclusion(&scope.audit_id, &work_item_id, conclusion)
+                    .map_err(tool_error)?;
+                json_output(&ArtifactResponse { artifact_ref })?
             }
             Self::FinishWork => {
                 let args: FinishWorkArgs = parse_arguments(&arguments)?;
@@ -314,7 +328,9 @@ fn validate_refs(
     required_prefix: &str,
 ) -> Result<(), FunctionCallError> {
     if refs.len() > MAX_REFS {
-        return Err(model_error("too many artifact references"));
+        return Err(model_error(&format!(
+            "too many {required_prefix} references"
+        )));
     }
     for value in refs {
         validate_text("artifact reference", value, MAX_ID_BYTES)?;

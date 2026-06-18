@@ -108,10 +108,11 @@ pub use analysis::{
     RuleSet, RuleSetConfig, RuleSetProvider, Severity, SourceFile, Span,
 };
 pub use harness::{
-    AuditCapabilityBinding, AuditCoverageGap, AuditEvidence, AuditEvidenceAttestation, AuditPlan,
-    AuditProfile, AuditReport, AuditRun, AuditRunStatus, AuditStageId, AuditStageRun,
-    AuditStageStatus, AuditTarget, AuditWorkItem, AuditWorkItemStatus, CodeLocation,
-    EvidenceConfidence, EvidenceItem, EvidenceKind, ExploitBundle, ExploitIntent, FindingCandidate,
+    AuditAgentConclusion, AuditAgentConclusionStatus, AuditAgentRole, AuditCapabilityBinding,
+    AuditCoverageGap, AuditEvidence, AuditEvidenceAttestation, AuditPlan, AuditProfile,
+    AuditReport, AuditRun, AuditRunStatus, AuditStageId, AuditStageRun, AuditStageStatus,
+    AuditTarget, AuditWorkItem, AuditWorkItemStatus, CodeLocation, EvidenceConfidence,
+    EvidenceItem, EvidenceKind, ExploitBundle, ExploitIntent, FindingCandidate,
     FindingCandidateSeverity, FindingCandidateStatus, JsonSchema, Metadata, PatchRecommendation,
     SecurityTool, SourcePrecision, ToolActionClass, ToolCost, ToolDiagnostic, ToolInput,
     ToolManifest, ToolMetric, ToolPrerequisite, ToolRiskLevel, ToolRunArtifact, ToolRunContext,

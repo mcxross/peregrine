@@ -1,7 +1,7 @@
 use super::{AuditStore, AuditStoreError, AuditStoreEvent, status_name};
 use peregrine_types::{
-    AuditEvidence, AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus, AuditWorkItem,
-    AuditWorkItemStatus,
+    AuditAgentConclusion, AuditEvidence, AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus,
+    AuditWorkItem, AuditWorkItemStatus,
 };
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::Serialize;
@@ -109,6 +109,46 @@ impl AuditStore {
             run.evidence_refs.push(evidence_ref.clone());
             run.updated_at = evidence.created_at;
             Ok(evidence_ref.clone())
+        })
+    }
+
+    pub fn record_agent_conclusion(
+        &self,
+        run_id: &str,
+        work_item_id: &str,
+        mut conclusion: AuditAgentConclusion,
+    ) -> Result<(AuditRun, String), AuditStoreError> {
+        conclusion.id = Uuid::new_v4().to_string();
+        conclusion.audit_run_id = run_id.to_string();
+        conclusion.work_item_id = work_item_id.to_string();
+        let artifact_ref = format!("artifacts/agent-conclusions/{}.json", conclusion.id);
+        let artifact_dir = self
+            .audits_root
+            .join(run_id)
+            .join("artifacts/agent-conclusions");
+        fs::create_dir_all(&artifact_dir).map_err(|source| AuditStoreError::Io {
+            action: "create agent conclusion artifact directory",
+            source,
+        })?;
+        self.mutate_run(run_id, |run| {
+            ensure_claimed_work_item(run, work_item_id)?;
+            for evidence_ref in &conclusion.evidence_refs {
+                if !run.evidence_refs.contains(evidence_ref) {
+                    return Err(AuditStoreError::EvidenceNotFound(evidence_ref.clone()));
+                }
+            }
+            for artifact_ref in &conclusion.artifact_refs {
+                if !run.artifact_refs.contains(artifact_ref) {
+                    return Err(AuditStoreError::InvalidArtifactPath);
+                }
+            }
+            self.write_json(
+                &self.audits_root.join(run_id).join(&artifact_ref),
+                &conclusion,
+            )?;
+            run.artifact_refs.push(artifact_ref.clone());
+            run.updated_at = conclusion.created_at;
+            Ok(artifact_ref.clone())
         })
     }
 

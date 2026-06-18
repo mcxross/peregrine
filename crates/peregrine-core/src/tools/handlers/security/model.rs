@@ -1,10 +1,11 @@
 use super::{
     AuditScope, MAX_ID_BYTES, MAX_OBSERVATION_BYTES, MAX_SUMMARY_BYTES, model_error, validate_refs,
-    validate_text,
+    validate_serialized_size, validate_text,
 };
 use crate::function_tool::FunctionCallError;
 use peregrine_types::{
-    AuditEvidence, AuditEvidenceAttestation, AuditRun, AuditRunStatus, AuditStageId, AuditWorkItem,
+    AuditAgentConclusion, AuditAgentConclusionStatus, AuditAgentRole, AuditEvidence,
+    AuditEvidenceAttestation, AuditRun, AuditRunStatus, AuditStageId, AuditWorkItem,
     AuditWorkItemStatus, FindingCandidate, Metadata, SourcePrecision, VerificationMethod,
 };
 use serde::{Deserialize, Serialize};
@@ -100,6 +101,78 @@ impl RecordEvidenceArgs {
             artifact_refs: self.artifact_refs.unwrap_or_default(),
             created_at,
             metadata: BTreeMap::new(),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub(super) struct RecordAgentConclusionArgs {
+    pub(super) work_item_id: String,
+    role: AuditAgentRole,
+    agent_thread_id: Option<String>,
+    status: AuditAgentConclusionStatus,
+    summary: String,
+    candidate_ids: Option<Vec<String>>,
+    evidence_refs: Option<Vec<String>>,
+    artifact_refs: Option<Vec<String>>,
+    metadata: Option<Metadata>,
+}
+
+impl RecordAgentConclusionArgs {
+    pub(super) fn validate(&self, scope: &AuditScope) -> Result<(), FunctionCallError> {
+        validate_text("work_item_id", &self.work_item_id, MAX_ID_BYTES)?;
+        validate_text("summary", &self.summary, MAX_SUMMARY_BYTES)?;
+        if let Some(agent_thread_id) = &self.agent_thread_id {
+            validate_text("agent_thread_id", agent_thread_id, MAX_ID_BYTES)?;
+        }
+        let candidate_ids = self.candidate_ids.as_deref().unwrap_or_default();
+        if candidate_ids.len() > super::MAX_REFS {
+            return Err(model_error("too many candidate references"));
+        }
+        for candidate_id in candidate_ids {
+            validate_text("candidate_id", candidate_id, MAX_ID_BYTES)?;
+        }
+        let evidence_refs = self.evidence_refs.as_deref().unwrap_or_default();
+        validate_refs(scope, evidence_refs, "evidence")?;
+        validate_refs(
+            scope,
+            self.artifact_refs.as_deref().unwrap_or_default(),
+            "artifacts",
+        )?;
+        if self.role == AuditAgentRole::Judge
+            && matches!(
+                self.status,
+                AuditAgentConclusionStatus::Accepted | AuditAgentConclusionStatus::Supported
+            )
+            && evidence_refs.is_empty()
+        {
+            return Err(model_error(
+                "positive judge conclusions require persisted evidence references",
+            ));
+        }
+        validate_serialized_size("agent conclusion", self, super::MAX_PACKET_BYTES)?;
+        Ok(())
+    }
+
+    pub(super) fn into_conclusion(
+        self,
+        audit_run_id: String,
+        created_at: i64,
+    ) -> AuditAgentConclusion {
+        AuditAgentConclusion {
+            schema_version: 1,
+            id: String::new(),
+            audit_run_id,
+            work_item_id: self.work_item_id,
+            role: self.role,
+            agent_thread_id: self.agent_thread_id,
+            status: self.status,
+            summary: self.summary,
+            candidate_ids: self.candidate_ids.unwrap_or_default(),
+            evidence_refs: self.evidence_refs.unwrap_or_default(),
+            artifact_refs: self.artifact_refs.unwrap_or_default(),
+            created_at,
+            metadata: self.metadata.unwrap_or_default(),
         }
     }
 }

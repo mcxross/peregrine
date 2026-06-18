@@ -417,6 +417,45 @@ pub enum VerificationMethod {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub enum AuditAgentRole {
+    Researcher,
+    Skeptic,
+    Exploiter,
+    Judge,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AuditAgentConclusionStatus {
+    Candidate,
+    Supported,
+    Refuted,
+    NeedsValidation,
+    Discarded,
+    Accepted,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditAgentConclusion {
+    pub schema_version: u8,
+    pub id: String,
+    pub audit_run_id: String,
+    pub work_item_id: String,
+    pub role: AuditAgentRole,
+    pub agent_thread_id: Option<String>,
+    pub status: AuditAgentConclusionStatus,
+    pub summary: String,
+    pub candidate_ids: Vec<String>,
+    pub evidence_refs: Vec<String>,
+    pub artifact_refs: Vec<String>,
+    pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub enum AuditEvidenceAttestation {
     ModelSubmitted,
     RouterCaptured,

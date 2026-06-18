@@ -6,6 +6,7 @@ pub const READ_RUN_TOOL_NAME: &str = "audit_read_run";
 pub const CLAIM_WORK_TOOL_NAME: &str = "audit_claim_work";
 pub const RECORD_PACKET_TOOL_NAME: &str = "audit_record_packet";
 pub const RECORD_EVIDENCE_TOOL_NAME: &str = "audit_record_evidence";
+pub const RECORD_AGENT_CONCLUSION_TOOL_NAME: &str = "audit_record_agent_conclusion";
 pub const FINISH_WORK_TOOL_NAME: &str = "audit_finish_work";
 pub const FINALIZE_REPORT_TOOL_NAME: &str = "audit_finalize_report";
 
@@ -151,6 +152,81 @@ pub fn record_evidence_tool() -> ToolSpec {
             "summary",
             "observation",
         ],
+    )
+}
+
+pub fn record_agent_conclusion_tool() -> ToolSpec {
+    function_tool(
+        RECORD_AGENT_CONCLUSION_TOOL_NAME,
+        "Persist a bounded Researcher/Skeptic/Exploiter/Judge conclusion for the current audit work item. The Judge must receive normalized evidence, exploit results, and role conclusions only; do not include hidden reasoning. Conclusions are artifacts, not verification evidence.",
+        BTreeMap::from([
+            (
+                "work_item_id".to_string(),
+                id_schema("Claimed work item ID."),
+            ),
+            (
+                "role".to_string(),
+                JsonSchema::string_enum(
+                    vec![
+                        json!("researcher"),
+                        json!("skeptic"),
+                        json!("exploiter"),
+                        json!("judge"),
+                    ],
+                    Some("Audit agent role that produced the conclusion.".to_string()),
+                ),
+            ),
+            (
+                "agent_thread_id".to_string(),
+                id_schema("Optional child thread ID for the subagent."),
+            ),
+            (
+                "status".to_string(),
+                JsonSchema::string_enum(
+                    vec![
+                        json!("candidate"),
+                        json!("supported"),
+                        json!("refuted"),
+                        json!("needsValidation"),
+                        json!("discarded"),
+                        json!("accepted"),
+                    ],
+                    Some("Role conclusion state for the candidate or work item.".to_string()),
+                ),
+            ),
+            (
+                "summary".to_string(),
+                JsonSchema::string(Some(
+                    "Bounded public conclusion. Cite artifact and evidence references instead of embedding traces.".to_string(),
+                )),
+            ),
+            (
+                "candidate_ids".to_string(),
+                JsonSchema::array(
+                    JsonSchema::string(None),
+                    Some("Candidate or hypothesis IDs addressed by this conclusion.".to_string()),
+                ),
+            ),
+            (
+                "evidence_refs".to_string(),
+                JsonSchema::array(
+                    JsonSchema::string(None),
+                    Some("Existing audit evidence references used by this conclusion.".to_string()),
+                ),
+            ),
+            (
+                "artifact_refs".to_string(),
+                JsonSchema::array(
+                    JsonSchema::string(None),
+                    Some("Existing audit-owned artifacts used by this conclusion.".to_string()),
+                ),
+            ),
+            (
+                "metadata".to_string(),
+                JsonSchema::object(BTreeMap::new(), None, Some(true.into())),
+            ),
+        ]),
+        vec!["work_item_id", "role", "status", "summary"],
     )
 }
 

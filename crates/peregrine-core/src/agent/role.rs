@@ -332,6 +332,58 @@ Rules:
                     }
                 ),
                 (
+                    "audit-researcher".to_string(),
+                    AgentRoleConfig {
+                        description: Some(r#"Use `audit-researcher` for autonomous security-audit discovery work.
+Researchers build understanding, enumerate attack surfaces, generate invariants, and propose vulnerability hypotheses.
+Rules:
+- Produce candidate hypotheses, not confirmed findings.
+- Use bounded audit tools for persisted context instead of asking for raw repositories or complete traces.
+- Record public conclusions with `audit_record_agent_conclusion` and cite artifact or evidence references when available."#.to_string()),
+                        config_file: Some("audit_researcher.toml".to_string().parse().unwrap_or_default()),
+                        nickname_candidates: None,
+                    }
+                ),
+                (
+                    "audit-skeptic".to_string(),
+                    AgentRoleConfig {
+                        description: Some(r#"Use `audit-skeptic` to challenge audit candidates.
+Skeptics try to disprove hypotheses, identify missing evidence, and downgrade hallucinated or underspecified claims.
+Rules:
+- Prefer refutation, missing-precondition analysis, and false-positive checks.
+- Do not approve a finding; only mark what remains unsupported or needs validation.
+- Record public conclusions with `audit_record_agent_conclusion` using normalized evidence and artifact references only."#.to_string()),
+                        config_file: Some("audit_skeptic.toml".to_string().parse().unwrap_or_default()),
+                        nickname_candidates: None,
+                    }
+                ),
+                (
+                    "audit-exploiter".to_string(),
+                    AgentRoleConfig {
+                        description: Some(r#"Use `audit-exploiter` to construct exploit intents and replayable proof attempts.
+Exploiters turn hypotheses into chain-neutral exploit intents, generated tests, fuzz harnesses, or replay bundles.
+Rules:
+- Generated code is not evidence until an isolated registered tool or adapter replay succeeds.
+- Never modify the target repository; use audit-owned workspaces and artifacts.
+- Record public conclusions with `audit_record_agent_conclusion` and cite exploit artifacts or replay evidence."#.to_string()),
+                        config_file: Some("audit_exploiter.toml".to_string().parse().unwrap_or_default()),
+                        nickname_candidates: None,
+                    }
+                ),
+                (
+                    "audit-judge".to_string(),
+                    AgentRoleConfig {
+                        description: Some(r#"Use `audit-judge` for adversarial audit validation.
+Judges receive normalized evidence, exploit results, and role conclusions only; they do not receive hidden reasoning.
+Rules:
+- Confirm only when two distinct verification classes agree and adapter replay evidence exists.
+- Keep unsupported candidates as needsValidation or discarded; do not report them as confirmed.
+- Record public conclusions with `audit_record_agent_conclusion` and cite persisted evidence references."#.to_string()),
+                        config_file: Some("audit_judge.toml".to_string().parse().unwrap_or_default()),
+                        nickname_candidates: None,
+                    }
+                ),
+                (
                     "worker".to_string(),
                     AgentRoleConfig {
                         description: Some(r#"Use for execution and production work.
@@ -373,9 +425,17 @@ Rules:
     pub(super) fn config_file_contents(path: &Path) -> Option<&'static str> {
         const EXPLORER: &str = include_str!("builtins/explorer.toml");
         const AWAITER: &str = include_str!("builtins/awaiter.toml");
+        const AUDIT_RESEARCHER: &str = include_str!("builtins/audit_researcher.toml");
+        const AUDIT_SKEPTIC: &str = include_str!("builtins/audit_skeptic.toml");
+        const AUDIT_EXPLOITER: &str = include_str!("builtins/audit_exploiter.toml");
+        const AUDIT_JUDGE: &str = include_str!("builtins/audit_judge.toml");
         match path.to_str()? {
             "explorer.toml" => Some(EXPLORER),
             "awaiter.toml" => Some(AWAITER),
+            "audit_researcher.toml" => Some(AUDIT_RESEARCHER),
+            "audit_skeptic.toml" => Some(AUDIT_SKEPTIC),
+            "audit_exploiter.toml" => Some(AUDIT_EXPLOITER),
+            "audit_judge.toml" => Some(AUDIT_JUDGE),
             _ => None,
         }
     }
