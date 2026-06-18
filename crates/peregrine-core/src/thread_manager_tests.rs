@@ -921,12 +921,29 @@ async fn rollout_path_resume_and_fork_read_history_through_thread_store() {
         .resume_thread_from_rollout(
             config.clone(),
             rollout_path.clone(),
-            auth_manager,
+            auth_manager.clone(),
             /*parent_trace*/ None,
         )
         .await
         .expect("resume from rollout path");
     assert_eq!(resumed_from_path.thread_id, resumed.thread_id);
+    resumed_from_path
+        .thread
+        .shutdown_and_wait()
+        .await
+        .expect("shutdown path-resumed thread before store resume");
+    let _ = manager.remove_thread(&resumed_from_path.thread_id).await;
+
+    let resumed_from_store = manager
+        .resume_thread_from_store(
+            config.clone(),
+            resumed.thread_id,
+            auth_manager,
+            /*parent_trace*/ None,
+        )
+        .await
+        .expect("resume from store");
+    assert_eq!(resumed_from_store.thread_id, resumed.thread_id);
 
     let forked = manager
         .fork_thread(
@@ -944,11 +961,11 @@ async fn rollout_path_resume_and_fork_read_history_through_thread_store() {
     let calls = in_memory_store.calls().await;
     assert_eq!(calls.read_thread_by_rollout_path, 2);
 
-    resumed_from_path
+    resumed_from_store
         .thread
         .shutdown_and_wait()
         .await
-        .expect("shutdown path-resumed thread");
+        .expect("shutdown store-resumed thread");
     forked
         .thread
         .shutdown_and_wait()

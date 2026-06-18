@@ -12,6 +12,7 @@ use crate::request_processors::audit_support::validate_profile;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use codex_features::Feature;
+use codex_login::AuthManager;
 use codex_rollout::StateDbHandle;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use peregrine_app_server_protocol::{
@@ -42,6 +43,7 @@ use uuid::Uuid;
 pub(crate) struct AuditRequestProcessor {
     store: Result<Arc<AuditStore>, String>,
     adapters: Arc<AuditAdapterRegistry>,
+    auth_manager: Arc<AuthManager>,
     thread_manager: Arc<ThreadManager>,
     thread_goal_processor: ThreadGoalRequestProcessor,
     outgoing: Arc<OutgoingMessageSender>,
@@ -51,6 +53,7 @@ pub(crate) struct AuditRequestProcessor {
 
 impl AuditRequestProcessor {
     pub(crate) fn new(
+        auth_manager: Arc<AuthManager>,
         thread_manager: Arc<ThreadManager>,
         thread_goal_processor: ThreadGoalRequestProcessor,
         outgoing: Arc<OutgoingMessageSender>,
@@ -64,6 +67,7 @@ impl AuditRequestProcessor {
         Self {
             store,
             adapters,
+            auth_manager,
             thread_manager,
             thread_goal_processor,
             outgoing,
@@ -381,6 +385,14 @@ impl AuditRequestProcessor {
         &self,
         workspace: &AuditWorkspace,
     ) -> Result<peregrine_core::NewThread, JSONRPCErrorError> {
+        let config = self.coordinator_config(workspace)?;
+        self.thread_manager
+            .start_thread(config)
+            .await
+            .map_err(|error| internal_error(format!("failed to start audit coordinator: {error}")))
+    }
+
+    fn coordinator_config(&self, workspace: &AuditWorkspace) -> Result<Config, JSONRPCErrorError> {
         let mut config = self.config.as_ref().clone();
         let cwd = AbsolutePathBuf::from_absolute_path_checked(&workspace.workspace)
             .map_err(|error| internal_error(format!("invalid audit workspace path: {error}")))?;
@@ -406,10 +418,7 @@ Do not confirm findings without two independent verification classes and success
             Some(existing) => format!("{existing}\n\n{instructions}"),
             None => instructions.to_string(),
         });
-        self.thread_manager
-            .start_thread(config)
-            .await
-            .map_err(|error| internal_error(format!("failed to start audit coordinator: {error}")))
+        Ok(config)
     }
 
     async fn transition(
@@ -418,14 +427,21 @@ Do not confirm findings without two independent verification classes and success
         next_status: AuditRunStatus,
     ) -> Result<AuditRun, JSONRPCErrorError> {
         let mut run = self.read_run(&audit_id)?;
-        let thread = self.running_coordinator(&run).await?;
+        let thread = self.coordinator_thread(&run).await?;
         let goal_status = match next_status {
             AuditRunStatus::Running => codex_state::ThreadGoalStatus::Active,
             AuditRunStatus::Paused => codex_state::ThreadGoalStatus::Paused,
             AuditRunStatus::Cancelled => codex_state::ThreadGoalStatus::Blocked,
             _ => return Err(invalid_request("unsupported audit lifecycle transition")),
         };
-        if matches!(next_status, AuditRunStatus::Running) {
+        self.update_linked_goal(&run, thread.as_ref(), goal_status)
+            .await?;
+        run.status = next_status;
+        run.updated_at = OffsetDateTime::now_utc().unix_timestamp();
+        self.store()?
+            .update_run(&run)
+            .map_err(|error| internal_error(error.to_string()))?;
+        if matches!(run.status, AuditRunStatus::Running) {
             thread
                 .inject_response_items(vec![ContextualUserFragment::into(
                     AuditRunContextFragment::from_run(&run),
@@ -435,13 +451,6 @@ Do not confirm findings without two independent verification classes and success
                     internal_error(format!("failed to inject audit context: {error}"))
                 })?;
         }
-        self.update_linked_goal(&run, thread.as_ref(), goal_status)
-            .await?;
-        run.status = next_status;
-        run.updated_at = OffsetDateTime::now_utc().unix_timestamp();
-        self.store()?
-            .update_run(&run)
-            .map_err(|error| internal_error(error.to_string()))?;
         self.emit_updated(&run).await?;
         self.emit_stage_updated(&run, lifecycle_stage_status(&run.status))
             .await?;
@@ -488,14 +497,30 @@ Do not confirm findings without two independent verification classes and success
         Ok(())
     }
 
-    async fn running_coordinator(
+    async fn coordinator_thread(
         &self,
         run: &AuditRun,
     ) -> Result<Arc<PeregrineThread>, JSONRPCErrorError> {
-        self.thread_manager
-            .get_thread(parse_coordinator_thread_id(run)?)
+        let thread_id = parse_coordinator_thread_id(run)?;
+        if let Ok(thread) = self.thread_manager.get_thread(thread_id).await {
+            return Ok(thread);
+        }
+
+        let workspace = self
+            .store()?
+            .create_workspace(&run.id)
+            .map_err(|error| internal_error(error.to_string()))?;
+        let config = self.coordinator_config(&workspace)?;
+        let thread = self
+            .thread_manager
+            .resume_thread_from_store(config, thread_id, self.auth_manager.clone(), None)
             .await
-            .map_err(|_| invalid_request("audit coordinator thread is not loaded"))
+            .map_err(|error| {
+                invalid_request(format!(
+                    "audit coordinator thread could not be loaded: {error}"
+                ))
+            })?;
+        Ok(thread.thread)
     }
 
     fn read_run(&self, audit_id: &str) -> Result<AuditRun, JSONRPCErrorError> {

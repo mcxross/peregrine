@@ -427,6 +427,7 @@ impl MessageProcessor {
         let mut audit_adapters = AuditAdapterRegistry::default();
         audit_adapters.register(Arc::new(SuiSecurityAdapter::default()));
         let audit_processor = AuditRequestProcessor::new(
+            auth_manager.clone(),
             Arc::clone(&thread_manager),
             thread_goal_processor.clone(),
             outgoing.clone(),

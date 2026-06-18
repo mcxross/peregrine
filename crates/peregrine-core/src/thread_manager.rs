@@ -669,6 +669,49 @@ impl ThreadManager {
         .await
     }
 
+    /// Resume a persisted thread by id through the configured thread store.
+    ///
+    /// This is used by app-server owned lifecycle flows that need to revive a
+    /// cold coordinator thread without taking a client-supplied rollout path.
+    pub async fn resume_thread_from_store(
+        &self,
+        config: Config,
+        thread_id: ThreadId,
+        auth_manager: Arc<AuthManager>,
+        parent_trace: Option<W3cTraceContext>,
+    ) -> PeregrineResult<NewThread> {
+        if let Ok(thread) = self.get_thread(thread_id).await {
+            return Ok(NewThread {
+                thread_id,
+                session_configured: thread.session_configured(),
+                thread,
+            });
+        }
+
+        let stored_thread = self
+            .state
+            .read_stored_thread(ReadThreadParams {
+                thread_id,
+                include_archived: true,
+                include_history: true,
+            })
+            .await?;
+        if stored_thread.archived_at.is_some() {
+            return Err(PeregrineErr::InvalidRequest(format!(
+                "thread {thread_id} is archived"
+            )));
+        }
+        let initial_history = stored_thread_to_initial_history(stored_thread, None)?;
+        self.resume_thread_with_history(
+            config,
+            initial_history,
+            auth_manager,
+            /*persist_extended_history*/ false,
+            parent_trace,
+        )
+        .await
+    }
+
     pub async fn resume_thread_with_history(
         &self,
         config: Config,
