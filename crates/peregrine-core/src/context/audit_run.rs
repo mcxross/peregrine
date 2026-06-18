@@ -1,11 +1,16 @@
 use super::ContextualUserFragment;
-use peregrine_types::AuditRun;
+use peregrine_types::{
+    AuditCoverageGap, AuditRun, AuditRunStatus, AuditStageId, AuditWorkItem, AuditWorkItemStatus,
+};
 use serde::Serialize;
+use std::collections::BTreeMap;
 
 const START_MARKER: &str = "<audit_run_context>";
 const END_MARKER: &str = "</audit_run_context>";
-const MAX_BODY_BYTES: usize = 8_000;
+const MAX_BODY_BYTES: usize = 6_000;
 const MAX_REFS: usize = 12;
+const MAX_WORK_ITEMS: usize = 8;
+const MAX_GAPS: usize = 8;
 
 /// Bounded model context describing the active persisted audit run.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,20 +23,41 @@ impl AuditRunContextFragment {
         let context = AuditRunContext {
             audit_id: &run.id,
             plan_fingerprint: &run.plan_fingerprint,
-            status: format!("{:?}", run.status),
-            current_stage: format!("{:?}", run.current_stage),
-            model_token_budget: run.profile.model_token_budget,
-            wall_time_seconds: run.profile.wall_time_seconds,
-            max_hypotheses: run.profile.max_hypotheses,
+            status: &run.status,
+            current_stage: &run.current_stage,
+            adapter_id: run.adapter_id.as_deref(),
+            coordinator_thread_id: run.coordinator_thread_id.as_deref(),
+            goal_id: run.goal_id.as_deref(),
+            budget: AuditBudgetContext {
+                model_token_budget: run.profile.model_token_budget,
+                wall_time_seconds: run.profile.wall_time_seconds,
+                max_hypotheses: run.profile.max_hypotheses,
+            },
+            counts: AuditRunCounts {
+                coverage_gaps: run.coverage_gaps.len(),
+                evidence_refs: run.evidence_refs.len(),
+                artifact_refs: run.artifact_refs.len(),
+                work_items: work_item_counts(run),
+            },
+            current_work: current_work_items(run),
             coverage_gaps: run
                 .coverage_gaps
                 .iter()
-                .take(MAX_REFS)
-                .map(|gap| format!("{}: {}", gap.capability, gap.reason))
+                .take(MAX_GAPS)
+                .map(CoverageGapContext::from)
                 .collect(),
-            evidence_refs: run.evidence_refs.iter().take(MAX_REFS).collect(),
-            artifact_refs: run.artifact_refs.iter().take(MAX_REFS).collect(),
-            work_items: run.work_items.len(),
+            evidence_refs: run
+                .evidence_refs
+                .iter()
+                .take(MAX_REFS)
+                .map(String::as_str)
+                .collect(),
+            artifact_refs: run
+                .artifact_refs
+                .iter()
+                .take(MAX_REFS)
+                .map(String::as_str)
+                .collect(),
         };
         let mut body = serde_json::to_string_pretty(&context)
             .unwrap_or_else(|error| format!("{{\"serializationError\":\"{error}\"}}"));
@@ -68,21 +94,142 @@ impl ContextualUserFragment for AuditRunContextFragment {
 struct AuditRunContext<'a> {
     audit_id: &'a str,
     plan_fingerprint: &'a str,
-    status: String,
-    current_stage: String,
+    status: &'a AuditRunStatus,
+    current_stage: &'a AuditStageId,
+    adapter_id: Option<&'a str>,
+    coordinator_thread_id: Option<&'a str>,
+    goal_id: Option<&'a str>,
+    budget: AuditBudgetContext,
+    counts: AuditRunCounts,
+    current_work: Vec<WorkItemContext<'a>>,
+    coverage_gaps: Vec<CoverageGapContext<'a>>,
+    evidence_refs: Vec<&'a str>,
+    artifact_refs: Vec<&'a str>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AuditBudgetContext {
     model_token_budget: i64,
     wall_time_seconds: i64,
     max_hypotheses: u32,
-    coverage_gaps: Vec<String>,
-    evidence_refs: Vec<&'a String>,
-    artifact_refs: Vec<&'a String>,
-    work_items: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AuditRunCounts {
+    coverage_gaps: usize,
+    evidence_refs: usize,
+    artifact_refs: usize,
+    work_items: BTreeMap<&'static str, usize>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkItemContext<'a> {
+    id: &'a str,
+    stage: &'a AuditStageId,
+    status: &'a AuditWorkItemStatus,
+    title: &'a str,
+    claimed_by: Option<&'a str>,
+    attempts: u32,
+    evidence_ref_count: usize,
+}
+
+impl<'a> From<&'a AuditWorkItem> for WorkItemContext<'a> {
+    fn from(value: &'a AuditWorkItem) -> Self {
+        Self {
+            id: &value.id,
+            stage: &value.stage,
+            status: &value.status,
+            title: &value.title,
+            claimed_by: value.claimed_by.as_deref(),
+            attempts: value.attempts,
+            evidence_ref_count: value.evidence_refs.len(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CoverageGapContext<'a> {
+    capability: &'a str,
+    stage: &'a AuditStageId,
+    reason: &'a str,
+    required: bool,
+}
+
+impl<'a> From<&'a AuditCoverageGap> for CoverageGapContext<'a> {
+    fn from(value: &'a AuditCoverageGap) -> Self {
+        Self {
+            capability: &value.capability,
+            stage: &value.stage,
+            reason: &value.reason,
+            required: value.required,
+        }
+    }
+}
+
+fn current_work_items(run: &AuditRun) -> Vec<WorkItemContext<'_>> {
+    let mut items = run
+        .work_items
+        .iter()
+        .filter(|item| {
+            item.stage == run.current_stage
+                && matches!(
+                    item.status,
+                    AuditWorkItemStatus::Claimed | AuditWorkItemStatus::Pending
+                )
+        })
+        .take(MAX_WORK_ITEMS)
+        .map(WorkItemContext::from)
+        .collect::<Vec<_>>();
+    if !items.is_empty() {
+        return items;
+    }
+
+    items = run
+        .work_items
+        .iter()
+        .filter(|item| item.stage == run.current_stage)
+        .take(MAX_WORK_ITEMS)
+        .map(WorkItemContext::from)
+        .collect::<Vec<_>>();
+    if !items.is_empty() {
+        return items;
+    }
+
+    run.work_items
+        .iter()
+        .filter(|item| item.status == AuditWorkItemStatus::Pending)
+        .take(MAX_WORK_ITEMS)
+        .map(WorkItemContext::from)
+        .collect()
+}
+
+fn work_item_counts(run: &AuditRun) -> BTreeMap<&'static str, usize> {
+    let mut counts = BTreeMap::new();
+    for item in &run.work_items {
+        let status = match item.status {
+            AuditWorkItemStatus::Pending => "pending",
+            AuditWorkItemStatus::Claimed => "claimed",
+            AuditWorkItemStatus::Completed => "completed",
+            AuditWorkItemStatus::Failed => "failed",
+            AuditWorkItemStatus::Blocked => "blocked",
+            AuditWorkItemStatus::Cancelled => "cancelled",
+        };
+        *counts.entry(status).or_default() += 1;
+    }
+    counts
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use peregrine_types::{AuditProfile, AuditRunStatus, AuditStageId, AuditTarget, Metadata};
+    use peregrine_types::{
+        AuditCoverageGap, AuditProfile, AuditRunStatus, AuditStageId, AuditTarget, AuditWorkItem,
+        AuditWorkItemStatus, Metadata,
+    };
 
     #[test]
     fn fragment_is_bounded() {
@@ -102,8 +249,36 @@ mod tests {
             goal_id: None,
             adapter_id: None,
             capabilities: Vec::new(),
-            coverage_gaps: Vec::new(),
-            work_items: Vec::new(),
+            coverage_gaps: (0..100)
+                .map(|index| AuditCoverageGap {
+                    capability: format!("capability-{index}"),
+                    stage: AuditStageId::BuildNormalize,
+                    reason: format!("reason-{index}"),
+                    required: true,
+                })
+                .collect(),
+            work_items: (0..100)
+                .map(|index| AuditWorkItem {
+                    id: format!("work-{index}"),
+                    stage: if index == 0 {
+                        AuditStageId::BuildNormalize
+                    } else {
+                        AuditStageId::AttackSurface
+                    },
+                    status: if index == 0 {
+                        AuditWorkItemStatus::Claimed
+                    } else {
+                        AuditWorkItemStatus::Pending
+                    },
+                    title: format!("Work item {index}"),
+                    claimed_by: (index == 0).then_some("researcher".to_string()),
+                    attempts: index,
+                    evidence_refs: Vec::new(),
+                    created_at: 0,
+                    updated_at: 0,
+                    metadata: Metadata::new(),
+                })
+                .collect(),
             evidence_refs: (0..100).map(|index| format!("evidence-{index}")).collect(),
             artifact_refs: (0..100).map(|index| format!("artifact-{index}")).collect(),
             created_at: 0,
@@ -115,6 +290,12 @@ mod tests {
 
         assert!(rendered.len() <= MAX_BODY_BYTES + 300);
         assert!(rendered.contains("audit-1"));
+        assert!(rendered.contains("\"status\": \"running\""));
+        assert!(rendered.contains("\"currentStage\": \"buildNormalize\""));
+        assert!(rendered.contains("\"currentWork\""));
+        assert!(rendered.contains("work-0"));
+        assert!(rendered.contains("\"evidenceRefs\": 100"));
         assert!(!rendered.contains("evidence-99"));
+        assert!(!rendered.contains("capability-99"));
     }
 }
