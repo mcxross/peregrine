@@ -164,6 +164,8 @@ impl AuditRequestProcessor {
         let work_items = create_audit_work_items(&audit_id, &plan.stages, now);
         let mut metadata = Metadata::new();
         metadata.insert("acquiredTarget".to_string(), serialize(&acquired)?);
+        let mut artifact_refs = vec![acquired.manifest_ref.clone()];
+        artifact_refs.extend(acquired.artifact_refs.clone());
         let mut run = AuditRun {
             schema_version: 1,
             id: audit_id,
@@ -183,7 +185,7 @@ impl AuditRequestProcessor {
             coverage_gaps,
             work_items,
             evidence_refs: Vec::new(),
-            artifact_refs: vec![acquired.manifest_ref],
+            artifact_refs,
             created_at: now,
             updated_at: now,
             metadata,

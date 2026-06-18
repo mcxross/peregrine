@@ -195,6 +195,7 @@ impl AuditChainAdapter for SuiSecurityAdapter {
                         adapter_id: ADAPTER_ID.to_string(),
                         root: destination,
                         manifest_ref,
+                        artifact_refs: Vec::new(),
                         immutable_state_ref: None,
                         diagnostics: Vec::new(),
                         metadata: Metadata::new(),
@@ -229,6 +230,19 @@ impl AuditChainAdapter for SuiSecurityAdapter {
                         serde_json::to_value(&artifact)
                             .map_err(|error| AuditAdapterError::Adapter(error.to_string()))?,
                     );
+                    let import_metadata_ref = audit_relative_ref(
+                        workspace,
+                        &artifact
+                            .raw_root
+                            .parent()
+                            .ok_or_else(|| {
+                                AuditAdapterError::Adapter(
+                                    "import artifact raw root has no import root".to_string(),
+                                )
+                            })?
+                            .join(".peregrine")
+                            .join("import-engine.json"),
+                    )?;
                     let manifest_ref = write_manifest(
                         workspace,
                         json!({
@@ -236,6 +250,7 @@ impl AuditChainAdapter for SuiSecurityAdapter {
                             "kind": "remotePackage",
                             "networkId": network_id,
                             "stateRef": state_ref,
+                            "importMetadataRef": import_metadata_ref,
                             "importArtifact": artifact,
                         }),
                     )?;
@@ -243,6 +258,7 @@ impl AuditChainAdapter for SuiSecurityAdapter {
                         adapter_id: ADAPTER_ID.to_string(),
                         root: artifact.project_root,
                         manifest_ref,
+                        artifact_refs: vec![import_metadata_ref],
                         immutable_state_ref: state_ref,
                         diagnostics: artifact
                             .diagnostics
@@ -366,7 +382,16 @@ fn write_manifest(
         action: "write audit target manifest",
         source,
     })?;
-    Ok(path.display().to_string())
+    audit_relative_ref(workspace, &path)
+}
+
+fn audit_relative_ref(
+    workspace: &AuditWorkspace,
+    path: &Path,
+) -> Result<String, AuditAdapterError> {
+    path.strip_prefix(&workspace.root)
+        .map(|relative| relative.to_string_lossy().into_owned())
+        .map_err(|error| AuditAdapterError::Adapter(error.to_string()))
 }
 
 #[cfg(test)]
@@ -398,6 +423,9 @@ mod tests {
             .expect("acquire");
 
         assert!(acquired.root.join("Move.toml").is_file());
+        assert_eq!(acquired.manifest_ref, "input/target-manifest.json");
+        assert_eq!(acquired.artifact_refs, Vec::<String>::new());
+        assert!(workspace.root.join(&acquired.manifest_ref).is_file());
         assert!(
             fs::metadata(acquired.root.join("sources/main.move"))
                 .expect("metadata")

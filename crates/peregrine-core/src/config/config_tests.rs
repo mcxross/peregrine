@@ -406,6 +406,7 @@ web_search = true
             experimental_request_user_input: None,
             sui: None,
             sui_move_analyzer: None,
+            sui_move_knowledge: None,
         })
     );
 }
@@ -427,6 +428,7 @@ web_search = false
             experimental_request_user_input: None,
             sui: None,
             sui_move_analyzer: None,
+            sui_move_knowledge: None,
         })
     );
 }
@@ -447,6 +449,7 @@ fn tools_experimental_request_user_input_defaults_to_enabled() {
             experimental_request_user_input: Some(ExperimentalRequestUserInput { enabled: true }),
             sui: None,
             sui_move_analyzer: None,
+            sui_move_knowledge: None,
         })
     );
 }
@@ -468,6 +471,7 @@ enabled = false
             experimental_request_user_input: Some(ExperimentalRequestUserInput { enabled: false }),
             sui: None,
             sui_move_analyzer: None,
+            sui_move_knowledge: None,
         })
     );
 }
@@ -484,6 +488,7 @@ async fn load_config_resolves_experimental_request_user_input_enabled() -> std::
                 }),
                 sui: None,
                 sui_move_analyzer: None,
+                sui_move_knowledge: None,
             }),
             ..ConfigToml::default()
         },

@@ -121,6 +121,8 @@ pub struct AcquiredAuditTarget {
     pub adapter_id: String,
     pub root: PathBuf,
     pub manifest_ref: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifact_refs: Vec<String>,
     pub immutable_state_ref: Option<String>,
     pub diagnostics: Vec<ToolDiagnostic>,
     #[serde(default, skip_serializing_if = "Metadata::is_empty")]

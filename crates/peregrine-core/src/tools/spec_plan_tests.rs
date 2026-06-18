@@ -522,6 +522,7 @@ async fn audit_tools_are_scoped_to_audit_coordinator_workspaces() {
         "audit_record_packet",
         "audit_record_evidence",
         "audit_finish_work",
+        "audit_finalize_report",
     ];
     let regular = probe(|_| {}).await;
     regular.assert_visible_lacks(&tool_names);
