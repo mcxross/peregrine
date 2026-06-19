@@ -192,6 +192,7 @@ impl AuditStore {
                         .unwrap_or_else(|| "unclaimed".to_string()),
                 });
             }
+            ensure_agent_assignment_claim_order(run, work_item_id, assignment_id)?;
             let assignment = ensure_agent_assignment(run, work_item_id, assignment_id)?;
             if assignment.status != AuditAgentAssignmentStatus::Pending {
                 return Err(AuditStoreError::InvalidAgentAssignmentStatus {
@@ -575,6 +576,33 @@ fn ensure_agent_assignment<'a>(
             assignment.id == assignment_id && assignment.work_item_id == work_item_id
         })
         .ok_or_else(|| AuditStoreError::AgentAssignmentNotFound(assignment_id.to_string()))
+}
+
+fn ensure_agent_assignment_claim_order(
+    run: &AuditRun,
+    work_item_id: &str,
+    assignment_id: &str,
+) -> Result<(), AuditStoreError> {
+    let mut blocked_by = Vec::new();
+    for assignment in run
+        .agent_assignments
+        .iter()
+        .filter(|assignment| assignment.work_item_id == work_item_id)
+    {
+        if assignment.id == assignment_id {
+            if blocked_by.is_empty() {
+                return Ok(());
+            }
+            return Err(AuditStoreError::AgentAssignmentBlocked {
+                assignment_id: assignment_id.to_string(),
+                blocked_by,
+            });
+        }
+        if assignment.status != AuditAgentAssignmentStatus::Completed {
+            blocked_by.push(assignment.id.clone());
+        }
+    }
+    Ok(())
 }
 
 fn ensure_agent_assignments_allow_work_status(

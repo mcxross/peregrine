@@ -304,6 +304,13 @@ pub enum AuditStoreError {
         status: String,
     },
     #[error(
+        "audit agent assignment `{assignment_id}` is blocked by earlier unfinished assignments: {blocked_by:?}"
+    )]
+    AgentAssignmentBlocked {
+        assignment_id: String,
+        blocked_by: Vec<String>,
+    },
+    #[error(
         "audit work item `{work_item_id}` has incomplete agent assignments: {assignment_ids:?}"
     )]
     IncompleteAgentAssignments {
@@ -876,6 +883,112 @@ mod tests {
                 updated_at: 14,
                 ..assignment
             }
+        );
+    }
+
+    #[test]
+    fn claim_agent_assignment_requires_prior_roles_to_complete() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let work_item_id = create_report_run(&store, "audit-agent-order");
+        let assignments = vec![
+            AuditAgentAssignment {
+                schema_version: 1,
+                id: "assignment-1".to_string(),
+                audit_run_id: "audit-agent-order".to_string(),
+                work_item_id: work_item_id.clone(),
+                role: AuditAgentRole::Researcher,
+                role_name: "audit-researcher".to_string(),
+                status: AuditAgentAssignmentStatus::Pending,
+                agent_thread_id: None,
+                conclusion_refs: Vec::new(),
+                created_at: 10,
+                updated_at: 10,
+                metadata: Metadata::new(),
+            },
+            AuditAgentAssignment {
+                schema_version: 1,
+                id: "assignment-2".to_string(),
+                audit_run_id: "audit-agent-order".to_string(),
+                work_item_id: work_item_id.clone(),
+                role: AuditAgentRole::Judge,
+                role_name: "audit-judge".to_string(),
+                status: AuditAgentAssignmentStatus::Pending,
+                agent_thread_id: None,
+                conclusion_refs: Vec::new(),
+                created_at: 10,
+                updated_at: 10,
+                metadata: Metadata::new(),
+            },
+        ];
+        let mut run = store
+            .read_run("audit-agent-order")
+            .expect("read run")
+            .expect("run exists");
+        run.agent_assignments = assignments;
+        store.update_run(&run).expect("update run");
+        store
+            .claim_work("audit-agent-order", "coordinator", None, 11)
+            .expect("claim work");
+
+        assert!(matches!(
+            store.claim_agent_assignment(
+                "audit-agent-order",
+                &work_item_id,
+                "assignment-2",
+                "coordinator",
+                12,
+            ),
+            Err(AuditStoreError::AgentAssignmentBlocked {
+                assignment_id,
+                blocked_by,
+            }) if assignment_id == "assignment-2" && blocked_by == vec!["assignment-1".to_string()]
+        ));
+
+        store
+            .claim_agent_assignment(
+                "audit-agent-order",
+                &work_item_id,
+                "assignment-1",
+                "coordinator",
+                13,
+            )
+            .expect("claim first assignment");
+        store
+            .record_agent_conclusion(
+                "audit-agent-order",
+                &work_item_id,
+                AuditAgentConclusion {
+                    schema_version: 1,
+                    id: String::new(),
+                    audit_run_id: String::new(),
+                    work_item_id: String::new(),
+                    role: AuditAgentRole::Researcher,
+                    agent_thread_id: None,
+                    status: AuditAgentConclusionStatus::Candidate,
+                    summary: "researcher completed public handoff".to_string(),
+                    candidate_ids: Vec::new(),
+                    evidence_refs: Vec::new(),
+                    artifact_refs: Vec::new(),
+                    created_at: 14,
+                    metadata: Metadata::new(),
+                },
+            )
+            .expect("record first conclusion");
+        let claimed = store
+            .claim_agent_assignment(
+                "audit-agent-order",
+                &work_item_id,
+                "assignment-2",
+                "coordinator",
+                15,
+            )
+            .expect("claim second assignment");
+
+        assert_eq!(claimed.assignment.id, "assignment-2");
+        assert_eq!(
+            claimed.assignment.status,
+            AuditAgentAssignmentStatus::Spawned
         );
     }
 
