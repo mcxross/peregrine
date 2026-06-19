@@ -15,7 +15,7 @@ use thiserror::Error;
 mod operations;
 mod report;
 
-pub use operations::{AgentAssignmentUpdate, WorkUpdate};
+pub use operations::{AgentAssignmentUpdate, ScheduledWorkBlock, WorkUpdate};
 pub use report::FinalizedAuditReport;
 
 const DATABASE_FILE: &str = "audits.sqlite";
@@ -738,6 +738,83 @@ mod tests {
                 .work_item
                 .metadata
                 .contains_key("stageScheduleOutcome")
+        );
+    }
+
+    #[test]
+    fn blocks_next_unavailable_scheduled_work_item() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let plan = store.store_plan(plan()).expect("store plan");
+        let stages = vec![AuditStageId::DynamicAnalysis, AuditStageId::AuditReport];
+        let mut work_items = create_audit_work_items("audit-auto-block", &stages, 10);
+        attach_stage_schedules(
+            &mut work_items,
+            &[AuditCapabilityBinding {
+                capability: "dynamic.fuzzing".to_string(),
+                provider_id: "mcp".to_string(),
+                adapter_id: None,
+                tool_name: Some("mcp__sui__movy_fuzz".to_string()),
+                available: false,
+                diagnostic: Some("fuzzer unavailable".to_string()),
+            }],
+        )
+        .expect("attach schedules");
+        let run = AuditRun {
+            schema_version: 1,
+            id: "audit-auto-block".to_string(),
+            plan_fingerprint: plan.fingerprint,
+            target: plan.target,
+            profile: plan.profile,
+            status: AuditRunStatus::Running,
+            current_stage: stages[0].clone(),
+            coordinator_thread_id: None,
+            goal_id: None,
+            adapter_id: Some("adapter/sui".to_string()),
+            capabilities: Vec::new(),
+            coverage_gaps: Vec::new(),
+            work_items,
+            agent_assignments: Vec::new(),
+            evidence_refs: Vec::new(),
+            artifact_refs: Vec::new(),
+            created_at: 10,
+            updated_at: 10,
+            metadata: Metadata::new(),
+        };
+        store.create_run(&run).expect("create run");
+        let events = store.subscribe_events().expect("subscribe events");
+
+        let block = store
+            .block_next_unavailable_scheduled_work("audit-auto-block", "scheduler", 11)
+            .expect("block unavailable work")
+            .expect("blocked work");
+
+        assert_eq!(block.work_item.stage, AuditStageId::DynamicAnalysis);
+        assert_eq!(block.work_item.status, AuditWorkItemStatus::Blocked);
+        assert_eq!(
+            block.diagnostics,
+            vec!["dynamic.fuzzing unavailable: fuzzer unavailable".to_string()]
+        );
+        assert!(block.artifact_ref.starts_with("artifacts/"));
+        assert_eq!(block.run.current_stage, AuditStageId::AuditReport);
+        assert!(matches!(
+            recv_event(&events),
+            AuditStoreEvent::StageUpdated {
+                audit_id,
+                stage: AuditStageId::DynamicAnalysis,
+                status: AuditStageStatus::Running,
+                run,
+            } if audit_id == "audit-auto-block"
+                && run.work_items[0].status == AuditWorkItemStatus::Claimed
+        ));
+        assert_eq!(
+            recv_event(&events),
+            AuditStoreEvent::StageUpdated {
+                audit_id: "audit-auto-block".to_string(),
+                stage: AuditStageId::DynamicAnalysis,
+                status: AuditStageStatus::Unavailable,
+                run: block.run,
+            }
         );
     }
 

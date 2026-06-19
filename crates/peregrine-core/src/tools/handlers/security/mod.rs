@@ -15,7 +15,6 @@ use codex_tools::{ToolName, ToolSpec};
 use peregrine_audit_store::AuditStore;
 use peregrine_types::{AuditEvidenceAttestation, AuditRun, AuditWorkItemStatus};
 use serde::Serialize;
-use serde_json::Value;
 use std::path::{Component, Path, PathBuf};
 
 pub use spec::{
@@ -30,6 +29,8 @@ const MAX_SUMMARY_BYTES: usize = 2_000;
 const MAX_OBSERVATION_BYTES: usize = 8_000;
 const MAX_PACKET_BYTES: usize = 128 * 1024;
 const MAX_REFS: usize = 32;
+const MAX_SCHEDULER_BLOCKS: usize = 64;
+const SCHEDULER_WORKER_ID: &str = "audit-deterministic-scheduler";
 
 #[derive(Clone, Copy)]
 pub(crate) enum AuditToolHandler {
@@ -126,6 +127,8 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
             Self::ClaimWork => {
                 let args: ClaimWorkArgs = parse_arguments(&arguments)?;
                 validate_text("worker_id", &args.worker_id, MAX_ID_BYTES)?;
+                let scheduler_result =
+                    block_unavailable_scheduled_work(&store, &scope.audit_id, now)?;
                 let claimed = store
                     .claim_work(&scope.audit_id, &args.worker_id, None, now)
                     .map_err(tool_error)?;
@@ -134,11 +137,20 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
                         inject_audit_context(&session, &turn, &run).await;
                         json_output(&ClaimWorkResponse {
                             agent_assignments: agent_assignments_for_work(&run, &work_item.id),
+                            scheduler_blocks: scheduler_result.blocks,
                             work_item: WorkSummary::from(&work_item),
                             remaining_pending: pending_count(&run),
                         })?
                     }
-                    None => json_output(&Value::String("no pending work".to_string()))?,
+                    None => {
+                        if let Some(run) = &scheduler_result.latest_run {
+                            inject_audit_context(&session, &turn, run).await;
+                        }
+                        json_output(&NoPendingWorkResponse {
+                            message: "no pending work".to_string(),
+                            scheduler_blocks: scheduler_result.blocks,
+                        })?
+                    }
                 }
             }
             Self::ClaimAgentAssignment => {
@@ -430,6 +442,33 @@ fn pending_count(run: &AuditRun) -> usize {
         .iter()
         .filter(|item| item.status == AuditWorkItemStatus::Pending)
         .count()
+}
+
+struct SchedulerBlockResult {
+    blocks: Vec<SchedulerBlockSummary>,
+    latest_run: Option<AuditRun>,
+}
+
+fn block_unavailable_scheduled_work(
+    store: &AuditStore,
+    audit_id: &str,
+    now: i64,
+) -> Result<SchedulerBlockResult, FunctionCallError> {
+    let mut blocks = Vec::new();
+    let mut latest_run = None;
+    for _ in 0..MAX_SCHEDULER_BLOCKS {
+        let Some(block) = store
+            .block_next_unavailable_scheduled_work(audit_id, SCHEDULER_WORKER_ID, now)
+            .map_err(tool_error)?
+        else {
+            return Ok(SchedulerBlockResult { blocks, latest_run });
+        };
+        latest_run = Some(block.run.clone());
+        blocks.push(SchedulerBlockSummary::from(block));
+    }
+    Err(model_error(
+        "deterministic audit scheduler reached its unavailable-stage limit",
+    ))
 }
 
 #[cfg(test)]

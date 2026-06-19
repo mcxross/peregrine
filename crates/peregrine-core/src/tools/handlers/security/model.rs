@@ -3,6 +3,7 @@ use super::{
     validate_serialized_size, validate_text,
 };
 use crate::function_tool::FunctionCallError;
+use peregrine_audit_store::ScheduledWorkBlock;
 use peregrine_types::{
     AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentConclusion,
     AuditAgentConclusionStatus, AuditAgentRole, AuditEvidence, AuditEvidenceAttestation, AuditRun,
@@ -449,7 +450,35 @@ pub(super) fn agent_assignments_for_work(
 pub(super) struct ClaimWorkResponse {
     pub(super) work_item: WorkSummary,
     pub(super) agent_assignments: Vec<AgentAssignmentSummary>,
+    pub(super) scheduler_blocks: Vec<SchedulerBlockSummary>,
     pub(super) remaining_pending: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct NoPendingWorkResponse {
+    pub(super) message: String,
+    pub(super) scheduler_blocks: Vec<SchedulerBlockSummary>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct SchedulerBlockSummary {
+    work_item_id: String,
+    stage: AuditStageId,
+    artifact_ref: String,
+    diagnostics: Vec<String>,
+}
+
+impl From<ScheduledWorkBlock> for SchedulerBlockSummary {
+    fn from(value: ScheduledWorkBlock) -> Self {
+        Self {
+            work_item_id: value.work_item.id,
+            stage: value.work_item.stage,
+            artifact_ref: value.artifact_ref,
+            diagnostics: value.diagnostics,
+        }
+    }
 }
 
 #[derive(Serialize)]

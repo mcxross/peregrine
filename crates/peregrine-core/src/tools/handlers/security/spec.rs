@@ -25,7 +25,7 @@ pub fn read_run_tool() -> ToolSpec {
 pub fn claim_work_tool() -> ToolSpec {
     function_tool(
         CLAIM_WORK_TOOL_NAME,
-        "Atomically claim the next pending item in the current audit's deterministic stage queue.",
+        "Atomically claim the next actionable item in the current audit's deterministic stage queue. Before claiming, this tool records and blocks leading scheduled stages whose required capabilities are unavailable, returning those scheduler blocks in the response.",
         BTreeMap::from([(
             "worker_id".to_string(),
             JsonSchema::string(Some(

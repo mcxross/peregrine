@@ -28,6 +28,14 @@ pub struct AgentAssignmentUpdate {
     pub assignment: AuditAgentAssignment,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScheduledWorkBlock {
+    pub run: AuditRun,
+    pub work_item: AuditWorkItem,
+    pub artifact_ref: String,
+    pub diagnostics: Vec<String>,
+}
+
 impl AuditStore {
     pub fn claim_work(
         &self,
@@ -310,6 +318,81 @@ impl AuditStore {
             Ok(Some(evidence_ref.clone()))
         })
         .map(|(run, evidence_ref)| evidence_ref.map(|evidence_ref| (run, evidence_ref)))
+    }
+
+    pub fn block_next_unavailable_scheduled_work(
+        &self,
+        run_id: &str,
+        worker_id: &str,
+        now: i64,
+    ) -> Result<Option<ScheduledWorkBlock>, AuditStoreError> {
+        let Some(run) = self.read_run(run_id)? else {
+            return Err(AuditStoreError::RunNotFound(run_id.to_string()));
+        };
+        if run
+            .work_items
+            .iter()
+            .any(|work_item| work_item.status == AuditWorkItemStatus::Claimed)
+        {
+            return Ok(None);
+        }
+        let Some(work_item) = run
+            .work_items
+            .iter()
+            .find(|work_item| work_item.status == AuditWorkItemStatus::Pending)
+        else {
+            return Ok(None);
+        };
+        let Some(schedule) = schedule_metadata(&work_item.metadata) else {
+            return Ok(None);
+        };
+        if schedule.action != AuditStageScheduleAction::RecordUnavailableAndContinue {
+            return Ok(None);
+        }
+        let diagnostics = schedule
+            .unavailable_capabilities
+            .iter()
+            .map(|capability| {
+                format!(
+                    "{} unavailable: {}",
+                    capability.capability, capability.reason
+                )
+            })
+            .collect::<Vec<_>>();
+        let packet = json!({
+            "schemaVersion": 1,
+            "stage": work_item.stage,
+            "workItemId": work_item.id,
+            "action": "recordUnavailableAndContinue",
+            "requiredCapabilities": schedule.required_capabilities,
+            "unavailableCapabilities": schedule.unavailable_capabilities,
+            "diagnostics": diagnostics,
+        });
+        let Some((_, claimed)) = self.claim_work(run_id, worker_id, None, now)? else {
+            return Ok(None);
+        };
+        let (_, artifact_ref) = self.record_packet(
+            run_id,
+            &claimed.id,
+            "capabilityUnavailable",
+            "Scheduled capability is unavailable; stage was blocked with a visible coverage gap.",
+            packet,
+            now,
+        )?;
+        let update = self.finish_work(
+            run_id,
+            &claimed.id,
+            worker_id,
+            AuditWorkItemStatus::Blocked,
+            &[],
+            now,
+        )?;
+        Ok(Some(ScheduledWorkBlock {
+            run: update.run,
+            work_item: update.work_item,
+            artifact_ref,
+            diagnostics,
+        }))
     }
 
     pub fn finish_work(
