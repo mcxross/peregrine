@@ -303,6 +303,18 @@ pub enum AuditStoreError {
         assignment_id: String,
         status: String,
     },
+    #[error(
+        "audit work item `{work_item_id}` has incomplete agent assignments: {assignment_ids:?}"
+    )]
+    IncompleteAgentAssignments {
+        work_item_id: String,
+        assignment_ids: Vec<String>,
+    },
+    #[error("audit work item `{work_item_id}` has failed agent assignments: {assignment_ids:?}")]
+    FailedAgentAssignments {
+        work_item_id: String,
+        assignment_ids: Vec<String>,
+    },
     #[error("audit work item `{work_item_id}` is claimed by `{claimed_by}`")]
     WorkItemClaimedByOther {
         work_item_id: String,
@@ -857,6 +869,87 @@ mod tests {
                 ..assignment
             }
         );
+    }
+
+    #[test]
+    fn finish_work_requires_agent_assignments_to_complete() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let work_item_id = create_report_run(&store, "audit-agent-gate");
+        let assignment = AuditAgentAssignment {
+            schema_version: 1,
+            id: "assignment-1".to_string(),
+            audit_run_id: "audit-agent-gate".to_string(),
+            work_item_id: work_item_id.clone(),
+            role: AuditAgentRole::Researcher,
+            role_name: "audit-researcher".to_string(),
+            status: AuditAgentAssignmentStatus::Pending,
+            agent_thread_id: None,
+            conclusion_refs: Vec::new(),
+            created_at: 10,
+            updated_at: 10,
+            metadata: Metadata::new(),
+        };
+        let mut run = store
+            .read_run("audit-agent-gate")
+            .expect("read run")
+            .expect("run exists");
+        run.agent_assignments.push(assignment);
+        store.update_run(&run).expect("update run");
+        store
+            .claim_work("audit-agent-gate", "coordinator", None, 11)
+            .expect("claim work");
+
+        assert!(matches!(
+            store.finish_work(
+                "audit-agent-gate",
+                &work_item_id,
+                "coordinator",
+                AuditWorkItemStatus::Completed,
+                &[],
+                12,
+            ),
+            Err(AuditStoreError::IncompleteAgentAssignments {
+                work_item_id: blocked_work_item_id,
+                assignment_ids,
+            }) if blocked_work_item_id == work_item_id && assignment_ids == vec!["assignment-1".to_string()]
+        ));
+
+        store
+            .finish_agent_assignment(
+                "audit-agent-gate",
+                &work_item_id,
+                "assignment-1",
+                AuditAgentAssignmentStatus::Failed,
+                13,
+            )
+            .expect("fail assignment");
+        assert!(matches!(
+            store.finish_work(
+                "audit-agent-gate",
+                &work_item_id,
+                "coordinator",
+                AuditWorkItemStatus::Completed,
+                &[],
+                14,
+            ),
+            Err(AuditStoreError::FailedAgentAssignments {
+                work_item_id: blocked_work_item_id,
+                assignment_ids,
+            }) if blocked_work_item_id == work_item_id && assignment_ids == vec!["assignment-1".to_string()]
+        ));
+
+        let update = store
+            .finish_work(
+                "audit-agent-gate",
+                &work_item_id,
+                "coordinator",
+                AuditWorkItemStatus::Blocked,
+                &[],
+                15,
+            )
+            .expect("block work");
+        assert_eq!(update.work_item.status, AuditWorkItemStatus::Blocked);
     }
 
     #[test]

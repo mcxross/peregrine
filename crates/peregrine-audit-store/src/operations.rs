@@ -327,6 +327,7 @@ impl AuditStore {
                     return Err(AuditStoreError::EvidenceNotFound(evidence_ref.clone()));
                 }
             }
+            ensure_agent_assignments_allow_work_status(run, work_item_id, &status)?;
             let work_item = ensure_work_item(run, work_item_id)?;
             if work_item.claimed_by.as_deref() != Some(worker_id) {
                 return Err(AuditStoreError::WorkItemClaimedByOther {
@@ -567,6 +568,54 @@ fn ensure_agent_assignment<'a>(
             assignment.id == assignment_id && assignment.work_item_id == work_item_id
         })
         .ok_or_else(|| AuditStoreError::AgentAssignmentNotFound(assignment_id.to_string()))
+}
+
+fn ensure_agent_assignments_allow_work_status(
+    run: &AuditRun,
+    work_item_id: &str,
+    status: &AuditWorkItemStatus,
+) -> Result<(), AuditStoreError> {
+    if *status != AuditWorkItemStatus::Completed {
+        return Ok(());
+    }
+    let assignments = run
+        .agent_assignments
+        .iter()
+        .filter(|assignment| assignment.work_item_id == work_item_id)
+        .collect::<Vec<_>>();
+    let incomplete = assignments
+        .iter()
+        .filter(|assignment| {
+            matches!(
+                assignment.status,
+                AuditAgentAssignmentStatus::Pending | AuditAgentAssignmentStatus::Spawned
+            )
+        })
+        .map(|assignment| assignment.id.clone())
+        .collect::<Vec<_>>();
+    if !incomplete.is_empty() {
+        return Err(AuditStoreError::IncompleteAgentAssignments {
+            work_item_id: work_item_id.to_string(),
+            assignment_ids: incomplete,
+        });
+    }
+    let failed = assignments
+        .iter()
+        .filter(|assignment| {
+            matches!(
+                assignment.status,
+                AuditAgentAssignmentStatus::Failed | AuditAgentAssignmentStatus::Cancelled
+            )
+        })
+        .map(|assignment| assignment.id.clone())
+        .collect::<Vec<_>>();
+    if !failed.is_empty() {
+        return Err(AuditStoreError::FailedAgentAssignments {
+            work_item_id: work_item_id.to_string(),
+            assignment_ids: failed,
+        });
+    }
+    Ok(())
 }
 
 fn current_claimed_work_item_index(run: &AuditRun) -> Option<usize> {
