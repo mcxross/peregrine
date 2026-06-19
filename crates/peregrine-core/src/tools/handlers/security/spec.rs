@@ -4,6 +4,9 @@ use std::collections::BTreeMap;
 
 pub const READ_RUN_TOOL_NAME: &str = "audit_read_run";
 pub const CLAIM_WORK_TOOL_NAME: &str = "audit_claim_work";
+pub const CLAIM_AGENT_ASSIGNMENT_TOOL_NAME: &str = "audit_claim_agent_assignment";
+pub const SET_AGENT_ASSIGNMENT_THREAD_TOOL_NAME: &str = "audit_set_agent_assignment_thread";
+pub const FINISH_AGENT_ASSIGNMENT_TOOL_NAME: &str = "audit_finish_agent_assignment";
 pub const RECORD_PACKET_TOOL_NAME: &str = "audit_record_packet";
 pub const RECORD_EVIDENCE_TOOL_NAME: &str = "audit_record_evidence";
 pub const RECORD_AGENT_CONCLUSION_TOOL_NAME: &str = "audit_record_agent_conclusion";
@@ -30,6 +33,75 @@ pub fn claim_work_tool() -> ToolSpec {
             )),
         )]),
         vec!["worker_id"],
+    )
+}
+
+pub fn claim_agent_assignment_tool() -> ToolSpec {
+    function_tool(
+        CLAIM_AGENT_ASSIGNMENT_TOOL_NAME,
+        "Atomically claim a pending audit agent assignment for an already claimed work item before spawning the configured role with spawn_agent.",
+        BTreeMap::from([
+            (
+                "work_item_id".to_string(),
+                id_schema("Claimed work item ID."),
+            ),
+            (
+                "assignment_id".to_string(),
+                id_schema("Pending audit agent assignment ID."),
+            ),
+            (
+                "worker_id".to_string(),
+                id_schema("Worker identifier used when claiming the work item."),
+            ),
+        ]),
+        vec!["work_item_id", "assignment_id", "worker_id"],
+    )
+}
+
+pub fn set_agent_assignment_thread_tool() -> ToolSpec {
+    function_tool(
+        SET_AGENT_ASSIGNMENT_THREAD_TOOL_NAME,
+        "Attach the spawned child agent task/thread identity returned by spawn_agent to an already claimed audit agent assignment.",
+        BTreeMap::from([
+            (
+                "work_item_id".to_string(),
+                id_schema("Claimed work item ID."),
+            ),
+            (
+                "assignment_id".to_string(),
+                id_schema("Spawned audit agent assignment ID."),
+            ),
+            (
+                "agent_thread_id".to_string(),
+                id_schema("Child agent task name or thread identifier returned by spawn_agent."),
+            ),
+        ]),
+        vec!["work_item_id", "assignment_id", "agent_thread_id"],
+    )
+}
+
+pub fn finish_agent_assignment_tool() -> ToolSpec {
+    function_tool(
+        FINISH_AGENT_ASSIGNMENT_TOOL_NAME,
+        "Mark an audit agent assignment failed or cancelled when no public conclusion artifact can be recorded. Successful assignments should complete through audit_record_agent_conclusion.",
+        BTreeMap::from([
+            (
+                "work_item_id".to_string(),
+                id_schema("Claimed work item ID."),
+            ),
+            (
+                "assignment_id".to_string(),
+                id_schema("Audit agent assignment ID."),
+            ),
+            (
+                "status".to_string(),
+                JsonSchema::string_enum(
+                    vec![json!("failed"), json!("cancelled")],
+                    Some("Terminal non-success assignment state.".to_string()),
+                ),
+            ),
+        ]),
+        vec!["work_item_id", "assignment_id", "status"],
     )
 }
 

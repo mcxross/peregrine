@@ -11,7 +11,10 @@ use peregrine_security_tools::{
     AcquiredAuditTarget, AdapterFuture, AuditChainAdapter, AuditTargetPreflight, ExploitReplay,
 };
 use peregrine_types::protocol::SessionSource;
-use peregrine_types::{AuditCapabilityBinding, AuditTarget, ExploitBundle, ExploitIntent};
+use peregrine_types::{
+    AuditAgentAssignmentStatus, AuditAgentRole, AuditCapabilityBinding, AuditTarget, ExploitBundle,
+    ExploitIntent,
+};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tempfile::{TempDir, tempdir};
@@ -223,6 +226,25 @@ async fn audit_start_and_resume_continue_coordinator_goal() -> anyhow::Result<()
     assert_eq!(run.status, AuditRunStatus::Running);
     assert!(run.goal_id.is_some());
     assert!(run.coordinator_thread_id.is_some());
+    assert_eq!(run.agent_assignments.len(), 13);
+    assert!(run.agent_assignments.iter().all(|assignment| {
+        assignment.audit_run_id == run.id
+            && assignment.status == AuditAgentAssignmentStatus::Pending
+            && assignment.agent_thread_id.is_none()
+            && assignment.conclusion_refs.is_empty()
+    }));
+    assert!(run.agent_assignments.iter().any(|assignment| {
+        assignment.role == AuditAgentRole::Researcher && assignment.role_name == "audit-researcher"
+    }));
+    assert!(run.agent_assignments.iter().any(|assignment| {
+        assignment.role == AuditAgentRole::Skeptic && assignment.role_name == "audit-skeptic"
+    }));
+    assert!(run.agent_assignments.iter().any(|assignment| {
+        assignment.role == AuditAgentRole::Exploiter && assignment.role_name == "audit-exploiter"
+    }));
+    assert!(run.agent_assignments.iter().any(|assignment| {
+        assignment.role == AuditAgentRole::Judge && assignment.role_name == "audit-judge"
+    }));
     assert_eq!(fixture.continuation.calls(), 1);
 
     fixture

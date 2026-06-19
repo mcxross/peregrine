@@ -4,9 +4,10 @@ use super::{
 };
 use crate::function_tool::FunctionCallError;
 use peregrine_types::{
-    AuditAgentConclusion, AuditAgentConclusionStatus, AuditAgentRole, AuditEvidence,
-    AuditEvidenceAttestation, AuditRun, AuditRunStatus, AuditStageId, AuditWorkItem,
-    AuditWorkItemStatus, FindingCandidate, Metadata, SourcePrecision, VerificationMethod,
+    AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentConclusion,
+    AuditAgentConclusionStatus, AuditAgentRole, AuditEvidence, AuditEvidenceAttestation, AuditRun,
+    AuditRunStatus, AuditStageId, AuditWorkItem, AuditWorkItemStatus, FindingCandidate, Metadata,
+    SourcePrecision, VerificationMethod,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -18,6 +19,27 @@ pub(super) struct EmptyArgs {}
 #[derive(Deserialize)]
 pub(super) struct ClaimWorkArgs {
     pub(super) worker_id: String,
+}
+
+#[derive(Deserialize)]
+pub(super) struct ClaimAgentAssignmentArgs {
+    pub(super) work_item_id: String,
+    pub(super) assignment_id: String,
+    pub(super) worker_id: String,
+}
+
+#[derive(Deserialize)]
+pub(super) struct SetAgentAssignmentThreadArgs {
+    pub(super) work_item_id: String,
+    pub(super) assignment_id: String,
+    pub(super) agent_thread_id: String,
+}
+
+#[derive(Deserialize)]
+pub(super) struct FinishAgentAssignmentArgs {
+    pub(super) work_item_id: String,
+    pub(super) assignment_id: String,
+    pub(super) status: AuditAgentAssignmentStatus,
 }
 
 #[derive(Deserialize)]
@@ -198,7 +220,9 @@ pub(super) struct RunSummary {
     status: AuditRunStatus,
     current_stage: AuditStageId,
     work_counts: BTreeMap<String, usize>,
+    agent_counts: BTreeMap<String, usize>,
     next_work: Vec<WorkSummary>,
+    agent_assignments: Vec<AgentAssignmentSummary>,
     evidence_count: usize,
     artifact_count: usize,
     coverage_gaps: Vec<String>,
@@ -212,11 +236,18 @@ impl RunSummary {
                 .entry(format!("{:?}", work_item.status))
                 .or_insert(0) += 1;
         }
+        let mut agent_counts = BTreeMap::new();
+        for assignment in &run.agent_assignments {
+            *agent_counts
+                .entry(format!("{:?}", assignment.status))
+                .or_insert(0) += 1;
+        }
         Self {
             audit_id: run.id.clone(),
             status: run.status.clone(),
             current_stage: run.current_stage.clone(),
             work_counts,
+            agent_counts,
             next_work: run
                 .work_items
                 .iter()
@@ -229,6 +260,7 @@ impl RunSummary {
                 .take(12)
                 .map(WorkSummary::from)
                 .collect(),
+            agent_assignments: next_agent_assignments(run),
             evidence_count: run.evidence_refs.len(),
             artifact_count: run.artifact_refs.len(),
             coverage_gaps: run
@@ -237,6 +269,32 @@ impl RunSummary {
                 .take(12)
                 .map(|gap| format!("{}: {}", gap.capability, gap.reason))
                 .collect(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AgentAssignmentSummary {
+    id: String,
+    work_item_id: String,
+    role: AuditAgentRole,
+    role_name: String,
+    status: AuditAgentAssignmentStatus,
+    agent_thread_id: Option<String>,
+    conclusion_ref_count: usize,
+}
+
+impl From<&AuditAgentAssignment> for AgentAssignmentSummary {
+    fn from(value: &AuditAgentAssignment) -> Self {
+        Self {
+            id: value.id.clone(),
+            work_item_id: value.work_item_id.clone(),
+            role: value.role.clone(),
+            role_name: value.role_name.clone(),
+            status: value.status.clone(),
+            agent_thread_id: value.agent_thread_id.clone(),
+            conclusion_ref_count: value.conclusion_refs.len(),
         }
     }
 }
@@ -267,11 +325,62 @@ impl From<&AuditWorkItem> for WorkSummary {
     }
 }
 
+fn next_agent_assignments(run: &AuditRun) -> Vec<AgentAssignmentSummary> {
+    let pending_work_ids = run
+        .work_items
+        .iter()
+        .filter(|item| {
+            matches!(
+                item.status,
+                AuditWorkItemStatus::Pending | AuditWorkItemStatus::Claimed
+            )
+        })
+        .map(|item| item.id.as_str())
+        .collect::<Vec<_>>();
+    let mut assignments = run
+        .agent_assignments
+        .iter()
+        .filter(|assignment| {
+            pending_work_ids
+                .iter()
+                .any(|work_item_id| *work_item_id == assignment.work_item_id)
+        })
+        .take(12)
+        .map(AgentAssignmentSummary::from)
+        .collect::<Vec<_>>();
+    if !assignments.is_empty() {
+        return assignments;
+    }
+
+    assignments = run
+        .agent_assignments
+        .iter()
+        .filter(|assignment| assignment.status == AuditAgentAssignmentStatus::Pending)
+        .take(12)
+        .map(AgentAssignmentSummary::from)
+        .collect::<Vec<_>>();
+    if !assignments.is_empty() {
+        return assignments;
+    }
+
+    run.agent_assignments
+        .iter()
+        .take(12)
+        .map(AgentAssignmentSummary::from)
+        .collect()
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct ClaimWorkResponse {
     pub(super) work_item: WorkSummary,
     pub(super) remaining_pending: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AgentAssignmentResponse {
+    pub(super) assignment: AgentAssignmentSummary,
 }
 
 #[derive(Serialize)]

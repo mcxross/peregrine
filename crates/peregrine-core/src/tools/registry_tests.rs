@@ -497,6 +497,7 @@ async fn dispatch_records_router_captured_evidence_for_audit_work() -> anyhow::R
             updated_at: 1,
             metadata: Metadata::new(),
         }],
+        agent_assignments: Vec::new(),
         evidence_refs: Vec::new(),
         artifact_refs: Vec::new(),
         created_at: 1,

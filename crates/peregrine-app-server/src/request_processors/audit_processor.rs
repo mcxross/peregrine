@@ -30,7 +30,8 @@ use peregrine_core::context::AuditRunContextFragment;
 use peregrine_core::context::ContextualUserFragment;
 use peregrine_core::{ExternalGoalPreviousStatus, ExternalGoalSet, PeregrineThread, ThreadManager};
 use peregrine_security_tools::{
-    AuditAdapterRegistry, AuditWorkspace, create_audit_work_items, default_audit_stages,
+    AuditAdapterRegistry, AuditWorkspace, create_audit_agent_assignments, create_audit_work_items,
+    default_audit_stages,
 };
 use peregrine_types::{
     AuditPlan, AuditProfile, AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus, Metadata,
@@ -198,6 +199,7 @@ impl AuditRequestProcessor {
         let coverage_gaps = coverage_gaps(&plan, &capabilities);
         let now = OffsetDateTime::now_utc().unix_timestamp();
         let work_items = create_audit_work_items(&audit_id, &plan.stages, now);
+        let agent_assignments = create_audit_agent_assignments(&audit_id, &work_items, now);
         let mut metadata = Metadata::new();
         metadata.insert("acquiredTarget".to_string(), serialize(&acquired)?);
         let mut artifact_refs = vec![acquired.manifest_ref.clone()];
@@ -220,6 +222,7 @@ impl AuditRequestProcessor {
             capabilities,
             coverage_gaps,
             work_items,
+            agent_assignments,
             evidence_refs: Vec::new(),
             artifact_refs,
             created_at: now,
@@ -442,6 +445,9 @@ impl AuditRequestProcessor {
 Never modify immutable audit input. Use only registered tools and isolated audit workspace paths. \
 Start coordinator work by calling audit_read_run, then audit_claim_work. \
 For each claimed item, persist bounded stage packets with audit_record_packet, persist evidence with audit_record_evidence, and close the item with audit_finish_work. \
+For claimed work that has agentAssignments, call audit_claim_agent_assignment before spawning each configured role with spawn_agent. Use the assignment roleName as agent_type and pass only public, bounded inputs: audit ID, work item ID, assignment ID, current stage, evidence refs, artifact refs, and recorded packet refs. After spawn_agent returns, call audit_set_agent_assignment_thread with the returned child agent task name or thread identifier. \
+Run adversarial review as Researcher to Skeptic to Exploiter to Judge. The Judge must receive only normalized evidence, replay results, public role conclusions, and artifact refs; never share hidden reasoning between agents. \
+Each audit agent must record its public conclusion with audit_record_agent_conclusion before its assignment is considered complete. If an agent cannot produce a conclusion, call audit_finish_agent_assignment with failed or cancelled and record a visible diagnostic in the stage packet. \
 Continue through the persisted stage queue until audit_finalize_report succeeds, a budget or usage limit stops the goal, or a visible diagnostic-worthy blocker prevents progress. \
 Treat generated code as a hypothesis until an isolated exploit replay produces evidence. \
 Do not confirm findings without two independent verification classes and successful replay.";

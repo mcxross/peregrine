@@ -1,6 +1,7 @@
 use peregrine_types::{
-    AuditCapabilityBinding, AuditProfile, AuditStageId, AuditTarget, AuditWorkItem,
-    AuditWorkItemStatus, ExploitBundle, ExploitIntent, Metadata, ToolDiagnostic,
+    AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentRole, AuditCapabilityBinding,
+    AuditProfile, AuditStageId, AuditTarget, AuditWorkItem, AuditWorkItemStatus, ExploitBundle,
+    ExploitIntent, Metadata, ToolDiagnostic,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -57,6 +58,82 @@ pub fn create_audit_work_items(
             metadata: Metadata::new(),
         })
         .collect()
+}
+
+pub fn create_audit_agent_assignments(
+    audit_id: &str,
+    work_items: &[AuditWorkItem],
+    created_at: i64,
+) -> Vec<AuditAgentAssignment> {
+    work_items
+        .iter()
+        .flat_map(|work_item| {
+            default_agent_roles_for_stage(&work_item.stage)
+                .into_iter()
+                .map(move |(role, role_name)| (work_item, role, role_name))
+        })
+        .enumerate()
+        .map(
+            |(index, (work_item, role, role_name))| AuditAgentAssignment {
+                schema_version: 1,
+                id: format!("{audit_id}:agent:{index}"),
+                audit_run_id: audit_id.to_string(),
+                work_item_id: work_item.id.clone(),
+                role,
+                role_name: role_name.to_string(),
+                status: AuditAgentAssignmentStatus::Pending,
+                agent_thread_id: None,
+                conclusion_refs: Vec::new(),
+                created_at,
+                updated_at: created_at,
+                metadata: Metadata::new(),
+            },
+        )
+        .collect()
+}
+
+fn default_agent_roles_for_stage(stage: &AuditStageId) -> Vec<(AuditAgentRole, &'static str)> {
+    match stage {
+        AuditStageId::AttackSurface | AuditStageId::Invariants | AuditStageId::AttackHypotheses => {
+            vec![(AuditAgentRole::Researcher, "audit-researcher")]
+        }
+        AuditStageId::TargetedTests
+        | AuditStageId::DynamicAnalysis
+        | AuditStageId::ExploitConfirmation => {
+            vec![(AuditAgentRole::Exploiter, "audit-exploiter")]
+        }
+        AuditStageId::AdversarialReview => vec![
+            (AuditAgentRole::Researcher, "audit-researcher"),
+            (AuditAgentRole::Skeptic, "audit-skeptic"),
+            (AuditAgentRole::Exploiter, "audit-exploiter"),
+            (AuditAgentRole::Judge, "audit-judge"),
+        ],
+        AuditStageId::FindingValidation => vec![
+            (AuditAgentRole::Skeptic, "audit-skeptic"),
+            (AuditAgentRole::Judge, "audit-judge"),
+        ],
+        AuditStageId::SeverityRanking | AuditStageId::AuditReport => {
+            vec![(AuditAgentRole::Judge, "audit-judge")]
+        }
+        AuditStageId::AuditSession
+        | AuditStageId::BuildNormalize
+        | AuditStageId::SemanticGraphs
+        | AuditStageId::Classification
+        | AuditStageId::ThreatModel
+        | AuditStageId::FunctionRiskMap
+        | AuditStageId::StaticAnalysis
+        | AuditStageId::GraphAnalysis
+        | AuditStageId::BytecodeReview
+        | AuditStageId::VerificationPlanning
+        | AuditStageId::InvariantStress
+        | AuditStageId::SymbolicExecution
+        | AuditStageId::EconomicSimulation
+        | AuditStageId::EvidenceAggregation
+        | AuditStageId::Remediation
+        | AuditStageId::RegressionTests
+        | AuditStageId::AuditTrace
+        | AuditStageId::FixVerification => Vec::new(),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -220,5 +297,87 @@ mod tests {
         let error = AuditWorkspace::create(root.path(), "../outside").expect_err("invalid ID");
 
         assert!(matches!(error, AuditAdapterError::InvalidTarget(_)));
+    }
+
+    #[test]
+    fn creates_default_agent_assignments_for_adversarial_stages() {
+        let work_items = create_audit_work_items(
+            "audit-1",
+            &[
+                AuditStageId::BuildNormalize,
+                AuditStageId::AttackHypotheses,
+                AuditStageId::AdversarialReview,
+                AuditStageId::FindingValidation,
+                AuditStageId::AuditReport,
+            ],
+            10,
+        );
+
+        let assignments = create_audit_agent_assignments("audit-1", &work_items, 10);
+        let summary = assignments
+            .iter()
+            .map(|assignment| {
+                (
+                    assignment.work_item_id.as_str(),
+                    &assignment.role,
+                    assignment.role_name.as_str(),
+                    &assignment.status,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            summary,
+            vec![
+                (
+                    "audit-1:stage:1",
+                    &AuditAgentRole::Researcher,
+                    "audit-researcher",
+                    &AuditAgentAssignmentStatus::Pending,
+                ),
+                (
+                    "audit-1:stage:2",
+                    &AuditAgentRole::Researcher,
+                    "audit-researcher",
+                    &AuditAgentAssignmentStatus::Pending,
+                ),
+                (
+                    "audit-1:stage:2",
+                    &AuditAgentRole::Skeptic,
+                    "audit-skeptic",
+                    &AuditAgentAssignmentStatus::Pending,
+                ),
+                (
+                    "audit-1:stage:2",
+                    &AuditAgentRole::Exploiter,
+                    "audit-exploiter",
+                    &AuditAgentAssignmentStatus::Pending,
+                ),
+                (
+                    "audit-1:stage:2",
+                    &AuditAgentRole::Judge,
+                    "audit-judge",
+                    &AuditAgentAssignmentStatus::Pending,
+                ),
+                (
+                    "audit-1:stage:3",
+                    &AuditAgentRole::Skeptic,
+                    "audit-skeptic",
+                    &AuditAgentAssignmentStatus::Pending,
+                ),
+                (
+                    "audit-1:stage:3",
+                    &AuditAgentRole::Judge,
+                    "audit-judge",
+                    &AuditAgentAssignmentStatus::Pending,
+                ),
+                (
+                    "audit-1:stage:4",
+                    &AuditAgentRole::Judge,
+                    "audit-judge",
+                    &AuditAgentAssignmentStatus::Pending,
+                ),
+            ]
+        );
     }
 }

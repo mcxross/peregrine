@@ -1,7 +1,7 @@
 use super::{AuditStore, AuditStoreError, AuditStoreEvent, status_name};
 use peregrine_types::{
-    AuditAgentConclusion, AuditEvidence, AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus,
-    AuditWorkItem, AuditWorkItemStatus,
+    AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentConclusion, AuditEvidence,
+    AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus, AuditWorkItem, AuditWorkItemStatus,
 };
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::Serialize;
@@ -18,6 +18,12 @@ pub struct WorkUpdate {
     pub run: AuditRun,
     pub work_item: AuditWorkItem,
     pub stage_changed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AgentAssignmentUpdate {
+    pub run: AuditRun,
+    pub assignment: AuditAgentAssignment,
 }
 
 impl AuditStore {
@@ -147,9 +153,122 @@ impl AuditStore {
                 &conclusion,
             )?;
             run.artifact_refs.push(artifact_ref.clone());
+            if let Some(assignment) = run.agent_assignments.iter_mut().find(|assignment| {
+                assignment.work_item_id == work_item_id
+                    && assignment.role == conclusion.role
+                    && (assignment.agent_thread_id.is_none()
+                        || conclusion.agent_thread_id.is_none()
+                        || assignment.agent_thread_id == conclusion.agent_thread_id)
+            }) {
+                if conclusion.agent_thread_id.is_some() {
+                    assignment.agent_thread_id = conclusion.agent_thread_id.clone();
+                }
+                assignment.status = AuditAgentAssignmentStatus::Completed;
+                assignment.conclusion_refs.push(artifact_ref.clone());
+                assignment.updated_at = conclusion.created_at;
+            }
             run.updated_at = conclusion.created_at;
             Ok(artifact_ref.clone())
         })
+    }
+
+    pub fn claim_agent_assignment(
+        &self,
+        run_id: &str,
+        work_item_id: &str,
+        assignment_id: &str,
+        worker_id: &str,
+        now: i64,
+    ) -> Result<AgentAssignmentUpdate, AuditStoreError> {
+        let (run, assignment) = self.mutate_run(run_id, |run| {
+            ensure_running(run)?;
+            let work_item = ensure_claimed_work_item(run, work_item_id)?;
+            if work_item.claimed_by.as_deref() != Some(worker_id) {
+                return Err(AuditStoreError::WorkItemClaimedByOther {
+                    work_item_id: work_item_id.to_string(),
+                    claimed_by: work_item
+                        .claimed_by
+                        .clone()
+                        .unwrap_or_else(|| "unclaimed".to_string()),
+                });
+            }
+            let assignment = ensure_agent_assignment(run, work_item_id, assignment_id)?;
+            if assignment.status != AuditAgentAssignmentStatus::Pending {
+                return Err(AuditStoreError::InvalidAgentAssignmentStatus {
+                    assignment_id: assignment_id.to_string(),
+                    status: format!("{:?}", assignment.status),
+                });
+            }
+            assignment.status = AuditAgentAssignmentStatus::Spawned;
+            assignment.updated_at = now;
+            let assignment = assignment.clone();
+            run.updated_at = now;
+            Ok(assignment)
+        })?;
+        Ok(AgentAssignmentUpdate { run, assignment })
+    }
+
+    pub fn update_agent_assignment_thread(
+        &self,
+        run_id: &str,
+        work_item_id: &str,
+        assignment_id: &str,
+        agent_thread_id: &str,
+        now: i64,
+    ) -> Result<AgentAssignmentUpdate, AuditStoreError> {
+        let (run, assignment) = self.mutate_run(run_id, |run| {
+            ensure_running(run)?;
+            ensure_claimed_work_item(run, work_item_id)?;
+            let assignment = ensure_agent_assignment(run, work_item_id, assignment_id)?;
+            if assignment.status != AuditAgentAssignmentStatus::Spawned {
+                return Err(AuditStoreError::InvalidAgentAssignmentStatus {
+                    assignment_id: assignment_id.to_string(),
+                    status: format!("{:?}", assignment.status),
+                });
+            }
+            assignment.agent_thread_id = Some(agent_thread_id.to_string());
+            assignment.updated_at = now;
+            let assignment = assignment.clone();
+            run.updated_at = now;
+            Ok(assignment)
+        })?;
+        Ok(AgentAssignmentUpdate { run, assignment })
+    }
+
+    pub fn finish_agent_assignment(
+        &self,
+        run_id: &str,
+        work_item_id: &str,
+        assignment_id: &str,
+        status: AuditAgentAssignmentStatus,
+        now: i64,
+    ) -> Result<AgentAssignmentUpdate, AuditStoreError> {
+        if !matches!(
+            status,
+            AuditAgentAssignmentStatus::Failed | AuditAgentAssignmentStatus::Cancelled
+        ) {
+            return Err(AuditStoreError::InvalidAgentAssignmentStatus {
+                assignment_id: assignment_id.to_string(),
+                status: format!("{status:?}"),
+            });
+        }
+        let (run, assignment) = self.mutate_run(run_id, |run| {
+            ensure_running(run)?;
+            ensure_claimed_work_item(run, work_item_id)?;
+            let assignment = ensure_agent_assignment(run, work_item_id, assignment_id)?;
+            if matches!(assignment.status, AuditAgentAssignmentStatus::Completed) {
+                return Err(AuditStoreError::InvalidAgentAssignmentStatus {
+                    assignment_id: assignment_id.to_string(),
+                    status: format!("{:?}", assignment.status),
+                });
+            }
+            assignment.status = status;
+            assignment.updated_at = now;
+            let assignment = assignment.clone();
+            run.updated_at = now;
+            Ok(assignment)
+        })?;
+        Ok(AgentAssignmentUpdate { run, assignment })
     }
 
     pub fn record_router_evidence_for_current_work(
@@ -435,6 +554,19 @@ fn ensure_claimed_work_item<'a>(
         ));
     }
     Ok(work_item)
+}
+
+fn ensure_agent_assignment<'a>(
+    run: &'a mut AuditRun,
+    work_item_id: &str,
+    assignment_id: &str,
+) -> Result<&'a mut AuditAgentAssignment, AuditStoreError> {
+    run.agent_assignments
+        .iter_mut()
+        .find(|assignment| {
+            assignment.id == assignment_id && assignment.work_item_id == work_item_id
+        })
+        .ok_or_else(|| AuditStoreError::AgentAssignmentNotFound(assignment_id.to_string()))
 }
 
 fn current_claimed_work_item_index(run: &AuditRun) -> Option<usize> {

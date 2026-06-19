@@ -19,8 +19,10 @@ use serde_json::Value;
 use std::path::{Component, Path, PathBuf};
 
 pub use spec::{
-    CLAIM_WORK_TOOL_NAME, FINALIZE_REPORT_TOOL_NAME, FINISH_WORK_TOOL_NAME, READ_RUN_TOOL_NAME,
+    CLAIM_AGENT_ASSIGNMENT_TOOL_NAME, CLAIM_WORK_TOOL_NAME, FINALIZE_REPORT_TOOL_NAME,
+    FINISH_AGENT_ASSIGNMENT_TOOL_NAME, FINISH_WORK_TOOL_NAME, READ_RUN_TOOL_NAME,
     RECORD_AGENT_CONCLUSION_TOOL_NAME, RECORD_EVIDENCE_TOOL_NAME, RECORD_PACKET_TOOL_NAME,
+    SET_AGENT_ASSIGNMENT_THREAD_TOOL_NAME,
 };
 
 const MAX_ID_BYTES: usize = 256;
@@ -33,6 +35,9 @@ const MAX_REFS: usize = 32;
 pub(crate) enum AuditToolHandler {
     ReadRun,
     ClaimWork,
+    ClaimAgentAssignment,
+    SetAgentAssignmentThread,
+    FinishAgentAssignment,
     RecordPacket,
     RecordEvidence,
     RecordAgentConclusion,
@@ -41,9 +46,12 @@ pub(crate) enum AuditToolHandler {
 }
 
 impl AuditToolHandler {
-    pub(crate) const ALL: [Self; 7] = [
+    pub(crate) const ALL: [Self; 10] = [
         Self::ReadRun,
         Self::ClaimWork,
+        Self::ClaimAgentAssignment,
+        Self::SetAgentAssignmentThread,
+        Self::FinishAgentAssignment,
         Self::RecordPacket,
         Self::RecordEvidence,
         Self::RecordAgentConclusion,
@@ -58,6 +66,9 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
         ToolName::plain(match self {
             Self::ReadRun => READ_RUN_TOOL_NAME,
             Self::ClaimWork => CLAIM_WORK_TOOL_NAME,
+            Self::ClaimAgentAssignment => CLAIM_AGENT_ASSIGNMENT_TOOL_NAME,
+            Self::SetAgentAssignmentThread => SET_AGENT_ASSIGNMENT_THREAD_TOOL_NAME,
+            Self::FinishAgentAssignment => FINISH_AGENT_ASSIGNMENT_TOOL_NAME,
             Self::RecordPacket => RECORD_PACKET_TOOL_NAME,
             Self::RecordEvidence => RECORD_EVIDENCE_TOOL_NAME,
             Self::RecordAgentConclusion => RECORD_AGENT_CONCLUSION_TOOL_NAME,
@@ -70,6 +81,9 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
         match self {
             Self::ReadRun => spec::read_run_tool(),
             Self::ClaimWork => spec::claim_work_tool(),
+            Self::ClaimAgentAssignment => spec::claim_agent_assignment_tool(),
+            Self::SetAgentAssignmentThread => spec::set_agent_assignment_thread_tool(),
+            Self::FinishAgentAssignment => spec::finish_agent_assignment_tool(),
             Self::RecordPacket => spec::record_packet_tool(),
             Self::RecordEvidence => spec::record_evidence_tool(),
             Self::RecordAgentConclusion => spec::record_agent_conclusion_tool(),
@@ -125,6 +139,62 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
                     }
                     None => json_output(&Value::String("no pending work".to_string()))?,
                 }
+            }
+            Self::ClaimAgentAssignment => {
+                let args: ClaimAgentAssignmentArgs = parse_arguments(&arguments)?;
+                validate_text("work_item_id", &args.work_item_id, MAX_ID_BYTES)?;
+                validate_text("assignment_id", &args.assignment_id, MAX_ID_BYTES)?;
+                validate_text("worker_id", &args.worker_id, MAX_ID_BYTES)?;
+                let update = store
+                    .claim_agent_assignment(
+                        &scope.audit_id,
+                        &args.work_item_id,
+                        &args.assignment_id,
+                        &args.worker_id,
+                        now,
+                    )
+                    .map_err(tool_error)?;
+                inject_audit_context(&session, &turn, &update.run).await;
+                json_output(&AgentAssignmentResponse {
+                    assignment: AgentAssignmentSummary::from(&update.assignment),
+                })?
+            }
+            Self::SetAgentAssignmentThread => {
+                let args: SetAgentAssignmentThreadArgs = parse_arguments(&arguments)?;
+                validate_text("work_item_id", &args.work_item_id, MAX_ID_BYTES)?;
+                validate_text("assignment_id", &args.assignment_id, MAX_ID_BYTES)?;
+                validate_text("agent_thread_id", &args.agent_thread_id, MAX_ID_BYTES)?;
+                let update = store
+                    .update_agent_assignment_thread(
+                        &scope.audit_id,
+                        &args.work_item_id,
+                        &args.assignment_id,
+                        &args.agent_thread_id,
+                        now,
+                    )
+                    .map_err(tool_error)?;
+                inject_audit_context(&session, &turn, &update.run).await;
+                json_output(&AgentAssignmentResponse {
+                    assignment: AgentAssignmentSummary::from(&update.assignment),
+                })?
+            }
+            Self::FinishAgentAssignment => {
+                let args: FinishAgentAssignmentArgs = parse_arguments(&arguments)?;
+                validate_text("work_item_id", &args.work_item_id, MAX_ID_BYTES)?;
+                validate_text("assignment_id", &args.assignment_id, MAX_ID_BYTES)?;
+                let update = store
+                    .finish_agent_assignment(
+                        &scope.audit_id,
+                        &args.work_item_id,
+                        &args.assignment_id,
+                        args.status,
+                        now,
+                    )
+                    .map_err(tool_error)?;
+                inject_audit_context(&session, &turn, &update.run).await;
+                json_output(&AgentAssignmentResponse {
+                    assignment: AgentAssignmentSummary::from(&update.assignment),
+                })?
             }
             Self::RecordPacket => {
                 let args: RecordPacketArgs = parse_arguments(&arguments)?;
@@ -366,6 +436,9 @@ mod tests {
             .map(|handler| handler.tool_name().name)
             .collect::<Vec<_>>();
 
+        assert!(names.contains(&CLAIM_AGENT_ASSIGNMENT_TOOL_NAME.to_string()));
+        assert!(names.contains(&SET_AGENT_ASSIGNMENT_THREAD_TOOL_NAME.to_string()));
+        assert!(names.contains(&FINISH_AGENT_ASSIGNMENT_TOOL_NAME.to_string()));
         assert!(names.contains(&FINALIZE_REPORT_TOOL_NAME.to_string()));
     }
 }

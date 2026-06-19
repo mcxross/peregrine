@@ -519,6 +519,9 @@ async fn audit_tools_are_scoped_to_audit_coordinator_workspaces() {
     let tool_names = [
         "audit_read_run",
         "audit_claim_work",
+        "audit_claim_agent_assignment",
+        "audit_set_agent_assignment_thread",
+        "audit_finish_agent_assignment",
         "audit_record_packet",
         "audit_record_evidence",
         "audit_record_agent_conclusion",

@@ -435,6 +435,34 @@ pub enum AuditAgentConclusionStatus {
     Accepted,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AuditAgentAssignmentStatus {
+    Pending,
+    Spawned,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditAgentAssignment {
+    pub schema_version: u8,
+    pub id: String,
+    pub audit_run_id: String,
+    pub work_item_id: String,
+    pub role: AuditAgentRole,
+    pub role_name: String,
+    pub status: AuditAgentAssignmentStatus,
+    pub agent_thread_id: Option<String>,
+    pub conclusion_refs: Vec<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    #[serde(default, skip_serializing_if = "Metadata::is_empty")]
+    pub metadata: Metadata,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AuditAgentConclusion {
@@ -577,6 +605,8 @@ pub struct AuditRun {
     pub capabilities: Vec<AuditCapabilityBinding>,
     pub coverage_gaps: Vec<AuditCoverageGap>,
     pub work_items: Vec<AuditWorkItem>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub agent_assignments: Vec<AuditAgentAssignment>,
     pub evidence_refs: Vec<String>,
     pub artifact_refs: Vec<String>,
     pub created_at: i64,

@@ -15,7 +15,7 @@ use thiserror::Error;
 mod operations;
 mod report;
 
-pub use operations::WorkUpdate;
+pub use operations::{AgentAssignmentUpdate, WorkUpdate};
 pub use report::FinalizedAuditReport;
 
 const DATABASE_FILE: &str = "audits.sqlite";
@@ -296,6 +296,13 @@ pub enum AuditStoreError {
     RunNotFound(String),
     #[error("audit work item `{0}` was not found")]
     WorkItemNotFound(String),
+    #[error("audit agent assignment `{0}` was not found")]
+    AgentAssignmentNotFound(String),
+    #[error("audit agent assignment `{assignment_id}` cannot transition to {status}")]
+    InvalidAgentAssignmentStatus {
+        assignment_id: String,
+        status: String,
+    },
     #[error("audit work item `{work_item_id}` is claimed by `{claimed_by}`")]
     WorkItemClaimedByOther {
         work_item_id: String,
@@ -336,11 +343,11 @@ mod tests {
     use super::*;
     use peregrine_security_tools::create_audit_work_items;
     use peregrine_types::{
-        AuditAgentConclusion, AuditAgentConclusionStatus, AuditAgentRole, AuditEvidence,
-        AuditEvidenceAttestation, AuditProfile, AuditReport, AuditRunStatus, AuditStageId,
-        AuditStageStatus, AuditTarget, AuditWorkItemStatus, EvidenceConfidence, FindingCandidate,
-        FindingCandidateSeverity, FindingCandidateStatus, Metadata, SourcePrecision,
-        ValidationPlan, VerificationMethod,
+        AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentConclusion,
+        AuditAgentConclusionStatus, AuditAgentRole, AuditEvidence, AuditEvidenceAttestation,
+        AuditProfile, AuditReport, AuditRunStatus, AuditStageId, AuditStageStatus, AuditTarget,
+        AuditWorkItemStatus, EvidenceConfidence, FindingCandidate, FindingCandidateSeverity,
+        FindingCandidateStatus, Metadata, SourcePrecision, ValidationPlan, VerificationMethod,
     };
 
     fn plan() -> AuditPlan {
@@ -380,6 +387,7 @@ mod tests {
             capabilities: Vec::new(),
             coverage_gaps: Vec::new(),
             work_items: Vec::new(),
+            agent_assignments: Vec::new(),
             evidence_refs: Vec::new(),
             artifact_refs: Vec::new(),
             created_at: 10,
@@ -423,6 +431,7 @@ mod tests {
                 capabilities: Vec::new(),
                 coverage_gaps: Vec::new(),
                 work_items: Vec::new(),
+                agent_assignments: Vec::new(),
                 evidence_refs: Vec::new(),
                 artifact_refs: Vec::new(),
                 created_at: updated_at,
@@ -480,6 +489,7 @@ mod tests {
             capabilities: Vec::new(),
             coverage_gaps: Vec::new(),
             work_items: Vec::new(),
+            agent_assignments: Vec::new(),
             evidence_refs: Vec::new(),
             artifact_refs: Vec::new(),
             created_at: 10,
@@ -534,6 +544,7 @@ mod tests {
             capabilities: Vec::new(),
             coverage_gaps: Vec::new(),
             work_items: create_audit_work_items("audit-work", &stages, 10),
+            agent_assignments: Vec::new(),
             evidence_refs: Vec::new(),
             artifact_refs: Vec::new(),
             created_at: 10,
@@ -625,6 +636,7 @@ mod tests {
             capabilities: Vec::new(),
             coverage_gaps: Vec::new(),
             work_items: create_audit_work_items("audit-router", &stages, 10),
+            agent_assignments: Vec::new(),
             evidence_refs: Vec::new(),
             artifact_refs: Vec::new(),
             created_at: 10,
@@ -679,6 +691,26 @@ mod tests {
         let home = tempfile::tempdir().expect("tempdir");
         let store = AuditStore::open(home.path()).expect("open store");
         let work_item_id = create_report_run(&store, "audit-agent");
+        let assignment = AuditAgentAssignment {
+            schema_version: 1,
+            id: "assignment-1".to_string(),
+            audit_run_id: "audit-agent".to_string(),
+            work_item_id: work_item_id.clone(),
+            role: AuditAgentRole::Judge,
+            role_name: "audit-judge".to_string(),
+            status: AuditAgentAssignmentStatus::Pending,
+            agent_thread_id: None,
+            conclusion_refs: Vec::new(),
+            created_at: 10,
+            updated_at: 10,
+            metadata: Metadata::new(),
+        };
+        let mut run = store
+            .read_run("audit-agent")
+            .expect("read run")
+            .expect("run exists");
+        run.agent_assignments.push(assignment.clone());
+        store.update_run(&run).expect("update run");
         store
             .claim_work("audit-agent", "judge", None, 11)
             .expect("claim work");
@@ -728,7 +760,103 @@ mod tests {
             format!("artifacts/agent-conclusions/{}.json", stored.id)
         );
         assert_eq!(run.artifact_refs, vec![artifact_ref]);
+        assert_eq!(
+            run.agent_assignments,
+            vec![AuditAgentAssignment {
+                status: AuditAgentAssignmentStatus::Completed,
+                agent_thread_id: Some("thread-1".to_string()),
+                conclusion_refs: run.artifact_refs.clone(),
+                updated_at: 13,
+                ..assignment
+            }]
+        );
         assert_eq!(stored, expected);
+    }
+
+    #[test]
+    fn agent_assignment_lifecycle_tracks_spawn_and_failure() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let work_item_id = create_report_run(&store, "audit-agent-lifecycle");
+        let assignment = AuditAgentAssignment {
+            schema_version: 1,
+            id: "assignment-1".to_string(),
+            audit_run_id: "audit-agent-lifecycle".to_string(),
+            work_item_id: work_item_id.clone(),
+            role: AuditAgentRole::Researcher,
+            role_name: "audit-researcher".to_string(),
+            status: AuditAgentAssignmentStatus::Pending,
+            agent_thread_id: None,
+            conclusion_refs: Vec::new(),
+            created_at: 10,
+            updated_at: 10,
+            metadata: Metadata::new(),
+        };
+        let mut run = store
+            .read_run("audit-agent-lifecycle")
+            .expect("read run")
+            .expect("run exists");
+        run.agent_assignments.push(assignment.clone());
+        store.update_run(&run).expect("update run");
+        store
+            .claim_work("audit-agent-lifecycle", "coordinator", None, 11)
+            .expect("claim work");
+
+        let claimed = store
+            .claim_agent_assignment(
+                "audit-agent-lifecycle",
+                &work_item_id,
+                "assignment-1",
+                "coordinator",
+                12,
+            )
+            .expect("claim assignment");
+        assert_eq!(
+            claimed.assignment,
+            AuditAgentAssignment {
+                status: AuditAgentAssignmentStatus::Spawned,
+                updated_at: 12,
+                ..assignment.clone()
+            }
+        );
+
+        let spawned = store
+            .update_agent_assignment_thread(
+                "audit-agent-lifecycle",
+                &work_item_id,
+                "assignment-1",
+                "agent-path-1",
+                13,
+            )
+            .expect("set agent thread");
+        assert_eq!(
+            spawned.assignment,
+            AuditAgentAssignment {
+                status: AuditAgentAssignmentStatus::Spawned,
+                agent_thread_id: Some("agent-path-1".to_string()),
+                updated_at: 13,
+                ..assignment.clone()
+            }
+        );
+
+        let failed = store
+            .finish_agent_assignment(
+                "audit-agent-lifecycle",
+                &work_item_id,
+                "assignment-1",
+                AuditAgentAssignmentStatus::Failed,
+                14,
+            )
+            .expect("finish assignment");
+        assert_eq!(
+            failed.assignment,
+            AuditAgentAssignment {
+                status: AuditAgentAssignmentStatus::Failed,
+                agent_thread_id: Some("agent-path-1".to_string()),
+                updated_at: 14,
+                ..assignment
+            }
+        );
     }
 
     #[test]
@@ -880,6 +1008,7 @@ mod tests {
             capabilities: Vec::new(),
             coverage_gaps: Vec::new(),
             work_items,
+            agent_assignments: Vec::new(),
             evidence_refs: Vec::new(),
             artifact_refs: Vec::new(),
             created_at: 10,

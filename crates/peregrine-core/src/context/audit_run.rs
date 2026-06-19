@@ -1,6 +1,7 @@
 use super::ContextualUserFragment;
 use peregrine_types::{
-    AuditCoverageGap, AuditRun, AuditRunStatus, AuditStageId, AuditWorkItem, AuditWorkItemStatus,
+    AuditAgentAssignment, AuditAgentAssignmentStatus, AuditCoverageGap, AuditRun, AuditRunStatus,
+    AuditStageId, AuditWorkItem, AuditWorkItemStatus,
 };
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -10,6 +11,7 @@ const END_MARKER: &str = "</audit_run_context>";
 const MAX_BODY_BYTES: usize = 6_000;
 const MAX_REFS: usize = 12;
 const MAX_WORK_ITEMS: usize = 8;
+const MAX_AGENT_ASSIGNMENTS: usize = 8;
 const MAX_GAPS: usize = 8;
 
 /// Bounded model context describing the active persisted audit run.
@@ -37,9 +39,11 @@ impl AuditRunContextFragment {
                 coverage_gaps: run.coverage_gaps.len(),
                 evidence_refs: run.evidence_refs.len(),
                 artifact_refs: run.artifact_refs.len(),
+                agent_assignments: agent_assignment_counts(run),
                 work_items: work_item_counts(run),
             },
             current_work: current_work_items(run),
+            agent_assignments: current_agent_assignments(run),
             coverage_gaps: run
                 .coverage_gaps
                 .iter()
@@ -102,6 +106,7 @@ struct AuditRunContext<'a> {
     budget: AuditBudgetContext,
     counts: AuditRunCounts,
     current_work: Vec<WorkItemContext<'a>>,
+    agent_assignments: Vec<AgentAssignmentContext<'a>>,
     coverage_gaps: Vec<CoverageGapContext<'a>>,
     evidence_refs: Vec<&'a str>,
     artifact_refs: Vec<&'a str>,
@@ -121,6 +126,7 @@ struct AuditRunCounts {
     coverage_gaps: usize,
     evidence_refs: usize,
     artifact_refs: usize,
+    agent_assignments: BTreeMap<&'static str, usize>,
     work_items: BTreeMap<&'static str, usize>,
 }
 
@@ -146,6 +152,37 @@ impl<'a> From<&'a AuditWorkItem> for WorkItemContext<'a> {
             claimed_by: value.claimed_by.as_deref(),
             attempts: value.attempts,
             evidence_ref_count: value.evidence_refs.len(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AgentAssignmentContext<'a> {
+    id: &'a str,
+    work_item_id: &'a str,
+    role: &'a str,
+    role_name: &'a str,
+    status: &'a AuditAgentAssignmentStatus,
+    agent_thread_id: Option<&'a str>,
+    conclusion_ref_count: usize,
+}
+
+impl<'a> From<&'a AuditAgentAssignment> for AgentAssignmentContext<'a> {
+    fn from(value: &'a AuditAgentAssignment) -> Self {
+        Self {
+            id: &value.id,
+            work_item_id: &value.work_item_id,
+            role: match value.role {
+                peregrine_types::AuditAgentRole::Researcher => "researcher",
+                peregrine_types::AuditAgentRole::Skeptic => "skeptic",
+                peregrine_types::AuditAgentRole::Exploiter => "exploiter",
+                peregrine_types::AuditAgentRole::Judge => "judge",
+            },
+            role_name: &value.role_name,
+            status: &value.status,
+            agent_thread_id: value.agent_thread_id.as_deref(),
+            conclusion_ref_count: value.conclusion_refs.len(),
         }
     }
 }
@@ -207,6 +244,67 @@ fn current_work_items(run: &AuditRun) -> Vec<WorkItemContext<'_>> {
         .collect()
 }
 
+fn current_agent_assignments(run: &AuditRun) -> Vec<AgentAssignmentContext<'_>> {
+    let current_work_ids = run
+        .work_items
+        .iter()
+        .filter(|item| {
+            item.stage == run.current_stage
+                && matches!(
+                    item.status,
+                    AuditWorkItemStatus::Claimed | AuditWorkItemStatus::Pending
+                )
+        })
+        .map(|item| item.id.as_str())
+        .collect::<Vec<_>>();
+    let mut assignments = run
+        .agent_assignments
+        .iter()
+        .filter(|assignment| {
+            current_work_ids
+                .iter()
+                .any(|work_item_id| *work_item_id == assignment.work_item_id)
+        })
+        .take(MAX_AGENT_ASSIGNMENTS)
+        .map(AgentAssignmentContext::from)
+        .collect::<Vec<_>>();
+    if !assignments.is_empty() {
+        return assignments;
+    }
+
+    assignments = run
+        .agent_assignments
+        .iter()
+        .filter(|assignment| assignment.status == AuditAgentAssignmentStatus::Pending)
+        .take(MAX_AGENT_ASSIGNMENTS)
+        .map(AgentAssignmentContext::from)
+        .collect::<Vec<_>>();
+    if !assignments.is_empty() {
+        return assignments;
+    }
+
+    run.agent_assignments
+        .iter()
+        .take(MAX_AGENT_ASSIGNMENTS)
+        .map(AgentAssignmentContext::from)
+        .collect()
+}
+
+fn agent_assignment_counts(run: &AuditRun) -> BTreeMap<&'static str, usize> {
+    let mut counts = BTreeMap::new();
+    for assignment in &run.agent_assignments {
+        let status = match assignment.status {
+            AuditAgentAssignmentStatus::Pending => "pending",
+            AuditAgentAssignmentStatus::Spawned => "spawned",
+            AuditAgentAssignmentStatus::Completed => "completed",
+            AuditAgentAssignmentStatus::Failed => "failed",
+            AuditAgentAssignmentStatus::Cancelled => "cancelled",
+        };
+        *counts.entry(status).or_default() += 1;
+    }
+    counts
+}
+
 fn work_item_counts(run: &AuditRun) -> BTreeMap<&'static str, usize> {
     let mut counts = BTreeMap::new();
     for item in &run.work_items {
@@ -227,7 +325,8 @@ fn work_item_counts(run: &AuditRun) -> BTreeMap<&'static str, usize> {
 mod tests {
     use super::*;
     use peregrine_types::{
-        AuditCoverageGap, AuditProfile, AuditRunStatus, AuditStageId, AuditTarget, AuditWorkItem,
+        AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentRole, AuditCoverageGap,
+        AuditProfile, AuditRunStatus, AuditStageId, AuditTarget, AuditWorkItem,
         AuditWorkItemStatus, Metadata,
     };
 
@@ -279,6 +378,26 @@ mod tests {
                     metadata: Metadata::new(),
                 })
                 .collect(),
+            agent_assignments: (0..100)
+                .map(|index| AuditAgentAssignment {
+                    schema_version: 1,
+                    id: format!("assignment-{index}"),
+                    audit_run_id: "audit-1".to_string(),
+                    work_item_id: if index == 0 {
+                        "work-0".to_string()
+                    } else {
+                        format!("work-{index}")
+                    },
+                    role: AuditAgentRole::Researcher,
+                    role_name: "audit-researcher".to_string(),
+                    status: AuditAgentAssignmentStatus::Pending,
+                    agent_thread_id: None,
+                    conclusion_refs: Vec::new(),
+                    created_at: 0,
+                    updated_at: 0,
+                    metadata: Metadata::new(),
+                })
+                .collect(),
             evidence_refs: (0..100).map(|index| format!("evidence-{index}")).collect(),
             artifact_refs: (0..100).map(|index| format!("artifact-{index}")).collect(),
             created_at: 0,
@@ -294,8 +413,11 @@ mod tests {
         assert!(rendered.contains("\"currentStage\": \"buildNormalize\""));
         assert!(rendered.contains("\"currentWork\""));
         assert!(rendered.contains("work-0"));
+        assert!(rendered.contains("\"agentAssignments\""));
+        assert!(rendered.contains("assignment-0"));
         assert!(rendered.contains("\"evidenceRefs\": 100"));
         assert!(!rendered.contains("evidence-99"));
+        assert!(!rendered.contains("assignment-99"));
         assert!(!rendered.contains("capability-99"));
     }
 }
