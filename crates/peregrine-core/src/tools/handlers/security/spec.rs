@@ -10,6 +10,7 @@ pub const FINISH_AGENT_ASSIGNMENT_TOOL_NAME: &str = "audit_finish_agent_assignme
 pub const RECORD_PACKET_TOOL_NAME: &str = "audit_record_packet";
 pub const RECORD_EVIDENCE_TOOL_NAME: &str = "audit_record_evidence";
 pub const RECORD_AGENT_CONCLUSION_TOOL_NAME: &str = "audit_record_agent_conclusion";
+pub const PREPARE_CAPABILITY_TOOL_NAME: &str = "audit_prepare_capability";
 pub const FINISH_WORK_TOOL_NAME: &str = "audit_finish_work";
 pub const FINALIZE_REPORT_TOOL_NAME: &str = "audit_finalize_report";
 
@@ -306,6 +307,26 @@ pub fn record_agent_conclusion_tool() -> ToolSpec {
             ),
         ]),
         vec!["work_item_id", "role", "status", "summary"],
+    )
+}
+
+pub fn prepare_capability_tool() -> ToolSpec {
+    function_tool(
+        PREPARE_CAPABILITY_TOOL_NAME,
+        "Prepare a claimed audit work item's scheduled capability for execution through a ToolRouter-visible native, code-mode, or MCP tool. This records a capabilityDispatch packet. If a concrete tool was bound from announced tool metadata it is returned; otherwise the response returns a discovery query and bounded target context. The coordinator must discover and call announced tools normally; router capture records evidence after success.",
+        BTreeMap::from([
+            (
+                "work_item_id".to_string(),
+                id_schema("Claimed work item ID."),
+            ),
+            (
+                "capability".to_string(),
+                id_schema(
+                    "Scheduled capability to execute, such as static.analysis or dynamic.fuzzing.",
+                ),
+            ),
+        ]),
+        vec!["work_item_id", "capability"],
     )
 }
 

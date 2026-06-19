@@ -19,9 +19,9 @@ use std::path::{Component, Path, PathBuf};
 
 pub use spec::{
     CLAIM_AGENT_ASSIGNMENT_TOOL_NAME, CLAIM_WORK_TOOL_NAME, FINALIZE_REPORT_TOOL_NAME,
-    FINISH_AGENT_ASSIGNMENT_TOOL_NAME, FINISH_WORK_TOOL_NAME, READ_RUN_TOOL_NAME,
-    RECORD_AGENT_CONCLUSION_TOOL_NAME, RECORD_EVIDENCE_TOOL_NAME, RECORD_PACKET_TOOL_NAME,
-    SET_AGENT_ASSIGNMENT_THREAD_TOOL_NAME,
+    FINISH_AGENT_ASSIGNMENT_TOOL_NAME, FINISH_WORK_TOOL_NAME, PREPARE_CAPABILITY_TOOL_NAME,
+    READ_RUN_TOOL_NAME, RECORD_AGENT_CONCLUSION_TOOL_NAME, RECORD_EVIDENCE_TOOL_NAME,
+    RECORD_PACKET_TOOL_NAME, SET_AGENT_ASSIGNMENT_THREAD_TOOL_NAME,
 };
 
 const MAX_ID_BYTES: usize = 256;
@@ -42,12 +42,13 @@ pub(crate) enum AuditToolHandler {
     RecordPacket,
     RecordEvidence,
     RecordAgentConclusion,
+    PrepareCapability,
     FinishWork,
     FinalizeReport,
 }
 
 impl AuditToolHandler {
-    pub(crate) const ALL: [Self; 10] = [
+    pub(crate) const ALL: [Self; 11] = [
         Self::ReadRun,
         Self::ClaimWork,
         Self::ClaimAgentAssignment,
@@ -56,6 +57,7 @@ impl AuditToolHandler {
         Self::RecordPacket,
         Self::RecordEvidence,
         Self::RecordAgentConclusion,
+        Self::PrepareCapability,
         Self::FinishWork,
         Self::FinalizeReport,
     ];
@@ -73,6 +75,7 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
             Self::RecordPacket => RECORD_PACKET_TOOL_NAME,
             Self::RecordEvidence => RECORD_EVIDENCE_TOOL_NAME,
             Self::RecordAgentConclusion => RECORD_AGENT_CONCLUSION_TOOL_NAME,
+            Self::PrepareCapability => PREPARE_CAPABILITY_TOOL_NAME,
             Self::FinishWork => FINISH_WORK_TOOL_NAME,
             Self::FinalizeReport => FINALIZE_REPORT_TOOL_NAME,
         })
@@ -88,6 +91,7 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
             Self::RecordPacket => spec::record_packet_tool(),
             Self::RecordEvidence => spec::record_evidence_tool(),
             Self::RecordAgentConclusion => spec::record_agent_conclusion_tool(),
+            Self::PrepareCapability => spec::prepare_capability_tool(),
             Self::FinishWork => spec::finish_work_tool(),
             Self::FinalizeReport => spec::finalize_report_tool(),
         }
@@ -253,6 +257,31 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
                     .record_agent_conclusion(&scope.audit_id, &work_item_id, conclusion)
                     .map_err(tool_error)?;
                 json_output(&ArtifactResponse { artifact_ref })?
+            }
+            Self::PrepareCapability => {
+                let args: PrepareCapabilityArgs = parse_arguments(&arguments)?;
+                validate_text("work_item_id", &args.work_item_id, MAX_ID_BYTES)?;
+                validate_text("capability", &args.capability, MAX_ID_BYTES)?;
+                let run = read_run(&store, &scope.audit_id)?;
+                let dispatch = prepare_capability_dispatch(&run, &args)?;
+                let packet = dispatch.packet();
+                let (_, artifact_ref) = store
+                    .record_packet(
+                        &scope.audit_id,
+                        &args.work_item_id,
+                        "capabilityDispatch",
+                        &format!(
+                            "Prepared scheduled capability `{}` for ToolRouter dispatch.",
+                            args.capability
+                        ),
+                        packet,
+                        now,
+                    )
+                    .map_err(tool_error)?;
+                json_output(&CapabilityDispatchResponse {
+                    artifact_ref,
+                    dispatch,
+                })?
             }
             Self::FinishWork => {
                 let args: FinishWorkArgs = parse_arguments(&arguments)?;
@@ -485,6 +514,7 @@ mod tests {
         assert!(names.contains(&CLAIM_AGENT_ASSIGNMENT_TOOL_NAME.to_string()));
         assert!(names.contains(&SET_AGENT_ASSIGNMENT_THREAD_TOOL_NAME.to_string()));
         assert!(names.contains(&FINISH_AGENT_ASSIGNMENT_TOOL_NAME.to_string()));
+        assert!(names.contains(&PREPARE_CAPABILITY_TOOL_NAME.to_string()));
         assert!(names.contains(&FINALIZE_REPORT_TOOL_NAME.to_string()));
     }
 }
