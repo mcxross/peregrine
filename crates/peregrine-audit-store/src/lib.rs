@@ -992,6 +992,13 @@ mod tests {
             )
             .expect("record replay evidence");
         let finding = confirmed_finding(vec![static_ref, replay_ref]);
+        store
+            .record_agent_conclusion(
+                "audit-report-ok",
+                &work_item_id,
+                judge_conclusion(&work_item_id, &finding),
+            )
+            .expect("record judge conclusion");
         let events = store.subscribe_events().expect("subscribe events");
 
         let finalized = store
@@ -1034,6 +1041,53 @@ mod tests {
                 report_ref: "reports/report.json".to_string(),
             }
         );
+    }
+
+    #[test]
+    fn finalized_report_rejects_confirmed_finding_without_judge_conclusion() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let work_item_id = create_report_run(&store, "audit-report-no-judge");
+        store
+            .claim_work("audit-report-no-judge", "judge", None, 11)
+            .expect("claim work");
+        let (_, static_ref) = store
+            .record_evidence(
+                "audit-report-no-judge",
+                evidence(
+                    &work_item_id,
+                    VerificationMethod::StaticAnalysis,
+                    AuditEvidenceAttestation::RouterCaptured,
+                    None,
+                ),
+            )
+            .expect("record static evidence");
+        let (_, replay_ref) = store
+            .record_evidence(
+                "audit-report-no-judge",
+                evidence(
+                    &work_item_id,
+                    VerificationMethod::ExploitReplay,
+                    AuditEvidenceAttestation::AdapterReplay,
+                    Some("traces/replay.json"),
+                ),
+            )
+            .expect("record replay evidence");
+
+        let error = store
+            .finalize_report(
+                "audit-report-no-judge",
+                vec![confirmed_finding(vec![static_ref, replay_ref])],
+                Metadata::new(),
+                20,
+            )
+            .expect_err("confirmed finding should require judge conclusion");
+
+        assert!(matches!(
+            error,
+            AuditStoreError::InvalidReport(message)
+                if message.contains("positive Judge conclusion")
+        ));
     }
 
     #[test]
@@ -1144,6 +1198,24 @@ mod tests {
             execution_trace_ref: execution_trace_ref.map(str::to_string),
             artifact_refs: Vec::new(),
             created_at: 12,
+            metadata: Metadata::new(),
+        }
+    }
+
+    fn judge_conclusion(work_item_id: &str, finding: &FindingCandidate) -> AuditAgentConclusion {
+        AuditAgentConclusion {
+            schema_version: 1,
+            id: String::new(),
+            audit_run_id: String::new(),
+            work_item_id: work_item_id.to_string(),
+            role: AuditAgentRole::Judge,
+            agent_thread_id: Some("judge-thread".to_string()),
+            status: AuditAgentConclusionStatus::Accepted,
+            summary: "judge accepts the confirmed finding".to_string(),
+            candidate_ids: vec![finding.id.clone()],
+            evidence_refs: finding.evidence_refs.clone(),
+            artifact_refs: Vec::new(),
+            created_at: 19,
             metadata: Metadata::new(),
         }
     }

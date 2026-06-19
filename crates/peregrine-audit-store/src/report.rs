@@ -1,6 +1,7 @@
 use super::{AuditStore, AuditStoreError, AuditStoreEvent};
 use peregrine_types::{
-    AuditEvidence, AuditEvidenceAttestation, AuditReport, AuditRun, AuditRunStatus, AuditStageId,
+    AuditAgentConclusion, AuditAgentConclusionStatus, AuditAgentRole, AuditEvidence,
+    AuditEvidenceAttestation, AuditReport, AuditRun, AuditRunStatus, AuditStageId,
     AuditStageStatus, AuditWorkItemStatus, EvidenceConfidence, FindingCandidate,
     FindingCandidateStatus, Metadata, VerificationMethod,
 };
@@ -28,7 +29,8 @@ impl AuditStore {
         let (run, _) = self.mutate_run(run_id, |run| {
             ensure_report_ready(run)?;
             let evidence = self.read_evidence_index(run_id, run)?;
-            validate_findings(&findings, &evidence)?;
+            let judge_conclusions = self.read_judge_conclusions(run_id, run)?;
+            validate_findings(&findings, &evidence, &judge_conclusions)?;
 
             let status = terminal_status(run);
             let report = AuditReport {
@@ -101,6 +103,33 @@ impl AuditStore {
             })
             .collect()
     }
+
+    fn read_judge_conclusions(
+        &self,
+        run_id: &str,
+        run: &AuditRun,
+    ) -> Result<Vec<AuditAgentConclusion>, AuditStoreError> {
+        run.artifact_refs
+            .iter()
+            .filter(|artifact_ref| artifact_ref.starts_with("artifacts/agent-conclusions/"))
+            .map(|artifact_ref| {
+                let path = self.audits_root.join(run_id).join(artifact_ref);
+                let body =
+                    std::fs::read_to_string(&path).map_err(|source| AuditStoreError::Io {
+                        action: "read audit agent conclusion",
+                        source,
+                    })?;
+                let conclusion: AuditAgentConclusion = serde_json::from_str(&body)?;
+                Ok(conclusion)
+            })
+            .filter(|result| {
+                result
+                    .as_ref()
+                    .map(|conclusion| conclusion.role == AuditAgentRole::Judge)
+                    .unwrap_or(true)
+            })
+            .collect()
+    }
 }
 
 fn ensure_report_ready(run: &AuditRun) -> Result<(), AuditStoreError> {
@@ -138,6 +167,7 @@ fn ensure_report_ready(run: &AuditRun) -> Result<(), AuditStoreError> {
 fn validate_findings(
     findings: &[FindingCandidate],
     evidence: &BTreeMap<String, AuditEvidence>,
+    judge_conclusions: &[AuditAgentConclusion],
 ) -> Result<(), AuditStoreError> {
     for finding in findings {
         if finding.evidence_refs.is_empty() {
@@ -152,7 +182,7 @@ fn validate_findings(
             }
         }
         if requires_confirmation(finding) {
-            validate_confirmed_finding(finding, evidence)?;
+            validate_confirmed_finding(finding, evidence, judge_conclusions)?;
         }
     }
     Ok(())
@@ -166,6 +196,7 @@ fn requires_confirmation(finding: &FindingCandidate) -> bool {
 fn validate_confirmed_finding(
     finding: &FindingCandidate,
     evidence: &BTreeMap<String, AuditEvidence>,
+    judge_conclusions: &[AuditAgentConclusion],
 ) -> Result<(), AuditStoreError> {
     let mut verification_methods = Vec::new();
     let mut has_adapter_replay = false;
@@ -197,7 +228,32 @@ fn validate_confirmed_finding(
             finding.id
         )));
     }
+    if !has_positive_judge_conclusion(finding, judge_conclusions) {
+        return Err(AuditStoreError::InvalidReport(format!(
+            "confirmed finding `{}` needs a public positive Judge conclusion",
+            finding.id
+        )));
+    }
     Ok(())
+}
+
+fn has_positive_judge_conclusion(
+    finding: &FindingCandidate,
+    judge_conclusions: &[AuditAgentConclusion],
+) -> bool {
+    judge_conclusions.iter().any(|conclusion| {
+        matches!(
+            conclusion.status,
+            AuditAgentConclusionStatus::Accepted | AuditAgentConclusionStatus::Supported
+        ) && (conclusion
+            .candidate_ids
+            .iter()
+            .any(|candidate_id| candidate_id == &finding.id)
+            || finding
+                .evidence_refs
+                .iter()
+                .all(|evidence_ref| conclusion.evidence_refs.contains(evidence_ref)))
+    })
 }
 
 fn push_verification_method_once(
