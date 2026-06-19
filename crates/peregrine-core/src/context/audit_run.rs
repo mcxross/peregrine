@@ -13,6 +13,7 @@ const MAX_REFS: usize = 12;
 const MAX_WORK_ITEMS: usize = 8;
 const MAX_AGENT_ASSIGNMENTS: usize = 8;
 const MAX_GAPS: usize = 8;
+const MAX_SCHEDULE_ITEMS: usize = 8;
 
 /// Bounded model context describing the active persisted audit run.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -140,6 +141,17 @@ struct WorkItemContext<'a> {
     claimed_by: Option<&'a str>,
     attempts: u32,
     evidence_ref_count: usize,
+    schedule: Option<StageScheduleContext>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StageScheduleContext {
+    action: String,
+    required_capabilities: Vec<String>,
+    available_capabilities: Vec<String>,
+    unavailable_capabilities: Vec<String>,
+    verification_methods: Vec<String>,
 }
 
 impl<'a> From<&'a AuditWorkItem> for WorkItemContext<'a> {
@@ -152,6 +164,7 @@ impl<'a> From<&'a AuditWorkItem> for WorkItemContext<'a> {
             claimed_by: value.claimed_by.as_deref(),
             attempts: value.attempts,
             evidence_ref_count: value.evidence_refs.len(),
+            schedule: stage_schedule_context(value),
         }
     }
 }
@@ -241,6 +254,55 @@ fn current_work_items(run: &AuditRun) -> Vec<WorkItemContext<'_>> {
         .filter(|item| item.status == AuditWorkItemStatus::Pending)
         .take(MAX_WORK_ITEMS)
         .map(WorkItemContext::from)
+        .collect()
+}
+
+fn stage_schedule_context(work_item: &AuditWorkItem) -> Option<StageScheduleContext> {
+    let schedule = work_item.metadata.get("stageSchedule")?;
+    Some(StageScheduleContext {
+        action: schedule.get("action")?.as_str()?.to_string(),
+        required_capabilities: string_array(schedule.get("requiredCapabilities")),
+        available_capabilities: capability_array(schedule.get("availableCapabilities")),
+        unavailable_capabilities: unavailable_capability_array(
+            schedule.get("unavailableCapabilities"),
+        ),
+        verification_methods: string_array(schedule.get("verificationMethods")),
+    })
+}
+
+fn string_array(value: Option<&serde_json::Value>) -> Vec<String> {
+    value
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(serde_json::Value::as_str)
+        .take(MAX_SCHEDULE_ITEMS)
+        .map(str::to_string)
+        .collect()
+}
+
+fn capability_array(value: Option<&serde_json::Value>) -> Vec<String> {
+    value
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|value| value.get("capability").and_then(serde_json::Value::as_str))
+        .take(MAX_SCHEDULE_ITEMS)
+        .map(str::to_string)
+        .collect()
+}
+
+fn unavailable_capability_array(value: Option<&serde_json::Value>) -> Vec<String> {
+    value
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|value| {
+            let capability = value.get("capability")?.as_str()?;
+            let reason = value.get("reason")?.as_str()?;
+            Some(format!("{capability}: {reason}"))
+        })
+        .take(MAX_SCHEDULE_ITEMS)
         .collect()
 }
 
@@ -357,25 +419,42 @@ mod tests {
                 })
                 .collect(),
             work_items: (0..100)
-                .map(|index| AuditWorkItem {
-                    id: format!("work-{index}"),
-                    stage: if index == 0 {
-                        AuditStageId::BuildNormalize
-                    } else {
-                        AuditStageId::AttackSurface
-                    },
-                    status: if index == 0 {
-                        AuditWorkItemStatus::Claimed
-                    } else {
-                        AuditWorkItemStatus::Pending
-                    },
-                    title: format!("Work item {index}"),
-                    claimed_by: (index == 0).then_some("researcher".to_string()),
-                    attempts: index,
-                    evidence_refs: Vec::new(),
-                    created_at: 0,
-                    updated_at: 0,
-                    metadata: Metadata::new(),
+                .map(|index| {
+                    let mut metadata = Metadata::new();
+                    if index == 0 {
+                        metadata.insert(
+                            "stageSchedule".to_string(),
+                            serde_json::json!({
+                                "action": "useAvailableCapabilities",
+                                "requiredCapabilities": ["target.acquire"],
+                                "availableCapabilities": [
+                                    {"capability": "target.acquire"}
+                                ],
+                                "unavailableCapabilities": [],
+                                "verificationMethods": [],
+                            }),
+                        );
+                    }
+                    AuditWorkItem {
+                        id: format!("work-{index}"),
+                        stage: if index == 0 {
+                            AuditStageId::BuildNormalize
+                        } else {
+                            AuditStageId::AttackSurface
+                        },
+                        status: if index == 0 {
+                            AuditWorkItemStatus::Claimed
+                        } else {
+                            AuditWorkItemStatus::Pending
+                        },
+                        title: format!("Work item {index}"),
+                        claimed_by: (index == 0).then_some("researcher".to_string()),
+                        attempts: index,
+                        evidence_refs: Vec::new(),
+                        created_at: 0,
+                        updated_at: 0,
+                        metadata,
+                    }
                 })
                 .collect(),
             agent_assignments: (0..100)
@@ -413,6 +492,8 @@ mod tests {
         assert!(rendered.contains("\"currentStage\": \"buildNormalize\""));
         assert!(rendered.contains("\"currentWork\""));
         assert!(rendered.contains("work-0"));
+        assert!(rendered.contains("\"schedule\""));
+        assert!(rendered.contains("target.acquire"));
         assert!(rendered.contains("\"agentAssignments\""));
         assert!(rendered.contains("assignment-0"));
         assert!(rendered.contains("\"evidenceRefs\": 100"));

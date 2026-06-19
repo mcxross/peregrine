@@ -1,3 +1,11 @@
+mod scheduler;
+
+pub use scheduler::{
+    AuditStageAvailableCapability, AuditStageSchedule, AuditStageScheduleAction,
+    AuditStageUnavailableCapability, STAGE_SCHEDULE_METADATA_KEY, attach_stage_schedules,
+    schedule_metadata, stage_required_capabilities, stage_schedule,
+};
+
 use peregrine_types::{
     AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentRole, AuditCapabilityBinding,
     AuditProfile, AuditStageId, AuditTarget, AuditWorkItem, AuditWorkItemStatus, ExploitBundle,
@@ -379,5 +387,77 @@ mod tests {
                 ),
             ]
         );
+    }
+
+    #[test]
+    fn attaches_stage_schedules_from_capability_bindings() {
+        let mut work_items = create_audit_work_items(
+            "audit-1",
+            &[
+                AuditStageId::BuildNormalize,
+                AuditStageId::DynamicAnalysis,
+                AuditStageId::AuditReport,
+            ],
+            10,
+        );
+        let capabilities = vec![
+            AuditCapabilityBinding {
+                capability: "target.acquire".to_string(),
+                provider_id: "adapter".to_string(),
+                adapter_id: Some("test-adapter".to_string()),
+                tool_name: None,
+                available: true,
+                diagnostic: None,
+            },
+            AuditCapabilityBinding {
+                capability: "target.normalize".to_string(),
+                provider_id: "adapter".to_string(),
+                adapter_id: Some("test-adapter".to_string()),
+                tool_name: None,
+                available: true,
+                diagnostic: None,
+            },
+            AuditCapabilityBinding {
+                capability: "dynamic.fuzzing".to_string(),
+                provider_id: "mcp".to_string(),
+                adapter_id: None,
+                tool_name: Some("mcp__sui__movy_fuzz".to_string()),
+                available: false,
+                diagnostic: Some("fuzzer unavailable".to_string()),
+            },
+        ];
+
+        attach_stage_schedules(&mut work_items, &capabilities).expect("attach schedules");
+
+        let build_schedule = schedule_metadata(&work_items[0].metadata).expect("build schedule");
+        assert_eq!(
+            build_schedule.action,
+            AuditStageScheduleAction::UseAvailableCapabilities
+        );
+        assert_eq!(
+            build_schedule
+                .available_capabilities
+                .iter()
+                .map(|capability| capability.capability.as_str())
+                .collect::<Vec<_>>(),
+            vec!["target.acquire", "target.normalize"]
+        );
+
+        let fuzz_schedule = schedule_metadata(&work_items[1].metadata).expect("fuzz schedule");
+        assert_eq!(
+            fuzz_schedule.action,
+            AuditStageScheduleAction::RecordUnavailableAndContinue
+        );
+        assert_eq!(
+            fuzz_schedule.unavailable_capabilities,
+            vec![AuditStageUnavailableCapability {
+                capability: "dynamic.fuzzing".to_string(),
+                reason: "fuzzer unavailable".to_string(),
+            }]
+        );
+
+        let report_schedule = schedule_metadata(&work_items[2].metadata).expect("report schedule");
+        assert_eq!(report_schedule.action, AuditStageScheduleAction::ModelOnly);
+        assert!(report_schedule.required_capabilities.is_empty());
     }
 }

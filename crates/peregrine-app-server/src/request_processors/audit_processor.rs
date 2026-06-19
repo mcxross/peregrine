@@ -33,8 +33,8 @@ use peregrine_core::context::AuditRunContextFragment;
 use peregrine_core::context::ContextualUserFragment;
 use peregrine_core::{ExternalGoalPreviousStatus, ExternalGoalSet, PeregrineThread, ThreadManager};
 use peregrine_security_tools::{
-    AuditAdapterRegistry, AuditWorkspace, create_audit_agent_assignments, create_audit_work_items,
-    default_audit_stages,
+    AuditAdapterRegistry, AuditWorkspace, attach_stage_schedules, create_audit_agent_assignments,
+    create_audit_work_items, default_audit_stages,
 };
 use peregrine_types::{
     AuditAgentAssignment, AuditPlan, AuditProfile, AuditRun, AuditRunStatus, AuditStageId,
@@ -203,7 +203,9 @@ impl AuditRequestProcessor {
         let capabilities = preflight.capabilities;
         let coverage_gaps = coverage_gaps(&plan, &capabilities);
         let now = OffsetDateTime::now_utc().unix_timestamp();
-        let work_items = create_audit_work_items(&audit_id, &plan.stages, now);
+        let mut work_items = create_audit_work_items(&audit_id, &plan.stages, now);
+        attach_stage_schedules(&mut work_items, &capabilities)
+            .map_err(|error| internal_error(error.to_string()))?;
         let mut agent_assignments = create_audit_agent_assignments(&audit_id, &work_items, now);
         let agent_role_bindings =
             bind_audit_agent_roles(self.config.as_ref(), &mut agent_assignments)?;

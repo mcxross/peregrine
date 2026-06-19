@@ -55,7 +55,24 @@ impl AuditChainAdapter for TestAuditAdapter {
     }
 
     fn capabilities(&self) -> Vec<AuditCapabilityBinding> {
-        Vec::new()
+        vec![
+            AuditCapabilityBinding {
+                capability: "target.acquire".to_string(),
+                provider_id: "test-adapter".to_string(),
+                adapter_id: Some(self.adapter_id().to_string()),
+                tool_name: None,
+                available: true,
+                diagnostic: None,
+            },
+            AuditCapabilityBinding {
+                capability: "target.normalize".to_string(),
+                provider_id: "test-adapter".to_string(),
+                adapter_id: Some(self.adapter_id().to_string()),
+                tool_name: None,
+                available: true,
+                diagnostic: None,
+            },
+        ]
     }
 
     fn preflight<'a>(&'a self, target: &'a AuditTarget) -> AdapterFuture<'a, AuditTargetPreflight> {
@@ -226,6 +243,20 @@ async fn audit_start_and_resume_continue_coordinator_goal() -> anyhow::Result<()
     assert_eq!(run.status, AuditRunStatus::Running);
     assert!(run.goal_id.is_some());
     assert!(run.coordinator_thread_id.is_some());
+    let first_schedule = run.work_items[0]
+        .metadata
+        .get("stageSchedule")
+        .expect("stage schedule")
+        .as_object()
+        .expect("stage schedule object");
+    assert_eq!(
+        first_schedule.get("action"),
+        Some(&serde_json::json!("useAvailableCapabilities"))
+    );
+    assert_eq!(
+        first_schedule.get("requiredCapabilities"),
+        Some(&serde_json::json!(["target.acquire", "target.normalize"]))
+    );
     assert_eq!(run.agent_assignments.len(), 13);
     assert!(run.agent_assignments.iter().all(|assignment| {
         assignment.audit_run_id == run.id

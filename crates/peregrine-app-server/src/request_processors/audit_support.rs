@@ -118,6 +118,8 @@ fn capability_stage(capability: &str) -> AuditStageId {
         "dynamic.fuzzing" => AuditStageId::DynamicAnalysis,
         "graph.analysis" => AuditStageId::GraphAnalysis,
         "static.analysis" => AuditStageId::StaticAnalysis,
+        "bytecode.analysis" => AuditStageId::BytecodeReview,
+        "formal.verification" => AuditStageId::InvariantStress,
         _ => AuditStageId::BuildNormalize,
     }
 }

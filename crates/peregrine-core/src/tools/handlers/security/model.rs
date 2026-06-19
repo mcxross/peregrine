@@ -310,6 +310,17 @@ pub(super) struct WorkSummary {
     claimed_by: Option<String>,
     attempts: u32,
     evidence_count: usize,
+    schedule: Option<WorkScheduleSummary>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct WorkScheduleSummary {
+    action: String,
+    required_capabilities: Vec<String>,
+    available_capabilities: Vec<String>,
+    unavailable_capabilities: Vec<String>,
+    verification_methods: Vec<String>,
 }
 
 impl From<&AuditWorkItem> for WorkSummary {
@@ -322,8 +333,58 @@ impl From<&AuditWorkItem> for WorkSummary {
             claimed_by: value.claimed_by.clone(),
             attempts: value.attempts,
             evidence_count: value.evidence_refs.len(),
+            schedule: work_schedule_summary(value),
         }
     }
+}
+
+fn work_schedule_summary(work_item: &AuditWorkItem) -> Option<WorkScheduleSummary> {
+    let schedule = work_item.metadata.get("stageSchedule")?;
+    Some(WorkScheduleSummary {
+        action: schedule.get("action")?.as_str()?.to_string(),
+        required_capabilities: string_array(schedule.get("requiredCapabilities")),
+        available_capabilities: capability_array(schedule.get("availableCapabilities")),
+        unavailable_capabilities: unavailable_capability_array(
+            schedule.get("unavailableCapabilities"),
+        ),
+        verification_methods: string_array(schedule.get("verificationMethods")),
+    })
+}
+
+fn string_array(value: Option<&Value>) -> Vec<String> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .take(super::MAX_REFS)
+        .map(str::to_string)
+        .collect()
+}
+
+fn capability_array(value: Option<&Value>) -> Vec<String> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|value| value.get("capability").and_then(Value::as_str))
+        .take(super::MAX_REFS)
+        .map(str::to_string)
+        .collect()
+}
+
+fn unavailable_capability_array(value: Option<&Value>) -> Vec<String> {
+    value
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|value| {
+            let capability = value.get("capability")?.as_str()?;
+            let reason = value.get("reason")?.as_str()?;
+            Some(format!("{capability}: {reason}"))
+        })
+        .take(super::MAX_REFS)
+        .collect()
 }
 
 fn next_agent_assignments(run: &AuditRun) -> Vec<AgentAssignmentSummary> {
