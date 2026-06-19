@@ -245,6 +245,29 @@ async fn audit_start_and_resume_continue_coordinator_goal() -> anyhow::Result<()
     assert!(run.agent_assignments.iter().any(|assignment| {
         assignment.role == AuditAgentRole::Judge && assignment.role_name == "audit-judge"
     }));
+    let researcher_assignment = run
+        .agent_assignments
+        .iter()
+        .find(|assignment| assignment.role == AuditAgentRole::Researcher)
+        .expect("researcher assignment");
+    assert_eq!(
+        researcher_assignment.metadata.get("roleSource"),
+        Some(&serde_json::json!("builtIn"))
+    );
+    assert_eq!(
+        researcher_assignment.metadata.get("roleConfigFile"),
+        Some(&serde_json::json!("audit_researcher.toml"))
+    );
+    let bindings = run
+        .metadata
+        .get("agentRoleBindings")
+        .and_then(serde_json::Value::as_array)
+        .expect("agent role bindings");
+    assert_eq!(bindings.len(), run.agent_assignments.len());
+    assert!(bindings.iter().any(|binding| {
+        binding.get("roleName") == Some(&serde_json::json!("audit-judge"))
+            && binding.get("source") == Some(&serde_json::json!("builtIn"))
+    }));
     assert_eq!(fixture.continuation.calls(), 1);
 
     fixture

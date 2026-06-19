@@ -25,6 +25,9 @@ use peregrine_app_server_protocol::{
     JSONRPCErrorError, ServerNotification,
 };
 use peregrine_audit_store::AuditStore;
+use peregrine_core::agent_role_catalog::{
+    AgentRoleCatalogEntry, AgentRoleCatalogSource, list_agent_roles,
+};
 use peregrine_core::config::Config;
 use peregrine_core::context::AuditRunContextFragment;
 use peregrine_core::context::ContextualUserFragment;
@@ -34,8 +37,10 @@ use peregrine_security_tools::{
     default_audit_stages,
 };
 use peregrine_types::{
-    AuditPlan, AuditProfile, AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus, Metadata,
+    AuditAgentAssignment, AuditPlan, AuditProfile, AuditRun, AuditRunStatus, AuditStageId,
+    AuditStageStatus, Metadata,
 };
+use serde_json::{Value, json};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -199,9 +204,12 @@ impl AuditRequestProcessor {
         let coverage_gaps = coverage_gaps(&plan, &capabilities);
         let now = OffsetDateTime::now_utc().unix_timestamp();
         let work_items = create_audit_work_items(&audit_id, &plan.stages, now);
-        let agent_assignments = create_audit_agent_assignments(&audit_id, &work_items, now);
+        let mut agent_assignments = create_audit_agent_assignments(&audit_id, &work_items, now);
+        let agent_role_bindings =
+            bind_audit_agent_roles(self.config.as_ref(), &mut agent_assignments)?;
         let mut metadata = Metadata::new();
         metadata.insert("acquiredTarget".to_string(), serialize(&acquired)?);
+        metadata.insert("agentRoleBindings".to_string(), agent_role_bindings);
         let mut artifact_refs = vec![acquired.manifest_ref.clone()];
         artifact_refs.extend(acquired.artifact_refs.clone());
         let mut run = AuditRun {
@@ -652,6 +660,82 @@ fn audit_coordinator_objective(audit_id: &str) -> String {
     format!(
         "Complete audit {audit_id} using its persisted stage plan. Drive the deterministic audit queue through audit_read_run, audit_claim_work, audit_record_packet, audit_record_evidence, audit_finish_work, and audit_finalize_report. Use only ToolRouter-visible native, code-mode, and MCP capabilities. Never treat generated code, model analysis, or knowledge citations as evidence until registered tools persist normalized evidence. Only complete after a terminal audit report exists."
     )
+}
+
+fn bind_audit_agent_roles(
+    config: &Config,
+    assignments: &mut [AuditAgentAssignment],
+) -> Result<Value, JSONRPCErrorError> {
+    let catalog = list_agent_roles(config);
+    let mut bindings = Vec::new();
+    for assignment in assignments {
+        let role = catalog
+            .iter()
+            .find(|entry| entry.name == assignment.role_name)
+            .ok_or_else(|| {
+                invalid_request(format!(
+                    "audit agent role `{}` is not configured",
+                    assignment.role_name
+                ))
+            })?;
+        stamp_agent_assignment_role_metadata(assignment, role)?;
+        bindings.push(agent_role_binding_value(assignment, role)?);
+    }
+    Ok(Value::Array(bindings))
+}
+
+fn stamp_agent_assignment_role_metadata(
+    assignment: &mut AuditAgentAssignment,
+    role: &AgentRoleCatalogEntry,
+) -> Result<(), JSONRPCErrorError> {
+    assignment.metadata.insert(
+        "roleSource".to_string(),
+        json!(agent_role_source_name(&role.source)),
+    );
+    assignment.metadata.insert(
+        "roleOverridesBuiltIn".to_string(),
+        json!(role.overrides_built_in),
+    );
+    if let Some(config_file) = &role.config_file {
+        assignment.metadata.insert(
+            "roleConfigFile".to_string(),
+            json!(config_file.display().to_string()),
+        );
+    }
+    if role.nickname_candidates.is_some() {
+        assignment.metadata.insert(
+            "roleNicknameCandidates".to_string(),
+            serde_json::to_value(&role.nickname_candidates)
+                .map_err(|error| internal_error(error.to_string()))?,
+        );
+    }
+    Ok(())
+}
+
+fn agent_role_binding_value(
+    assignment: &AuditAgentAssignment,
+    role: &AgentRoleCatalogEntry,
+) -> Result<Value, JSONRPCErrorError> {
+    Ok(json!({
+        "assignmentId": assignment.id,
+        "workItemId": assignment.work_item_id,
+        "role": serde_json::to_value(&assignment.role)
+            .map_err(|error| internal_error(error.to_string()))?,
+        "roleName": assignment.role_name,
+        "source": agent_role_source_name(&role.source),
+        "overridesBuiltIn": role.overrides_built_in,
+        "configFile": role.config_file
+            .as_ref()
+            .map(|config_file| config_file.display().to_string()),
+        "nicknameCandidates": role.nickname_candidates,
+    }))
+}
+
+fn agent_role_source_name(source: &AgentRoleCatalogSource) -> &'static str {
+    match source {
+        AgentRoleCatalogSource::BuiltIn => "builtIn",
+        AgentRoleCatalogSource::Configured => "configured",
+    }
 }
 
 fn is_recorded_artifact_ref(run: &AuditRun, artifact_ref: &str) -> bool {
