@@ -322,6 +322,20 @@ pub enum AuditStoreError {
         work_item_id: String,
         assignment_ids: Vec<String>,
     },
+    #[error(
+        "audit work item `{work_item_id}` has unavailable scheduled capabilities: {capabilities:?}"
+    )]
+    UnavailableScheduledCapabilities {
+        work_item_id: String,
+        capabilities: Vec<String>,
+    },
+    #[error(
+        "audit work item `{work_item_id}` is missing non-model evidence for scheduled verification methods: {verification_methods:?}"
+    )]
+    MissingScheduledEvidence {
+        work_item_id: String,
+        verification_methods: Vec<String>,
+    },
     #[error("audit work item `{work_item_id}` is claimed by `{claimed_by}`")]
     WorkItemClaimedByOther {
         work_item_id: String,
@@ -360,13 +374,14 @@ pub enum AuditStoreError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use peregrine_security_tools::create_audit_work_items;
+    use peregrine_security_tools::{attach_stage_schedules, create_audit_work_items};
     use peregrine_types::{
         AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentConclusion,
-        AuditAgentConclusionStatus, AuditAgentRole, AuditEvidence, AuditEvidenceAttestation,
-        AuditProfile, AuditReport, AuditRunStatus, AuditStageId, AuditStageStatus, AuditTarget,
-        AuditWorkItemStatus, EvidenceConfidence, FindingCandidate, FindingCandidateSeverity,
-        FindingCandidateStatus, Metadata, SourcePrecision, ValidationPlan, VerificationMethod,
+        AuditAgentConclusionStatus, AuditAgentRole, AuditCapabilityBinding, AuditEvidence,
+        AuditEvidenceAttestation, AuditProfile, AuditReport, AuditRunStatus, AuditStageId,
+        AuditStageStatus, AuditTarget, AuditWorkItemStatus, EvidenceConfidence, FindingCandidate,
+        FindingCandidateSeverity, FindingCandidateStatus, Metadata, SourcePrecision,
+        ValidationPlan, VerificationMethod,
     };
 
     fn plan() -> AuditPlan {
@@ -632,6 +647,211 @@ mod tests {
                 status: AuditStageStatus::Succeeded,
                 run: update.run,
             }
+        );
+    }
+
+    #[test]
+    fn finish_work_blocks_completion_when_scheduled_capability_is_unavailable() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let plan = store.store_plan(plan()).expect("store plan");
+        let stages = vec![AuditStageId::DynamicAnalysis];
+        let mut work_items = create_audit_work_items("audit-schedule-gap", &stages, 10);
+        attach_stage_schedules(
+            &mut work_items,
+            &[AuditCapabilityBinding {
+                capability: "dynamic.fuzzing".to_string(),
+                provider_id: "mcp".to_string(),
+                adapter_id: None,
+                tool_name: Some("mcp__sui__movy_fuzz".to_string()),
+                available: false,
+                diagnostic: Some("fuzzer unavailable".to_string()),
+            }],
+        )
+        .expect("attach schedules");
+        let work_item_id = work_items[0].id.clone();
+        let run = AuditRun {
+            schema_version: 1,
+            id: "audit-schedule-gap".to_string(),
+            plan_fingerprint: plan.fingerprint,
+            target: plan.target,
+            profile: plan.profile,
+            status: AuditRunStatus::Running,
+            current_stage: stages[0].clone(),
+            coordinator_thread_id: None,
+            goal_id: None,
+            adapter_id: Some("adapter/sui".to_string()),
+            capabilities: Vec::new(),
+            coverage_gaps: Vec::new(),
+            work_items,
+            agent_assignments: Vec::new(),
+            evidence_refs: Vec::new(),
+            artifact_refs: Vec::new(),
+            created_at: 10,
+            updated_at: 10,
+            metadata: Metadata::new(),
+        };
+        store.create_run(&run).expect("create run");
+        let events = store.subscribe_events().expect("subscribe events");
+        store
+            .claim_work("audit-schedule-gap", "coordinator", None, 11)
+            .expect("claim work");
+        let _ = recv_event(&events);
+
+        assert!(matches!(
+            store.finish_work(
+                "audit-schedule-gap",
+                &work_item_id,
+                "coordinator",
+                AuditWorkItemStatus::Completed,
+                &[],
+                12,
+            ),
+            Err(AuditStoreError::UnavailableScheduledCapabilities {
+                work_item_id: blocked_work_item_id,
+                capabilities,
+            }) if blocked_work_item_id == work_item_id && capabilities == vec!["dynamic.fuzzing".to_string()]
+        ));
+
+        let update = store
+            .finish_work(
+                "audit-schedule-gap",
+                &work_item_id,
+                "coordinator",
+                AuditWorkItemStatus::Blocked,
+                &[],
+                13,
+            )
+            .expect("block unavailable work");
+        assert_eq!(update.work_item.status, AuditWorkItemStatus::Blocked);
+        assert_eq!(
+            recv_event(&events),
+            AuditStoreEvent::StageUpdated {
+                audit_id: "audit-schedule-gap".to_string(),
+                stage: AuditStageId::DynamicAnalysis,
+                status: AuditStageStatus::Unavailable,
+                run: update.run.clone(),
+            }
+        );
+        assert!(
+            update
+                .work_item
+                .metadata
+                .contains_key("stageScheduleOutcome")
+        );
+    }
+
+    #[test]
+    fn finish_work_requires_non_model_evidence_for_scheduled_verification() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let plan = store.store_plan(plan()).expect("store plan");
+        let stages = vec![AuditStageId::DynamicAnalysis];
+        let mut work_items = create_audit_work_items("audit-schedule-evidence", &stages, 10);
+        attach_stage_schedules(
+            &mut work_items,
+            &[AuditCapabilityBinding {
+                capability: "dynamic.fuzzing".to_string(),
+                provider_id: "native".to_string(),
+                adapter_id: Some("adapter/sui".to_string()),
+                tool_name: Some("movy_fuzz".to_string()),
+                available: true,
+                diagnostic: None,
+            }],
+        )
+        .expect("attach schedules");
+        let work_item_id = work_items[0].id.clone();
+        let run = AuditRun {
+            schema_version: 1,
+            id: "audit-schedule-evidence".to_string(),
+            plan_fingerprint: plan.fingerprint,
+            target: plan.target,
+            profile: plan.profile,
+            status: AuditRunStatus::Running,
+            current_stage: stages[0].clone(),
+            coordinator_thread_id: None,
+            goal_id: None,
+            adapter_id: Some("adapter/sui".to_string()),
+            capabilities: Vec::new(),
+            coverage_gaps: Vec::new(),
+            work_items,
+            agent_assignments: Vec::new(),
+            evidence_refs: Vec::new(),
+            artifact_refs: Vec::new(),
+            created_at: 10,
+            updated_at: 10,
+            metadata: Metadata::new(),
+        };
+        store.create_run(&run).expect("create run");
+        store
+            .claim_work("audit-schedule-evidence", "coordinator", None, 11)
+            .expect("claim work");
+
+        assert!(matches!(
+            store.finish_work(
+                "audit-schedule-evidence",
+                &work_item_id,
+                "coordinator",
+                AuditWorkItemStatus::Completed,
+                &[],
+                12,
+            ),
+            Err(AuditStoreError::MissingScheduledEvidence {
+                work_item_id: blocked_work_item_id,
+                verification_methods,
+            }) if blocked_work_item_id == work_item_id && verification_methods == vec!["Fuzzing".to_string()]
+        ));
+
+        let (_, model_ref) = store
+            .record_evidence(
+                "audit-schedule-evidence",
+                evidence(
+                    &work_item_id,
+                    VerificationMethod::Fuzzing,
+                    AuditEvidenceAttestation::ModelSubmitted,
+                    None,
+                ),
+            )
+            .expect("record model evidence");
+        assert!(matches!(
+            store.finish_work(
+                "audit-schedule-evidence",
+                &work_item_id,
+                "coordinator",
+                AuditWorkItemStatus::Completed,
+                &[model_ref],
+                13,
+            ),
+            Err(AuditStoreError::MissingScheduledEvidence { .. })
+        ));
+
+        let (_, router_ref) = store
+            .record_evidence(
+                "audit-schedule-evidence",
+                evidence(
+                    &work_item_id,
+                    VerificationMethod::Fuzzing,
+                    AuditEvidenceAttestation::RouterCaptured,
+                    None,
+                ),
+            )
+            .expect("record router evidence");
+        let update = store
+            .finish_work(
+                "audit-schedule-evidence",
+                &work_item_id,
+                "coordinator",
+                AuditWorkItemStatus::Completed,
+                &[router_ref],
+                14,
+            )
+            .expect("complete scheduled work");
+        assert_eq!(update.work_item.status, AuditWorkItemStatus::Completed);
+        assert!(
+            update
+                .work_item
+                .metadata
+                .contains_key("stageScheduleOutcome")
         );
     }
 

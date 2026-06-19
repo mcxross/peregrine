@@ -1,7 +1,9 @@
 use super::{AuditStore, AuditStoreError, AuditStoreEvent, status_name};
+use peregrine_security_tools::{AuditStageScheduleAction, schedule_metadata};
 use peregrine_types::{
     AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentConclusion, AuditEvidence,
-    AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus, AuditWorkItem, AuditWorkItemStatus,
+    AuditEvidenceAttestation, AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus,
+    AuditWorkItem, AuditWorkItemStatus,
 };
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::Serialize;
@@ -346,6 +348,7 @@ impl AuditStore {
                         .unwrap_or_else(|| "unclaimed".to_string()),
                 });
             }
+            self.ensure_schedule_allows_work_status(run_id, work_item, &status, evidence_refs)?;
             work_item.status = status;
             work_item.updated_at = now;
             for evidence_ref in evidence_refs {
@@ -353,6 +356,7 @@ impl AuditStore {
                     work_item.evidence_refs.push(evidence_ref.clone());
                 }
             }
+            stamp_schedule_outcome(work_item, now);
             let completed = work_item.clone();
             if let Some(next) = run
                 .work_items
@@ -367,7 +371,7 @@ impl AuditStore {
         self.publish_event(AuditStoreEvent::StageUpdated {
             audit_id: run.id.clone(),
             stage: work_item.stage.clone(),
-            status: work_item_stage_status(&work_item.status),
+            status: work_item_stage_status(&work_item),
             run: run.clone(),
         });
         Ok(WorkUpdate {
@@ -375,6 +379,73 @@ impl AuditStore {
             run,
             work_item,
         })
+    }
+
+    fn ensure_schedule_allows_work_status(
+        &self,
+        run_id: &str,
+        work_item: &AuditWorkItem,
+        status: &AuditWorkItemStatus,
+        evidence_refs: &[String],
+    ) -> Result<(), AuditStoreError> {
+        if *status != AuditWorkItemStatus::Completed {
+            return Ok(());
+        }
+        let Some(schedule) = schedule_metadata(&work_item.metadata) else {
+            return Ok(());
+        };
+        if schedule.action == AuditStageScheduleAction::RecordUnavailableAndContinue {
+            return Err(AuditStoreError::UnavailableScheduledCapabilities {
+                work_item_id: work_item.id.clone(),
+                capabilities: schedule
+                    .unavailable_capabilities
+                    .into_iter()
+                    .map(|capability| capability.capability)
+                    .collect(),
+            });
+        }
+        if schedule.verification_methods.is_empty() {
+            return Ok(());
+        }
+
+        let mut effective_evidence_refs = work_item.evidence_refs.clone();
+        for evidence_ref in evidence_refs {
+            if !effective_evidence_refs.contains(evidence_ref) {
+                effective_evidence_refs.push(evidence_ref.clone());
+            }
+        }
+        for evidence_ref in effective_evidence_refs {
+            let evidence = self.read_work_evidence(run_id, &evidence_ref)?;
+            if evidence.work_item_id.as_deref() == Some(work_item.id.as_str())
+                && evidence.attestation != AuditEvidenceAttestation::ModelSubmitted
+                && schedule
+                    .verification_methods
+                    .contains(&evidence.verification_method)
+            {
+                return Ok(());
+            }
+        }
+        Err(AuditStoreError::MissingScheduledEvidence {
+            work_item_id: work_item.id.clone(),
+            verification_methods: schedule
+                .verification_methods
+                .into_iter()
+                .map(|method| format!("{method:?}"))
+                .collect(),
+        })
+    }
+
+    fn read_work_evidence(
+        &self,
+        run_id: &str,
+        evidence_ref: &str,
+    ) -> Result<AuditEvidence, AuditStoreError> {
+        let path = self.audits_root.join(run_id).join(evidence_ref);
+        let body = std::fs::read_to_string(&path).map_err(|source| AuditStoreError::Io {
+            action: "read audit evidence",
+            source,
+        })?;
+        serde_json::from_str(&body).map_err(AuditStoreError::from)
     }
 
     pub(crate) fn mutate_run<T>(
@@ -520,8 +591,17 @@ fn validate_artifact_ref(artifact_ref: &str) -> Result<(), AuditStoreError> {
     Ok(())
 }
 
-fn work_item_stage_status(status: &AuditWorkItemStatus) -> AuditStageStatus {
-    match status {
+fn work_item_stage_status(work_item: &AuditWorkItem) -> AuditStageStatus {
+    if work_item.status == AuditWorkItemStatus::Blocked
+        && schedule_metadata(&work_item.metadata)
+            .map(|schedule| {
+                schedule.action == AuditStageScheduleAction::RecordUnavailableAndContinue
+            })
+            .unwrap_or(false)
+    {
+        return AuditStageStatus::Unavailable;
+    }
+    match work_item.status {
         AuditWorkItemStatus::Pending => AuditStageStatus::Pending,
         AuditWorkItemStatus::Claimed => AuditStageStatus::Running,
         AuditWorkItemStatus::Completed => AuditStageStatus::Succeeded,
@@ -529,6 +609,38 @@ fn work_item_stage_status(status: &AuditWorkItemStatus) -> AuditStageStatus {
         AuditWorkItemStatus::Blocked => AuditStageStatus::Blocked,
         AuditWorkItemStatus::Cancelled => AuditStageStatus::Cancelled,
     }
+}
+
+fn stamp_schedule_outcome(work_item: &mut AuditWorkItem, now: i64) {
+    let Some(schedule) = schedule_metadata(&work_item.metadata) else {
+        return;
+    };
+    let status = match work_item.status {
+        AuditWorkItemStatus::Pending => "pending",
+        AuditWorkItemStatus::Claimed => "claimed",
+        AuditWorkItemStatus::Completed => "completed",
+        AuditWorkItemStatus::Failed => "failed",
+        AuditWorkItemStatus::Blocked => "blocked",
+        AuditWorkItemStatus::Cancelled => "cancelled",
+    };
+    work_item.metadata.insert(
+        "stageScheduleOutcome".to_string(),
+        json!({
+            "schemaVersion": 1,
+            "status": status,
+            "updatedAt": now,
+            "requiredCapabilities": schedule.required_capabilities,
+            "unavailableCapabilities": schedule
+                .unavailable_capabilities
+                .into_iter()
+                .map(|capability| json!({
+                    "capability": capability.capability,
+                    "reason": capability.reason,
+                }))
+                .collect::<Vec<_>>(),
+            "evidenceRefs": work_item.evidence_refs.clone(),
+        }),
+    );
 }
 
 fn ensure_running(run: &AuditRun) -> Result<(), AuditStoreError> {
