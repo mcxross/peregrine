@@ -133,6 +133,7 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
                     Some((run, work_item)) => {
                         inject_audit_context(&session, &turn, &run).await;
                         json_output(&ClaimWorkResponse {
+                            agent_assignments: agent_assignments_for_work(&run, &work_item.id),
                             work_item: WorkSummary::from(&work_item),
                             remaining_pending: pending_count(&run),
                         })?
@@ -182,12 +183,14 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
                 let args: FinishAgentAssignmentArgs = parse_arguments(&arguments)?;
                 validate_text("work_item_id", &args.work_item_id, MAX_ID_BYTES)?;
                 validate_text("assignment_id", &args.assignment_id, MAX_ID_BYTES)?;
+                validate_text("reason", &args.reason, MAX_SUMMARY_BYTES)?;
                 let update = store
                     .finish_agent_assignment(
                         &scope.audit_id,
                         &args.work_item_id,
                         &args.assignment_id,
                         args.status,
+                        &args.reason,
                         now,
                     )
                     .map_err(tool_error)?;
@@ -259,6 +262,10 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
                     inject_audit_context(&session, &turn, &update.run).await;
                 }
                 json_output(&FinishWorkResponse {
+                    agent_assignments: agent_assignments_for_work(
+                        &update.run,
+                        &update.work_item.id,
+                    ),
                     work_item: WorkSummary::from(&update.work_item),
                     current_stage: update.run.current_stage.clone(),
                     remaining_pending: pending_count(&update.run),

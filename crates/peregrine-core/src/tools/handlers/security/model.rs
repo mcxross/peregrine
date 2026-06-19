@@ -40,6 +40,7 @@ pub(super) struct FinishAgentAssignmentArgs {
     pub(super) work_item_id: String,
     pub(super) assignment_id: String,
     pub(super) status: AuditAgentAssignmentStatus,
+    pub(super) reason: String,
 }
 
 #[derive(Deserialize)]
@@ -370,10 +371,23 @@ fn next_agent_assignments(run: &AuditRun) -> Vec<AgentAssignmentSummary> {
         .collect()
 }
 
+pub(super) fn agent_assignments_for_work(
+    run: &AuditRun,
+    work_item_id: &str,
+) -> Vec<AgentAssignmentSummary> {
+    run.agent_assignments
+        .iter()
+        .filter(|assignment| assignment.work_item_id == work_item_id)
+        .take(12)
+        .map(AgentAssignmentSummary::from)
+        .collect()
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct ClaimWorkResponse {
     pub(super) work_item: WorkSummary,
+    pub(super) agent_assignments: Vec<AgentAssignmentSummary>,
     pub(super) remaining_pending: usize,
 }
 
@@ -400,6 +414,7 @@ pub(super) struct EvidenceResponse {
 #[serde(rename_all = "camelCase")]
 pub(super) struct FinishWorkResponse {
     pub(super) work_item: WorkSummary,
+    pub(super) agent_assignments: Vec<AgentAssignmentSummary>,
     pub(super) current_stage: AuditStageId,
     pub(super) remaining_pending: usize,
 }

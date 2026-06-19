@@ -241,6 +241,7 @@ impl AuditStore {
         work_item_id: &str,
         assignment_id: &str,
         status: AuditAgentAssignmentStatus,
+        reason: &str,
         now: i64,
     ) -> Result<AgentAssignmentUpdate, AuditStoreError> {
         if !matches!(
@@ -263,6 +264,12 @@ impl AuditStore {
                 });
             }
             assignment.status = status;
+            assignment
+                .metadata
+                .insert("finishReason".to_string(), json!(reason));
+            assignment
+                .metadata
+                .insert("finishedAt".to_string(), json!(now));
             assignment.updated_at = now;
             let assignment = assignment.clone();
             run.updated_at = now;

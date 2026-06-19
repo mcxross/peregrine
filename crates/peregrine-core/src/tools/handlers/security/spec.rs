@@ -83,7 +83,7 @@ pub fn set_agent_assignment_thread_tool() -> ToolSpec {
 pub fn finish_agent_assignment_tool() -> ToolSpec {
     function_tool(
         FINISH_AGENT_ASSIGNMENT_TOOL_NAME,
-        "Mark an audit agent assignment failed or cancelled when no public conclusion artifact can be recorded. Successful assignments should complete through audit_record_agent_conclusion.",
+        "Mark an audit agent assignment failed or cancelled when no public conclusion artifact can be recorded. Successful assignments should complete through audit_record_agent_conclusion. The reason must say whether this came from wait_agent timeout, agent error, cancellation, or missing public conclusion.",
         BTreeMap::from([
             (
                 "work_item_id".to_string(),
@@ -100,8 +100,15 @@ pub fn finish_agent_assignment_tool() -> ToolSpec {
                     Some("Terminal non-success assignment state.".to_string()),
                 ),
             ),
+            (
+                "reason".to_string(),
+                JsonSchema::string(Some(
+                    "Bounded public reason, such as wait_agent timed out or agent returned no public conclusion."
+                        .to_string(),
+                )),
+            ),
         ]),
-        vec!["work_item_id", "assignment_id", "status"],
+        vec!["work_item_id", "assignment_id", "status", "reason"],
     )
 }
 

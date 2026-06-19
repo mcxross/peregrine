@@ -857,14 +857,22 @@ mod tests {
                 &work_item_id,
                 "assignment-1",
                 AuditAgentAssignmentStatus::Failed,
+                "agent returned no public conclusion",
                 14,
             )
             .expect("finish assignment");
+        let mut failure_metadata = Metadata::new();
+        failure_metadata.insert(
+            "finishReason".to_string(),
+            serde_json::json!("agent returned no public conclusion"),
+        );
+        failure_metadata.insert("finishedAt".to_string(), serde_json::json!(14));
         assert_eq!(
             failed.assignment,
             AuditAgentAssignment {
                 status: AuditAgentAssignmentStatus::Failed,
                 agent_thread_id: Some("agent-path-1".to_string()),
+                metadata: failure_metadata,
                 updated_at: 14,
                 ..assignment
             }
@@ -921,6 +929,7 @@ mod tests {
                 &work_item_id,
                 "assignment-1",
                 AuditAgentAssignmentStatus::Failed,
+                "wait_agent timed out",
                 13,
             )
             .expect("fail assignment");
