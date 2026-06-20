@@ -3,7 +3,7 @@ mod scheduler;
 pub use scheduler::{
     AuditStageAvailableCapability, AuditStageSchedule, AuditStageScheduleAction,
     AuditStageUnavailableCapability, STAGE_SCHEDULE_METADATA_KEY, attach_stage_schedules,
-    schedule_metadata, stage_required_capabilities, stage_schedule,
+    schedule_metadata, stage_desired_capabilities, stage_schedule,
 };
 
 use peregrine_types::{
@@ -28,6 +28,7 @@ pub fn default_audit_stages() -> Vec<AuditStageId> {
     vec![
         AuditStageId::BuildNormalize,
         AuditStageId::SemanticGraphs,
+        AuditStageId::BytecodeReview,
         AuditStageId::AttackSurface,
         AuditStageId::Invariants,
         AuditStageId::AttackHypotheses,
@@ -395,6 +396,7 @@ mod tests {
             "audit-1",
             &[
                 AuditStageId::BuildNormalize,
+                AuditStageId::AttackSurface,
                 AuditStageId::DynamicAnalysis,
                 AuditStageId::AuditReport,
             ],
@@ -418,10 +420,26 @@ mod tests {
                 diagnostic: None,
             },
             AuditCapabilityBinding {
+                capability: "static.analysis".to_string(),
+                provider_id: "mcp".to_string(),
+                adapter_id: None,
+                tool_name: None,
+                available: true,
+                diagnostic: None,
+            },
+            AuditCapabilityBinding {
+                capability: "graph.analysis".to_string(),
+                provider_id: "mcp".to_string(),
+                adapter_id: None,
+                tool_name: None,
+                available: false,
+                diagnostic: Some("graph unavailable".to_string()),
+            },
+            AuditCapabilityBinding {
                 capability: "dynamic.fuzzing".to_string(),
                 provider_id: "mcp".to_string(),
                 adapter_id: None,
-                tool_name: Some("mcp__sui__movy_fuzz".to_string()),
+                tool_name: Some("mcp__audit__fuzz".to_string()),
                 available: false,
                 diagnostic: Some("fuzzer unavailable".to_string()),
             },
@@ -443,7 +461,29 @@ mod tests {
             vec!["target.acquire", "target.normalize"]
         );
 
-        let fuzz_schedule = schedule_metadata(&work_items[1].metadata).expect("fuzz schedule");
+        let partial_schedule =
+            schedule_metadata(&work_items[1].metadata).expect("partial schedule");
+        assert_eq!(
+            partial_schedule.action,
+            AuditStageScheduleAction::UseAvailableCapabilitiesWithGaps
+        );
+        assert_eq!(
+            partial_schedule
+                .available_capabilities
+                .iter()
+                .map(|capability| capability.capability.as_str())
+                .collect::<Vec<_>>(),
+            vec!["static.analysis"]
+        );
+        assert_eq!(
+            partial_schedule.unavailable_capabilities,
+            vec![AuditStageUnavailableCapability {
+                capability: "graph.analysis".to_string(),
+                reason: "graph unavailable".to_string(),
+            }]
+        );
+
+        let fuzz_schedule = schedule_metadata(&work_items[2].metadata).expect("fuzz schedule");
         assert_eq!(
             fuzz_schedule.action,
             AuditStageScheduleAction::RecordUnavailableAndContinue
@@ -456,8 +496,21 @@ mod tests {
             }]
         );
 
-        let report_schedule = schedule_metadata(&work_items[2].metadata).expect("report schedule");
+        let report_schedule = schedule_metadata(&work_items[3].metadata).expect("report schedule");
         assert_eq!(report_schedule.action, AuditStageScheduleAction::ModelOnly);
-        assert!(report_schedule.required_capabilities.is_empty());
+        assert!(report_schedule.desired_capabilities.is_empty());
+    }
+
+    #[test]
+    fn unregistered_desired_capabilities_are_discovered_at_runtime() {
+        let schedule = stage_schedule(&AuditStageId::BytecodeReview, &[]);
+
+        assert_eq!(
+            schedule.action,
+            AuditStageScheduleAction::UseAvailableCapabilities
+        );
+        assert_eq!(schedule.desired_capabilities, vec!["bytecode.analysis"]);
+        assert!(schedule.available_capabilities.is_empty());
+        assert!(schedule.unavailable_capabilities.is_empty());
     }
 }

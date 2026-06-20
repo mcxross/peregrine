@@ -721,7 +721,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
         ),
         read_tool(
             STATIC_ANALYZE_PACKAGE,
-            "Run Peregrine static analysis on a Sui Move package.",
+            "Run Peregrine static analysis on a Sui Move package. Audit capability: static.analysis.",
             static_analysis_schema(),
         ),
         read_tool(
@@ -754,12 +754,12 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
         ),
         read_tool(
             GRAPHS,
-            "Build package-level Sui Move call, type, and state-access graphs.",
+            "Build package-level Sui Move call, type, and state-access graphs. Audit capability: graph.analysis.",
             package_schema(),
         ),
         read_tool(
             FUNCTION_STATE_GRAPH,
-            "Build a focused state-access graph for a Sui Move function.",
+            "Build a focused state-access graph for a Sui Move function. Audit capability: graph.analysis.",
             object_schema(
                 vec![
                     package_project_root(),
@@ -773,12 +773,12 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
         ),
         read_tool(
             BYTECODE_VIEW,
-            "Load compiled Sui Move bytecode, disassembly, and control-flow blocks.",
+            "Load compiled Sui Move bytecode, disassembly, and control-flow blocks. Audit capability: bytecode.analysis.",
             package_schema(),
         ),
         read_tool(
             BYTECODE_DECOMPILE,
-            "Decompile compiled root-package Sui Move bytecode modules.",
+            "Decompile compiled root-package Sui Move bytecode modules. Audit capability: bytecode.analysis.",
             package_schema(),
         ),
         ToolDefinition {
@@ -817,7 +817,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: MOVY_FUZZ,
-            description: "Run Movy local executor fuzzing for public Sui Move targets.",
+            description: "Run Movy local executor fuzzing for public Sui Move targets. Audit capability: dynamic.fuzzing.",
             input_schema: object_schema(
                 vec![
                     package_project_root(),
@@ -836,7 +836,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: FORMAL_VERIFY,
-            description: "Run bundled Sui prover formal verification for one module.",
+            description: "Run bundled Sui prover formal verification for one module. Audit capability: formal.verification.",
             input_schema: object_schema(
                 vec![
                     package_project_root(),
@@ -855,7 +855,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: ANALYZE,
-            description: "Run the shared Sui analysis engine over a local or on-chain package.",
+            description: "Run the shared Sui analysis engine over a local or on-chain package. Audit capabilities: static.analysis, graph.analysis, bytecode.analysis, dynamic.fuzzing, formal.verification.",
             input_schema: analyze_schema(),
             read_only: false,
             destructive: false,
@@ -1067,7 +1067,7 @@ fn object_schema(properties: Vec<(&'static str, Value)>, required: &[&str]) -> V
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
 
     #[test]
@@ -1122,6 +1122,31 @@ mod tests {
         };
 
         assert!(!command_kinds.contains(&json!("publish")));
+    }
+
+    #[test]
+    fn audit_capability_phrases_are_searchable() {
+        let descriptions = tool_definitions()
+            .into_iter()
+            .map(|definition| (definition.name, definition.description))
+            .collect::<BTreeMap<_, _>>();
+
+        for (tool, capability) in [
+            (tool_name::STATIC_ANALYZE_PACKAGE, "static.analysis"),
+            (tool_name::GRAPHS, "graph.analysis"),
+            (tool_name::FUNCTION_STATE_GRAPH, "graph.analysis"),
+            (tool_name::BYTECODE_VIEW, "bytecode.analysis"),
+            (tool_name::BYTECODE_DECOMPILE, "bytecode.analysis"),
+            (tool_name::MOVY_FUZZ, "dynamic.fuzzing"),
+            (tool_name::FORMAL_VERIFY, "formal.verification"),
+        ] {
+            assert!(
+                descriptions
+                    .get(tool)
+                    .is_some_and(|description| description.contains(capability)),
+                "{tool} description should contain {capability}",
+            );
+        }
     }
 
     #[test]

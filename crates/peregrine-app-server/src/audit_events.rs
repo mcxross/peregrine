@@ -3,7 +3,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use peregrine_app_server_protocol::{
-    AuditFindingUpdatedNotification, AuditStageUpdatedNotification, ServerNotification,
+    AuditActivityNotification, AuditFindingUpdatedNotification, AuditStageUpdatedNotification,
+    ServerNotification,
 };
 use peregrine_audit_store::{AuditStore, AuditStoreEvent};
 use serde_json::Value as JsonValue;
@@ -66,6 +67,29 @@ impl AuditEventForwarder {
 
 fn forward_event(outgoing: &OutgoingMessageSender, event: AuditStoreEvent) {
     match event {
+        AuditStoreEvent::Activity {
+            audit_id,
+            category,
+            message,
+            stage,
+            work_item_id,
+            artifact_ref,
+            agent_role,
+            tool_name,
+        } => {
+            outgoing.try_send_server_notification(ServerNotification::AuditActivity(
+                AuditActivityNotification {
+                    audit_id,
+                    category,
+                    message,
+                    stage,
+                    work_item_id,
+                    artifact_ref,
+                    agent_role,
+                    tool_name,
+                },
+            ));
+        }
         AuditStoreEvent::StageUpdated {
             audit_id,
             stage,

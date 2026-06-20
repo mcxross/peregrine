@@ -13,15 +13,19 @@ pub(crate) use capture::router_evidence_capture;
 use chrono::Utc;
 use codex_tools::{ToolName, ToolSpec};
 use peregrine_audit_store::AuditStore;
-use peregrine_types::{AuditEvidenceAttestation, AuditRun, AuditWorkItemStatus};
+use peregrine_types::{
+    AuditEvidenceAttestation, AuditPlan, AuditPlannerOutput, AuditRun, AuditStageId,
+    AuditStagePlan, AuditWorkItemStatus, Metadata,
+};
 use serde::Serialize;
 use std::path::{Component, Path, PathBuf};
 
 pub use spec::{
     CLAIM_AGENT_ASSIGNMENT_TOOL_NAME, CLAIM_WORK_TOOL_NAME, FINALIZE_REPORT_TOOL_NAME,
     FINISH_AGENT_ASSIGNMENT_TOOL_NAME, FINISH_WORK_TOOL_NAME, PREPARE_CAPABILITY_TOOL_NAME,
-    READ_RUN_TOOL_NAME, RECORD_AGENT_CONCLUSION_TOOL_NAME, RECORD_EVIDENCE_TOOL_NAME,
-    RECORD_PACKET_TOOL_NAME, SET_AGENT_ASSIGNMENT_THREAD_TOOL_NAME,
+    READ_RUN_TOOL_NAME, RECORD_AGENT_CONCLUSION_TOOL_NAME, RECORD_CAPABILITY_GAP_TOOL_NAME,
+    RECORD_EVIDENCE_TOOL_NAME, RECORD_PACKET_TOOL_NAME, SET_AGENT_ASSIGNMENT_THREAD_TOOL_NAME,
+    STORE_PLAN_TOOL_NAME,
 };
 
 const MAX_ID_BYTES: usize = 256;
@@ -30,7 +34,77 @@ const MAX_OBSERVATION_BYTES: usize = 8_000;
 const MAX_PACKET_BYTES: usize = 128 * 1024;
 const MAX_REFS: usize = 32;
 const MAX_SCHEDULER_BLOCKS: usize = 64;
+const MAX_PLAN_STAGES: usize = 32;
+const MAX_PLAN_FOCUS_ITEMS: usize = 64;
 const SCHEDULER_WORKER_ID: &str = "audit-deterministic-scheduler";
+
+#[derive(Clone, Copy)]
+pub(crate) enum AuditPlanningToolHandler {
+    StorePlan,
+}
+
+#[async_trait::async_trait]
+impl ToolExecutor<ToolInvocation> for AuditPlanningToolHandler {
+    fn tool_name(&self) -> ToolName {
+        ToolName::plain(match self {
+            Self::StorePlan => STORE_PLAN_TOOL_NAME,
+        })
+    }
+
+    fn spec(&self) -> ToolSpec {
+        match self {
+            Self::StorePlan => spec::store_plan_tool(),
+        }
+    }
+
+    async fn handle(
+        &self,
+        invocation: ToolInvocation,
+    ) -> Result<Box<dyn crate::tools::context::ToolOutput>, FunctionCallError> {
+        let ToolInvocation { turn, payload, .. } = invocation;
+        let arguments = match payload {
+            ToolPayload::Function { arguments } => arguments,
+            _ => {
+                return Err(FunctionCallError::RespondToModel(
+                    "audit planner handler received unsupported payload".to_string(),
+                ));
+            }
+        };
+        let store = AuditStore::open(&turn.config.peregrine_home)
+            .map_err(|error| FunctionCallError::Fatal(error.to_string()))?;
+        let now = Utc::now().timestamp();
+        let output = match self {
+            Self::StorePlan => {
+                let args: StorePlanArgs = parse_arguments(&arguments)?;
+                validate_store_plan_args(&args)?;
+                let plan = AuditPlan {
+                    schema_version: 1,
+                    id: uuid::Uuid::now_v7().to_string(),
+                    fingerprint: String::new(),
+                    target: args.target,
+                    profile: args.profile,
+                    stages: args.stages,
+                    desired_capabilities: args.desired_capabilities,
+                    planner_output: args.planner_output,
+                    created_at: now,
+                    metadata: Metadata::from([(
+                        "planner".to_string(),
+                        serde_json::Value::String("model".to_string()),
+                    )]),
+                };
+                let plan = store.store_plan(plan).map_err(tool_error)?;
+                json_output(&StorePlanResponse {
+                    fingerprint: plan.fingerprint.clone(),
+                    start_command: format!("/audit start {}", plan.fingerprint),
+                    plan,
+                })?
+            }
+        };
+        Ok(boxed_tool_output(output))
+    }
+}
+
+impl CoreToolRuntime for AuditPlanningToolHandler {}
 
 #[derive(Clone, Copy)]
 pub(crate) enum AuditToolHandler {
@@ -43,12 +117,13 @@ pub(crate) enum AuditToolHandler {
     RecordEvidence,
     RecordAgentConclusion,
     PrepareCapability,
+    RecordCapabilityGap,
     FinishWork,
     FinalizeReport,
 }
 
 impl AuditToolHandler {
-    pub(crate) const ALL: [Self; 11] = [
+    pub(crate) const ALL: [Self; 12] = [
         Self::ReadRun,
         Self::ClaimWork,
         Self::ClaimAgentAssignment,
@@ -58,6 +133,7 @@ impl AuditToolHandler {
         Self::RecordEvidence,
         Self::RecordAgentConclusion,
         Self::PrepareCapability,
+        Self::RecordCapabilityGap,
         Self::FinishWork,
         Self::FinalizeReport,
     ];
@@ -76,6 +152,7 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
             Self::RecordEvidence => RECORD_EVIDENCE_TOOL_NAME,
             Self::RecordAgentConclusion => RECORD_AGENT_CONCLUSION_TOOL_NAME,
             Self::PrepareCapability => PREPARE_CAPABILITY_TOOL_NAME,
+            Self::RecordCapabilityGap => RECORD_CAPABILITY_GAP_TOOL_NAME,
             Self::FinishWork => FINISH_WORK_TOOL_NAME,
             Self::FinalizeReport => FINALIZE_REPORT_TOOL_NAME,
         })
@@ -92,6 +169,7 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
             Self::RecordEvidence => spec::record_evidence_tool(),
             Self::RecordAgentConclusion => spec::record_agent_conclusion_tool(),
             Self::PrepareCapability => spec::prepare_capability_tool(),
+            Self::RecordCapabilityGap => spec::record_capability_gap_tool(),
             Self::FinishWork => spec::finish_work_tool(),
             Self::FinalizeReport => spec::finalize_report_tool(),
         }
@@ -283,6 +361,33 @@ impl ToolExecutor<ToolInvocation> for AuditToolHandler {
                     dispatch,
                 })?
             }
+            Self::RecordCapabilityGap => {
+                let args: RecordCapabilityGapArgs = parse_arguments(&arguments)?;
+                validate_text("work_item_id", &args.work_item_id, MAX_ID_BYTES)?;
+                validate_text("capability", &args.capability, MAX_ID_BYTES)?;
+                validate_text("reason", &args.reason, MAX_SUMMARY_BYTES)?;
+                if let Some(provider_id) = &args.provider_id {
+                    validate_text("provider_id", provider_id, MAX_ID_BYTES)?;
+                }
+                if let Some(tool_name) = &args.tool_name {
+                    validate_text("tool_name", tool_name, MAX_ID_BYTES)?;
+                }
+                let update = store
+                    .record_capability_gap(
+                        &scope.audit_id,
+                        &args.work_item_id,
+                        &args.capability,
+                        &args.reason,
+                        args.provider_id.as_deref(),
+                        args.tool_name.as_deref(),
+                        now,
+                    )
+                    .map_err(tool_error)?;
+                json_output(&CapabilityGapResponse {
+                    artifact_ref: update.artifact_ref,
+                    work_item: WorkSummary::from(&update.work_item),
+                })?
+            }
             Self::FinishWork => {
                 let args: FinishWorkArgs = parse_arguments(&arguments)?;
                 validate_text("work_item_id", &args.work_item_id, MAX_ID_BYTES)?;
@@ -425,6 +530,73 @@ fn validate_text(name: &str, value: &str, max_bytes: usize) -> Result<(), Functi
     Ok(())
 }
 
+fn validate_store_plan_args(args: &StorePlanArgs) -> Result<(), FunctionCallError> {
+    if args.stages.is_empty() {
+        return Err(model_error("stages must not be empty"));
+    }
+    if args.stages.len() > MAX_PLAN_STAGES {
+        return Err(model_error("too many audit stages"));
+    }
+    if args.stages.first() != Some(&AuditStageId::BuildNormalize) {
+        return Err(model_error("first stage must be buildNormalize"));
+    }
+    if !args.stages.contains(&AuditStageId::AuditReport) {
+        return Err(model_error("stages must include auditReport"));
+    }
+    if args.desired_capabilities.len() > MAX_PLAN_FOCUS_ITEMS {
+        return Err(model_error("too many desired capabilities"));
+    }
+    for capability in &args.desired_capabilities {
+        validate_text("desired capability", capability, MAX_ID_BYTES)?;
+    }
+    validate_planner_output(&args.planner_output)?;
+    for stage_plan in &args.planner_output.stage_plans {
+        if !args.stages.contains(&stage_plan.stage) {
+            return Err(model_error(
+                "planner output contains a stage that is not in stages",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_planner_output(output: &AuditPlannerOutput) -> Result<(), FunctionCallError> {
+    validate_text("planner summary", &output.summary, MAX_SUMMARY_BYTES)?;
+    validate_text("planner rationale", &output.rationale, MAX_SUMMARY_BYTES)?;
+    validate_string_list("focus area", &output.focus_areas)?;
+    validate_string_list("non-goal", &output.non_goals)?;
+    validate_string_list("acceptance criterion", &output.acceptance_criteria)?;
+    if output.stage_plans.is_empty() {
+        return Err(model_error("planner output must include stage plans"));
+    }
+    if output.stage_plans.len() > MAX_PLAN_STAGES {
+        return Err(model_error("too many planner stage plans"));
+    }
+    for stage_plan in &output.stage_plans {
+        validate_stage_plan(stage_plan)?;
+    }
+    validate_serialized_size("planner output", output, MAX_PACKET_BYTES)
+}
+
+fn validate_stage_plan(stage_plan: &AuditStagePlan) -> Result<(), FunctionCallError> {
+    validate_text("stage objective", &stage_plan.objective, MAX_SUMMARY_BYTES)?;
+    validate_text("stage rationale", &stage_plan.rationale, MAX_SUMMARY_BYTES)?;
+    validate_string_list("stage focus", &stage_plan.focus)?;
+    validate_string_list("stage desired capability", &stage_plan.desired_capabilities)?;
+    validate_string_list("stage success criterion", &stage_plan.success_criteria)?;
+    Ok(())
+}
+
+fn validate_string_list(name: &str, values: &[String]) -> Result<(), FunctionCallError> {
+    if values.len() > MAX_PLAN_FOCUS_ITEMS {
+        return Err(model_error(&format!("too many {name} entries")));
+    }
+    for value in values {
+        validate_text(name, value, MAX_SUMMARY_BYTES)?;
+    }
+    Ok(())
+}
+
 fn validate_serialized_size(
     name: &str,
     value: &impl Serialize,
@@ -515,6 +687,7 @@ mod tests {
         assert!(names.contains(&SET_AGENT_ASSIGNMENT_THREAD_TOOL_NAME.to_string()));
         assert!(names.contains(&FINISH_AGENT_ASSIGNMENT_TOOL_NAME.to_string()));
         assert!(names.contains(&PREPARE_CAPABILITY_TOOL_NAME.to_string()));
+        assert!(names.contains(&RECORD_CAPABILITY_GAP_TOOL_NAME.to_string()));
         assert!(names.contains(&FINALIZE_REPORT_TOOL_NAME.to_string()));
     }
 }

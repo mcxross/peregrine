@@ -509,12 +509,6 @@ client_request_definitions! {
         serialization: thread_id(params.thread_id),
         response: v2::ThreadGoalClearResponse,
     },
-    #[experimental("audit/preflight")]
-    AuditPreflight => "audit/preflight" {
-        params: v2::AuditPreflightParams,
-        serialization: global_shared_read("audit"),
-        response: v2::AuditPreflightResponse,
-    },
     #[experimental("auditPlan/store")]
     AuditPlanStore => "auditPlan/store" {
         params: v2::AuditPlanStoreParams,
@@ -1585,6 +1579,8 @@ server_notification_definitions! {
     AuditStageUpdated => "audit/stage/updated" (v2::AuditStageUpdatedNotification),
     #[experimental("audit/finding/updated")]
     AuditFindingUpdated => "audit/finding/updated" (v2::AuditFindingUpdatedNotification),
+    #[experimental("audit/activity")]
+    AuditActivity => "audit/activity" (v2::AuditActivityNotification),
     #[experimental("audit/diagnostic")]
     AuditDiagnostic => "audit/diagnostic" (v2::AuditDiagnosticNotification),
     #[experimental("thread/settings/updated")]

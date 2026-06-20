@@ -45,7 +45,9 @@ use crate::tools::handlers::multi_agents_v2::ListAgentsHandler as ListAgentsHand
 use crate::tools::handlers::multi_agents_v2::SendMessageHandler as SendMessageHandlerV2;
 use crate::tools::handlers::multi_agents_v2::SpawnAgentHandler as SpawnAgentHandlerV2;
 use crate::tools::handlers::multi_agents_v2::WaitAgentHandler as WaitAgentHandlerV2;
-use crate::tools::handlers::security::{AuditToolHandler, audit_tools_enabled};
+use crate::tools::handlers::security::{
+    AuditPlanningToolHandler, AuditToolHandler, audit_tools_enabled,
+};
 use crate::tools::handlers::view_image_spec::ViewImageToolOptions;
 use crate::tools::hosted_spec::WebSearchToolOptions;
 use crate::tools::hosted_spec::create_image_generation_tool;
@@ -601,6 +603,7 @@ fn add_core_utility_tools(context: &CoreToolPlanContext<'_>, planned_tools: &mut
         planned_tools.add(GetGoalHandler);
         planned_tools.add(CreateGoalHandler);
         planned_tools.add(UpdateGoalHandler);
+        planned_tools.add(AuditPlanningToolHandler::StorePlan);
     }
     if audit_tools_enabled(turn_context) {
         for handler in AuditToolHandler::ALL {

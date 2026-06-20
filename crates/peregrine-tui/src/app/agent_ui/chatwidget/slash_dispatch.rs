@@ -11,12 +11,15 @@ use crate::agent::agent_command::AGENT_USAGE;
 use crate::agent::agent_command::parse_agent_command;
 use crate::agent::app_event::ThreadGoalSetMode;
 use crate::agent::audit_command::AUDIT_USAGE;
+use crate::agent::audit_command::AuditCommand;
+use crate::agent::audit_command::audit_planner_prompt;
 use crate::agent::audit_command::parse_audit_command;
 use crate::agent::bottom_pane::prompt_args::parse_slash_name;
 use crate::agent::bottom_pane::slash_commands::BuiltinCommandFlags;
 use crate::agent::bottom_pane::slash_commands::ServiceTierCommand;
 use crate::agent::bottom_pane::slash_commands::SlashCommandItem;
 use crate::agent::bottom_pane::slash_commands::find_slash_command;
+use crate::agent::chatwidget::user_messages::UserMessageHistoryOverride;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SlashCommandDispatchSource {
@@ -220,6 +223,28 @@ impl ChatWidget {
         match parse_audit_command(trimmed, &cwd) {
             Ok(command) => {
                 let command_text = format!("/audit {trimmed}");
+                match command {
+                    AuditCommand::Plan(request) => {
+                        self.dispatch_audit_plan_prompt(command_text, request, source);
+                        return;
+                    }
+                    AuditCommand::Run(_) => {
+                        self.add_error_message(
+                            "Direct audit start now requires an accepted model-authored plan."
+                                .to_string(),
+                        );
+                        self.add_info_message(
+                            AUDIT_USAGE.to_string(),
+                            Some("Use /audit --plan <target>, then /audit start <fingerprint>."
+                                .to_string()),
+                        );
+                        if source == SlashCommandDispatchSource::Live {
+                            self.bottom_pane.drain_pending_submission_state();
+                        }
+                        return;
+                    }
+                    _ => {}
+                }
                 self.app_event_tx.send(AppEvent::RunAuditCommand {
                     command,
                     command_text: command_text.clone(),
@@ -233,12 +258,67 @@ impl ChatWidget {
                 self.add_error_message(message);
                 self.add_info_message(
                     AUDIT_USAGE.to_string(),
-                    Some("Examples: /audit --plan .  |  /audit .  |  /audit list".to_string()),
+                    Some("Examples: /audit --plan .  |  /audit start <fingerprint>  |  /audit list".to_string()),
                 );
                 if source == SlashCommandDispatchSource::Live {
                     self.bottom_pane.drain_pending_submission_state();
                 }
             }
+        }
+    }
+
+    fn dispatch_audit_plan_prompt(
+        &mut self,
+        command_text: String,
+        request: crate::agent::audit_command::AuditTargetRequest,
+        source: SlashCommandDispatchSource,
+    ) {
+        if !self.collaboration_modes_enabled() {
+            self.add_info_message(
+                "Collaboration modes are disabled.".to_string(),
+                Some("Enable collaboration modes to use /audit --plan.".to_string()),
+            );
+            if source == SlashCommandDispatchSource::Live {
+                self.bottom_pane.drain_pending_submission_state();
+            }
+            return;
+        }
+        let Some(mask) = collaboration_modes::plan_mask(self.model_catalog.as_ref()) else {
+            self.add_info_message(
+                "Plan mode unavailable right now.".to_string(),
+                /*hint*/ None,
+            );
+            if source == SlashCommandDispatchSource::Live {
+                self.bottom_pane.drain_pending_submission_state();
+            }
+            return;
+        };
+        let prompt = audit_planner_prompt(&command_text, &request);
+        self.set_collaboration_mask_from_user_action(mask);
+        let user_message = UserMessage {
+            text: prompt,
+            local_images: Vec::new(),
+            remote_image_urls: Vec::new(),
+            text_elements: Vec::new(),
+            mention_bindings: Vec::new(),
+        };
+        if self.is_session_configured() {
+            self.reasoning_buffer.clear();
+            self.full_reasoning_buffer.clear();
+            self.set_status_header(String::from("Working"));
+            self.submit_user_message_with_history_record(
+                user_message,
+                UserMessageHistoryRecord::Override(UserMessageHistoryOverride {
+                    text: command_text.clone(),
+                    text_elements: Vec::new(),
+                }),
+            );
+        } else {
+            self.queue_user_message(user_message);
+            self.append_message_history_entry(command_text.clone());
+        }
+        if source == SlashCommandDispatchSource::Live {
+            self.bottom_pane.drain_pending_submission_state();
         }
     }
 
@@ -407,7 +487,7 @@ impl ChatWidget {
             SlashCommand::Audit => {
                 self.add_info_message(
                     AUDIT_USAGE.to_string(),
-                    Some("Examples: /audit --plan .  |  /audit .  |  /audit list".to_string()),
+                    Some("Examples: /audit --plan .  |  /audit start <fingerprint>  |  /audit list".to_string()),
                 );
             }
             SlashCommand::Side | SlashCommand::Btw => {

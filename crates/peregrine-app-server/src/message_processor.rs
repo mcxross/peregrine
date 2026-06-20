@@ -1098,11 +1098,6 @@ impl MessageProcessor {
                         .thread_goal_clear(request_id.clone(), params)
                         .await
                 }
-                ClientRequest::AuditPreflight { params, .. } => self
-                    .audit_processor
-                    .preflight(params)
-                    .await
-                    .map(|response| Some(response.into())),
                 ClientRequest::AuditPlanStore { params, .. } => self
                     .audit_processor
                     .store_plan(params)

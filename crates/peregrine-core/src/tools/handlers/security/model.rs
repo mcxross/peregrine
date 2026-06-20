@@ -7,8 +7,9 @@ use peregrine_audit_store::ScheduledWorkBlock;
 use peregrine_types::{
     AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentConclusion,
     AuditAgentConclusionStatus, AuditAgentRole, AuditEvidence, AuditEvidenceAttestation, AuditRun,
-    AuditRunStatus, AuditStageId, AuditWorkItem, AuditWorkItemStatus, FindingCandidate, Metadata,
-    SourcePrecision, VerificationMethod,
+    AuditPlan, AuditPlannerOutput, AuditProfile, AuditRunStatus, AuditStageId, AuditTarget,
+    AuditWorkItem, AuditWorkItemStatus, FindingCandidate, Metadata, SourcePrecision,
+    VerificationMethod,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -16,6 +17,22 @@ use std::collections::BTreeMap;
 
 #[derive(Deserialize)]
 pub(super) struct EmptyArgs {}
+
+#[derive(Deserialize)]
+pub(super) struct StorePlanArgs {
+    pub(super) target: AuditTarget,
+    pub(super) profile: AuditProfile,
+    pub(super) stages: Vec<AuditStageId>,
+    pub(super) desired_capabilities: Vec<String>,
+    pub(super) planner_output: AuditPlannerOutput,
+}
+
+#[derive(Serialize)]
+pub(super) struct StorePlanResponse {
+    pub(super) fingerprint: String,
+    pub(super) start_command: String,
+    pub(super) plan: AuditPlan,
+}
 
 #[derive(Deserialize)]
 pub(super) struct ClaimWorkArgs {
@@ -208,6 +225,15 @@ pub(super) struct PrepareCapabilityArgs {
 }
 
 #[derive(Deserialize)]
+pub(super) struct RecordCapabilityGapArgs {
+    pub(super) work_item_id: String,
+    pub(super) capability: String,
+    pub(super) reason: String,
+    pub(super) provider_id: Option<String>,
+    pub(super) tool_name: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub(super) struct FinishWorkArgs {
     pub(super) work_item_id: String,
     pub(super) worker_id: String,
@@ -324,7 +350,7 @@ pub(super) struct WorkSummary {
 #[serde(rename_all = "camelCase")]
 pub(super) struct WorkScheduleSummary {
     action: String,
-    required_capabilities: Vec<String>,
+    desired_capabilities: Vec<String>,
     available_capabilities: Vec<String>,
     unavailable_capabilities: Vec<String>,
     verification_methods: Vec<String>,
@@ -349,7 +375,7 @@ fn work_schedule_summary(work_item: &AuditWorkItem) -> Option<WorkScheduleSummar
     let schedule = work_item.metadata.get("stageSchedule")?;
     Some(WorkScheduleSummary {
         action: schedule.get("action")?.as_str()?.to_string(),
-        required_capabilities: string_array(schedule.get("requiredCapabilities")),
+        desired_capabilities: string_array(schedule.get("desiredCapabilities")),
         available_capabilities: capability_array(schedule.get("availableCapabilities")),
         unavailable_capabilities: unavailable_capability_array(
             schedule.get("unavailableCapabilities"),
@@ -550,6 +576,15 @@ pub(super) fn prepare_capability_dispatch(
         .metadata
         .get("stageSchedule")
         .ok_or_else(|| model_error("work item has no stage schedule"))?;
+    let desired_capabilities = string_array(schedule.get("desiredCapabilities"));
+    if !desired_capabilities
+        .iter()
+        .any(|capability| capability == &args.capability)
+    {
+        return Err(model_error(
+            "requested capability is not desired for this work item",
+        ));
+    }
     let binding = schedule
         .get("availableCapabilities")
         .and_then(Value::as_array)
@@ -558,18 +593,16 @@ pub(super) fn prepare_capability_dispatch(
         .find(|binding| {
             binding.get("capability").and_then(Value::as_str) == Some(args.capability.as_str())
         })
-        .ok_or_else(|| model_error("requested capability is not available for this work item"))?;
+        .cloned();
     let package_root = acquired_package_root(run)?;
-    let tool_name = binding.get("toolName").and_then(Value::as_str);
+    let tool_name = binding
+        .as_ref()
+        .and_then(|binding| binding.get("toolName").and_then(Value::as_str));
     let (tool_namespace, tool_function) = tool_name.map(split_tool_name).unwrap_or((None, None));
     let discovery_query = tool_name.is_none().then(|| {
-        format!(
-            "{} {} audit capability",
-            binding
-                .get("providerId")
-                .and_then(Value::as_str)
-                .unwrap_or("security"),
-            args.capability
+        run.adapter_id.as_deref().map_or_else(
+            || format!("{} audit capability", args.capability),
+            |adapter_id| format!("{adapter_id} {} audit capability", args.capability),
         )
     });
     let instructions = if tool_name.is_some() {
@@ -583,14 +616,17 @@ pub(super) fn prepare_capability_dispatch(
         stage: work_item.stage.clone(),
         capability: args.capability.clone(),
         provider_id: binding
-            .get("providerId")
+            .as_ref()
+            .and_then(|binding| binding.get("providerId"))
             .and_then(Value::as_str)
-            .unwrap_or("unknown")
+            .unwrap_or("toolrouter.announced")
             .to_string(),
         adapter_id: binding
-            .get("adapterId")
+            .as_ref()
+            .and_then(|binding| binding.get("adapterId"))
             .and_then(Value::as_str)
-            .map(str::to_string),
+            .map(str::to_string)
+            .or_else(|| run.adapter_id.clone()),
         tool_name: tool_name.map(str::to_string),
         tool_namespace,
         tool_function,
@@ -645,6 +681,13 @@ pub(super) struct ArtifactResponse {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(super) struct CapabilityGapResponse {
+    pub(super) artifact_ref: String,
+    pub(super) work_item: WorkSummary,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct EvidenceResponse {
     pub(super) evidence_ref: String,
     pub(super) attestation: AuditEvidenceAttestation,
@@ -687,6 +730,7 @@ mod tests {
         work_metadata.insert(
             "stageSchedule".to_string(),
             json!({
+                "desiredCapabilities": ["static.analysis"],
                 "availableCapabilities": [
                     {
                         "capability": "static.analysis",
@@ -759,5 +803,80 @@ mod tests {
                 .instructions
                 .contains("announced ToolRouter-visible tool")
         );
+    }
+
+    #[test]
+    fn prepare_capability_discovers_desired_capability_without_binding() {
+        let work_item_id = "audit-1:stage:0".to_string();
+        let mut run_metadata = Metadata::new();
+        run_metadata.insert(
+            "acquiredTarget".to_string(),
+            json!({
+                "root": "/tmp/audit/input/package",
+            }),
+        );
+        let mut work_metadata = Metadata::new();
+        work_metadata.insert(
+            "stageSchedule".to_string(),
+            json!({
+                "desiredCapabilities": ["bytecode.analysis"],
+                "availableCapabilities": [],
+                "unavailableCapabilities": [],
+                "verificationMethods": ["bytecodeAnalysis"]
+            }),
+        );
+        let run = AuditRun {
+            schema_version: 1,
+            id: "audit-1".to_string(),
+            plan_fingerprint: "plan".to_string(),
+            target: AuditTarget::LocalPackage {
+                chain_id: "sui".to_string(),
+                path: "/tmp/source".to_string(),
+                metadata: Metadata::new(),
+            },
+            profile: AuditProfile::default(),
+            status: AuditRunStatus::Running,
+            current_stage: AuditStageId::BytecodeReview,
+            coordinator_thread_id: None,
+            goal_id: None,
+            adapter_id: Some("peregrine.sui".to_string()),
+            capabilities: Vec::new(),
+            coverage_gaps: Vec::new(),
+            work_items: vec![AuditWorkItem {
+                id: work_item_id.clone(),
+                stage: AuditStageId::BytecodeReview,
+                status: AuditWorkItemStatus::Claimed,
+                title: "Bytecode review".to_string(),
+                claimed_by: Some("coordinator".to_string()),
+                attempts: 1,
+                evidence_refs: Vec::new(),
+                created_at: 1,
+                updated_at: 1,
+                metadata: work_metadata,
+            }],
+            agent_assignments: Vec::new(),
+            evidence_refs: Vec::new(),
+            artifact_refs: Vec::new(),
+            created_at: 1,
+            updated_at: 1,
+            metadata: run_metadata,
+        };
+
+        let dispatch = prepare_capability_dispatch(
+            &run,
+            &PrepareCapabilityArgs {
+                work_item_id,
+                capability: "bytecode.analysis".to_string(),
+            },
+        )
+        .expect("dispatch");
+
+        assert_eq!(dispatch.provider_id, "toolrouter.announced");
+        assert_eq!(
+            dispatch.discovery_query,
+            Some("peregrine.sui bytecode.analysis audit capability".to_string())
+        );
+        assert_eq!(dispatch.adapter_id, Some("peregrine.sui".to_string()));
+        assert_eq!(dispatch.tool_name, None);
     }
 }

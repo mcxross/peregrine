@@ -78,26 +78,6 @@ impl AuditChainAdapter for SuiSecurityAdapter {
         [
             ("target.acquire", true, None),
             ("target.normalize", true, None),
-            ("static.analysis", true, Some("MCP capability")),
-            ("graph.analysis", true, Some("MCP capability")),
-            ("bytecode.analysis", true, Some("MCP capability")),
-            ("dynamic.fuzzing", true, Some("MCP capability")),
-            ("formal.verification", true, Some("MCP capability")),
-            (
-                "symbolic.execution",
-                false,
-                Some("symbolic engine is not registered"),
-            ),
-            (
-                "economic.simulation",
-                false,
-                Some("economic engine is not registered"),
-            ),
-            (
-                "exploit.replay",
-                false,
-                Some("isolated PTB replay engine is not registered"),
-            ),
         ]
         .into_iter()
         .map(

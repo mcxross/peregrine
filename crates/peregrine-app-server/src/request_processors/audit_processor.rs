@@ -3,11 +3,8 @@ use crate::error_code::invalid_request;
 use crate::outgoing_message::OutgoingMessageSender;
 use crate::request_processors::ThreadGoalRequestProcessor;
 use crate::request_processors::audit_support::coverage_gaps;
-use crate::request_processors::audit_support::default_required_capabilities;
 use crate::request_processors::audit_support::parse_coordinator_thread_id;
-use crate::request_processors::audit_support::profile_from_params;
 use crate::request_processors::audit_support::serialize;
-use crate::request_processors::audit_support::target_from_params;
 use crate::request_processors::audit_support::validate_profile;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -16,10 +13,10 @@ use codex_login::AuthManager;
 use codex_rollout::StateDbHandle;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use peregrine_app_server_protocol::{
-    AuditArtifactReadParams, AuditArtifactReadResponse, AuditCancelResponse, AuditDeleteResponse,
-    AuditDiagnosticNotification, AuditLifecycleParams, AuditListParams, AuditListResponse,
-    AuditPauseResponse, AuditPlanStoreParams, AuditPlanStoreResponse, AuditPreflightParams,
-    AuditPreflightResponse, AuditReadParams, AuditReadResponse, AuditReportFormat,
+    AuditActivityNotification, AuditArtifactReadParams, AuditArtifactReadResponse,
+    AuditCancelResponse, AuditDeleteResponse, AuditDiagnosticNotification, AuditLifecycleParams,
+    AuditListParams, AuditListResponse, AuditPauseResponse, AuditPlanStoreParams,
+    AuditPlanStoreResponse, AuditReadParams, AuditReadResponse, AuditReportFormat,
     AuditReportReadParams, AuditReportReadResponse, AuditResumeResponse,
     AuditStageUpdatedNotification, AuditStartParams, AuditStartResponse, AuditUpdatedNotification,
     JSONRPCErrorError, ServerNotification,
@@ -34,11 +31,11 @@ use peregrine_core::context::ContextualUserFragment;
 use peregrine_core::{ExternalGoalPreviousStatus, ExternalGoalSet, PeregrineThread, ThreadManager};
 use peregrine_security_tools::{
     AuditAdapterRegistry, AuditWorkspace, attach_stage_schedules, create_audit_agent_assignments,
-    create_audit_work_items, default_audit_stages,
+    create_audit_work_items,
 };
 use peregrine_types::{
-    AuditAgentAssignment, AuditPlan, AuditProfile, AuditRun, AuditRunStatus, AuditStageId,
-    AuditStageStatus, Metadata,
+    AuditAgentAssignment, AuditPlan, AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus,
+    Metadata,
 };
 use serde_json::{Value, json};
 use std::future::Future;
@@ -109,46 +106,6 @@ impl AuditRequestProcessor {
     ) -> Self {
         self.coordinator_continuation = coordinator_continuation;
         self
-    }
-
-    pub(crate) async fn preflight(
-        &self,
-        params: AuditPreflightParams,
-    ) -> Result<AuditPreflightResponse, JSONRPCErrorError> {
-        let target = target_from_params(params.target);
-        let adapter = self
-            .adapters
-            .get(target.chain_id())
-            .map_err(|error| invalid_request(error.to_string()))?;
-        let preflight = adapter
-            .preflight(&target)
-            .await
-            .map_err(|error| invalid_request(error.to_string()))?;
-        let profile = params
-            .profile
-            .map_or_else(AuditProfile::default, profile_from_params);
-        validate_profile(&profile)?;
-        let now = OffsetDateTime::now_utc().unix_timestamp();
-        let plan = AuditPlan {
-            schema_version: 1,
-            id: Uuid::now_v7().to_string(),
-            fingerprint: String::new(),
-            target: preflight.normalized_target,
-            profile,
-            stages: default_audit_stages(),
-            required_capabilities: default_required_capabilities(),
-            created_at: now,
-            metadata: Metadata::new(),
-        };
-        let diagnostics = preflight
-            .diagnostics
-            .into_iter()
-            .map(|diagnostic| diagnostic.message)
-            .collect();
-        Ok(AuditPreflightResponse {
-            plan: serialize(&plan)?,
-            diagnostics,
-        })
     }
 
     pub(crate) async fn store_plan(
@@ -269,6 +226,41 @@ impl AuditRequestProcessor {
         self.emit_updated(&run).await?;
         self.emit_stage_updated(&run, AuditStageStatus::Running)
             .await?;
+        self.outgoing
+            .send_server_notification(ServerNotification::AuditActivity(
+                AuditActivityNotification {
+                    audit_id: run.id.clone(),
+                    category: "orchestrator".to_string(),
+                    message: format!(
+                        "plan accepted; coordinator started with {} persisted stages",
+                        run.work_items.len()
+                    ),
+                    stage: Some(format!("{:?}", run.current_stage)),
+                    work_item_id: None,
+                    artifact_ref: None,
+                    agent_role: None,
+                    tool_name: None,
+                },
+            ))
+            .await;
+        self.outgoing
+            .send_server_notification(ServerNotification::AuditActivity(
+                AuditActivityNotification {
+                    audit_id: run.id.clone(),
+                    category: "orchestrator".to_string(),
+                    message: format!(
+                        "audit running with {} agent assignments and {} desired capabilities",
+                        run.agent_assignments.len(),
+                        plan.desired_capabilities.len()
+                    ),
+                    stage: Some(format!("{:?}", run.current_stage)),
+                    work_item_id: None,
+                    artifact_ref: None,
+                    agent_role: None,
+                    tool_name: None,
+                },
+            ))
+            .await;
         for gap in &run.coverage_gaps {
             self.outgoing
                 .send_server_notification(ServerNotification::AuditDiagnostic(
@@ -455,7 +447,7 @@ impl AuditRequestProcessor {
 Never modify immutable audit input. Use only registered tools and isolated audit workspace paths. \
 Start coordinator work by calling audit_read_run, then audit_claim_work. \
 For each claimed item, persist bounded stage packets with audit_record_packet, persist evidence with audit_record_evidence, and close the item with audit_finish_work. \
-For claimed work with a scheduled capability, first call audit_prepare_capability. If it returns a concrete tool, call that ToolRouter-visible tool normally. If it returns a discovery query, use announced tools via tool_search or the current model-visible tool list; never import or call MCP server implementations directly. After the tool succeeds, call audit_read_run and confirm router-captured evidence is attached before completing capability-backed work. \
+Desired capabilities are optional evidence goals, not guaranteed tools. availableCapabilities are only pre-bound hints; absence from availableCapabilities means discover the current ToolRouter environment, not unavailable. For each desired capability on claimed work, first call audit_prepare_capability. If it returns a concrete tool, call that ToolRouter-visible tool normally. If it returns a discovery query, use announced tools via tool_search or the current model-visible MCP/native tool list; never import or call MCP server implementations directly. After the tool succeeds, call audit_read_run and confirm router-captured evidence is attached before completing capability-backed work. If discovery finds no suitable announced tool, or the announced tool fails before producing evidence, call audit_record_capability_gap with a public reason. Work with desired capability gaps must close as blocked/unavailable, not completed, so the deterministic queue advances and the report becomes completedWithGaps. \
 For claimed work that has agentAssignments, call audit_claim_agent_assignment before spawning each configured role with spawn_agent. Use the assignment roleName as agent_type and pass only public, bounded inputs: audit ID, work item ID, assignment ID, current stage, evidence refs, artifact refs, and recorded packet refs. After spawn_agent returns, call audit_set_agent_assignment_thread with the returned child agent task name or thread identifier, then call wait_agent when the role result is on the critical path. \
 After wait_agent returns, call audit_read_run and, when needed, list_agents for the spawned task. If wait_agent times out, the agent reaches an error/interrupted/shutdown/not_found state, or no audit_record_agent_conclusion artifact appears for that assignment after a final agent response, call audit_finish_agent_assignment with failed or cancelled and a public reason. \
 Run adversarial review as Researcher to Skeptic to Exploiter to Judge. The Judge must receive only normalized evidence, replay results, public role conclusions, and artifact refs; never share hidden reasoning between agents. \

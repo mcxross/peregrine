@@ -36,10 +36,6 @@ use peregrine_app_server_protocol::AuditLifecycleParams;
 use peregrine_app_server_protocol::AuditListParams;
 use peregrine_app_server_protocol::AuditListResponse;
 use peregrine_app_server_protocol::AuditPauseResponse;
-use peregrine_app_server_protocol::AuditPlanStoreParams;
-use peregrine_app_server_protocol::AuditPlanStoreResponse;
-use peregrine_app_server_protocol::AuditPreflightParams;
-use peregrine_app_server_protocol::AuditPreflightResponse;
 use peregrine_app_server_protocol::AuditReadParams;
 use peregrine_app_server_protocol::AuditReadResponse;
 use peregrine_app_server_protocol::AuditReportReadParams;
@@ -907,31 +903,6 @@ impl AppServerSession {
             })
             .await
             .wrap_err("thread/goal/clear failed in TUI")
-    }
-
-    pub(crate) async fn audit_preflight(
-        &mut self,
-        params: AuditPreflightParams,
-    ) -> Result<AuditPreflightResponse> {
-        let request_id = self.next_request_id();
-        self.client
-            .request_typed(ClientRequest::AuditPreflight { request_id, params })
-            .await
-            .wrap_err("audit/preflight failed in TUI")
-    }
-
-    pub(crate) async fn audit_plan_store(
-        &mut self,
-        plan: serde_json::Value,
-    ) -> Result<AuditPlanStoreResponse> {
-        let request_id = self.next_request_id();
-        self.client
-            .request_typed(ClientRequest::AuditPlanStore {
-                request_id,
-                params: AuditPlanStoreParams { plan },
-            })
-            .await
-            .wrap_err("auditPlan/store failed in TUI")
     }
 
     pub(crate) async fn audit_start(

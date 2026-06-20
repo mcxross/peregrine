@@ -11,7 +11,7 @@ pub struct AuditStageSchedule {
     pub schema_version: u8,
     pub stage: AuditStageId,
     pub action: AuditStageScheduleAction,
-    pub required_capabilities: Vec<String>,
+    pub desired_capabilities: Vec<String>,
     pub available_capabilities: Vec<AuditStageAvailableCapability>,
     pub unavailable_capabilities: Vec<AuditStageUnavailableCapability>,
     pub verification_methods: Vec<VerificationMethod>,
@@ -22,6 +22,7 @@ pub struct AuditStageSchedule {
 pub enum AuditStageScheduleAction {
     ModelOnly,
     UseAvailableCapabilities,
+    UseAvailableCapabilitiesWithGaps,
     RecordUnavailableAndContinue,
 }
 
@@ -59,13 +60,13 @@ pub fn stage_schedule(
     stage: &AuditStageId,
     capabilities: &[AuditCapabilityBinding],
 ) -> AuditStageSchedule {
-    let required_capabilities = stage_required_capabilities(stage)
+    let desired_capabilities = stage_desired_capabilities(stage)
         .into_iter()
         .map(str::to_string)
         .collect::<Vec<_>>();
     let mut available_capabilities = Vec::new();
     let mut unavailable_capabilities = Vec::new();
-    for capability in &required_capabilities {
+    for capability in &desired_capabilities {
         match capabilities
             .iter()
             .find(|binding| binding.capability == *capability)
@@ -87,18 +88,15 @@ pub fn stage_schedule(
                         .unwrap_or_else(|| "capability provider is unavailable".to_string()),
                 });
             }
-            None => {
-                unavailable_capabilities.push(AuditStageUnavailableCapability {
-                    capability: capability.clone(),
-                    reason: "no capability provider is registered".to_string(),
-                });
-            }
+            None => {}
         }
     }
-    let action = if required_capabilities.is_empty() {
+    let action = if desired_capabilities.is_empty() {
         AuditStageScheduleAction::ModelOnly
     } else if unavailable_capabilities.is_empty() {
         AuditStageScheduleAction::UseAvailableCapabilities
+    } else if unavailable_capabilities.len() < desired_capabilities.len() {
+        AuditStageScheduleAction::UseAvailableCapabilitiesWithGaps
     } else {
         AuditStageScheduleAction::RecordUnavailableAndContinue
     };
@@ -107,13 +105,13 @@ pub fn stage_schedule(
         stage: stage.clone(),
         action,
         verification_methods: verification_methods_for_stage(stage),
-        required_capabilities,
+        desired_capabilities,
         available_capabilities,
         unavailable_capabilities,
     }
 }
 
-pub fn stage_required_capabilities(stage: &AuditStageId) -> Vec<&'static str> {
+pub fn stage_desired_capabilities(stage: &AuditStageId) -> Vec<&'static str> {
     match stage {
         AuditStageId::BuildNormalize => vec!["target.acquire", "target.normalize"],
         AuditStageId::SemanticGraphs

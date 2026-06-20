@@ -1,12 +1,12 @@
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{Result, bail};
 use peregrine_app_server_protocol::{
-    AuditArtifactReadParams, AuditLifecycleParams, AuditListParams, AuditPreflightParams,
-    AuditReadParams, AuditReportReadParams, AuditStartParams,
+    AuditArtifactReadParams, AuditLifecycleParams, AuditListParams, AuditReadParams,
+    AuditReportReadParams, AuditStartParams,
 };
 
 use super::output::{
-    artifact_output_lines, delete_output_lines, list_output_lines, plan_output_lines,
-    report_output_lines, run_output_lines,
+    artifact_output_lines, delete_output_lines, list_output_lines, report_output_lines,
+    run_output_lines,
 };
 use super::{AuditCommand, AuditCommandOutput, AuditLifecycleAction};
 use crate::agent::app_server_session::AppServerSession;
@@ -19,40 +19,19 @@ pub(crate) async fn execute_audit_command(
 ) -> Result<AuditCommandOutput> {
     match command {
         AuditCommand::Plan(request) => {
-            let preflight = app_server
-                .audit_preflight(AuditPreflightParams {
-                    target: request.target,
-                    profile: request.profile,
-                })
-                .await?;
-            let stored = app_server.audit_plan_store(preflight.plan.clone()).await?;
-            Ok(AuditCommandOutput {
-                lines: plan_output_lines(&stored.fingerprint, &stored.plan, &preflight.diagnostics),
-            })
+            let _ = request;
+            bail!("/audit --plan must be handled as a model-authored Plan-mode turn")
         }
         AuditCommand::Run(request) => {
-            let preflight = app_server
-                .audit_preflight(AuditPreflightParams {
-                    target: request.target,
-                    profile: request.profile,
-                })
-                .await?;
-            let stored = app_server.audit_plan_store(preflight.plan).await?;
-            let started = app_server
-                .audit_start(AuditStartParams {
-                    fingerprint: stored.fingerprint,
-                })
-                .await?;
-            Ok(AuditCommandOutput {
-                lines: run_output_lines("Audit started", &started.run, &preflight.diagnostics),
-            })
+            let _ = request;
+            bail!("direct audit start requires /audit --plan followed by /audit start <fingerprint>")
         }
         AuditCommand::Start { fingerprint } => {
             let started = app_server
                 .audit_start(AuditStartParams { fingerprint })
                 .await?;
             Ok(AuditCommandOutput {
-                lines: run_output_lines("Audit started", &started.run, &[]),
+                lines: run_output_lines("Audit plan accepted; audit started", &started.run, &[]),
             })
         }
         AuditCommand::Read { audit_id } => {

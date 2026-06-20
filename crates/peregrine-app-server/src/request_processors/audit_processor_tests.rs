@@ -9,11 +9,12 @@ use peregrine_core::init_state_db;
 use peregrine_core::thread_store_from_config;
 use peregrine_security_tools::{
     AcquiredAuditTarget, AdapterFuture, AuditChainAdapter, AuditTargetPreflight, ExploitReplay,
+    default_audit_stages,
 };
 use peregrine_types::protocol::SessionSource;
 use peregrine_types::{
-    AuditAgentAssignmentStatus, AuditAgentRole, AuditCapabilityBinding, AuditTarget, ExploitBundle,
-    ExploitIntent,
+    AuditAgentAssignmentStatus, AuditAgentRole, AuditCapabilityBinding, AuditPlannerOutput,
+    AuditProfile, AuditStagePlan, AuditTarget, ExploitBundle, ExploitIntent,
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
@@ -213,7 +214,18 @@ async fn processor_fixture() -> anyhow::Result<ProcessorFixture> {
         },
         profile: AuditProfile::default(),
         stages: default_audit_stages(),
-        required_capabilities: default_required_capabilities(),
+        desired_capabilities: vec![
+            "target.acquire".to_string(),
+            "target.normalize".to_string(),
+            "static.analysis".to_string(),
+            "graph.analysis".to_string(),
+            "bytecode.analysis".to_string(),
+            "dynamic.fuzzing".to_string(),
+            "symbolic.execution".to_string(),
+            "economic.simulation".to_string(),
+            "exploit.replay".to_string(),
+        ],
+        planner_output: test_planner_output(),
         created_at: 1,
         metadata: Metadata::new(),
     };
@@ -226,6 +238,36 @@ async fn processor_fixture() -> anyhow::Result<ProcessorFixture> {
         _peregrine_home: peregrine_home,
         _target_root: target_root,
     })
+}
+
+fn test_planner_output() -> AuditPlannerOutput {
+    AuditPlannerOutput {
+        summary: "Test model-authored audit plan".to_string(),
+        rationale: "Exercise the persisted audit lifecycle with a typed planner output.".to_string(),
+        focus_areas: vec!["entry points".to_string()],
+        non_goals: Vec::new(),
+        stage_plans: vec![
+            AuditStagePlan {
+                stage: AuditStageId::BuildNormalize,
+                objective: "Normalize the test target.".to_string(),
+                rationale: "Every audit needs a normalized target.".to_string(),
+                focus: vec!["manifest".to_string()],
+                desired_capabilities: vec!["target.normalize".to_string()],
+                agent_roles: Vec::new(),
+                success_criteria: vec!["target acquired".to_string()],
+            },
+            AuditStagePlan {
+                stage: AuditStageId::AuditReport,
+                objective: "Write the test report.".to_string(),
+                rationale: "Every audit must terminate in a report.".to_string(),
+                focus: vec!["summary".to_string()],
+                desired_capabilities: Vec::new(),
+                agent_roles: vec![AuditAgentRole::Judge],
+                success_criteria: vec!["report persisted".to_string()],
+            },
+        ],
+        acceptance_criteria: vec!["audit report exists".to_string()],
+    }
 }
 
 #[tokio::test]
@@ -254,7 +296,7 @@ async fn audit_start_and_resume_continue_coordinator_goal() -> anyhow::Result<()
         Some(&serde_json::json!("useAvailableCapabilities"))
     );
     assert_eq!(
-        first_schedule.get("requiredCapabilities"),
+        first_schedule.get("desiredCapabilities"),
         Some(&serde_json::json!(["target.acquire", "target.normalize"]))
     );
     assert_eq!(run.agent_assignments.len(), 13);

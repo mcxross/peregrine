@@ -83,6 +83,38 @@ pub(crate) fn audit_finding_update_lines(
     vec![line.into()]
 }
 
+pub(crate) fn audit_activity_lines(
+    audit_id: &str,
+    category: &str,
+    message: &str,
+    stage: Option<&str>,
+    artifact_ref: Option<&str>,
+    agent_role: Option<&str>,
+    tool_name: Option<&str>,
+) -> Vec<Line<'static>> {
+    let mut line = vec![
+        "audit ".cyan(),
+        audit_id.to_string().cyan(),
+        " ".into(),
+        category_span(category),
+        ": ".into(),
+        message.to_string().into(),
+    ];
+    if let Some(stage) = stage {
+        line.extend([" at ".dim(), stage.to_string().dim()]);
+    }
+    if let Some(agent_role) = agent_role {
+        line.extend([" role ".dim(), agent_role.to_string().magenta()]);
+    }
+    if let Some(tool_name) = tool_name {
+        line.extend([" tool ".dim(), tool_name.to_string().cyan()]);
+    }
+    if let Some(artifact_ref) = artifact_ref {
+        line.extend([" ref ".dim(), artifact_ref.to_string().dim()]);
+    }
+    vec![line.into()]
+}
+
 pub(super) fn plan_output_lines(
     fingerprint: &str,
     plan_value: &JsonValue,
@@ -94,8 +126,8 @@ pub(super) fn plan_output_lines(
         lines.push(kv_line("target", &target_label(&plan.target)));
         lines.push(kv_line("stages", &plan.stages.len().to_string()));
         lines.push(kv_line(
-            "required capabilities",
-            &plan.required_capabilities.len().to_string(),
+            "desired capabilities",
+            &plan.desired_capabilities.len().to_string(),
         ));
         lines.push(kv_line(
             "budget",
@@ -106,12 +138,23 @@ pub(super) fn plan_output_lines(
                 plan.profile.max_hypotheses
             ),
         ));
+        lines.push("orchestrator plan".green().bold().into());
+        for (index, stage) in plan.stages.iter().enumerate() {
+            lines.push(
+                vec![
+                    format!("  {}. ", index + 1).dim(),
+                    format!("{stage:?}").into(),
+                ]
+                .into(),
+            );
+        }
     }
     append_diagnostics(&mut lines, diagnostics);
     lines.push(
         vec![
-            "start with ".dim(),
+            "approval: ".green(),
             format!("/audit start {fingerprint}").cyan(),
+            " accepts this immutable plan".dim(),
         ]
         .into(),
     );
@@ -307,6 +350,19 @@ fn append_diagnostics(lines: &mut Vec<Line<'static>>, diagnostics: &[String]) {
 
 fn kv_line(key: &str, value: &str) -> Line<'static> {
     vec![format!("{key}: ").dim(), value.to_string().into()].into()
+}
+
+fn category_span(category: &str) -> ratatui::text::Span<'static> {
+    match category {
+        "orchestrator" => "orchestrator".green(),
+        "agent" => "agent".magenta(),
+        "tool" => "tool".cyan(),
+        "judging" => "judging".yellow(),
+        "report" => "report".green(),
+        "coverage" => "coverage".yellow(),
+        "evidence" => "evidence".cyan(),
+        _ => category.to_string().into(),
+    }
 }
 
 fn parse_plan(value: &JsonValue) -> Option<AuditPlan> {

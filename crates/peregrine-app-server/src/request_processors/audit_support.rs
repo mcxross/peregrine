@@ -1,20 +1,10 @@
 use crate::error_code::internal_error;
 use crate::error_code::invalid_request;
-use peregrine_app_server_protocol::{AuditProfileParams, AuditTargetParams, JSONRPCErrorError};
+use peregrine_app_server_protocol::JSONRPCErrorError;
 use peregrine_types::{
     AuditCapabilityBinding, AuditCoverageGap, AuditPlan, AuditProfile, AuditRun, AuditStageId,
-    AuditTarget, ThreadId,
+    ThreadId,
 };
-
-pub(super) fn profile_from_params(value: AuditProfileParams) -> AuditProfile {
-    AuditProfile {
-        model_token_budget: value.model_token_budget,
-        wall_time_seconds: value.wall_time_seconds,
-        max_hypotheses: value.max_hypotheses,
-        max_dependency_depth: value.max_dependency_depth,
-        max_dependency_packages: value.max_dependency_packages,
-    }
-}
 
 pub(super) fn validate_profile(profile: &AuditProfile) -> Result<(), JSONRPCErrorError> {
     if profile.model_token_budget <= 0 {
@@ -41,71 +31,26 @@ pub(super) fn validate_profile(profile: &AuditProfile) -> Result<(), JSONRPCErro
     Ok(())
 }
 
-pub(super) fn target_from_params(value: AuditTargetParams) -> AuditTarget {
-    match value {
-        AuditTargetParams::LocalPackage {
-            chain_id,
-            path,
-            metadata,
-        } => AuditTarget::LocalPackage {
-            chain_id,
-            path,
-            metadata: metadata.unwrap_or_default().into_iter().collect(),
-        },
-        AuditTargetParams::RemotePackage {
-            chain_id,
-            network_id,
-            package_ref,
-            source_uri,
-            state_ref,
-            metadata,
-        } => AuditTarget::RemotePackage {
-            chain_id,
-            network_id,
-            package_ref,
-            source_uri,
-            state_ref,
-            metadata: metadata.unwrap_or_default().into_iter().collect(),
-        },
-    }
-}
-
-pub(super) fn default_required_capabilities() -> Vec<String> {
-    [
-        "target.acquire",
-        "target.normalize",
-        "static.analysis",
-        "graph.analysis",
-        "dynamic.fuzzing",
-        "symbolic.execution",
-        "economic.simulation",
-        "exploit.replay",
-    ]
-    .into_iter()
-    .map(str::to_string)
-    .collect()
-}
-
 pub(super) fn coverage_gaps(
     plan: &AuditPlan,
     capabilities: &[AuditCapabilityBinding],
 ) -> Vec<AuditCoverageGap> {
-    plan.required_capabilities
+    plan.desired_capabilities
         .iter()
-        .filter(|required| {
-            !capabilities
+        .filter_map(|capability| {
+            let binding = capabilities
                 .iter()
-                .any(|binding| binding.capability == **required && binding.available)
+                .find(|binding| binding.capability == *capability)?;
+            (!binding.available).then(|| (capability, binding))
         })
-        .map(|capability| AuditCoverageGap {
+        .map(|(capability, binding)| AuditCoverageGap {
             capability: capability.clone(),
             stage: capability_stage(capability),
-            reason: capabilities
-                .iter()
-                .find(|binding| binding.capability == *capability)
-                .and_then(|binding| binding.diagnostic.clone())
-                .unwrap_or_else(|| "no capability provider is registered".to_string()),
-            required: true,
+            reason: binding
+                .diagnostic
+                .clone()
+                .unwrap_or_else(|| "capability provider is unavailable".to_string()),
+            affects_terminal_status: true,
         })
         .collect()
 }

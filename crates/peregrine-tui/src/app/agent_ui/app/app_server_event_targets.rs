@@ -148,6 +148,7 @@ pub(super) fn server_notification_thread_target(
         | ServerNotification::AuditUpdated(_)
         | ServerNotification::AuditStageUpdated(_)
         | ServerNotification::AuditFindingUpdated(_)
+        | ServerNotification::AuditActivity(_)
         | ServerNotification::AuditDiagnostic(_)
         | ServerNotification::McpServerStatusUpdated(_)
         | ServerNotification::McpServerOauthLoginCompleted(_)

@@ -56,24 +56,6 @@ pub struct AuditProfileParams {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export_to = "v2/")]
-pub struct AuditPreflightParams {
-    pub target: AuditTargetParams,
-    #[ts(optional = nullable)]
-    pub profile: Option<AuditProfileParams>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
-pub struct AuditPreflightResponse {
-    #[ts(type = "unknown")]
-    pub plan: JsonValue,
-    pub diagnostics: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
 pub struct AuditPlanStoreParams {
     #[ts(type = "unknown")]
     pub plan: JsonValue,
@@ -258,6 +240,20 @@ pub struct AuditFindingUpdatedNotification {
     #[ts(type = "unknown")]
     pub finding: JsonValue,
     pub report_ref: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct AuditActivityNotification {
+    pub audit_id: String,
+    pub category: String,
+    pub message: String,
+    pub stage: Option<String>,
+    pub work_item_id: Option<String>,
+    pub artifact_ref: Option<String>,
+    pub agent_role: Option<String>,
+    pub tool_name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]

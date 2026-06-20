@@ -530,7 +530,7 @@ pub struct AuditCoverageGap {
     pub capability: String,
     pub stage: AuditStageId,
     pub reason: String,
-    pub required: bool,
+    pub affects_terminal_status: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -574,6 +574,29 @@ pub struct ExploitBundle {
     pub metadata: Metadata,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditPlannerOutput {
+    pub summary: String,
+    pub rationale: String,
+    pub focus_areas: Vec<String>,
+    pub non_goals: Vec<String>,
+    pub stage_plans: Vec<AuditStagePlan>,
+    pub acceptance_criteria: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditStagePlan {
+    pub stage: AuditStageId,
+    pub objective: String,
+    pub rationale: String,
+    pub focus: Vec<String>,
+    pub desired_capabilities: Vec<String>,
+    pub agent_roles: Vec<AuditAgentRole>,
+    pub success_criteria: Vec<String>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AuditPlan {
@@ -583,7 +606,8 @@ pub struct AuditPlan {
     pub target: AuditTarget,
     pub profile: AuditProfile,
     pub stages: Vec<AuditStageId>,
-    pub required_capabilities: Vec<String>,
+    pub desired_capabilities: Vec<String>,
+    pub planner_output: AuditPlannerOutput,
     pub created_at: i64,
     #[serde(default, skip_serializing_if = "Metadata::is_empty")]
     pub metadata: Metadata,

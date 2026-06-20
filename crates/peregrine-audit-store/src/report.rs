@@ -70,6 +70,21 @@ impl AuditStore {
             status: terminal_stage_status(&run.status),
             run: run.clone(),
         });
+        self.publish_event(AuditStoreEvent::Activity {
+            audit_id: run.id.clone(),
+            category: "report".to_string(),
+            message: format!(
+                "terminal report written with status {:?}: {} findings, {} coverage gaps",
+                run.status,
+                finding_events.len(),
+                run.coverage_gaps.len()
+            ),
+            stage: Some(format!("{:?}", run.current_stage)),
+            work_item_id: None,
+            artifact_ref: Some(report_ref.clone()),
+            agent_role: Some("Judge".to_string()),
+            tool_name: Some("audit_finalize_report".to_string()),
+        });
         for finding in finding_events {
             self.publish_event(AuditStoreEvent::FindingUpdated {
                 audit_id: run.id.clone(),
@@ -277,7 +292,10 @@ fn counts_as_independent_confirmation(evidence: &AuditEvidence) -> bool {
 }
 
 fn terminal_status(run: &AuditRun) -> AuditRunStatus {
-    if run.coverage_gaps.iter().any(|gap| gap.required)
+    if run
+        .coverage_gaps
+        .iter()
+        .any(|gap| gap.affects_terminal_status)
         || run.work_items.iter().any(|item| {
             matches!(
                 item.status,
@@ -356,7 +374,11 @@ fn render_report_markdown(report: &AuditReport) -> String {
                 gap.stage,
                 gap.capability,
                 gap.reason,
-                if gap.required { " (required)" } else { "" }
+                if gap.affects_terminal_status {
+                    " (affects terminal status)"
+                } else {
+                    ""
+                }
             ));
         }
         output.push('\n');

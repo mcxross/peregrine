@@ -148,7 +148,7 @@ struct WorkItemContext<'a> {
 #[serde(rename_all = "camelCase")]
 struct StageScheduleContext {
     action: String,
-    required_capabilities: Vec<String>,
+    desired_capabilities: Vec<String>,
     available_capabilities: Vec<String>,
     unavailable_capabilities: Vec<String>,
     verification_methods: Vec<String>,
@@ -206,7 +206,7 @@ struct CoverageGapContext<'a> {
     capability: &'a str,
     stage: &'a AuditStageId,
     reason: &'a str,
-    required: bool,
+    affects_terminal_status: bool,
 }
 
 impl<'a> From<&'a AuditCoverageGap> for CoverageGapContext<'a> {
@@ -215,7 +215,7 @@ impl<'a> From<&'a AuditCoverageGap> for CoverageGapContext<'a> {
             capability: &value.capability,
             stage: &value.stage,
             reason: &value.reason,
-            required: value.required,
+            affects_terminal_status: value.affects_terminal_status,
         }
     }
 }
@@ -261,7 +261,7 @@ fn stage_schedule_context(work_item: &AuditWorkItem) -> Option<StageScheduleCont
     let schedule = work_item.metadata.get("stageSchedule")?;
     Some(StageScheduleContext {
         action: schedule.get("action")?.as_str()?.to_string(),
-        required_capabilities: string_array(schedule.get("requiredCapabilities")),
+        desired_capabilities: string_array(schedule.get("desiredCapabilities")),
         available_capabilities: capability_array(schedule.get("availableCapabilities")),
         unavailable_capabilities: unavailable_capability_array(
             schedule.get("unavailableCapabilities"),
@@ -415,7 +415,7 @@ mod tests {
                     capability: format!("capability-{index}"),
                     stage: AuditStageId::BuildNormalize,
                     reason: format!("reason-{index}"),
-                    required: true,
+                    affects_terminal_status: true,
                 })
                 .collect(),
             work_items: (0..100)
@@ -426,7 +426,7 @@ mod tests {
                             "stageSchedule".to_string(),
                             serde_json::json!({
                                 "action": "useAvailableCapabilities",
-                                "requiredCapabilities": ["target.acquire"],
+                                "desiredCapabilities": ["target.acquire"],
                                 "availableCapabilities": [
                                     {"capability": "target.acquire"}
                                 ],

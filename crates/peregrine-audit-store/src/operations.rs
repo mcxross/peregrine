@@ -1,9 +1,9 @@
 use super::{AuditStore, AuditStoreError, AuditStoreEvent, status_name};
 use peregrine_security_tools::{AuditStageScheduleAction, schedule_metadata};
 use peregrine_types::{
-    AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentConclusion, AuditEvidence,
-    AuditEvidenceAttestation, AuditRun, AuditRunStatus, AuditStageId, AuditStageStatus,
-    AuditWorkItem, AuditWorkItemStatus,
+    AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentConclusion, AuditCoverageGap,
+    AuditEvidence, AuditEvidenceAttestation, AuditRun, AuditRunStatus, AuditStageId,
+    AuditStageStatus, AuditWorkItem, AuditWorkItemStatus, Metadata, VerificationMethod,
 };
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::Serialize;
@@ -34,6 +34,13 @@ pub struct ScheduledWorkBlock {
     pub work_item: AuditWorkItem,
     pub artifact_ref: String,
     pub diagnostics: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CapabilityGapUpdate {
+    pub run: AuditRun,
+    pub work_item: AuditWorkItem,
+    pub artifact_ref: String,
 }
 
 impl AuditStore {
@@ -67,6 +74,16 @@ impl AuditStore {
                 status: AuditStageStatus::Running,
                 run: run.clone(),
             });
+            self.publish_event(AuditStoreEvent::Activity {
+                audit_id: run.id.clone(),
+                category: "orchestrator".to_string(),
+                message: format!("claimed stage {:?}: {}", work_item.stage, work_item.title),
+                stage: Some(format!("{:?}", work_item.stage)),
+                work_item_id: Some(work_item.id.clone()),
+                artifact_ref: None,
+                agent_role: None,
+                tool_name: None,
+            });
         }
         Ok(claimed.1.map(|work_item| (claimed.0, work_item)))
     }
@@ -82,6 +99,9 @@ impl AuditStore {
     ) -> Result<(AuditRun, String), AuditStoreError> {
         let artifact_id = Uuid::new_v4().to_string();
         let artifact_ref = format!("artifacts/{artifact_id}.json");
+        let packet_for_metadata = packet.clone();
+        let activity_category = packet_activity_category(packet_kind).to_string();
+        let activity_message = packet_activity_message(packet_kind, summary, &packet_for_metadata);
         let envelope = json!({
             "schemaVersion": 1,
             "id": artifact_id,
@@ -92,8 +112,14 @@ impl AuditStore {
             "createdAt": now,
             "packet": packet,
         });
-        self.mutate_run(run_id, |run| {
-            ensure_claimed_work_item(run, work_item_id)?;
+        let result = self.mutate_run(run_id, |run| {
+            let work_item = ensure_claimed_work_item(run, work_item_id)?;
+            if packet_kind == "capabilityDispatch" {
+                work_item.metadata.insert(
+                    "activeCapabilityDispatch".to_string(),
+                    packet_for_metadata.clone(),
+                );
+            }
             self.write_json(
                 &self.audits_root.join(run_id).join(&artifact_ref),
                 &envelope,
@@ -101,6 +127,114 @@ impl AuditStore {
             run.artifact_refs.push(artifact_ref.clone());
             run.updated_at = now;
             Ok(artifact_ref.clone())
+        });
+        if let Ok((run, artifact_ref)) = &result {
+            let stage = run
+                .work_items
+                .iter()
+                .find(|item| item.id == work_item_id)
+                .map(|item| format!("{:?}", item.stage));
+            self.publish_event(AuditStoreEvent::Activity {
+                audit_id: run.id.clone(),
+                category: activity_category,
+                message: activity_message,
+                stage,
+                work_item_id: Some(work_item_id.to_string()),
+                artifact_ref: Some(artifact_ref.clone()),
+                agent_role: None,
+                tool_name: packet_for_metadata
+                    .get("toolName")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+            });
+        }
+        result
+    }
+
+    pub fn record_capability_gap(
+        &self,
+        run_id: &str,
+        work_item_id: &str,
+        capability: &str,
+        reason: &str,
+        provider_id: Option<&str>,
+        tool_name: Option<&str>,
+        now: i64,
+    ) -> Result<CapabilityGapUpdate, AuditStoreError> {
+        let artifact_id = Uuid::new_v4().to_string();
+        let artifact_ref = format!("artifacts/{artifact_id}.json");
+        let (run, work_item) = self.mutate_run(run_id, |run| {
+            ensure_running(run)?;
+            let work_item_index = run
+                .work_items
+                .iter()
+                .position(|item| item.id == work_item_id)
+                .ok_or_else(|| AuditStoreError::WorkItemNotFound(work_item_id.to_string()))?;
+            if run.work_items[work_item_index].status != AuditWorkItemStatus::Claimed {
+                return Err(AuditStoreError::WorkItemNotClaimed(work_item_id.to_string()));
+            }
+            let stage = run.work_items[work_item_index].stage.clone();
+            let gap = AuditCoverageGap {
+                capability: capability.to_string(),
+                stage: stage.clone(),
+                reason: reason.to_string(),
+                affects_terminal_status: true,
+            };
+            upsert_coverage_gap(&mut run.coverage_gaps, gap);
+            let packet = json!({
+                "schemaVersion": 1,
+                "stage": stage,
+                "workItemId": work_item_id,
+                "action": "recordCapabilityGap",
+                "capability": capability,
+                "reason": reason,
+                "providerId": provider_id,
+                "toolName": tool_name,
+                "affectsTerminalStatus": true,
+            });
+            let envelope = json!({
+                "schemaVersion": 1,
+                "id": artifact_id,
+                "auditRunId": run_id,
+                "workItemId": work_item_id,
+                "kind": "capabilityUnavailable",
+                "summary": "Desired audit capability is unavailable; recorded a visible coverage gap.",
+                "createdAt": now,
+                "packet": packet,
+            });
+            self.write_json(
+                &self.audits_root.join(run_id).join(&artifact_ref),
+                &envelope,
+            )?;
+            let work_item = &mut run.work_items[work_item_index];
+            append_runtime_capability_gap(
+                &mut work_item.metadata,
+                capability,
+                reason,
+                provider_id,
+                tool_name,
+                now,
+            );
+            work_item.updated_at = now;
+            let work_item = work_item.clone();
+            run.artifact_refs.push(artifact_ref.clone());
+            run.updated_at = now;
+            Ok(work_item)
+        })?;
+        self.publish_event(AuditStoreEvent::Activity {
+            audit_id: run.id.clone(),
+            category: "coverage".to_string(),
+            message: format!("capability gap recorded for {capability}: {reason}"),
+            stage: Some(format!("{:?}", work_item.stage)),
+            work_item_id: Some(work_item.id.clone()),
+            artifact_ref: Some(artifact_ref.clone()),
+            agent_role: None,
+            tool_name: tool_name.map(str::to_string),
+        });
+        Ok(CapabilityGapUpdate {
+            run,
+            work_item,
+            artifact_ref,
         })
     }
 
@@ -112,7 +246,9 @@ impl AuditStore {
         evidence.id = Uuid::new_v4().to_string();
         evidence.audit_run_id = run_id.to_string();
         let evidence_ref = format!("evidence/{}.json", evidence.id);
-        self.mutate_run(run_id, |run| {
+        let activity = evidence_activity(&evidence);
+        let work_item_id = evidence.work_item_id.clone();
+        let result = self.mutate_run(run_id, |run| {
             if let Some(work_item_id) = evidence.work_item_id.as_deref() {
                 ensure_claimed_work_item(run, work_item_id)?
                     .evidence_refs
@@ -125,7 +261,20 @@ impl AuditStore {
             run.evidence_refs.push(evidence_ref.clone());
             run.updated_at = evidence.created_at;
             Ok(evidence_ref.clone())
-        })
+        });
+        if let Ok((run, evidence_ref)) = &result {
+            self.publish_event(AuditStoreEvent::Activity {
+                audit_id: run.id.clone(),
+                category: activity.category,
+                message: activity.message,
+                stage: stage_for_work_item(run, work_item_id.as_deref()),
+                work_item_id: work_item_id.clone(),
+                artifact_ref: Some(evidence_ref.clone()),
+                agent_role: None,
+                tool_name: activity.tool_name,
+            });
+        }
+        result
     }
 
     pub fn record_agent_conclusion(
@@ -146,7 +295,7 @@ impl AuditStore {
             action: "create agent conclusion artifact directory",
             source,
         })?;
-        self.mutate_run(run_id, |run| {
+        let result = self.mutate_run(run_id, |run| {
             ensure_claimed_work_item(run, work_item_id)?;
             for evidence_ref in &conclusion.evidence_refs {
                 if !run.evidence_refs.contains(evidence_ref) {
@@ -179,7 +328,23 @@ impl AuditStore {
             }
             run.updated_at = conclusion.created_at;
             Ok(artifact_ref.clone())
-        })
+        });
+        if let Ok((run, artifact_ref)) = &result {
+            self.publish_event(AuditStoreEvent::Activity {
+                audit_id: run.id.clone(),
+                category: "agent".to_string(),
+                message: format!(
+                    "{:?} recorded {:?} conclusion: {}",
+                    conclusion.role, conclusion.status, conclusion.summary
+                ),
+                stage: stage_for_work_item(run, Some(work_item_id)),
+                work_item_id: Some(work_item_id.to_string()),
+                artifact_ref: Some(artifact_ref.clone()),
+                agent_role: Some(format!("{:?}", conclusion.role)),
+                tool_name: None,
+            });
+        }
+        result
     }
 
     pub fn claim_agent_assignment(
@@ -216,6 +381,19 @@ impl AuditStore {
             run.updated_at = now;
             Ok(assignment)
         })?;
+        self.publish_event(AuditStoreEvent::Activity {
+            audit_id: run.id.clone(),
+            category: "agent".to_string(),
+            message: format!(
+                "claimed {:?} agent assignment `{}`",
+                assignment.role, assignment.role_name
+            ),
+            stage: stage_for_work_item(&run, Some(work_item_id)),
+            work_item_id: Some(work_item_id.to_string()),
+            artifact_ref: None,
+            agent_role: Some(format!("{:?}", assignment.role)),
+            tool_name: Some("spawn_agent".to_string()),
+        });
         Ok(AgentAssignmentUpdate { run, assignment })
     }
 
@@ -243,6 +421,16 @@ impl AuditStore {
             run.updated_at = now;
             Ok(assignment)
         })?;
+        self.publish_event(AuditStoreEvent::Activity {
+            audit_id: run.id.clone(),
+            category: "agent".to_string(),
+            message: format!("{:?} agent spawned as {}", assignment.role, agent_thread_id),
+            stage: stage_for_work_item(&run, Some(work_item_id)),
+            work_item_id: Some(work_item_id.to_string()),
+            artifact_ref: None,
+            agent_role: Some(format!("{:?}", assignment.role)),
+            tool_name: Some("spawn_agent".to_string()),
+        });
         Ok(AgentAssignmentUpdate { run, assignment })
     }
 
@@ -264,6 +452,7 @@ impl AuditStore {
                 status: format!("{status:?}"),
             });
         }
+        let activity_status = status.clone();
         let (run, assignment) = self.mutate_run(run_id, |run| {
             ensure_running(run)?;
             ensure_claimed_work_item(run, work_item_id)?;
@@ -286,6 +475,19 @@ impl AuditStore {
             run.updated_at = now;
             Ok(assignment)
         })?;
+        self.publish_event(AuditStoreEvent::Activity {
+            audit_id: run.id.clone(),
+            category: "agent".to_string(),
+            message: format!(
+                "{:?} agent marked {:?}: {reason}",
+                assignment.role, activity_status
+            ),
+            stage: stage_for_work_item(&run, Some(work_item_id)),
+            work_item_id: Some(work_item_id.to_string()),
+            artifact_ref: None,
+            agent_role: Some(format!("{:?}", assignment.role)),
+            tool_name: Some("wait_agent".to_string()),
+        });
         Ok(AgentAssignmentUpdate { run, assignment })
     }
 
@@ -296,28 +498,47 @@ impl AuditStore {
     ) -> Result<Option<(AuditRun, String)>, AuditStoreError> {
         evidence.id = Uuid::new_v4().to_string();
         let evidence_ref = format!("evidence/{}.json", evidence.id);
-        self.mutate_run(run_id, |run| {
-            ensure_running(run)?;
-            let Some(work_item_index) = current_claimed_work_item_index(run) else {
-                return Ok(None);
-            };
-            evidence.audit_run_id = run.id.clone();
-            if evidence.adapter_id.is_none() {
-                evidence.adapter_id = run.adapter_id.clone();
-            }
-            evidence.work_item_id = Some(run.work_items[work_item_index].id.clone());
-            self.write_json(
-                &self.audits_root.join(run_id).join(&evidence_ref),
-                &evidence,
-            )?;
-            run.work_items[work_item_index]
-                .evidence_refs
-                .push(evidence_ref.clone());
-            run.evidence_refs.push(evidence_ref.clone());
-            run.updated_at = evidence.created_at;
-            Ok(Some(evidence_ref.clone()))
-        })
-        .map(|(run, evidence_ref)| evidence_ref.map(|evidence_ref| (run, evidence_ref)))
+        let result = self
+            .mutate_run(run_id, |run| {
+                ensure_running(run)?;
+                let Some(work_item_index) = current_claimed_work_item_index(run) else {
+                    return Ok(None);
+                };
+                evidence.audit_run_id = run.id.clone();
+                if evidence.adapter_id.is_none() {
+                    evidence.adapter_id = run.adapter_id.clone();
+                }
+                apply_active_capability_dispatch(&mut evidence, &run.work_items[work_item_index]);
+                evidence.work_item_id = Some(run.work_items[work_item_index].id.clone());
+                self.write_json(
+                    &self.audits_root.join(run_id).join(&evidence_ref),
+                    &evidence,
+                )?;
+                run.work_items[work_item_index]
+                    .evidence_refs
+                    .push(evidence_ref.clone());
+                run.evidence_refs.push(evidence_ref.clone());
+                run.updated_at = evidence.created_at;
+                Ok(Some(evidence_ref.clone()))
+            })
+            .map(|(run, evidence_ref)| evidence_ref.map(|evidence_ref| (run, evidence_ref)));
+        if let Ok(Some((run, evidence_ref))) = &result
+            && let Ok(evidence) = self.read_work_evidence(run_id, evidence_ref)
+        {
+            let activity = evidence_activity(&evidence);
+            let work_item_id = evidence.work_item_id.clone();
+            self.publish_event(AuditStoreEvent::Activity {
+                audit_id: run.id.clone(),
+                category: activity.category,
+                message: activity.message,
+                stage: stage_for_work_item(run, work_item_id.as_deref()),
+                work_item_id,
+                artifact_ref: Some(evidence_ref.clone()),
+                agent_role: None,
+                tool_name: activity.tool_name,
+            });
+        }
+        result
     }
 
     pub fn block_next_unavailable_scheduled_work(
@@ -364,7 +585,7 @@ impl AuditStore {
             "stage": work_item.stage,
             "workItemId": work_item.id,
             "action": "recordUnavailableAndContinue",
-            "requiredCapabilities": schedule.required_capabilities,
+            "desiredCapabilities": schedule.desired_capabilities,
             "unavailableCapabilities": schedule.unavailable_capabilities,
             "diagnostics": diagnostics,
         });
@@ -432,6 +653,11 @@ impl AuditStore {
                 });
             }
             self.ensure_schedule_allows_work_status(run_id, work_item, &status, evidence_refs)?;
+            let schedule_gaps = if status == AuditWorkItemStatus::Blocked {
+                schedule_coverage_gaps(work_item)
+            } else {
+                Vec::new()
+            };
             work_item.status = status;
             work_item.updated_at = now;
             for evidence_ref in evidence_refs {
@@ -441,6 +667,9 @@ impl AuditStore {
             }
             stamp_schedule_outcome(work_item, now);
             let completed = work_item.clone();
+            for gap in schedule_gaps {
+                upsert_coverage_gap(&mut run.coverage_gaps, gap);
+            }
             if let Some(next) = run
                 .work_items
                 .iter()
@@ -456,6 +685,16 @@ impl AuditStore {
             stage: work_item.stage.clone(),
             status: work_item_stage_status(&work_item),
             run: run.clone(),
+        });
+        self.publish_event(AuditStoreEvent::Activity {
+            audit_id: run.id.clone(),
+            category: "orchestrator".to_string(),
+            message: format!("{:?} finished as {:?}", work_item.stage, work_item.status),
+            stage: Some(format!("{:?}", work_item.stage)),
+            work_item_id: Some(work_item.id.clone()),
+            artifact_ref: None,
+            agent_role: None,
+            tool_name: None,
         });
         Ok(WorkUpdate {
             stage_changed: previous_stage != run.current_stage,
@@ -474,17 +713,26 @@ impl AuditStore {
         if *status != AuditWorkItemStatus::Completed {
             return Ok(());
         }
+        if has_runtime_capability_gaps(work_item) {
+            return Err(AuditStoreError::UnavailableScheduledCapabilities {
+                work_item_id: work_item.id.clone(),
+                capabilities: runtime_capability_gap_names(work_item),
+            });
+        }
         let Some(schedule) = schedule_metadata(&work_item.metadata) else {
             return Ok(());
         };
-        if schedule.action == AuditStageScheduleAction::RecordUnavailableAndContinue {
+        if !schedule.unavailable_capabilities.is_empty() {
+            let mut capabilities = schedule
+                .unavailable_capabilities
+                .into_iter()
+                .map(|capability| capability.capability)
+                .collect::<Vec<_>>();
+            capabilities.sort();
+            capabilities.dedup();
             return Err(AuditStoreError::UnavailableScheduledCapabilities {
                 work_item_id: work_item.id.clone(),
-                capabilities: schedule
-                    .unavailable_capabilities
-                    .into_iter()
-                    .map(|capability| capability.capability)
-                    .collect(),
+                capabilities,
             });
         }
         if schedule.verification_methods.is_empty() {
@@ -676,11 +924,7 @@ fn validate_artifact_ref(artifact_ref: &str) -> Result<(), AuditStoreError> {
 
 fn work_item_stage_status(work_item: &AuditWorkItem) -> AuditStageStatus {
     if work_item.status == AuditWorkItemStatus::Blocked
-        && schedule_metadata(&work_item.metadata)
-            .map(|schedule| {
-                schedule.action == AuditStageScheduleAction::RecordUnavailableAndContinue
-            })
-            .unwrap_or(false)
+        && (has_unavailable_schedule(work_item) || has_runtime_capability_gaps(work_item))
     {
         return AuditStageStatus::Unavailable;
     }
@@ -692,6 +936,200 @@ fn work_item_stage_status(work_item: &AuditWorkItem) -> AuditStageStatus {
         AuditWorkItemStatus::Blocked => AuditStageStatus::Blocked,
         AuditWorkItemStatus::Cancelled => AuditStageStatus::Cancelled,
     }
+}
+
+fn has_unavailable_schedule(work_item: &AuditWorkItem) -> bool {
+    schedule_metadata(&work_item.metadata)
+        .map(|schedule| !schedule.unavailable_capabilities.is_empty())
+        .unwrap_or(false)
+}
+
+fn has_runtime_capability_gaps(work_item: &AuditWorkItem) -> bool {
+    work_item
+        .metadata
+        .get("runtimeCapabilityGaps")
+        .and_then(Value::as_array)
+        .map(|gaps| !gaps.is_empty())
+        .unwrap_or(false)
+}
+
+fn runtime_capability_gap_names(work_item: &AuditWorkItem) -> Vec<String> {
+    work_item
+        .metadata
+        .get("runtimeCapabilityGaps")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|gap| gap.get("capability").and_then(Value::as_str))
+        .map(str::to_string)
+        .collect()
+}
+
+fn upsert_coverage_gap(coverage_gaps: &mut Vec<AuditCoverageGap>, gap: AuditCoverageGap) {
+    if let Some(existing) = coverage_gaps
+        .iter_mut()
+        .find(|existing| existing.capability == gap.capability && existing.stage == gap.stage)
+    {
+        existing.reason = gap.reason;
+        existing.affects_terminal_status = gap.affects_terminal_status;
+        return;
+    }
+    coverage_gaps.push(gap);
+}
+
+fn schedule_coverage_gaps(work_item: &AuditWorkItem) -> Vec<AuditCoverageGap> {
+    let Some(schedule) = schedule_metadata(&work_item.metadata) else {
+        return Vec::new();
+    };
+    schedule
+        .unavailable_capabilities
+        .into_iter()
+        .map(|capability| AuditCoverageGap {
+            capability: capability.capability,
+            stage: work_item.stage.clone(),
+            reason: capability.reason,
+            affects_terminal_status: true,
+        })
+        .collect()
+}
+
+fn append_runtime_capability_gap(
+    metadata: &mut Metadata,
+    capability: &str,
+    reason: &str,
+    provider_id: Option<&str>,
+    tool_name: Option<&str>,
+    now: i64,
+) {
+    let mut gaps = metadata
+        .get("runtimeCapabilityGaps")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    if let Some(existing) = gaps
+        .iter_mut()
+        .find(|gap| gap.get("capability").and_then(Value::as_str) == Some(capability))
+    {
+        *existing = json!({
+            "schemaVersion": 1,
+            "capability": capability,
+            "reason": reason,
+            "providerId": provider_id,
+            "toolName": tool_name,
+            "affectsTerminalStatus": true,
+            "updatedAt": now,
+        });
+    } else {
+        gaps.push(json!({
+            "schemaVersion": 1,
+            "capability": capability,
+            "reason": reason,
+            "providerId": provider_id,
+            "toolName": tool_name,
+            "affectsTerminalStatus": true,
+            "updatedAt": now,
+        }));
+    }
+    metadata.insert("runtimeCapabilityGaps".to_string(), Value::Array(gaps));
+}
+
+fn apply_active_capability_dispatch(evidence: &mut AuditEvidence, work_item: &AuditWorkItem) {
+    let Some(dispatch) = work_item.metadata.get("activeCapabilityDispatch") else {
+        return;
+    };
+    let Some(capability) = dispatch.get("capability").and_then(Value::as_str) else {
+        return;
+    };
+    evidence.verification_method = verification_method_for_capability(capability);
+    evidence
+        .metadata
+        .insert("capability".to_string(), json!(capability));
+    if let Some(provider_id) = dispatch.get("providerId").and_then(Value::as_str) {
+        evidence.provider_id = provider_id.to_string();
+    }
+    if let Some(adapter_id) = dispatch.get("adapterId").and_then(Value::as_str) {
+        evidence.adapter_id = Some(adapter_id.to_string());
+    }
+}
+
+fn verification_method_for_capability(capability: &str) -> VerificationMethod {
+    match capability {
+        "graph.analysis" => VerificationMethod::GraphAnalysis,
+        "bytecode.analysis" => VerificationMethod::BytecodeAnalysis,
+        "dynamic.fuzzing" => VerificationMethod::Fuzzing,
+        "symbolic.execution" => VerificationMethod::SymbolicExecution,
+        "formal.verification" => VerificationMethod::FormalVerification,
+        "economic.simulation" => VerificationMethod::EconomicSimulation,
+        "exploit.replay" => VerificationMethod::ExploitReplay,
+        "static.analysis" => VerificationMethod::StaticAnalysis,
+        "target.acquire" | "target.normalize" => VerificationMethod::StaticAnalysis,
+        _ => VerificationMethod::StaticAnalysis,
+    }
+}
+
+struct EvidenceActivity {
+    category: String,
+    message: String,
+    tool_name: Option<String>,
+}
+
+fn evidence_activity(evidence: &AuditEvidence) -> EvidenceActivity {
+    let category = if evidence.attestation == AuditEvidenceAttestation::RouterCaptured {
+        "tool"
+    } else {
+        "evidence"
+    }
+    .to_string();
+    let tool_name = (!evidence.tool_name.is_empty()).then(|| evidence.tool_name.clone());
+    let mut source = evidence.provider_id.clone();
+    if let Some(tool_name) = &tool_name {
+        source = format!("{source}/{tool_name}");
+    }
+    EvidenceActivity {
+        category,
+        message: format!(
+            "{:?} evidence recorded from {}: {}",
+            evidence.verification_method, source, evidence.summary
+        ),
+        tool_name,
+    }
+}
+
+fn packet_activity_category(packet_kind: &str) -> &'static str {
+    match packet_kind {
+        "capabilityDispatch" => "tool",
+        "capabilityUnavailable" => "coverage",
+        "findingCandidate" | "findingValidation" => "judging",
+        "report" | "finalReport" => "report",
+        _ => "orchestrator",
+    }
+}
+
+fn packet_activity_message(packet_kind: &str, summary: &str, packet: &Value) -> String {
+    if packet_kind == "capabilityDispatch"
+        && let Some(capability) = packet.get("capability").and_then(Value::as_str)
+    {
+        let via = packet
+            .get("toolName")
+            .and_then(Value::as_str)
+            .map(|tool_name| format!(" via {tool_name}"))
+            .unwrap_or_else(|| " via announced tool discovery".to_string());
+        return format!("preparing {capability}{via}");
+    }
+    if packet_kind == "agentReview"
+        && let Some(role) = packet.get("role").and_then(Value::as_str)
+    {
+        return format!("{role} review packet recorded: {summary}");
+    }
+    format!("{packet_kind}: {summary}")
+}
+
+fn stage_for_work_item(run: &AuditRun, work_item_id: Option<&str>) -> Option<String> {
+    let work_item_id = work_item_id?;
+    run.work_items
+        .iter()
+        .find(|item| item.id == work_item_id)
+        .map(|item| format!("{:?}", item.stage))
 }
 
 fn stamp_schedule_outcome(work_item: &mut AuditWorkItem, now: i64) {
@@ -712,7 +1150,7 @@ fn stamp_schedule_outcome(work_item: &mut AuditWorkItem, now: i64) {
             "schemaVersion": 1,
             "status": status,
             "updatedAt": now,
-            "requiredCapabilities": schedule.required_capabilities,
+            "desiredCapabilities": schedule.desired_capabilities,
             "unavailableCapabilities": schedule
                 .unavailable_capabilities
                 .into_iter()
@@ -722,6 +1160,11 @@ fn stamp_schedule_outcome(work_item: &mut AuditWorkItem, now: i64) {
                 }))
                 .collect::<Vec<_>>(),
             "evidenceRefs": work_item.evidence_refs.clone(),
+            "runtimeCapabilityGaps": work_item
+                .metadata
+                .get("runtimeCapabilityGaps")
+                .cloned()
+                .unwrap_or_else(|| json!([])),
         }),
     );
 }

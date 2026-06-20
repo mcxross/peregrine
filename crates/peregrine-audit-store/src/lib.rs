@@ -15,7 +15,7 @@ use thiserror::Error;
 mod operations;
 mod report;
 
-pub use operations::{AgentAssignmentUpdate, ScheduledWorkBlock, WorkUpdate};
+pub use operations::{AgentAssignmentUpdate, CapabilityGapUpdate, ScheduledWorkBlock, WorkUpdate};
 pub use report::FinalizedAuditReport;
 
 const DATABASE_FILE: &str = "audits.sqlite";
@@ -25,6 +25,16 @@ static EVENT_BROKERS: OnceLock<Mutex<HashMap<PathBuf, Vec<Sender<AuditStoreEvent
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AuditStoreEvent {
+    Activity {
+        audit_id: String,
+        category: String,
+        message: String,
+        stage: Option<String>,
+        work_item_id: Option<String>,
+        artifact_ref: Option<String>,
+        agent_role: Option<String>,
+        tool_name: Option<String>,
+    },
     StageUpdated {
         audit_id: String,
         stage: AuditStageId,
@@ -378,9 +388,10 @@ mod tests {
     use peregrine_types::{
         AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentConclusion,
         AuditAgentConclusionStatus, AuditAgentRole, AuditCapabilityBinding, AuditEvidence,
-        AuditEvidenceAttestation, AuditProfile, AuditReport, AuditRunStatus, AuditStageId,
-        AuditStageStatus, AuditTarget, AuditWorkItemStatus, EvidenceConfidence, FindingCandidate,
-        FindingCandidateSeverity, FindingCandidateStatus, Metadata, SourcePrecision,
+        AuditEvidenceAttestation, AuditPlannerOutput, AuditProfile, AuditReport, AuditRunStatus,
+        AuditStageId, AuditStagePlan, AuditStageStatus, AuditTarget, AuditWorkItemStatus,
+        EvidenceConfidence, FindingCandidate, FindingCandidateSeverity, FindingCandidateStatus,
+        Metadata, SourcePrecision,
         ValidationPlan, VerificationMethod,
     };
 
@@ -396,9 +407,29 @@ mod tests {
             },
             profile: AuditProfile::default(),
             stages: vec![AuditStageId::AuditSession],
-            required_capabilities: vec!["target.acquire".to_string()],
+            desired_capabilities: vec!["target.acquire".to_string()],
+            planner_output: planner_output(),
             created_at: 10,
             metadata: Metadata::new(),
+        }
+    }
+
+    fn planner_output() -> AuditPlannerOutput {
+        AuditPlannerOutput {
+            summary: "Test planner output".to_string(),
+            rationale: "Exercise audit store persistence.".to_string(),
+            focus_areas: vec!["test focus".to_string()],
+            non_goals: Vec::new(),
+            stage_plans: vec![AuditStagePlan {
+                stage: AuditStageId::AuditSession,
+                objective: "Run the test stage.".to_string(),
+                rationale: "The store test uses a single synthetic stage.".to_string(),
+                focus: vec!["state transition".to_string()],
+                desired_capabilities: vec!["target.acquire".to_string()],
+                agent_roles: Vec::new(),
+                success_criteria: vec!["stage persisted".to_string()],
+            }],
+            acceptance_criteria: vec!["plan can be stored".to_string()],
         }
     }
 
@@ -663,7 +694,7 @@ mod tests {
                 capability: "dynamic.fuzzing".to_string(),
                 provider_id: "mcp".to_string(),
                 adapter_id: None,
-                tool_name: Some("mcp__sui__movy_fuzz".to_string()),
+                tool_name: Some("mcp__audit__fuzz".to_string()),
                 available: false,
                 diagnostic: Some("fuzzer unavailable".to_string()),
             }],
@@ -754,7 +785,7 @@ mod tests {
                 capability: "dynamic.fuzzing".to_string(),
                 provider_id: "mcp".to_string(),
                 adapter_id: None,
-                tool_name: Some("mcp__sui__movy_fuzz".to_string()),
+                tool_name: Some("mcp__audit__fuzz".to_string()),
                 available: false,
                 diagnostic: Some("fuzzer unavailable".to_string()),
             }],
@@ -819,6 +850,97 @@ mod tests {
     }
 
     #[test]
+    fn runtime_capability_gap_blocks_completion_and_advances_as_unavailable() {
+        let home = tempfile::tempdir().expect("tempdir");
+        let store = AuditStore::open(home.path()).expect("open store");
+        let plan = store.store_plan(plan()).expect("store plan");
+        let stages = vec![AuditStageId::BytecodeReview, AuditStageId::AuditReport];
+        let mut work_items = create_audit_work_items("audit-runtime-gap", &stages, 10);
+        attach_stage_schedules(&mut work_items, &[]).expect("attach schedules");
+        let work_item_id = work_items[0].id.clone();
+        let run = AuditRun {
+            schema_version: 1,
+            id: "audit-runtime-gap".to_string(),
+            plan_fingerprint: plan.fingerprint,
+            target: plan.target,
+            profile: plan.profile,
+            status: AuditRunStatus::Running,
+            current_stage: stages[0].clone(),
+            coordinator_thread_id: None,
+            goal_id: None,
+            adapter_id: Some("adapter/sui".to_string()),
+            capabilities: Vec::new(),
+            coverage_gaps: Vec::new(),
+            work_items,
+            agent_assignments: Vec::new(),
+            evidence_refs: Vec::new(),
+            artifact_refs: Vec::new(),
+            created_at: 10,
+            updated_at: 10,
+            metadata: Metadata::new(),
+        };
+        store.create_run(&run).expect("create run");
+        let events = store.subscribe_events().expect("subscribe events");
+        store
+            .claim_work("audit-runtime-gap", "coordinator", None, 11)
+            .expect("claim work");
+        let _ = recv_event(&events);
+
+        let gap = store
+            .record_capability_gap(
+                "audit-runtime-gap",
+                &work_item_id,
+                "bytecode.analysis",
+                "no announced bytecode tool matched the audit capability",
+                Some("toolrouter.announced"),
+                None,
+                12,
+            )
+            .expect("record gap");
+        assert!(gap.artifact_ref.starts_with("artifacts/"));
+        assert_eq!(gap.run.coverage_gaps.len(), 1);
+        assert_eq!(gap.run.coverage_gaps[0].capability, "bytecode.analysis");
+        assert!(gap.run.coverage_gaps[0].affects_terminal_status);
+        assert!(gap.work_item.metadata.contains_key("runtimeCapabilityGaps"));
+
+        assert!(matches!(
+            store.finish_work(
+                "audit-runtime-gap",
+                &work_item_id,
+                "coordinator",
+                AuditWorkItemStatus::Completed,
+                &[],
+                13,
+            ),
+            Err(AuditStoreError::UnavailableScheduledCapabilities {
+                work_item_id: blocked_work_item_id,
+                capabilities,
+            }) if blocked_work_item_id == work_item_id && capabilities == vec!["bytecode.analysis".to_string()]
+        ));
+
+        let update = store
+            .finish_work(
+                "audit-runtime-gap",
+                &work_item_id,
+                "coordinator",
+                AuditWorkItemStatus::Blocked,
+                &[],
+                14,
+            )
+            .expect("block runtime gap work");
+        assert_eq!(update.run.current_stage, AuditStageId::AuditReport);
+        assert_eq!(
+            recv_event(&events),
+            AuditStoreEvent::StageUpdated {
+                audit_id: "audit-runtime-gap".to_string(),
+                stage: AuditStageId::BytecodeReview,
+                status: AuditStageStatus::Unavailable,
+                run: update.run,
+            }
+        );
+    }
+
+    #[test]
     fn finish_work_requires_non_model_evidence_for_scheduled_verification() {
         let home = tempfile::tempdir().expect("tempdir");
         let store = AuditStore::open(home.path()).expect("open store");
@@ -831,7 +953,7 @@ mod tests {
                 capability: "dynamic.fuzzing".to_string(),
                 provider_id: "native".to_string(),
                 adapter_id: Some("adapter/sui".to_string()),
-                tool_name: Some("movy_fuzz".to_string()),
+                tool_name: Some("fuzz_entrypoints".to_string()),
                 available: true,
                 diagnostic: None,
             }],
@@ -968,9 +1090,9 @@ mod tests {
             audit_run_id: String::new(),
             work_item_id: None,
             verification_method: VerificationMethod::StaticAnalysis,
-            provider_id: "mcp__sui".to_string(),
+            provider_id: "mcp__audit".to_string(),
             adapter_id: None,
-            tool_name: "mcp__sui__static_analysis".to_string(),
+            tool_name: "mcp__audit__static_analysis".to_string(),
             tool_version: None,
             input_hash: "sha256:abc".to_string(),
             source_precision: SourcePrecision::Summary,
@@ -1652,8 +1774,13 @@ mod tests {
     }
 
     fn recv_event(receiver: &std::sync::mpsc::Receiver<AuditStoreEvent>) -> AuditStoreEvent {
-        receiver
-            .recv_timeout(std::time::Duration::from_secs(1))
-            .expect("audit event")
+        loop {
+            let event = receiver
+                .recv_timeout(std::time::Duration::from_secs(1))
+                .expect("audit event");
+            if !matches!(event, AuditStoreEvent::Activity { .. }) {
+                return event;
+            }
+        }
     }
 }

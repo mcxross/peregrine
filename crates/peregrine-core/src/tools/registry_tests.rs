@@ -2,10 +2,12 @@ use super::*;
 use codex_utils_absolute_path::test_support::PathExt;
 use peregrine_audit_store::AuditStore;
 use peregrine_types::{
-    AuditEvidence, AuditEvidenceAttestation, AuditPlan, AuditProfile, AuditRun, AuditRunStatus,
-    AuditStageId, AuditTarget, AuditWorkItem, AuditWorkItemStatus, Metadata,
+    AuditEvidence, AuditEvidenceAttestation, AuditPlan, AuditPlannerOutput, AuditProfile,
+    AuditRun, AuditRunStatus, AuditStageId, AuditStagePlan, AuditTarget, AuditWorkItem,
+    AuditWorkItemStatus, Metadata, VerificationMethod,
 };
 use pretty_assertions::assert_eq;
+use serde_json::json;
 
 struct TestHandler {
     tool_name: codex_tools::ToolName,
@@ -468,7 +470,23 @@ async fn dispatch_records_router_captured_evidence_for_audit_work() -> anyhow::R
         },
         profile: AuditProfile::default(),
         stages: stages.clone(),
-        required_capabilities: Vec::new(),
+        desired_capabilities: Vec::new(),
+        planner_output: AuditPlannerOutput {
+            summary: "Router evidence test plan".to_string(),
+            rationale: "Exercise router evidence capture.".to_string(),
+            focus_areas: vec!["tool dispatch".to_string()],
+            non_goals: Vec::new(),
+            stage_plans: vec![AuditStagePlan {
+                stage: AuditStageId::BuildNormalize,
+                objective: "Capture router evidence.".to_string(),
+                rationale: "The test stage needs a persisted plan.".to_string(),
+                focus: vec!["router capture".to_string()],
+                desired_capabilities: Vec::new(),
+                agent_roles: Vec::new(),
+                success_criteria: vec!["evidence recorded".to_string()],
+            }],
+            acceptance_criteria: vec!["evidence persisted".to_string()],
+        },
         created_at: 1,
         metadata: Metadata::new(),
     })?;
@@ -505,7 +523,22 @@ async fn dispatch_records_router_captured_evidence_for_audit_work() -> anyhow::R
         metadata: Metadata::new(),
     };
     store.create_run(&run)?;
-    store.claim_work(run_id, "router", None, 2)?;
+    let (_, work_item) = store.claim_work(run_id, "router", None, 2)?.expect("work");
+    store.record_packet(
+        run_id,
+        &work_item.id,
+        "capabilityDispatch",
+        "Prepared bytecode capability.",
+        json!({
+            "schemaVersion": 1,
+            "workItemId": work_item.id,
+            "stage": "buildNormalize",
+            "capability": "bytecode.analysis",
+            "providerId": "toolrouter.announced",
+            "adapterId": "adapter/sui",
+        }),
+        3,
+    )?;
 
     let (session, mut turn) = crate::session::tests::make_session_and_context().await;
     let workspace = home.path().join("audits").join(run_id).join("workspace");
@@ -523,7 +556,7 @@ async fn dispatch_records_router_captured_evidence_for_audit_work() -> anyhow::R
         turn.cwd = workspace;
     }
 
-    let tool_name = codex_tools::ToolName::namespaced("mcp__sui", "static_analysis");
+    let tool_name = codex_tools::ToolName::namespaced("mcp__audit", "static_analysis");
     let handler = Arc::new(TestHandler {
         tool_name: tool_name.clone(),
     }) as Arc<dyn CoreToolRuntime>;
@@ -554,7 +587,15 @@ async fn dispatch_records_router_captured_evidence_for_audit_work() -> anyhow::R
     );
     assert_eq!(evidence.work_item_id, Some(format!("{run_id}:stage:0")));
     assert_eq!(evidence.adapter_id, Some("adapter/sui".to_string()));
-    assert_eq!(evidence.provider_id, "mcp__sui");
+    assert_eq!(evidence.provider_id, "toolrouter.announced");
+    assert_eq!(
+        evidence.verification_method,
+        VerificationMethod::BytecodeAnalysis
+    );
+    assert_eq!(
+        evidence.metadata.get("capability"),
+        Some(&json!("bytecode.analysis"))
+    );
 
     Ok(())
 }

@@ -11,8 +11,52 @@ pub const RECORD_PACKET_TOOL_NAME: &str = "audit_record_packet";
 pub const RECORD_EVIDENCE_TOOL_NAME: &str = "audit_record_evidence";
 pub const RECORD_AGENT_CONCLUSION_TOOL_NAME: &str = "audit_record_agent_conclusion";
 pub const PREPARE_CAPABILITY_TOOL_NAME: &str = "audit_prepare_capability";
+pub const RECORD_CAPABILITY_GAP_TOOL_NAME: &str = "audit_record_capability_gap";
 pub const FINISH_WORK_TOOL_NAME: &str = "audit_finish_work";
 pub const FINALIZE_REPORT_TOOL_NAME: &str = "audit_finalize_report";
+pub const STORE_PLAN_TOOL_NAME: &str = "audit_store_plan";
+
+pub fn store_plan_tool() -> ToolSpec {
+    function_tool(
+        STORE_PLAN_TOOL_NAME,
+        "Persist a model-authored immutable audit plan before a run starts. Use this only after tailoring the strategy to the target. The returned fingerprint is what the user accepts with /audit start <fingerprint>.",
+        BTreeMap::from([
+            (
+                "target".to_string(),
+                JsonSchema::object(BTreeMap::new(), None, Some(true.into())),
+            ),
+            (
+                "profile".to_string(),
+                JsonSchema::object(BTreeMap::new(), None, Some(true.into())),
+            ),
+            (
+                "stages".to_string(),
+                JsonSchema::array(
+                    JsonSchema::string(Some("Audit stage ID in camelCase, such as buildNormalize, attackSurface, dynamicAnalysis, auditReport.".to_string())),
+                    Some("Ordered stages selected for this target. Build/normalize and report stages are guardrail stages; middle stages should be tailored.".to_string()),
+                ),
+            ),
+            (
+                "desired_capabilities".to_string(),
+                JsonSchema::array(
+                    JsonSchema::string(Some("Capability phrase, such as static.analysis or dynamic.fuzzing.".to_string())),
+                    Some("Best-effort evidence goals selected for this target.".to_string()),
+                ),
+            ),
+            (
+                "planner_output".to_string(),
+                JsonSchema::object(BTreeMap::new(), None, Some(true.into())),
+            ),
+        ]),
+        vec![
+            "target",
+            "profile",
+            "stages",
+            "desired_capabilities",
+            "planner_output",
+        ],
+    )
+}
 
 pub fn read_run_tool() -> ToolSpec {
     function_tool(
@@ -26,7 +70,7 @@ pub fn read_run_tool() -> ToolSpec {
 pub fn claim_work_tool() -> ToolSpec {
     function_tool(
         CLAIM_WORK_TOOL_NAME,
-        "Atomically claim the next actionable item in the current audit's deterministic stage queue. Before claiming, this tool records and blocks leading scheduled stages whose required capabilities are unavailable, returning those scheduler blocks in the response.",
+        "Atomically claim the next actionable item in the current audit's deterministic stage queue. Before claiming, this tool records and blocks leading scheduled stages whose desired capabilities are unavailable, returning those unavailable-stage blocks in the response.",
         BTreeMap::from([(
             "worker_id".to_string(),
             JsonSchema::string(Some(
@@ -313,7 +357,7 @@ pub fn record_agent_conclusion_tool() -> ToolSpec {
 pub fn prepare_capability_tool() -> ToolSpec {
     function_tool(
         PREPARE_CAPABILITY_TOOL_NAME,
-        "Prepare a claimed audit work item's scheduled capability for execution through a ToolRouter-visible native, code-mode, or MCP tool. This records a capabilityDispatch packet. If a concrete tool was bound from announced tool metadata it is returned; otherwise the response returns a discovery query and bounded target context. The coordinator must discover and call announced tools normally; router capture records evidence after success.",
+        "Prepare a claimed audit work item's desired capability for execution through a ToolRouter-visible native, code-mode, or MCP tool. This records a capabilityDispatch packet. If a concrete tool was bound from announced tool metadata it is returned; otherwise the response returns a discovery query and bounded target context. Absence from availableCapabilities means discover announced tools, not unavailable. The coordinator must discover and call announced tools normally; router capture records evidence after success.",
         BTreeMap::from([
             (
                 "work_item_id".to_string(),
@@ -327,6 +371,41 @@ pub fn prepare_capability_tool() -> ToolSpec {
             ),
         ]),
         vec!["work_item_id", "capability"],
+    )
+}
+
+pub fn record_capability_gap_tool() -> ToolSpec {
+    function_tool(
+        RECORD_CAPABILITY_GAP_TOOL_NAME,
+        "Record that a desired audit capability could not be satisfied by announced ToolRouter/MCP tools at runtime. This creates a visible coverage gap and capabilityUnavailable packet; the work item should later close as blocked/unavailable so the deterministic queue can advance.",
+        BTreeMap::from([
+            (
+                "work_item_id".to_string(),
+                id_schema("Claimed work item ID."),
+            ),
+            (
+                "capability".to_string(),
+                id_schema("Desired capability that could not be satisfied."),
+            ),
+            (
+                "reason".to_string(),
+                JsonSchema::string(Some(
+                    "Public reason such as no announced tool matched the capability or the announced tool failed before producing evidence."
+                        .to_string(),
+                )),
+            ),
+            (
+                "provider_id".to_string(),
+                JsonSchema::string(Some("Optional capability provider ID.".to_string())),
+            ),
+            (
+                "tool_name".to_string(),
+                JsonSchema::string(Some(
+                    "Optional announced tool name that failed or was unsuitable.".to_string(),
+                )),
+            ),
+        ]),
+        vec!["work_item_id", "capability", "reason"],
     )
 }
 

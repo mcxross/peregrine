@@ -35,6 +35,31 @@ fn fast_tier_command() -> ServiceTierCommand {
     }
 }
 
+fn configure_audit_test_thread(chat: &mut ChatWidget) {
+    chat.handle_thread_session(crate::agent::session_state::ThreadSessionState {
+        thread_id: ThreadId::new(),
+        forked_from_id: None,
+        fork_parent_title: None,
+        thread_name: None,
+        model: "test-model".to_string(),
+        model_provider_id: "test-provider".to_string(),
+        service_tier: None,
+        approval_policy: AskForApproval::Never,
+        approvals_reviewer: ApprovalsReviewer::User,
+        permission_profile: PermissionProfile::read_only(),
+        active_permission_profile: None,
+        cwd: test_path_buf("/home/user/project").abs(),
+        runtime_workspace_roots: Vec::new(),
+        instruction_source_paths: Vec::new(),
+        reasoning_effort: Some(ReasoningEffortConfig::default()),
+        collaboration_mode: None,
+        personality: None,
+        message_history: None,
+        network_proxy: None,
+        rollout_path: None,
+    });
+}
+
 fn complete_turn_with_message(chat: &mut ChatWidget, turn_id: &str, message: Option<&str>) {
     if let Some(message) = message {
         complete_assistant_message(
@@ -731,41 +756,33 @@ async fn scan_slash_command_includes_inline_scope_in_security_goal() {
 }
 
 #[tokio::test]
-async fn audit_plan_slash_command_emits_audit_event() {
+async fn audit_plan_slash_command_submits_model_planning_turn() {
     let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
     chat.set_feature_enabled(Feature::Goals, /*enabled*/ true);
+    chat.set_feature_enabled(Feature::CollaborationModes, /*enabled*/ true);
+    configure_audit_test_thread(&mut chat);
     let command = "/audit --plan ./move_pkg --tokens 123";
 
     submit_composer_text(&mut chat, command);
 
-    let event = rx.try_recv().expect("expected audit event");
-    let AppEvent::RunAuditCommand {
-        command: audit_command,
-        command_text,
-    } = event
-    else {
-        panic!("expected RunAuditCommand, got {event:?}");
+    while let Ok(event) = rx.try_recv() {
+        assert!(
+            !matches!(event, AppEvent::RunAuditCommand { .. }),
+            "audit plan should not emit an audit lifecycle app event: {event:?}"
+        );
+    }
+    let items = match next_submit_op(&mut op_rx) {
+        Op::UserTurn { items, .. } => items,
+        other => panic!("expected Op::UserTurn, got {other:?}"),
     };
-    assert_eq!(command_text, command);
-    let crate::agent::audit_command::AuditCommand::Plan(request) = audit_command else {
-        panic!("expected audit plan command");
+    assert_eq!(items.len(), 1);
+    let UserInput::Text { text, .. } = &items[0] else {
+        panic!("expected text input");
     };
-    let peregrine_app_server_protocol::AuditTargetParams::LocalPackage {
-        chain_id,
-        path,
-        metadata,
-    } = request.target
-    else {
-        panic!("expected local package target");
-    };
-    assert_eq!(chain_id, "sui");
-    assert!(path.ends_with("/./move_pkg"), "{path}");
-    assert_eq!(metadata, None);
-    assert_eq!(
-        request.profile.map(|profile| profile.model_token_budget),
-        Some(123)
-    );
-    assert_no_submit_op(&mut op_rx);
+    assert!(text.contains("audit_store_plan"), "{text}");
+    assert!(text.contains("\"chainId\": \"sui\""), "{text}");
+    assert!(text.contains("\"modelTokenBudget\": 123"), "{text}");
+    assert_eq!(chat.active_collaboration_mode_kind(), ModeKind::Plan);
     assert_eq!(recall_latest_after_clearing(&mut chat), command);
 }
 
