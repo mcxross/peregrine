@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-release:
+    name: Build and Release CLI/TUI
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: peregrine-tui-linux-x86_64
+          - os: macos-latest
+            artifact_name: peregrine-tui-macos-x86_64
+          - os: windows-latest
+            artifact_name: peregrine-tui-windows-x86_64.exe
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Bun dependencies
+        run: bun install
+
+      - name: Build TUI (Sidecars)
+        run: bun run build:tui
+
+      - name: Build CLI/TUI (Release)
+        run: cargo build --release -p peregrine-tui
+
+      - name: Rename Artifact
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv target/release/peregrine-tui.exe target/release/${{ matrix.artifact_name }}
+          else
+            mv target/release/peregrine-tui target/release/${{ matrix.artifact_name }}
+          fi
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/release/${{ matrix.artifact_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
