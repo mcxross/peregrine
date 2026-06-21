@@ -315,6 +315,10 @@ pub(crate) struct ChatController {
     handoff_thread_id: Option<ThreadId>,
     pending_requests: PendingRequests,
     transcript_scroll: usize,
+    cached_transcript_width: u16,
+    cached_history_len: usize,
+    cached_active_cell_key: Option<crate::agent::chatwidget::ActiveCellTranscriptKey>,
+    cached_lines: Vec<ratatui::text::Line<'static>>,
 }
 
 impl Default for ChatController {
@@ -340,6 +344,10 @@ impl Default for ChatController {
             handoff_thread_id: None,
             pending_requests: PendingRequests::default(),
             transcript_scroll: 0,
+            cached_transcript_width: 0,
+            cached_history_len: 0,
+            cached_active_cell_key: None,
+            cached_lines: Vec::new(),
         }
     }
 }
@@ -691,12 +699,25 @@ impl ChatController {
             self.render_message(frame, area, focused, palette);
             return;
         };
-        let lines = chat.embedded_transcript_lines(&self.history_cells, area.width);
+
+        let width = area.width;
+        let active_key = chat.active_cell_transcript_key();
+        if self.cached_transcript_width != width
+            || self.cached_history_len != self.history_cells.len()
+            || self.cached_active_cell_key != active_key
+        {
+            self.cached_lines = chat.embedded_transcript_lines(&self.history_cells, width);
+            self.cached_transcript_width = width;
+            self.cached_history_len = self.history_cells.len();
+            self.cached_active_cell_key = active_key;
+        }
+
+        let lines = &self.cached_lines;
         let visible_height = area.height.saturating_sub(2) as usize;
         let max_scroll = lines.len().saturating_sub(visible_height);
         self.transcript_scroll = self.transcript_scroll.min(max_scroll);
         let scroll = max_scroll.saturating_sub(self.transcript_scroll);
-        let paragraph = Paragraph::new(lines)
+        let paragraph = Paragraph::new(lines.clone())
             .style(chat_base_style(palette))
             .block(chat_block(self.chat_title(), focused, palette))
             .scroll((u16_saturating(scroll), 0))
