@@ -1,5 +1,5 @@
 use peregrine_analysis::{AnalysisReport, GraphKind};
-use peregrine_sui_mcp_protocol::{MoveProjectGraphs, MoveCallGraph, MoveTypeGraph, MoveStateAccessGraph};
+use peregrine_sui_mcp_protocol::{MoveProjectGraphs, MoveStateAccessGraph};
 use rmcp::ErrorData;
 use serde::de::DeserializeOwned;
 use std::collections::HashSet;

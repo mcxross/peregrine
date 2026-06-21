@@ -4,7 +4,7 @@ use rmcp::model::{ServerNotification, LoggingMessageNotification, LoggingMessage
 use crate::{
     adapter::{SecuritySuiCommandKind, build_sui_move_new_command, build_sui_package_command},
     analysis::{
-        apply_analyze_args, ensure_required_stages, legacy_static_report, scanner_report_value,
+        apply_analyze_args, legacy_static_report, scanner_report_value,
         static_rule_catalog, sui_bytecode_decompile, sui_bytecode_view, sui_modules,
         sui_package_insights, sui_signatures, sui_test_scanner_report,
     },
@@ -108,11 +108,14 @@ impl PeregrineMcpServer {
             match state {
                 Some(PackageState::Ready(report)) => return (*report).clone(),
                 Some(PackageState::Analyzing(mut rx)) => {
-                    let _ = context.session().send_notification(rmcp::model::ServerNotification::CustomNotification("notifications/message".into(), serde_json::json!({
-                        "level": "info",
-                        "logger": "peregrine",
-                        "data": "Background analysis in progress. Blocking until graph is ready..."
-                    }))).await;
+                    let mut param = rmcp::model::LoggingMessageNotificationParam::new(
+                        rmcp::model::LoggingLevel::Info,
+                        serde_json::json!("Background analysis in progress. Blocking until graph is ready...")
+                    );
+                    param.logger = Some("peregrine".to_string());
+                    let _ = context.peer.send_notification(rmcp::model::ServerNotification::LoggingMessageNotification(
+                        rmcp::model::LoggingMessageNotification::new(param)
+                    )).await;
                     
                     let _ = rx.changed().await;
                 }
@@ -354,6 +357,7 @@ impl PeregrineMcpServer {
                             ("pluginPaths".to_string(), json!(args.plugins)),
                             ("rulesets".to_string(), json!(args.rulesets)),
                         ]),
+                        context,
                     )
                     .await;
                 let report = legacy_static_report(&report)?;
@@ -374,6 +378,7 @@ impl PeregrineMcpServer {
                         Vec::new(),
                         Vec::new(),
                         AnalysisOptions::new(),
+                        context,
                     )
                     .await;
                 json!({
@@ -424,6 +429,7 @@ impl PeregrineMcpServer {
                             .collect(),
                         Vec::new(),
                         options,
+                        context,
                     )
                     .await;
                     
@@ -467,6 +473,7 @@ impl PeregrineMcpServer {
                             ("moduleName".to_string(), json!(args.module_name)),
                             ("functionName".to_string(), json!(args.function_name)),
                         ]),
+                        context,
                     )
                     .await;
                 let graph = legacy_state_graph(&report)?;
@@ -565,6 +572,7 @@ impl PeregrineMcpServer {
                                 json!(args.seed.unwrap_or(DEFAULT_MOVY_FUZZ_SEED)),
                             ),
                         ]),
+                        context,
                     )
                     .await;
                 serde_json::to_value(dynamic_command_result(
@@ -597,6 +605,7 @@ impl PeregrineMcpServer {
                             ("trace".to_string(), json!(args.trace)),
                             ("keepTemp".to_string(), json!(args.keep_temp)),
                         ]),
+                        context,
                     )
                     .await;
                 serde_json::to_value(dynamic_command_result(
