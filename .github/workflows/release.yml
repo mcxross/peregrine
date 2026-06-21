@@ -20,7 +20,7 @@ jobs:
           - os: macos-latest
             artifact_name: peregrine-tui-macos-x86_64
           - os: windows-latest
-            artifact_name: peregrine-tui-windows-x86_64.exe
+            artifact_name: peregrine-tui-windows-x86_64
 
     runs-on: ${{ matrix.os }}
     
@@ -42,24 +42,49 @@ jobs:
       - name: Install Bun dependencies
         run: bun install
 
-      - name: Build TUI (Sidecars)
+      - name: Build TUI and Sidecars
+        # This script builds all sidecars + the TUI and prepares them
         run: bun run build:tui
 
-      - name: Build CLI/TUI (Release)
-        run: cargo build --release -p peregrine-tui
+      - name: Build App Server
+        run: cargo build --release -p peregrine-app-server
 
-      - name: Rename Artifact
+      - name: Package Release
         shell: bash
         run: |
+          mkdir peregrine-tui-release
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            mv target/release/peregrine-tui.exe target/release/${{ matrix.artifact_name }}
+            cp target/release/peregrine-tui.exe peregrine-tui-release/
+            cp target/release/peregrine-app-server.exe peregrine-tui-release/
+            cp target/release/peregrine-helper.exe peregrine-tui-release/
+            cp target/release/peregrine-sui-mcp-server.exe peregrine-tui-release/
+            cp target/release/peregrine-sui-move-analyzer-mcp-server.exe peregrine-tui-release/
+            cd peregrine-tui-release
+            7z a ../${{ matrix.artifact_name }}.zip *
+            cd ..
+            sha256sum ${{ matrix.artifact_name }}.zip > ${{ matrix.artifact_name }}.zip.sha256
           else
-            mv target/release/peregrine-tui target/release/${{ matrix.artifact_name }}
+            cp target/release/peregrine-tui peregrine-tui-release/
+            cp target/release/peregrine-app-server peregrine-tui-release/
+            cp target/release/peregrine-helper peregrine-tui-release/
+            cp target/release/peregrine-sui-mcp-server peregrine-tui-release/
+            cp target/release/peregrine-sui-move-analyzer-mcp-server peregrine-tui-release/
+            cd peregrine-tui-release
+            tar -czvf ../${{ matrix.artifact_name }}.tar.gz *
+            cd ..
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum ${{ matrix.artifact_name }}.tar.gz > ${{ matrix.artifact_name }}.tar.gz.sha256
+            else
+              shasum -a 256 ${{ matrix.artifact_name }}.tar.gz > ${{ matrix.artifact_name }}.tar.gz.sha256
+            fi
           fi
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: target/release/${{ matrix.artifact_name }}
+          files: |
+            *.zip
+            *.tar.gz
+            *.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
