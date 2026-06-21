@@ -86,9 +86,10 @@ pub fn resolve_mcp_config(options: McpClientOptions) -> io::Result<ResolvedMcpCo
     if mode == SuiToolsMode::Disabled {
         servers.remove(SERVER_NAME);
     } else {
+        let port = config.sui_mcp_server_port;
         servers
             .entry(SERVER_NAME.to_string())
-            .or_insert_with(|| default_peregrine_server(options.self_exe.as_deref(), &adapter));
+            .or_insert_with(|| default_peregrine_server(options.self_exe.as_deref(), &adapter, port));
     }
     if move_analyzer_mode == MoveAnalyzerToolsMode::Disabled {
         servers.remove(MOVE_ANALYZER_SERVER_NAME);
@@ -223,6 +224,7 @@ pub fn default_sui_move_analyzer_server(
 pub fn default_peregrine_server(
     self_exe: Option<&Path>,
     adapter: &SuiAdapterSettings,
+    port: Option<u16>,
 ) -> McpServerConfig {
     let server_executable = resolve_server_executable_from(
         self_exe,
@@ -249,14 +251,25 @@ pub fn default_peregrine_server(
         );
     }
 
-    McpServerConfig {
-        transport: McpServerTransportConfig::Stdio {
+    let transport = if let Some(p) = port {
+        McpServerTransportConfig::StreamableHttp {
+            url: format!("http://127.0.0.1:{p}/messages"),
+            bearer_token_env_var: None,
+            http_headers: None,
+            env_http_headers: None,
+        }
+    } else {
+        McpServerTransportConfig::Stdio {
             command: server_executable.to_string_lossy().into_owned(),
             args: Vec::new(),
             env: Some(env),
             env_vars: Vec::new(),
             cwd: None,
-        },
+        }
+    };
+
+    McpServerConfig {
+        transport,
         environment_id: DEFAULT_MCP_SERVER_ENVIRONMENT_ID.to_string(),
         enabled: true,
         required: false,
@@ -485,7 +498,7 @@ enabled = false
         let frontend = directory.path().join("peregrine-tui");
         std::fs::write(&frontend, "").expect("write frontend");
 
-        let sui = default_peregrine_server(Some(&frontend), &SuiAdapterSettings::default());
+        let sui = default_peregrine_server(Some(&frontend), &SuiAdapterSettings::default(), None);
         let analyzer = default_sui_move_analyzer_server(
             Some(&frontend),
             &MoveAnalyzerAdapterSettings::default(),

@@ -72,6 +72,7 @@ fn default_server_config(config: &Config) -> Option<codex_compat::McpServerConfi
     let server = default_peregrine_server(
         config.peregrine_self_exe.as_deref(),
         &config.sui_tools.adapter,
+        config.sui_mcp_server_port,
     );
     let servers = std::collections::HashMap::from([(SERVER_NAME.to_string(), server)]);
     codex_compat::mcp_server_config_map_to_codex(&servers).remove(SERVER_NAME)

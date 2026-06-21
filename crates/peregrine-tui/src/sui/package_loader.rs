@@ -302,6 +302,7 @@ fn scan_tests_with_mode(
         package: PackageArgs {
             project_root: Some(context.project_root.display().to_string()),
             package_path: Some(context.package_path.clone()),
+            unbounded: false,
         },
         source_mode,
     };

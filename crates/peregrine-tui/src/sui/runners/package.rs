@@ -35,6 +35,7 @@ fn run_sui_step(context: &CliContext, name: &str, command_kind: &str) -> CliStep
             package: PackageArgs {
                 project_root: None,
                 package_path: Some(context.package_path.clone()),
+                unbounded: false,
             },
             command_kind: command_kind.to_string(),
             publish_build_env: None,

@@ -3094,7 +3094,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "lazy_static",
  "lazycell",
  "proc-macro2",
@@ -3114,7 +3114,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "regex",
@@ -3132,7 +3132,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -5855,7 +5855,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
  "lazy_static",
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -9544,8 +9544,8 @@ dependencies = [
  "libc",
  "log",
  "rustversion",
- "windows-link 0.2.1",
- "windows-result 0.4.1",
+ "windows-link 0.1.3",
+ "windows-result 0.3.4",
 ]
 
 [[package]]
@@ -11318,7 +11318,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -11540,7 +11540,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.58.0",
+ "windows-core 0.61.2",
 ]
 
 [[package]]
@@ -13727,7 +13727,7 @@ dependencies = [
  "serde_json",
  "syn 2.0.118",
  "tuple_list",
- "zstd 0.11.2+zstd.1.5.2",
+ "zstd 0.12.4",
 ]
 
 [[package]]
@@ -13756,7 +13756,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tuple_list",
  "typeid",
- "zstd 0.11.2+zstd.1.5.2",
+ "zstd 0.12.4",
 ]
 
 [[package]]
@@ -15790,7 +15790,7 @@ dependencies = [
 [[package]]
 name = "movy"
 version = "0.0.1"
-source = "git+https://github.com/astinz/movy.git?branch=mcxross%2Fcompat#49fc402a1fb1ccde973dd6597f730a6edae71386"
+source = "git+https://github.com/astinz/movy.git?branch=mcxross%2Fcompat#339becacb26fcb94475664f00e9129ff165e3865"
 dependencies = [
  "bcs",
  "clap",
@@ -15813,7 +15813,7 @@ dependencies = [
 [[package]]
 name = "movy-fuzz"
 version = "0.0.1"
-source = "git+https://github.com/astinz/movy.git?branch=mcxross%2Fcompat#49fc402a1fb1ccde973dd6597f730a6edae71386"
+source = "git+https://github.com/astinz/movy.git?branch=mcxross%2Fcompat#339becacb26fcb94475664f00e9129ff165e3865"
 dependencies = [
  "alloy-primitives",
  "anyhow",
@@ -15850,7 +15850,7 @@ dependencies = [
 [[package]]
 name = "movy-fuzz-core"
 version = "0.0.1"
-source = "git+https://github.com/astinz/movy.git?branch=mcxross%2Fcompat#49fc402a1fb1ccde973dd6597f730a6edae71386"
+source = "git+https://github.com/astinz/movy.git?branch=mcxross%2Fcompat#339becacb26fcb94475664f00e9129ff165e3865"
 dependencies = [
  "alloy-primitives",
  "anyhow",
@@ -15871,7 +15871,7 @@ dependencies = [
 [[package]]
 name = "movy-replay"
 version = "0.0.1"
-source = "git+https://github.com/astinz/movy.git?branch=mcxross%2Fcompat#49fc402a1fb1ccde973dd6597f730a6edae71386"
+source = "git+https://github.com/astinz/movy.git?branch=mcxross%2Fcompat#339becacb26fcb94475664f00e9129ff165e3865"
 dependencies = [
  "alloy-primitives",
  "anyhow",
@@ -15912,7 +15912,7 @@ dependencies = [
 [[package]]
 name = "movy-sui"
 version = "0.0.1"
-source = "git+https://github.com/astinz/movy.git?branch=mcxross%2Fcompat#49fc402a1fb1ccde973dd6597f730a6edae71386"
+source = "git+https://github.com/astinz/movy.git?branch=mcxross%2Fcompat#339becacb26fcb94475664f00e9129ff165e3865"
 dependencies = [
  "auto_impl",
  "bcs",
@@ -15956,7 +15956,7 @@ dependencies = [
 [[package]]
 name = "movy-types"
 version = "0.0.1"
-source = "git+https://github.com/astinz/movy.git?branch=mcxross%2Fcompat#49fc402a1fb1ccde973dd6597f730a6edae71386"
+source = "git+https://github.com/astinz/movy.git?branch=mcxross%2Fcompat#339becacb26fcb94475664f00e9129ff165e3865"
 dependencies = [
  "alloy-primitives",
  "anyhow",
@@ -16851,7 +16851,7 @@ version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "680998035259dcfcafe653688bf2aa6d3e2dc05e98be6ab46afb089dc84f1df8"
 dependencies = [
- "proc-macro-crate 2.0.0",
+ "proc-macro-crate 3.5.0",
  "proc-macro2",
  "quote",
  "syn 2.0.118",
@@ -17662,7 +17662,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -19074,6 +19074,7 @@ name = "peregrine-sui-mcp-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum 0.8.9",
  "notify",
  "peregrine-analysis",
  "peregrine-analysis-engine",
@@ -19096,6 +19097,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "toml 0.9.12+spec-1.1.0",
+ "tracing",
 ]
 
 [[package]]
@@ -20210,7 +20212,7 @@ checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes",
  "heck 0.5.0",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "log",
  "multimap",
  "once_cell",
@@ -20230,7 +20232,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03da047801ff44bb6a4d407d4860c05fd70bb81714e6b2f3812603d5b145b042"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.11.0",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "petgraph 0.8.3",
@@ -20251,7 +20253,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81bddcdb20abf9501610992b6759a4c888aef7d1a7247ef75e2404275ac24af1"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "proc-macro2",
  "quote",
  "syn 2.0.118",
@@ -20264,7 +20266,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.118",
@@ -20277,7 +20279,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b570b25f7617e43d59005d0990ccb79e950a423952cea19671b7a876da390adf"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.118",
@@ -30951,7 +30953,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

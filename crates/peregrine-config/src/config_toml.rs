@@ -260,6 +260,10 @@ pub struct ConfigToml {
     /// When unset, Peregrine will bind to an ephemeral port chosen by the OS.
     pub mcp_oauth_callback_port: Option<u16>,
 
+    /// Port for the Sui MCP Server (daemon) when using the SSE transport.
+    /// Defaults to 8765.
+    pub sui_mcp_server_port: Option<u16>,
+
     /// Optional redirect URI to use during MCP OAuth login.
     /// When set, this URI is used in the OAuth authorization request instead
     /// of the local listener address. The local callback listener still binds

@@ -34,8 +34,14 @@ peregrine-sui-scanner = { workspace = true }
 peregrine-sui-static-analysis = { workspace = true }
 rmcp = { workspace = true, default-features = false, features = [
     "server",
+    "server-side-http",
     "transport-io",
+    "transport-worker",
+    "transport-streamable-http-server",
+    "transport-streamable-http-server-session",
 ] }
+tracing = { workspace = true }
+axum = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

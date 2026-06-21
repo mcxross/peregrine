@@ -61,6 +61,31 @@ fn workspace_client(workspace_root: &Path) -> Result<Arc<WorkspaceClient>, Strin
 
     let peregrine_home = peregrine_utils_home_dir::find_peregrine_home()
         .map_err(|error| format!("failed to resolve PEREGRINE_HOME: {error}"))?;
+
+    let config_path = peregrine_home.join(peregrine_config::CONFIG_TOML_FILE);
+    let config: peregrine_config::config_toml::ConfigToml = std::fs::read_to_string(&config_path)
+        .ok()
+        .and_then(|raw| toml::from_str(&raw).ok())
+        .unwrap_or_default();
+    
+    if let Some(port) = config.sui_mcp_server_port {
+        if std::net::TcpStream::connect(("127.0.0.1", port)).is_err() {
+            let self_exe = std::env::current_exe().ok();
+            let server_executable = peregrine_sui_mcp_protocol::resolve_server_executable_from(
+                self_exe.as_deref(),
+                std::env::var_os(peregrine_sui_mcp_protocol::SERVER_PATH_ENV),
+                std::env::var_os("PATH"),
+            );
+            
+            let _ = std::process::Command::new(server_executable)
+                .arg("--transport")
+                .arg(format!("sse:{port}"))
+                .spawn();
+                
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+    }
+
     let runtime = McpClientRuntime::load(McpClientOptions::new(
         workspace_root.clone(),
         peregrine_home.to_path_buf(),

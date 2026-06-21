@@ -19,6 +19,7 @@ pub(crate) fn fetch_modules(
             package: PackageArgs {
                 project_root: Some(project_root.display().to_string()),
                 package_path: Some(package_path.to_string()),
+                unbounded: false,
             },
             modules: modules.clone(),
             file: file.clone(),
@@ -53,6 +54,7 @@ pub(crate) fn fetch_signatures(
             package: PackageArgs {
                 project_root: Some(project_root.display().to_string()),
                 package_path: Some(package_path.to_string()),
+                unbounded: false,
             },
             modules: modules.clone(),
             file: file.clone(),

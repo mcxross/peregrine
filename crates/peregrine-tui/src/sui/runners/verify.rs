@@ -32,6 +32,7 @@ fn run_verify_target(context: &CliContext, args: &VerifyArgs, target: FormalTarg
             package: PackageArgs {
                 project_root: None,
                 package_path: Some(context.package_path.clone()),
+                unbounded: false,
             },
             file_path: target.file_path.clone(),
             module_name: target.module_name.clone(),

@@ -19,6 +19,7 @@ pub fn run_analyze(context: &CliContext, args: &AnalyzeArgs) -> CliStep {
         package: PackageArgs {
             project_root: Some(context.project_root.display().to_string()),
             package_path: Some(context.package_path.clone()),
+            unbounded: false,
         },
         no_global_plugins: args.no_global_plugins,
         plugins: args

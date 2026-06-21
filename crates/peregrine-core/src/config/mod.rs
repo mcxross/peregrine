@@ -777,6 +777,9 @@ pub struct Config {
     /// When unset, Peregrine will bind to an ephemeral port chosen by the OS.
     pub mcp_oauth_callback_port: Option<u16>,
 
+    /// Port for the Sui MCP Server (daemon) when using the SSE transport.
+    pub sui_mcp_server_port: Option<u16>,
+
     /// Optional redirect URI to use during MCP OAuth login.
     ///
     /// When set, this URI is used in the OAuth authorization request instead
@@ -3510,6 +3513,7 @@ impl Config {
                 env!("CARGO_PKG_VERSION"),
             ),
             mcp_oauth_callback_port: cfg.mcp_oauth_callback_port,
+            sui_mcp_server_port: cfg.sui_mcp_server_port,
             mcp_oauth_callback_url: cfg.mcp_oauth_callback_url.clone(),
             model_providers,
             project_doc_max_bytes: cfg.project_doc_max_bytes.unwrap_or(AGENTS_MD_MAX_BYTES),

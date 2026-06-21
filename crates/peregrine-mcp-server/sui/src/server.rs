@@ -1,6 +1,5 @@
 use crate::command;
 use crate::cache::{EagerCache, PackageState};
-use rmcp::model::{ServerNotification, LoggingMessageNotification, LoggingMessageNotificationParam, LoggingLevel};
 use crate::{
     adapter::{SecuritySuiCommandKind, build_sui_move_new_command, build_sui_package_command},
     analysis::{
@@ -54,12 +53,22 @@ use std::{
     sync::Arc,
 };
 
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+#[derive(Clone)]
+pub struct WorkspaceState {
+    pub adapter_settings: SuiAdapterSettings,
+    pub analysis_engine: AnalysisEngine,
+    pub cache: EagerCache,
+}
+
 #[derive(Clone)]
 pub struct PeregrineMcpServer {
-    workspace_root: PathBuf,
-    adapter_settings: SuiAdapterSettings,
-    analysis_engine: AnalysisEngine,
-    cache: EagerCache,
+    default_workspace_root: PathBuf,
+    default_adapter_settings: SuiAdapterSettings,
+    workspaces: Arc<std::sync::RwLock<std::collections::HashMap<PathBuf, WorkspaceState>>>,
+    pub last_activity: Arc<AtomicU64>,
 }
 
 impl PeregrineMcpServer {
@@ -67,23 +76,68 @@ impl PeregrineMcpServer {
         let workspace_root = workspace_root.canonicalize()?;
         let analysis_engine = sui_analysis_engine()?;
         let cache = EagerCache::new(analysis_engine.clone());
-        Ok(Self {
-            workspace_root,
-            adapter_settings: SuiAdapterSettings::default(),
+        let adapter_settings = SuiAdapterSettings::default();
+
+        let mut workspaces = std::collections::HashMap::new();
+        workspaces.insert(workspace_root.clone(), WorkspaceState {
+            adapter_settings: adapter_settings.clone(),
             analysis_engine,
             cache,
+        });
+
+        Ok(Self {
+            default_workspace_root: workspace_root,
+            default_adapter_settings: adapter_settings,
+            workspaces: Arc::new(std::sync::RwLock::new(workspaces)),
+            last_activity: Arc::new(AtomicU64::new(SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs())),
         })
+    }
+
+    pub fn record_activity(&self) {
+        self.last_activity.store(SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs(), Ordering::Relaxed);
     }
 
     pub fn with_adapter_settings(
         mut self,
         adapter_settings: SuiAdapterSettings,
     ) -> anyhow::Result<Self> {
-        self.analysis_engine =
+        let analysis_engine =
             sui_analysis_engine_with_settings(to_adapter_settings(&adapter_settings))?;
-        self.cache = EagerCache::new(self.analysis_engine.clone());
-        self.adapter_settings = adapter_settings;
+        let cache = EagerCache::new(analysis_engine.clone());
+        
+        {
+            let mut workspaces = self.workspaces.write().unwrap();
+            workspaces.insert(self.default_workspace_root.clone(), WorkspaceState {
+                adapter_settings: adapter_settings.clone(),
+                analysis_engine,
+                cache,
+            });
+        }
+        
+        self.default_adapter_settings = adapter_settings;
         Ok(self)
+    }
+
+    fn get_or_create_workspace(&self, project_root: &Path) -> anyhow::Result<WorkspaceState> {
+        {
+            let workspaces = self.workspaces.read().unwrap();
+            if let Some(state) = workspaces.get(project_root) {
+                return Ok(state.clone());
+            }
+        }
+        
+        let analysis_engine =
+            sui_analysis_engine_with_settings(to_adapter_settings(&self.default_adapter_settings))?;
+        let cache = EagerCache::new(analysis_engine.clone());
+        let state = WorkspaceState {
+            adapter_settings: self.default_adapter_settings.clone(),
+            analysis_engine,
+            cache,
+        };
+        
+        let mut workspaces = self.workspaces.write().unwrap();
+        workspaces.insert(project_root.to_path_buf(), state.clone());
+        Ok(state)
     }
 
     fn resolve_context(&self, args: &PackageArgs) -> Result<MovePackageContext, String> {
@@ -94,6 +148,7 @@ impl PeregrineMcpServer {
 
     async fn run_package_analysis(
         &self,
+        workspace: &WorkspaceState,
         ctx: &MovePackageContext,
         _stages: Vec<AnalysisStage>,
         _graph_kinds: Vec<GraphKind>,
@@ -101,10 +156,10 @@ impl PeregrineMcpServer {
         _options: AnalysisOptions,
         context: &RequestContext<RoleServer>,
     ) -> EngineAnalysisReport {
-        self.cache.ensure_watched(ctx).await;
+        workspace.cache.ensure_watched(ctx).await;
         
         loop {
-            let state = self.cache.get_state(&ctx.package_root).await;
+            let state = workspace.cache.get_state(&ctx.package_root).await;
             match state {
                 Some(PackageState::Ready(report)) => return (*report).clone(),
                 Some(PackageState::Analyzing(mut rx)) => {
@@ -131,20 +186,12 @@ impl PeregrineMcpServer {
         let project_root = project_root
             .filter(|value| !value.trim().is_empty())
             .map_or_else(
-                || self.workspace_root.clone(),
-                |value| self.workspace_root.join(value),
+                || self.default_workspace_root.clone(),
+                |value| self.default_workspace_root.join(value),
             )
             .canonicalize()
             .map_err(|error| format!("failed to resolve project_root: {error}"))?;
-        if !project_root.starts_with(&self.workspace_root) {
-            return Err(format!(
-                "project_root must remain inside the MCP workspace {}",
-                self.workspace_root.display()
-            ));
-        }
-        if !project_root.is_dir() {
-            return Err("project_root must be a directory".to_string());
-        }
+            
         Ok(project_root)
     }
 
@@ -154,7 +201,7 @@ impl PeregrineMcpServer {
         let value = match request.name.as_ref() {
             tool_name::PACKAGE_RESOLVE => {
                 let args = parse_args::<PackageArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args).map_err(|e| tool_error(e.to_string()))?;
                 json!({
                     "status": "ok",
                     "package": package_summary(&ctx),
@@ -162,7 +209,7 @@ impl PeregrineMcpServer {
             }
             tool_name::MODULES => {
                 let args = parse_args::<ModulesArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args.package).map_err(|e| tool_error(e.to_string()))?;
                 let (source, modules) =
                     sui_modules(&ctx).map_err(|error| tool_error(error.to_string()))?;
                 let modules = modules
@@ -206,7 +253,7 @@ impl PeregrineMcpServer {
             }
             tool_name::SIGNATURES => {
                 let args = parse_args::<SignaturesArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args.package).map_err(|e| tool_error(e.to_string()))?;
                 let module_filters = args
                     .modules
                     .iter()
@@ -257,13 +304,13 @@ impl PeregrineMcpServer {
                 let args = parse_args::<ImportPackageArgs>(&arguments)?;
                 let project_root = self
                     .resolve_project_root(args.project_root.as_deref())
-                    .map_err(tool_error)?;
+                    .map_err(|e| tool_error(e.to_string()))?;
                 let import_root = match args.output_path.as_deref() {
                     Some(output_path) => {
-                        workspace_output_path(&project_root, output_path).map_err(tool_error)?
+                        workspace_output_path(&project_root, output_path).map_err(|e| tool_error(e.to_string()))?
                     }
                     None => default_import_root(&project_root, &args.network_id, &args.package_id)
-                        .map_err(tool_error)?,
+                        .map_err(|e| tool_error(e.to_string()))?,
                 };
                 let request = BuildableImportRequest {
                     network_id: args.network_id,
@@ -283,7 +330,7 @@ impl PeregrineMcpServer {
                 let artifact = engine
                     .import_buildable_package(request)
                     .await
-                    .map_err(tool_error)?;
+                    .map_err(|e| tool_error(e.to_string()))?;
                 let artifact = serde_json::from_value::<ImportArtifact>(
                     serde_json::to_value(artifact).map_err(serialization_error)?,
                 )
@@ -299,8 +346,8 @@ impl PeregrineMcpServer {
                 let args = parse_args::<CreatePackageArgs>(&arguments)?;
                 let project_root = self
                     .resolve_project_root(args.project_root.as_deref())
-                    .map_err(tool_error)?;
-                let adapter_settings = to_adapter_settings(&self.adapter_settings);
+                    .map_err(|e| tool_error(e.to_string()))?;
+                let adapter_settings = to_adapter_settings(&self.default_adapter_settings);
                 let security_command = build_sui_move_new_command(
                     &project_root,
                     &adapter_settings,
@@ -326,7 +373,7 @@ impl PeregrineMcpServer {
             }
             tool_name::STATIC_RULE_CATALOG => {
                 let args = parse_args::<StaticAnalysisArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args.package).map_err(|e| tool_error(e.to_string()))?;
                 let catalog = static_rule_catalog(&ctx, &args)
                     .map_err(|error| tool_error(error.to_string()))?;
                 let catalog = serde_json::from_value::<ProtocolAnalysisRuleCatalog>(
@@ -342,9 +389,11 @@ impl PeregrineMcpServer {
             }
             tool_name::STATIC_ANALYZE_PACKAGE => {
                 let args = parse_args::<StaticAnalysisArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args.package).map_err(|e| tool_error(e.to_string()))?;
+                let workspace = self.get_or_create_workspace(Path::new(&ctx.project_root)).map_err(|e| tool_error(e.to_string()))?;
                 let report = self
                     .run_package_analysis(
+                        &workspace,
                         &ctx,
                         vec![
                             AnalysisStage::Scan,
@@ -371,9 +420,11 @@ impl PeregrineMcpServer {
             }
             tool_name::SCANNER_REPORT => {
                 let args = parse_args::<PackageArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args).map_err(|e| tool_error(e.to_string()))?;
+                let workspace = self.get_or_create_workspace(Path::new(&ctx.project_root)).map_err(|e| tool_error(e.to_string()))?;
                 let report = self
                     .run_package_analysis(
+                        &workspace,
                         &ctx,
                         vec![AnalysisStage::Scan],
                         Vec::new(),
@@ -390,7 +441,7 @@ impl PeregrineMcpServer {
             }
             tool_name::TEST_SCANNER_REPORT => {
                 let args = parse_args::<TestScannerArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args.package).map_err(|e| tool_error(e.to_string()))?;
                 serde_json::to_value(TestScannerResponse {
                     status: "ok".to_string(),
                     package: package_summary(&ctx),
@@ -401,7 +452,7 @@ impl PeregrineMcpServer {
             }
             tool_name::PACKAGE_INSIGHTS => {
                 let args = parse_args::<PackageArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args).map_err(|e| tool_error(e.to_string()))?;
                 json!({
                     "status": "ok",
                     "package": package_summary(&ctx),
@@ -411,7 +462,7 @@ impl PeregrineMcpServer {
             }
             tool_name::GRAPHS => {
                 let args = parse_args::<ProjectGraphsArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args.package).map_err(|e| tool_error(e.to_string()))?;
                 
                 let mut options = AnalysisOptions::new();
                 // Since `modules` is an array and the legacy engine might expect a single string `moduleName`
@@ -420,8 +471,10 @@ impl PeregrineMcpServer {
                     options.insert("moduleName".to_string(), json!(module));
                 }
 
+                let workspace = self.get_or_create_workspace(Path::new(&ctx.project_root)).map_err(|e| tool_error(e.to_string()))?;
                 let report = self
                     .run_package_analysis(
+                        &workspace,
                         &ctx,
                         vec![AnalysisStage::Scan, AnalysisStage::Graph],
                         [GraphKind::CALL, GraphKind::TYPE, GraphKind::STATE_ACCESS]
@@ -462,9 +515,11 @@ impl PeregrineMcpServer {
             }
             tool_name::FUNCTION_STATE_GRAPH => {
                 let args = parse_args::<FunctionStateGraphArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args.package).map_err(|e| tool_error(e.to_string()))?;
+                let workspace = self.get_or_create_workspace(Path::new(&ctx.project_root)).map_err(|e| tool_error(e.to_string()))?;
                 let report = self
                     .run_package_analysis(
+                        &workspace,
                         &ctx,
                         vec![AnalysisStage::Scan, AnalysisStage::Graph],
                         vec![GraphKind::new(GraphKind::STATE_ACCESS)],
@@ -487,7 +542,7 @@ impl PeregrineMcpServer {
             }
             tool_name::BYTECODE_VIEW => {
                 let args = parse_args::<BytecodeViewArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args.package).map_err(|e| tool_error(e.to_string()))?;
                 let mut bytecode = serde_json::from_value::<MoveBytecodePackageView>(
                     serde_json::to_value(
                         sui_bytecode_view(&ctx).map_err(|error| tool_error(error.to_string()))?,
@@ -523,7 +578,7 @@ impl PeregrineMcpServer {
             }
             tool_name::BYTECODE_DECOMPILE => {
                 let args = parse_args::<PackageArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args).map_err(|e| tool_error(e.to_string()))?;
                 json!({
                     "status": "ok",
                     "package": package_summary(&ctx),
@@ -533,12 +588,13 @@ impl PeregrineMcpServer {
             }
             tool_name::COMMAND => {
                 let args = parse_args::<SuiCommandArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args.package).map_err(|e| tool_error(e.to_string()))?;
+                let workspace = self.get_or_create_workspace(&ctx.project_root).map_err(|e| tool_error(e.to_string()))?;
                 let kind = SecuritySuiCommandKind::parse(&args.command_kind)
                     .map_err(|error| tool_error(error.to_string()))?;
                 let security_command = build_sui_package_command(
                     &ctx,
-                    &to_adapter_settings(&self.adapter_settings),
+                    &to_adapter_settings(&workspace.adapter_settings),
                     kind,
                     args.publish_build_env.as_deref(),
                     args.with_unpublished_dependencies.unwrap_or(false),
@@ -556,12 +612,14 @@ impl PeregrineMcpServer {
             }
             tool_name::MOVY_FUZZ => {
                 let args = parse_args::<MovyFuzzArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args.package).map_err(|e| tool_error(e.to_string()))?;
+                let workspace = self.get_or_create_workspace(&ctx.project_root).map_err(|e| tool_error(e.to_string()))?;
                 let time_limit_seconds = args
                     .time_limit_seconds
                     .unwrap_or(DEFAULT_MOVY_FUZZ_TIME_LIMIT_SECONDS);
                 let report = self
                     .run_package_analysis(
+                        &workspace,
                         &ctx,
                         vec![AnalysisStage::Scan, AnalysisStage::Dynamic],
                         Vec::new(),
@@ -586,9 +644,11 @@ impl PeregrineMcpServer {
             }
             tool_name::FORMAL_VERIFY => {
                 let args = parse_args::<FormalVerifyArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                let ctx = self.resolve_context(&args.package).map_err(|e| tool_error(e.to_string()))?;
+                let workspace = self.get_or_create_workspace(Path::new(&ctx.project_root)).map_err(|e| tool_error(e.to_string()))?;
                 let report = self
                     .run_package_analysis(
+                        &workspace,
                         &ctx,
                         vec![AnalysisStage::Scan, AnalysisStage::Dynamic],
                         Vec::new(),
@@ -630,7 +690,8 @@ impl PeregrineMcpServer {
                 request
                     .options
                     .insert("packagePath".to_string(), json!(package_path));
-                let report = self.analysis_engine.run(request).await;
+                let workspace = self.get_or_create_workspace(Path::new(&project_root)).map_err(|e| tool_error(e.to_string()))?;
+                let report = workspace.analysis_engine.run(request).await;
                 serde_json::to_value(EngineAnalysisResponse {
                     status: "ok".to_string(),
                     report,
@@ -662,8 +723,9 @@ impl PeregrineMcpServer {
                 let package = PackageArgs {
                     project_root,
                     package_path,
+                    unbounded: false,
                 };
-                let context = self.resolve_context(&package).map_err(tool_error)?;
+                let context = self.resolve_context(&package).map_err(|e| tool_error(e.to_string()))?;
                 Ok((
                     AnalysisTarget::LocalPackage {
                         path: context.package_root.clone(),
@@ -682,9 +744,9 @@ impl PeregrineMcpServer {
             } => {
                 let project_root = self
                     .resolve_project_root(project_root.as_deref())
-                    .map_err(tool_error)?;
+                    .map_err(|e| tool_error(e.to_string()))?;
                 let import_root = default_import_root(&project_root, &network_id, &package_id)
-                    .map_err(tool_error)?;
+                    .map_err(|e| tool_error(e.to_string()))?;
                 let artifact = ImportEngine::new(ImportEngineConfig {
                     max_dependency_depth: max_dependency_depth.unwrap_or(3).min(16),
                     max_dependency_packages: max_dependency_packages.unwrap_or(64).clamp(1, 512),
@@ -698,7 +760,7 @@ impl PeregrineMcpServer {
                     generate_buildable: true,
                 })
                 .await
-                .map_err(tool_error)?;
+                .map_err(|e| tool_error(e.to_string()))?;
                 Ok((
                     AnalysisTarget::LocalPackage {
                         path: artifact.buildable_root.clone(),
@@ -713,6 +775,7 @@ impl PeregrineMcpServer {
 
 impl ServerHandler for PeregrineMcpServer {
     fn get_info(&self) -> ServerInfo {
+        self.record_activity();
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build()).with_server_info(
             Implementation::new(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
                 .with_title("Peregrine Sui Analysis"),
@@ -724,6 +787,7 @@ impl ServerHandler for PeregrineMcpServer {
         _request: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
+        self.record_activity();
         let tools = tool_definitions()
             .into_iter()
             .map(|definition| {
@@ -755,6 +819,7 @@ impl ServerHandler for PeregrineMcpServer {
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
+        self.record_activity();
         match self.dispatch(request, &context).await {
             Ok(result) => Ok(result),
             Err(error) => Ok(CallToolResult::structured_error(json!({

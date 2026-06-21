@@ -8,9 +8,9 @@ pub(crate) fn legacy_project_graphs(
     report: &AnalysisReport,
 ) -> Result<MoveProjectGraphs, ErrorData> {
     Ok(MoveProjectGraphs {
-        call_graph: legacy_graph(report, GraphKind::CALL)?,
-        type_graph: legacy_graph(report, GraphKind::TYPE)?,
-        state_access_graph: legacy_graph(report, GraphKind::STATE_ACCESS)?,
+        call_graph: legacy_graph(report, GraphKind::CALL).unwrap_or_default(),
+        type_graph: legacy_graph(report, GraphKind::TYPE).unwrap_or_default(),
+        state_access_graph: legacy_graph(report, GraphKind::STATE_ACCESS).unwrap_or_default(),
     })
 }
 

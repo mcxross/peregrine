@@ -16,6 +16,7 @@ pub fn run_fuzz(context: &CliContext, args: &FuzzArgs) -> CliStep {
             package: PackageArgs {
                 project_root: None,
                 package_path: Some(context.package_path.clone()),
+                unbounded: false,
             },
             time_limit_seconds: Some(args.time_limit_seconds),
             seed: Some(args.seed),
