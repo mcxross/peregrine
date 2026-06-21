@@ -2383,7 +2383,7 @@ fn provider_setup_warning_uses_app_server_credential_metadata() {
     assert_eq!(
         ChatWidget::provider_setup_warning(&provider).as_deref(),
         Some(
-            "Anthropic is selected, but its API key is not configured. Set ANTHROPIC_API_KEY before starting a turn."
+            "Anthropic is selected, but its API key is not configured. Configure an API key before starting a turn."
         )
     );
 }

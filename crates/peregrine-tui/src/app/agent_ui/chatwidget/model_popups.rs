@@ -51,6 +51,34 @@ impl ChatWidget {
                             provider_display_name: provider_display_name.clone(),
                         });
                     })]
+                } else if provider.auth_strategy == ModelProviderAuthStrategy::AccountOrApiKey
+                    && matches!(
+                        provider.credential_state,
+                        Some(ModelProviderCredentialState::MissingApiKey)
+                            | Some(ModelProviderCredentialState::NeedsLogin)
+                    )
+                {
+                    vec![Box::new(move |tx| {
+                        tx.send(AppEvent::PromptForProviderAuthMethod {
+                            provider_id: provider_id.clone(),
+                            provider_display_name: provider_display_name.clone(),
+                            model: default_model.clone(),
+                        });
+                    })]
+                } else if provider.auth_strategy == ModelProviderAuthStrategy::ApiKey
+                    && matches!(
+                        provider.credential_state,
+                        Some(ModelProviderCredentialState::MissingApiKey)
+                            | Some(ModelProviderCredentialState::NeedsLogin)
+                    )
+                {
+                    vec![Box::new(move |tx| {
+                        tx.send(AppEvent::PromptForProviderApiKey {
+                            provider_id: provider_id.clone(),
+                            provider_display_name: provider_display_name.clone(),
+                            model: default_model.clone(),
+                        });
+                    })]
                 } else {
                     vec![Box::new(move |tx| {
                         tx.send(AppEvent::PersistProviderSelection {
@@ -82,6 +110,82 @@ impl ChatWidget {
         header.push(Line::from(
             "Choose the backend Peregrine should use for new sessions.".dim(),
         ));
+        self.bottom_pane.show_selection_view(SelectionViewParams {
+            footer_hint: Some(standard_popup_hint_line()),
+            items,
+            header: Box::new(header),
+            ..Default::default()
+        });
+        self.request_redraw();
+    }
+
+    pub(crate) fn open_text_input_popup(
+        &mut self,
+        title: String,
+        hint: String,
+        initial_value: String,
+        on_submit: Box<dyn Fn(String) + Send + Sync + 'static>,
+    ) {
+        let view = crate::agent::chatwidget::CustomPromptView::new(
+            title,
+            hint,
+            initial_value,
+            None,
+            on_submit,
+        );
+        self.bottom_pane.show_view(Box::new(view));
+    }
+
+    pub(crate) fn open_provider_auth_method_popup(
+        &mut self,
+        provider_id: String,
+        provider_display_name: String,
+        model: Option<String>,
+    ) {
+        let mut items = Vec::new();
+
+        let p_id_login = provider_id.clone();
+        let m_login = model.clone();
+        let login_actions: Vec<SelectionAction> = vec![Box::new(move |tx| {
+            tx.send(AppEvent::BeginOAuthLogin {
+                provider_id: p_id_login.clone(),
+                model: m_login.clone(),
+            });
+        })];
+        items.push(SelectionItem {
+            name: "Login with Browser (OAuth)".to_string(),
+            description: Some("Authenticate using your browser.".to_string()),
+            actions: login_actions,
+            dismiss_on_select: true,
+            ..Default::default()
+        });
+
+        let p_id = provider_id.clone();
+        let p_name = provider_display_name.clone();
+        let m = model.clone();
+        let api_key_actions: Vec<SelectionAction> = vec![Box::new(move |tx| {
+            tx.send(AppEvent::PromptForProviderApiKey {
+                provider_id: p_id.clone(),
+                provider_display_name: p_name.clone(),
+                model: m.clone(),
+            });
+        })];
+        items.push(SelectionItem {
+            name: "Enter API Key".to_string(),
+            description: Some("Manually enter an API key.".to_string()),
+            actions: api_key_actions,
+            dismiss_on_select: true,
+            ..Default::default()
+        });
+
+        let mut header = ColumnRenderable::new();
+        header.push(Line::from(
+            format!("Authenticate with {provider_display_name}").bold(),
+        ));
+        header.push(Line::from(
+            "Choose how you want to provide credentials.".dim(),
+        ));
+
         self.bottom_pane.show_selection_view(SelectionViewParams {
             footer_hint: Some(standard_popup_hint_line()),
             items,

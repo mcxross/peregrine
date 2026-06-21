@@ -69,6 +69,16 @@ impl ChatWidget {
         );
     }
 
+    pub(crate) fn submit_user_message_from_app_event(&mut self, text: String) {
+        self.submit_user_message(UserMessage {
+            text,
+            local_images: Vec::new(),
+            remote_image_urls: Vec::new(),
+            text_elements: Vec::new(),
+            mention_bindings: Vec::new(),
+        });
+    }
+
     pub(super) fn submit_user_message_with_history_record(
         &mut self,
         user_message: UserMessage,

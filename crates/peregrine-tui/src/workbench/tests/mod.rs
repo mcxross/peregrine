@@ -692,6 +692,8 @@ fn selecting_bytecode_tab_is_lazy_until_enter() {
     assert!(matches!(app.bytecode, BytecodePane::Selecting(_)));
 }
 
+use crate::workbench::{BytecodeTargetKey, BytecodeCacheStamp};
+
 #[test]
 fn stale_bytecode_load_result_is_ignored_after_invalidation() {
     let temp = tempfile::tempdir().expect("temp dir");

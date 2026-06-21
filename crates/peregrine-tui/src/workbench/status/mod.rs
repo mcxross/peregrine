@@ -1,7 +1,7 @@
 use super::{App, render_cli_step_summary};
 use crate::output::CliStatus;
 use crate::sui::package_loader::{PackageLoadReport, ScannerResult};
-use ratatui::text::Span;
+use ratatui::text::{Span, Line};
 use std::time::{Duration, Instant};
 
 pub(crate) fn package_load_status(report: &PackageLoadReport) -> String {

@@ -12,7 +12,6 @@ use codex_analytics::AnalyticsEventsClient;
 use codex_features::canonical_feature_for_key;
 use codex_features::feature_for_key;
 use codex_login::AuthManager;
-use codex_model_provider_info::OPENAI_PROVIDER_ID;
 use peregrine_app_server_protocol::AgentRoleListParams;
 use peregrine_app_server_protocol::AgentRoleListResponse;
 use peregrine_app_server_protocol::AgentRoleReadParams;
@@ -67,8 +66,6 @@ use peregrine_config::SandboxModeRequirement as CoreSandboxModeRequirement;
 use peregrine_core::ThreadManager;
 use peregrine_core::agent_role_catalog::AgentRoleCatalogEntry;
 use peregrine_core::agent_role_catalog::AgentRoleCatalogSource as CoreAgentRoleCatalogSource;
-use peregrine_model_provider::ANTHROPIC_API_KEY_ENV_VAR;
-use peregrine_model_provider::ANTHROPIC_PROVIDER_ID;
 use peregrine_model_provider::OLLAMA_DEFAULT_MODEL;
 use peregrine_model_provider::ProviderAuthStrategy as CoreProviderAuthStrategy;
 use peregrine_model_provider::ProviderCatalogEntry;
@@ -718,7 +715,7 @@ fn provider_credential_metadata(
             } else {
                 (
                     ModelProviderCredentialState::NeedsLogin,
-                    Some("Use /login or set OPENAI_API_KEY before starting a turn.".to_string()),
+                    Some("Use the provider selection menu to login via browser or enter an API key.".to_string()),
                 )
             }
         }
@@ -757,28 +754,9 @@ fn provider_has_static_credential(
 }
 
 fn api_key_setup_hint(
-    entry: &ProviderCatalogEntry,
-    provider: Option<&codex_model_provider_info::ModelProviderInfo>,
+    _entry: &ProviderCatalogEntry,
+    _provider: Option<&codex_model_provider_info::ModelProviderInfo>,
 ) -> String {
-    if entry.id == ANTHROPIC_PROVIDER_ID {
-        return format!("Set {ANTHROPIC_API_KEY_ENV_VAR} before starting a turn.");
-    }
-    if entry.id == OPENAI_PROVIDER_ID {
-        return "Use /login or set OPENAI_API_KEY before starting a turn.".to_string();
-    }
-    if let Some(instructions) = provider
-        .and_then(|provider| provider.env_key_instructions.as_deref())
-        .filter(|instructions| !instructions.trim().is_empty())
-    {
-        return instructions.to_string();
-    }
-    if let Some(env_key) = provider
-        .and_then(|provider| provider.env_key.as_deref())
-        .filter(|env_key| !env_key.trim().is_empty())
-    {
-        return format!("Set {env_key} before starting a turn.");
-    }
-
     "Configure an API key before starting a turn.".to_string()
 }
 

@@ -139,6 +139,13 @@ pub(crate) fn build_oss_provider_edit(provider: &str) -> ConfigEdit {
     replace_config_value("oss_provider", serde_json::json!(provider))
 }
 
+pub(crate) fn build_provider_api_key_edit(provider: &str, api_key: &str) -> ConfigEdit {
+    replace_config_value(
+        format!("model_providers.{}.experimental_bearer_token", provider),
+        serde_json::json!(api_key),
+    )
+}
+
 pub(crate) async fn write_config_batch(
     request_handle: AppServerRequestHandle,
     edits: Vec<ConfigEdit>,

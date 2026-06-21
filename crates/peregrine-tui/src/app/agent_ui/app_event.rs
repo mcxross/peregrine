@@ -207,6 +207,11 @@ pub(crate) enum AppEvent {
         text: String,
     },
 
+    /// Submit a user message text to the current thread.
+    SubmitUserMessage {
+        text: String,
+    },
+
     /// Open the resume picker inside the running TUI session.
     OpenResumePicker,
 
@@ -725,6 +730,34 @@ pub(crate) enum AppEvent {
         provider_id: String,
         provider_display_name: String,
         models: ModelProviderModelsListResponse,
+    },
+
+    /// Prompt the user to choose between OAuth login or entering an API key.
+    PromptForProviderAuthMethod {
+        provider_id: String,
+        provider_display_name: String,
+        model: Option<String>,
+    },
+
+    /// Prompt the user to enter an API key for the selected provider.
+    PromptForProviderApiKey {
+        provider_id: String,
+        provider_display_name: String,
+        model: Option<String>,
+    },
+
+    /// Begin the OAuth login flow in the browser.
+    BeginOAuthLogin {
+        provider_id: String,
+        model: Option<String>,
+    },
+
+
+    /// Submit the entered API key and persist the provider selection.
+    SubmitProviderApiKey {
+        provider_id: String,
+        model: Option<String>,
+        api_key: String,
     },
 
     /// Persist the selected model provider to the appropriate config.

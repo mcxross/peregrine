@@ -884,6 +884,83 @@ impl App {
                     models,
                 );
             }
+            AppEvent::PromptForProviderAuthMethod {
+                provider_id,
+                provider_display_name,
+                model,
+            } => {
+                self.chat_widget.open_provider_auth_method_popup(
+                    provider_id,
+                    provider_display_name,
+                    model,
+                );
+            }
+            AppEvent::PromptForProviderApiKey {
+                provider_id,
+                provider_display_name,
+                model,
+            } => {
+                let p_id = provider_id.clone();
+                let m = model.clone();
+                let tx = self.app_event_tx.clone();
+                self.chat_widget.open_text_input_popup(
+                    format!("Enter API Key for {provider_display_name}"),
+                    "API Key:".to_string(),
+                    "".to_string(),
+                    Box::new(move |api_key| {
+                        tx.send(AppEvent::SubmitProviderApiKey {
+                            provider_id: p_id.clone(),
+                            model: m.clone(),
+                            api_key,
+                        });
+                    }),
+                );
+            }
+            AppEvent::SubmitProviderApiKey {
+                provider_id,
+                model,
+                api_key,
+            } => {
+                let tx = self.app_event_tx.clone();
+                let p_id = provider_id.clone();
+                let m = model.clone();
+                let handle = app_server.request_handle();
+                tokio::spawn(async move {
+                    let edit = crate::agent::config_update::build_provider_api_key_edit(&p_id, &api_key);
+                    if let Ok(_) = crate::agent::config_update::write_config_batch(handle, vec![edit]).await {
+                        tx.send(AppEvent::PersistProviderSelection {
+                            provider_id: p_id,
+                            model: m,
+                        });
+                    }
+                });
+            }
+            AppEvent::BeginOAuthLogin { provider_id, model } => {
+                let tx = self.app_event_tx.clone();
+                let handle = app_server.request_handle();
+                tokio::spawn(async move {
+                    let result = handle.request_typed::<peregrine_app_server_protocol::LoginAccountResponse>(
+                        peregrine_app_server_protocol::ClientRequest::LoginAccount {
+                            request_id: peregrine_app_server_protocol::RequestId::String(uuid::Uuid::new_v4().to_string()),
+                            params: peregrine_app_server_protocol::LoginAccountParams::Chatgpt {
+                                peregrine_streamlined_login: true,
+                            },
+                        }
+                    ).await;
+                    if let Ok(peregrine_app_server_protocol::LoginAccountResponse::Chatgpt { auth_url, .. }) = result {
+                        if let Err(err) = webbrowser::open(&auth_url) {
+                            tracing::warn!("failed to open browser for login URL: {err}");
+                        }
+                        tx.send(AppEvent::PersistProviderSelection {
+                            provider_id,
+                            model,
+                        });
+                    }
+                });
+            }
+            AppEvent::SubmitUserMessage { text } => {
+                self.chat_widget.submit_user_message_from_app_event(text);
+            }
             AppEvent::OpenFullAccessConfirmation {
                 preset,
                 return_to_permissions,
