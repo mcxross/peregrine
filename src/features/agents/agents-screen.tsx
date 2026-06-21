@@ -27,7 +27,10 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -59,6 +62,7 @@ import type {
   MovePackage,
   PackageTree,
 } from "@peregrine/desktop-runtime";
+import type { Model } from "@peregrine/app-server-protocol/v2";
 import {
   displayMovePackageName,
   loadProjectMetadata,
@@ -137,6 +141,8 @@ export function AgentsScreen({
     label: "App-server model",
     status: "idle",
   });
+  const [modelCatalog, setModelCatalog] = React.useState<Model[]>([]);
+  const [selectedModelId, setSelectedModelId] = React.useState<string | null>(null);
   const [isProjectStateLoaded, setIsProjectStateLoaded] = React.useState(false);
   const activeRunControllerRef = React.useRef<AbortController | null>(null);
   const [slashInput, setSlashInput] = React.useState("");
@@ -252,12 +258,14 @@ export function AgentsScreen({
       target: settings.target,
     })
       .then((response) => {
+        setModelCatalog(response.models.data);
         const defaultModel =
           response.models.data.find((model) => model.isDefault) ??
           response.models.data[0];
         const selectedProvider = response.providers.data.find(
           (provider) => provider.selected,
         );
+        setSelectedModelId(defaultModel?.id ?? null);
         setModelSummary({
           label: defaultModel
             ? `${selectedProvider?.displayName ?? response.providers.selectedProviderId}/${defaultModel.model}`
@@ -267,6 +275,7 @@ export function AgentsScreen({
         });
       })
       .catch((error) => {
+        console.error("Failed to load models:", error);
         setModelSummary({
           error: error instanceof Error ? error.message : String(error),
           label: "Model list unavailable",
@@ -386,14 +395,52 @@ export function AgentsScreen({
                     >
                       <Plus className="size-5" />
                     </Button>
-                    <Button
-                      className="h-8 gap-1.5 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground"
-                      type="button"
-                      variant="ghost"
-                    >
-                      {modelSummary.label}
-                      <ChevronDown className="size-3.5" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          className="h-8 gap-1.5 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground"
+                          type="button"
+                          variant="ghost"
+                        >
+                          {modelSummary.label}
+                          <ChevronDown className="size-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-[300px]">
+                        <DropdownMenuLabel>Available Models</DropdownMenuLabel>
+                        {modelSummary.status === "error" && modelSummary.error && (
+                          <div className="px-2 py-1 text-xs text-destructive">
+                            Error: {modelSummary.error}
+                          </div>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuGroup>
+                          {modelCatalog.filter(m => !m.hidden).map((model) => (
+                            <DropdownMenuItem
+                              key={model.id}
+                              onClick={() => {
+                                setSelectedModelId(model.id);
+                                setModelSummary((current) => ({
+                                  ...current,
+                                  label: model.displayName || model.model,
+                                }));
+                              }}
+                              className="flex flex-col items-start gap-1 p-2"
+                            >
+                              <div className="flex w-full items-center justify-between">
+                                <span className="font-medium">{model.displayName || model.model}</span>
+                                {model.id === selectedModelId && <CheckCircle2 className="size-4 text-primary" />}
+                              </div>
+                              {model.description && (
+                                <span className="text-xs text-muted-foreground line-clamp-2">
+                                  {model.description}
+                                </span>
+                              )}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                   <Button
                     className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground"

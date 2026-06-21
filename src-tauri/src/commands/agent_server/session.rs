@@ -422,7 +422,10 @@ async fn start_embedded_client(
         .collect();
 
     InProcessAppServerClient::start(InProcessClientStartArgs {
-        arg0_paths: Arg0DispatchPaths::default(),
+        arg0_paths: Arg0DispatchPaths {
+            codex_self_exe: crate::helper_args::resolve_helper_executable().ok(),
+            ..Default::default()
+        },
         config: Arc::new(config),
         cli_overrides: Vec::<(String, toml::Value)>::new(),
         loader_overrides,
