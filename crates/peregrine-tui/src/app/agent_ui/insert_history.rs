@@ -191,6 +191,7 @@ where
             }
         }
         InsertHistoryMode::Standard => {
+            let visible_history_rows = terminal.visible_history_rows();
             let writer = terminal.backend_mut();
             let cursor_top = if area.bottom() < screen_size.height {
                 // If the viewport is not at the bottom of the screen, scroll it down to make room.
@@ -209,6 +210,8 @@ where
                 area.y += scroll_amount;
                 should_update_area = true;
                 cursor_top
+            } else if visible_history_rows < area.top() {
+                visible_history_rows.saturating_sub(1)
             } else {
                 area.top().saturating_sub(1)
             };

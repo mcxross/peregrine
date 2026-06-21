@@ -1332,7 +1332,7 @@ async fn run_ratatui_app(
         prev_hook(info);
     }));
     let mut initialized_terminal = tui::init()?;
-    initialized_terminal.terminal.clear()?;
+    initialized_terminal.terminal.clear_visible_screen()?;
 
     let mut tui = Tui::new(
         initialized_terminal.terminal,

@@ -1,6 +1,6 @@
 ---
 source: crates/peregrine-tui/src/app/agent_ui/app/tests.rs
-assertion_line: 3018
+assertion_line: 3020
 expression: snapshot
 ---
 Main [default] | 00000000-0000-0000-0000-000000000123

@@ -48,7 +48,9 @@ fn with_border_internal(
 
     let mut out = Vec::with_capacity(lines.len() + 2);
     let border_inner_width = content_width + 2;
-    out.push(vec![format!("╭{}╮", "─".repeat(border_inner_width)).dim()].into());
+    let border_style = ratatui::style::Style::default().fg(crate::theme::shared_theme_state().palette().graph.edge);
+
+    out.push(vec![Span::styled(format!("╭{}╮", "─".repeat(border_inner_width)), border_style)].into());
 
     for line in lines.into_iter() {
         let used_width: usize = line
@@ -57,16 +59,16 @@ fn with_border_internal(
             .sum();
         let span_count = line.spans.len();
         let mut spans: Vec<Span<'static>> = Vec::with_capacity(span_count + 4);
-        spans.push(Span::from("│ ").dim());
+        spans.push(Span::styled("│ ", border_style));
         spans.extend(line);
         if used_width < content_width {
-            spans.push(Span::from(" ".repeat(content_width - used_width)).dim());
+            spans.push(Span::raw(" ".repeat(content_width - used_width)));
         }
-        spans.push(Span::from(" │").dim());
+        spans.push(Span::styled(" │", border_style));
         out.push(Line::from(spans));
     }
 
-    out.push(vec![format!("╰{}╯", "─".repeat(border_inner_width)).dim()].into());
+    out.push(vec![Span::styled(format!("╰{}╯", "─".repeat(border_inner_width)), border_style)].into());
 
     out
 }
@@ -181,44 +183,88 @@ pub(crate) fn new_session_info_with_directory(
         &session.permission_profile,
     ))
     .with_directory_visible(show_directory);
-    let mut parts: Vec<Box<dyn HistoryCell>> = vec![Box::new(header)];
+    let mut parts: Vec<Box<dyn HistoryCell>> = Vec::new();
 
-    if is_first_event {
-        // Help lines below the header (new copy and list)
-        let help_lines: Vec<Line<'static>> = vec![
-            "  To get started, describe a task or try one of these commands:"
-                .dim()
-                .into(),
-            Line::from(""),
-            Line::from(vec![
-                "  ".into(),
-                "/init".into(),
-                " - create an AGENTS.md file with instructions for Peregrine".dim(),
-            ]),
-            Line::from(vec![
-                "  ".into(),
-                "/status".into(),
-                " - show current session configuration".dim(),
-            ]),
-            Line::from(vec![
-                "  ".into(),
-                "/permissions".into(),
-                " - choose what Peregrine is allowed to do".dim(),
-            ]),
-            Line::from(vec![
-                "  ".into(),
-                "/provider".into(),
-                " - choose the AI provider Peregrine uses".dim(),
-            ]),
-            Line::from(vec![
-                "  ".into(),
-                "/review".into(),
-                " - review any changes and find issues".dim(),
-            ]),
-        ];
+    #[derive(Debug)]
+    struct HeroHistoryCell {
+        art: Vec<&'static str>,
+        header: SessionHeaderHistoryCell,
+    }
 
-        parts.push(Box::new(PlainHistoryCell { lines: help_lines }));
-    } else {
+    impl HistoryCell for HeroHistoryCell {
+        fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
+            let Some(max_avail_inner) = card_inner_width(width, usize::MAX) else {
+                return Vec::new();
+            };
+
+            let art_width = 32;
+            let art_pad_len = (max_avail_inner.saturating_sub(art_width) / 2) as usize;
+            let art_padding = " ".repeat(art_pad_len);
+
+            let mut header_lines = self.header.display_lines(max_avail_inner as u16);
+            let box_width = header_lines.iter().map(|l| l.width()).max().unwrap_or(0);
+            let header_pad_len = (max_avail_inner.saturating_sub(box_width) / 2) as usize;
+            let header_padding = " ".repeat(header_pad_len);
+
+            let mut result = vec![Line::from("")]; // Top padding
+
+            // 1. Add Centered ASCII Art
+            for &s in &self.art {
+                result.push(Line::from(vec![
+                    Span::raw(art_padding.clone()),
+                    Span::styled(s, ratatui::style::Style::default().fg(ratatui::style::Color::Cyan)),
+                ]));
+            }
+
+            // 2. Add gap
+            result.push(Line::from(""));
+
+            // 3. Add Centered Header Box
+            for (i, line) in header_lines.into_iter().enumerate() {
+                let mut spans = vec![Span::raw(header_padding.clone())];
+                
+                // Center the first line (name and version) within the box
+                if i == 0 {
+                    let line_width = line.width();
+                    let inner_pad = (box_width.saturating_sub(line_width) / 2) as usize;
+                    spans.push(Span::raw(" ".repeat(inner_pad)));
+                }
+
+                for span in line.into_iter() {
+                    spans.push(span);
+                }
+                result.push(Line::from(spans));
+            }
+
+            result.push(Line::from("")); // Bottom padding
+
+            with_border_with_inner_width(result, max_avail_inner)
+        }
+
+        fn raw_lines(&self) -> Vec<Line<'static>> {
+            let mut result = self.art.iter().map(|&s| Line::from(s)).collect::<Vec<_>>();
+            result.push(Line::from(""));
+            result.extend(self.header.raw_lines());
+            result
+        }
+    }
+
+    let ascii_art = vec![
+        "   ██                      ██   ",
+        "    ████                ████    ",
+        "     ██████   ████   ██████     ",
+        "   █ ██████████████████████ █   ",
+        "     ██████████████████████     ",
+        "      █████  ██████  █████      ",
+        "       █████   ██   █████       ",
+        "         ████  ██  ████         ",
+        "           ██  ██  ██           ",
+        "            █      █            ",
+    ];
+        
+    parts.push(Box::new(HeroHistoryCell { art: ascii_art, header }));
+
+    if !is_first_event {
         if config.show_tooltips
             && let Some(tooltips) = tooltip_override
                 .or_else(|| tooltips::get_tooltip(auth_plan, show_fast_status))
@@ -361,7 +407,7 @@ impl SessionHeaderHistoryCell {
 
 impl HistoryCell for SessionHeaderHistoryCell {
     fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
-        let Some(inner_width) = card_inner_width(width, SESSION_HEADER_MAX_INNER_WIDTH) else {
+        let Some(max_avail_inner) = card_inner_width(width, usize::MAX) else {
             return Vec::new();
         };
 
@@ -426,7 +472,7 @@ impl HistoryCell for SessionHeaderHistoryCell {
             let dir_label = format!("{DIR_LABEL:<label_width$}");
             let dir_prefix = format!("{dir_label} ");
             let dir_prefix_width = UnicodeWidthStr::width(dir_prefix.as_str());
-            let dir_max_width = inner_width.saturating_sub(dir_prefix_width);
+            let dir_max_width = max_avail_inner.saturating_sub(dir_prefix_width);
             let dir = self.format_directory(Some(dir_max_width));
             let dir_spans = vec![Span::from(dir_prefix).dim(), Span::from(dir)];
             lines.push(make_row(dir_spans));
@@ -440,7 +486,7 @@ impl HistoryCell for SessionHeaderHistoryCell {
             ]));
         }
 
-        with_border(lines)
+        lines
     }
 
     fn raw_lines(&self) -> Vec<Line<'static>> {

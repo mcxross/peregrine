@@ -775,8 +775,8 @@ impl ChatComposer {
             | ActivePopup::Skill(_)
             | ActivePopup::MentionV2(_) => Constraint::Max(footer_total_height),
         };
-        let [composer_rect, popup_rect] =
-            Layout::vertical([Constraint::Min(3), popup_constraint]).areas(area);
+        let [popup_rect, composer_rect] =
+            Layout::vertical([popup_constraint, Constraint::Min(3)]).areas(area);
         let mut textarea_rect = composer_rect.inset(Insets::tlbr(
             /*top*/ 1,
             LIVE_PREFIX_COLS,

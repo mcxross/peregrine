@@ -1,0 +1,9 @@
+---
+source: crates/peregrine-tui/src/app/agent_ui/app/tests.rs
+assertion_line: 3729
+expression: rendered
+---
+>_ Peregrine (v<VERSION>)
+
+model:     gpt-test high   /provider to change provider
+directory: /tmp/project

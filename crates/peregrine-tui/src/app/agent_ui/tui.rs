@@ -358,7 +358,7 @@ fn flush_terminal_input_buffer() {
 #[cfg(not(any(unix, windows)))]
 pub(crate) fn flush_terminal_input_buffer() {}
 
-/// Initialize the terminal (inline viewport; history stays in normal scrollback)
+/// Initialize the terminal in full screen mode (alternate screen)
 pub(crate) fn init() -> Result<InitializedTerminal> {
     if !stdin().is_terminal() {
         return Err(std::io::Error::other("stdin is not a terminal"));
@@ -817,16 +817,27 @@ impl Tui {
         area.width = size.width;
         let mut needs_full_repaint = false;
 
-        if area.bottom() > size.height {
-            let scroll_by = area.bottom() - size.height;
-            if !terminal_height_shrank {
+        let desired_y = size.height.saturating_sub(area.height);
+        let min_y = terminal.visible_history_rows();
+
+        if area.y > desired_y {
+            // Viewport wants to grow past the bottom of the screen.
+            let required_expansion = area.y - desired_y;
+            let empty_space = area.y.saturating_sub(min_y);
+            let scroll_by = required_expansion.saturating_sub(empty_space);
+            
+            if scroll_by > 0 && !terminal_height_shrank {
                 terminal
                     .backend_mut()
                     .scroll_region_up(0..area.top(), scroll_by)?;
             }
-            area.y = size.height - area.height;
-        } else if terminal_height_grew && viewport_was_bottom_aligned {
-            area.y = size.height - area.height;
+            area.y = desired_y;
+        } else if area.y < desired_y {
+            if terminal_height_grew && viewport_was_bottom_aligned {
+                area.y = desired_y.max(min_y);
+            } else if min_y < desired_y {
+                area.y = desired_y.max(min_y);
+            }
         }
 
         if area != terminal.viewport_area {
@@ -901,12 +912,25 @@ impl Tui {
             let mut area = terminal.viewport_area;
             area.height = height.min(size.height);
             area.width = size.width;
-            // If the viewport has expanded, scroll everything else up to make room.
-            if area.bottom() > size.height {
-                terminal
-                    .backend_mut()
-                    .scroll_region_up(0..area.top(), area.bottom() - size.height)?;
-                area.y = size.height - area.height;
+            let desired_y = size.height.saturating_sub(area.height);
+            let min_y = terminal.visible_history_rows();
+
+            if area.y > desired_y {
+                // Viewport wants to grow past the bottom of the screen.
+                // We must move area.y UP.
+                let required_expansion = area.y - desired_y;
+                let empty_space = area.y.saturating_sub(min_y);
+                let scroll_by = required_expansion.saturating_sub(empty_space);
+                
+                if scroll_by > 0 {
+                    terminal
+                        .backend_mut()
+                        .scroll_region_up(0..area.top(), scroll_by)?;
+                }
+                area.y = desired_y;
+            } else if area.y < desired_y {
+                // Viewport shrank or there is room to push it down to the bottom.
+                area.y = desired_y.max(min_y);
             }
             if area != terminal.viewport_area {
                 // On startup, the old viewport can still be empty. Clear from the
