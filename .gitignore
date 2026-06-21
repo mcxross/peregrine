@@ -41,3 +41,4 @@ knowledge/sui-move/source/
 crates/peregrine-plugin/sui-move/knowledge/sui-move/source/move-pr-review/evals/
 .peregrine-dev
 .zed
+doc/
