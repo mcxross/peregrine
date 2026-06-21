@@ -1988,14 +1988,38 @@ fn draw_trust_consent(
         let area = inset_rect(frame.area(), 2, 1);
         frame.render_widget_ref(Clear, frame.area());
 
-        let mut lines = vec![
-            Line::from(vec![
-                Span::styled("> ", Style::default().fg(palette.accent)),
-                Span::styled("You are in ", Style::default().fg(palette.fg)),
-                Span::styled(cwd.display().to_string(), Style::default().fg(palette.info)),
-            ]),
-            Line::from(""),
+        let ascii_art: &[&str] = &[
+            "   ██                      ██   ",
+            "    ████                ████    ",
+            "     ██████   ████   ██████     ",
+            "   █ ██████████████████████ █   ",
+            "     ██████████████████████     ",
+            "      █████  ██████  █████      ",
+            "       █████   ██   █████       ",
+            "         ████  ██  ████         ",
+            "           ██  ██  ██           ",
+            "            █      █            ",
         ];
+
+        let mut lines: Vec<Line<'static>> = Vec::new();
+
+        for &art_line in ascii_art {
+            lines.push(
+                Line::from(Span::styled(
+                    art_line,
+                    Style::default().fg(palette.accent),
+                ))
+                .alignment(ratatui::layout::Alignment::Center),
+            );
+        }
+        lines.push(Line::from(""));
+
+        lines.push(Line::from(vec![
+            Span::styled("> ", Style::default().fg(palette.accent)),
+            Span::styled("You are in ", Style::default().fg(palette.fg)),
+            Span::styled(cwd.display().to_string(), Style::default().fg(palette.info)),
+        ]));
+        lines.push(Line::from(""));
 
         if cwd.as_path() != trust_target {
             lines.push(Line::from(Span::styled(
@@ -2040,7 +2064,7 @@ fn draw_trust_consent(
 
         let paragraph = Paragraph::new(lines)
             .style(Style::default().fg(palette.fg).bg(palette.bg))
-            .wrap(Wrap { trim: true });
+            .wrap(Wrap { trim: false });
         frame.render_widget_ref(paragraph, area);
 
         fn trust_option_line(

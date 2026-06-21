@@ -7,7 +7,7 @@ use crate::sui::project::{bytecode_targets, resolve_context};
 use crate::sui::runners::{run_call_graph, run_cfg};
 use crate::workbench::prelude::*;
 use peregrine_sui_mcp_protocol::{
-    GraphsResponse, MoveTypeGraph, PackageArgs as McpPackageArgs, tool_name,
+    GraphsResponse, PackageArgs as McpPackageArgs, tool_name,
 };
 use std::ffi::OsStr;
 use std::path::Path;

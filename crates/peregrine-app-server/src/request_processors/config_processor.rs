@@ -118,6 +118,7 @@ pub(crate) struct ConfigRequestProcessor {
     config_manager: ConfigManager,
     auth_manager: Arc<AuthManager>,
     thread_manager: Arc<ThreadManager>,
+    #[allow(dead_code)]
     analytics_events_client: AnalyticsEventsClient,
 }
 

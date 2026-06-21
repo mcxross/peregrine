@@ -98,6 +98,7 @@ pub(crate) struct OutgoingMessageSender {
     /// We keep them here because this is where responses, errors, and
     /// disconnect cleanup all get handled.
     request_contexts: Mutex<HashMap<ConnectionRequestId, RequestContext>>,
+    #[allow(dead_code)]
     analytics_events_client: AnalyticsEventsClient,
 }
 

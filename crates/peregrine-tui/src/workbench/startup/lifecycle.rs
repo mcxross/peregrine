@@ -2,16 +2,6 @@ use crate::workbench::prelude::*;
 
 use crate::chat;
 use crate::keybinds;
-use crate::navigation::{self, NavigationCommand, NavigationIntent};
-use ratatui::crossterm::event::{
-    self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent,
-    MouseEventKind,
-};
-use ratatui::layout::{Constraint, Direction, Layout, Position, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
-use ratatui::{DefaultTerminal, Frame};
 use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -23,7 +13,7 @@ use crate::navigation::Navigation;
 use crate::sui::package_loader::{
     PackageCreateReport, PackageInspection, PackageLoadReport, WorkbenchTrustResolution,
     create_child_move_package, failed_create_report, inspect_package_directory,
-    load_package_after_trust, persist_created_package_trust, persist_trust_for_resolution,
+    load_package_after_trust, persist_created_package_trust,
     resolve_trust_for_directory, trust_denied_load_report, workflow_failed_status,
 };
 use crate::sui::project::CliContext;

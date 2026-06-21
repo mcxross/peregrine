@@ -1,8 +1,7 @@
 use super::{App, render_cli_step_summary};
-use crate::output::{CliStatus, CliStep};
-use crate::sui::package_loader::{PackageLoadReport, PackageScannerReport, ScannerResult};
-use ratatui::style::{Modifier, Style};
-use ratatui::text::{Line, Span};
+use crate::output::CliStatus;
+use crate::sui::package_loader::{PackageLoadReport, ScannerResult};
+use ratatui::text::Span;
 use std::time::{Duration, Instant};
 
 pub(crate) fn package_load_status(report: &PackageLoadReport) -> String {
@@ -258,6 +257,7 @@ fn scanner_count(result: &ScannerResult) -> Option<usize> {
     }
 }
 
+#[allow(dead_code)]
 fn cli_status_label(status: CliStatus) -> &'static str {
     match status {
         CliStatus::Passed => "passed",

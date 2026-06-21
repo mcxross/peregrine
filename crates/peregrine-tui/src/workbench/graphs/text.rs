@@ -5,7 +5,6 @@ use crate::workbench::WorkbenchTab;
 use peregrine_sui_mcp_protocol::{
     MoveTypeGraph, MoveTypeGraphEdge, MoveTypeGraphNode, MoveUnresolvedType,
 };
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) fn text_graph_output_args() -> GraphOutputArgs {

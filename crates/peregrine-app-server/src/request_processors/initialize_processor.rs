@@ -18,9 +18,11 @@ const NON_ORIGINATING_CLIENT_NAMES: &[&str] = &["peregrine_app_server_daemon", "
 #[derive(Clone)]
 pub(crate) struct InitializeRequestProcessor {
     outgoing: Arc<OutgoingMessageSender>,
+    #[allow(dead_code)]
     analytics_events_client: AnalyticsEventsClient,
     config: Arc<Config>,
     config_warnings: Arc<Vec<ConfigWarningNotification>>,
+    #[allow(dead_code)]
     rpc_transport: AppServerRpcTransport,
 }
 

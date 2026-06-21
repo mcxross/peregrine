@@ -1,4 +1,3 @@
-use super::{normalized_path_string, relative_path_label};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::fs;

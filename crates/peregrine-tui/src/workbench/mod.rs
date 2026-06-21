@@ -16,6 +16,7 @@ mod status;
 mod types;
 mod util;
 
+#[allow(dead_code)]
 pub(crate) const AGENT_TOKIO_WORKER_STACK_SIZE_BYTES: usize = 16 * 1024 * 1024;
 
 pub use app::App;
@@ -47,7 +48,6 @@ pub(crate) use types::{
 pub(crate) use bytecode::{
     BytecodeCacheEntry, BytecodeCacheStamp, BytecodeLoadResult, BytecodeLoadState, BytecodeOptions,
     BytecodePane, BytecodeRequest, BytecodeSelector, BytecodeSession, BytecodeTargetKey,
-    OwnedBytecodeView,
 };
 pub(crate) use startup::{
     default_package_name, is_quit_key, package_name_error, render_cli_step_summary,

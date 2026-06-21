@@ -1,27 +1,11 @@
 use crate::workbench::prelude::*;
 
-use crate::chat;
-use crate::keybinds;
-use crate::navigation::{self, NavigationCommand, NavigationIntent};
-use ratatui::crossterm::event::{
-    self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent,
-    MouseEventKind,
-};
-use ratatui::layout::{Constraint, Direction, Layout, Position, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::layout::Rect;
+use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
-use ratatui::{DefaultTerminal, Frame};
-use std::collections::HashMap;
-use std::io;
-use std::path::{Path, PathBuf};
-use std::sync::mpsc;
-use std::thread;
+use ratatui::widgets::{Paragraph, Wrap};
+use ratatui::Frame;
 
-use super::super::{
-    format_elapsed, package_load_spinner, package_load_status_spans, render_cli_step_summary,
-};
-use crate::sui::package_loader::WorkbenchTrustResolution;
 
 impl App {
     pub(crate) fn render_startup(&self, frame: &mut Frame<'_>, area: Rect) {

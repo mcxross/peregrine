@@ -3,7 +3,6 @@ use super::types::{BytecodeRequest, BytecodeTargetKey};
 use crate::output::CliStatus;
 use crate::session;
 use crate::sui;
-use crate::sui::project::CliContext;
 use crate::theme::ThemePalette;
 use peregrine_sui_mcp_protocol::{
     BytecodeViewResponse, MoveBytecodeModuleView, MoveBytecodeSourceSpan,
