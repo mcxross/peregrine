@@ -16,76 +16,23 @@
 >
 > Thing are changing rapidly, and the current state of the project may not be stable. Use with caution and expect breaking changes.
 
-# Development
+## Quickstart
 
-## Prerequisites
+### Installing and running Peregrine
 
-- [Rust](https://www.rust-lang.org/) (latest stable)
-- Node.js 22
-- [bun](https://bun.sh/)
+Run the following on Mac or Linux to install Peregrine:
 
-## Getting Started
-
-```bash
-# Install dependencies
-bun install
-
-# Build the isolated sidecars and run the Tauri desktop app
-bun run dev:desktop
-
-# Build the isolated sidecars and run the TUI
-bun run dev:tui
+```shell
+curl -fsSL https://mcxross.xyz/peregrine/install.sh | sh
 ```
 
-## Cargo
+Run the following on Windows to install Peregrine:
 
-```bash
-# Compile the full workspace
-cargo build
-
-# Build a runnable release TUI with sibling sidecars
-bun run build:tui
-
-# Run tests
-cargo test --workspace
-
-# Lint and check
-cargo fmt
-cargo clippy --workspace --all-targets
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://mcxross.xyz/peregrine/install.ps1 | iex"
 ```
 
-## Architecture
-
-See [docs/analysis-architecture.md](docs/analysis-architecture.md) for the
-chain-neutral analysis engine, Sui plugin composition, and MCP server layout.
-
-## Validation
-
-```bash
-# Tauri desktop bundle with packaged-sidecar verification
-bun run build:desktop
-
-# Rust
-cargo fmt
-cargo clippy --workspace --all-targets
-cargo test --workspace
-```
-
-## Sidecar Packaging
-
-The desktop and TUI binaries do not embed the Sui MCP servers or the Peregrine
-helper. A runnable Peregrine installation must place these executables beside
-the frontend executable:
-
-- `peregrine-helper`
-- `peregrine-sui-mcp-server`
-- `peregrine-sui-move-analyzer-mcp-server`
-
-`bun run dev:desktop`, `bun run build:desktop`, `bun run dev:tui`, and
-`bun run build:tui` build and verify this complete process set. Directly
-building only `peregrine-tui` is useful for compilation checks, but does not
-produce a complete installation. Release bundles must be built natively on
-each target platform so the packaging preflight can execute every sidecar.
+Then simply run `peregrine` to get started.
 
 ## License
 
