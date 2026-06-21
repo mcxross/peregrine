@@ -3050,7 +3050,7 @@ checksum = "230c5f1ca6a325a32553f8640d31ac9b49f2411e901e427570154868b46da4f7"
 [[package]]
 name = "bin-version"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "const-str 0.5.7",
  "git-version",
@@ -3094,7 +3094,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools 0.12.1",
+ "itertools 0.11.0",
  "lazy_static",
  "lazycell",
  "proc-macro2",
@@ -3114,7 +3114,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.11.0",
  "proc-macro2",
  "quote",
  "regex",
@@ -3132,7 +3132,7 @@ dependencies = [
  "bitflags 2.13.0",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.11.0",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -5928,7 +5928,7 @@ dependencies = [
 [[package]]
 name = "consensus-config"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
  "mysten-network 0.2.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -5952,7 +5952,7 @@ dependencies = [
 [[package]]
 name = "consensus-core"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -6006,7 +6006,7 @@ dependencies = [
 [[package]]
 name = "consensus-types"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "base64 0.21.7",
  "consensus-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -7233,7 +7233,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccc2776f0c61eca1ca32528f85548abd1a4be8fb53d1b21c013e4f18da1e7090"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -8220,7 +8220,7 @@ dependencies = [
 [[package]]
 name = "enum-compat-util"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "serde_yaml 0.8.26",
 ]
@@ -11540,7 +11540,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -12470,7 +12470,7 @@ checksum = "a5a3cc660ba5d72bce0b3bb295bf20847ccbb40fd423f3f05b61273672e561fe"
 [[package]]
 name = "jsonrpc"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "serde",
  "serde_json",
@@ -13727,7 +13727,7 @@ dependencies = [
  "serde_json",
  "syn 2.0.118",
  "tuple_list",
- "zstd 0.13.3",
+ "zstd 0.11.2+zstd.1.5.2",
 ]
 
 [[package]]
@@ -13756,7 +13756,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tuple_list",
  "typeid",
- "zstd 0.13.3",
+ "zstd 0.11.2+zstd.1.5.2",
 ]
 
 [[package]]
@@ -13998,7 +13998,7 @@ dependencies = [
 [[package]]
 name = "move-abstract-interpreter"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 
 [[package]]
 name = "move-abstract-interpreter"
@@ -14013,7 +14013,7 @@ source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b
 [[package]]
 name = "move-abstract-interpreter-v2"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
 ]
@@ -14021,12 +14021,12 @@ dependencies = [
 [[package]]
 name = "move-abstract-interpreter-v3"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 
 [[package]]
 name = "move-abstract-stack"
 version = "0.0.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 
 [[package]]
 name = "move-abstract-stack"
@@ -14041,7 +14041,7 @@ source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b
 [[package]]
 name = "move-analyzer"
 version = "1.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "clap",
@@ -14073,7 +14073,7 @@ dependencies = [
 [[package]]
 name = "move-binary-format"
 version = "0.0.3"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "enum-compat-util 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -14121,7 +14121,7 @@ dependencies = [
 [[package]]
 name = "move-borrow-graph"
 version = "0.0.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 
 [[package]]
 name = "move-borrow-graph"
@@ -14136,7 +14136,7 @@ source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b
 [[package]]
 name = "move-bytecode-source-map"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -14184,7 +14184,7 @@ dependencies = [
 [[package]]
 name = "move-bytecode-utils"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "indexmap 2.14.0",
@@ -14223,7 +14223,7 @@ dependencies = [
 [[package]]
 name = "move-bytecode-verifier"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-abstract-interpreter 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-abstract-stack 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -14272,7 +14272,7 @@ dependencies = [
 [[package]]
 name = "move-bytecode-verifier-meter"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -14302,7 +14302,7 @@ dependencies = [
 [[package]]
 name = "move-bytecode-verifier-v0"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-abstract-interpreter-v2",
  "move-abstract-stack 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -14317,7 +14317,7 @@ dependencies = [
 [[package]]
 name = "move-bytecode-verifier-v1"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-abstract-interpreter-v2",
  "move-abstract-stack 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -14332,7 +14332,7 @@ dependencies = [
 [[package]]
 name = "move-bytecode-verifier-v2"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-abstract-interpreter-v2",
  "move-abstract-stack 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -14347,7 +14347,7 @@ dependencies = [
 [[package]]
 name = "move-bytecode-verifier-v3"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-abstract-interpreter 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-abstract-stack 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -14364,7 +14364,7 @@ dependencies = [
 [[package]]
 name = "move-bytecode-viewer"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "clap",
@@ -14379,7 +14379,7 @@ dependencies = [
 [[package]]
 name = "move-cli"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "clap",
@@ -14424,7 +14424,7 @@ dependencies = [
 [[package]]
 name = "move-command-line-common"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -14485,7 +14485,7 @@ dependencies = [
 [[package]]
 name = "move-compiler"
 version = "0.0.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -14591,7 +14591,7 @@ dependencies = [
 [[package]]
 name = "move-core-types"
 version = "0.0.4"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -14662,7 +14662,7 @@ dependencies = [
 [[package]]
 name = "move-coverage"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -14738,7 +14738,7 @@ dependencies = [
 [[package]]
 name = "move-decompiler"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "indexmap 2.14.0",
@@ -14758,7 +14758,7 @@ dependencies = [
 [[package]]
 name = "move-disassembler"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "clap",
@@ -14820,7 +14820,7 @@ dependencies = [
 [[package]]
 name = "move-docgen"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "clap",
@@ -14861,7 +14861,7 @@ dependencies = [
 [[package]]
 name = "move-ir-to-bytecode"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "codespan-reporting 0.11.1",
@@ -14915,7 +14915,7 @@ dependencies = [
 [[package]]
 name = "move-ir-to-bytecode-syntax"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "hex",
@@ -14954,7 +14954,7 @@ dependencies = [
 [[package]]
 name = "move-ir-types"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "hex",
  "move-command-line-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -14991,7 +14991,7 @@ dependencies = [
 [[package]]
 name = "move-model"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "codespan",
@@ -15061,7 +15061,7 @@ dependencies = [
 [[package]]
 name = "move-model-2"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "indexmap 2.14.0",
@@ -15102,7 +15102,7 @@ dependencies = [
 [[package]]
 name = "move-package"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "clap",
@@ -15173,7 +15173,7 @@ dependencies = [
 [[package]]
 name = "move-package-alt"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "append-only-vec",
@@ -15213,7 +15213,7 @@ dependencies = [
 [[package]]
 name = "move-package-alt-compilation"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "clap",
@@ -15240,7 +15240,7 @@ dependencies = [
 [[package]]
 name = "move-proc-macros"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "enum-compat-util 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "quote",
@@ -15306,7 +15306,7 @@ dependencies = [
 [[package]]
 name = "move-regex-borrow-graph"
 version = "0.0.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "indexmap 2.14.0",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -15333,7 +15333,7 @@ dependencies = [
 [[package]]
 name = "move-stackless-bytecode"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "codespan",
  "codespan-reporting 0.11.1",
@@ -15381,7 +15381,7 @@ dependencies = [
 [[package]]
 name = "move-stackless-bytecode-2"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "move-abstract-interpreter 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -15399,7 +15399,7 @@ dependencies = [
 [[package]]
 name = "move-stdlib"
 version = "0.1.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "hex",
@@ -15415,7 +15415,7 @@ dependencies = [
 [[package]]
 name = "move-stdlib-natives-v0"
 version = "0.1.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "hex",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -15430,7 +15430,7 @@ dependencies = [
 [[package]]
 name = "move-stdlib-natives-v1"
 version = "0.1.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "hex",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -15445,7 +15445,7 @@ dependencies = [
 [[package]]
 name = "move-stdlib-natives-v2"
 version = "0.1.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "hex",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -15460,7 +15460,7 @@ dependencies = [
 [[package]]
 name = "move-stdlib-natives-v3"
 version = "0.1.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "hex",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -15475,7 +15475,7 @@ dependencies = [
 [[package]]
 name = "move-symbol-pool"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "phf 0.11.3",
  "serde",
@@ -15503,7 +15503,7 @@ dependencies = [
 [[package]]
 name = "move-trace-format"
 version = "0.0.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -15539,7 +15539,7 @@ dependencies = [
 [[package]]
 name = "move-unit-test"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -15563,7 +15563,7 @@ dependencies = [
 [[package]]
 name = "move-vm-config"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
 ]
@@ -15588,7 +15588,7 @@ dependencies = [
 [[package]]
 name = "move-vm-profiler"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-trace-format 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -15613,7 +15613,7 @@ dependencies = [
 [[package]]
 name = "move-vm-runtime"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -15643,7 +15643,7 @@ dependencies = [
 [[package]]
 name = "move-vm-runtime-v0"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "better_any",
  "fail",
@@ -15661,7 +15661,7 @@ dependencies = [
 [[package]]
 name = "move-vm-runtime-v1"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "better_any",
  "fail",
@@ -15679,7 +15679,7 @@ dependencies = [
 [[package]]
 name = "move-vm-runtime-v2"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "better_any",
  "fail",
@@ -15697,7 +15697,7 @@ dependencies = [
 [[package]]
 name = "move-vm-runtime-v3"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "better_any",
  "fail",
@@ -15742,7 +15742,7 @@ dependencies = [
 [[package]]
 name = "move-vm-types-v0"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -15754,7 +15754,7 @@ dependencies = [
 [[package]]
 name = "move-vm-types-v1"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -15766,7 +15766,7 @@ dependencies = [
 [[package]]
 name = "move-vm-types-v2"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -15778,7 +15778,7 @@ dependencies = [
 [[package]]
 name = "move-vm-types-v3"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -16179,7 +16179,7 @@ dependencies = [
 [[package]]
 name = "mysten-common"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "antithesis_sdk",
  "either",
@@ -16221,7 +16221,7 @@ dependencies = [
 [[package]]
 name = "mysten-metrics"
 version = "0.7.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "async-trait",
  "axum 0.8.9",
@@ -16263,7 +16263,7 @@ dependencies = [
 [[package]]
 name = "mysten-network"
 version = "0.2.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
  "anemo-tower 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
@@ -16335,7 +16335,7 @@ dependencies = [
 [[package]]
 name = "mysten-service"
 version = "0.0.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "axum 0.8.9",
@@ -16851,7 +16851,7 @@ version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "680998035259dcfcafe653688bf2aa6d3e2dc05e98be6ab46afb089dc84f1df8"
 dependencies = [
- "proc-macro-crate 3.5.0",
+ "proc-macro-crate 2.0.0",
  "proc-macro2",
  "quote",
  "syn 2.0.118",
@@ -20125,7 +20125,7 @@ dependencies = [
 [[package]]
 name = "prometheus-closure-metric"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "prometheus 0.14.0",
@@ -20209,7 +20209,7 @@ checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes",
  "heck 0.5.0",
- "itertools 0.12.1",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "once_cell",
@@ -20229,7 +20229,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03da047801ff44bb6a4d407d4860c05fd70bb81714e6b2f3812603d5b145b042"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.14.0",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "petgraph 0.8.3",
@@ -20250,7 +20250,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81bddcdb20abf9501610992b6759a4c888aef7d1a7247ef75e2404275ac24af1"
 dependencies = [
  "anyhow",
- "itertools 0.12.1",
+ "itertools 0.11.0",
  "proc-macro2",
  "quote",
  "syn 2.0.118",
@@ -20263,7 +20263,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.11.0",
  "proc-macro2",
  "quote",
  "syn 2.0.118",
@@ -20276,7 +20276,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b570b25f7617e43d59005d0990ccb79e950a423952cea19671b7a876da390adf"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.11.0",
  "proc-macro2",
  "quote",
  "syn 2.0.118",
@@ -23184,7 +23184,7 @@ dependencies = [
 [[package]]
 name = "shared-crypto"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "eyre",
@@ -24104,7 +24104,7 @@ checksum = "734676eb262c623cec13c3155096e08d1f8f29adce39ba17948b18dad1e54142"
 [[package]]
 name = "sui"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
  "anyhow",
@@ -24203,7 +24203,7 @@ dependencies = [
 [[package]]
 name = "sui-adapter-latest"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -24238,7 +24238,7 @@ dependencies = [
 [[package]]
 name = "sui-adapter-v0"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -24266,7 +24266,7 @@ dependencies = [
 [[package]]
 name = "sui-adapter-v1"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -24293,7 +24293,7 @@ dependencies = [
 [[package]]
 name = "sui-adapter-v2"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -24320,7 +24320,7 @@ dependencies = [
 [[package]]
 name = "sui-adapter-v3"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -24355,7 +24355,7 @@ dependencies = [
 [[package]]
 name = "sui-authority-aggregation"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "futures",
  "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -24367,7 +24367,7 @@ dependencies = [
 [[package]]
 name = "sui-bridge"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "alloy",
  "alloy-multiprovider-strategy",
@@ -24423,7 +24423,7 @@ dependencies = [
 [[package]]
 name = "sui-config"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
  "anyhow",
@@ -24488,7 +24488,7 @@ dependencies = [
 [[package]]
 name = "sui-core"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
  "antithesis_sdk",
@@ -24620,7 +24620,7 @@ dependencies = [
 [[package]]
 name = "sui-data-store"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -24641,7 +24641,7 @@ dependencies = [
 [[package]]
 name = "sui-default-config"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -24650,7 +24650,7 @@ dependencies = [
 [[package]]
 name = "sui-display"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -24673,7 +24673,7 @@ dependencies = [
 [[package]]
 name = "sui-enum-compat-util"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "serde_yaml 0.8.26",
 ]
@@ -24689,7 +24689,7 @@ dependencies = [
 [[package]]
 name = "sui-execution"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-abstract-interpreter 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-abstract-interpreter-v2",
@@ -24734,7 +24734,7 @@ dependencies = [
 [[package]]
 name = "sui-faucet"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "axum 0.8.9",
@@ -24759,7 +24759,7 @@ dependencies = [
 [[package]]
 name = "sui-field-count"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "sui-field-count-derive",
 ]
@@ -24767,7 +24767,7 @@ dependencies = [
 [[package]]
 name = "sui-field-count-derive"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -24776,7 +24776,7 @@ dependencies = [
 [[package]]
 name = "sui-framework"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -24789,7 +24789,7 @@ dependencies = [
 [[package]]
 name = "sui-framework-snapshot"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -24804,7 +24804,7 @@ dependencies = [
 [[package]]
 name = "sui-futures"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "futures",
@@ -24817,7 +24817,7 @@ dependencies = [
 [[package]]
 name = "sui-genesis-builder"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -24845,7 +24845,7 @@ dependencies = [
 [[package]]
 name = "sui-http"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bytes",
  "http 1.4.2",
@@ -24885,7 +24885,7 @@ dependencies = [
 [[package]]
 name = "sui-indexer-alt"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -24915,7 +24915,7 @@ dependencies = [
 [[package]]
 name = "sui-indexer-alt-consistent-api"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "prost 0.14.4",
  "prost-types 0.14.4",
@@ -24926,7 +24926,7 @@ dependencies = [
 [[package]]
 name = "sui-indexer-alt-consistent-store"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -24978,7 +24978,7 @@ dependencies = [
 [[package]]
 name = "sui-indexer-alt-framework"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -25023,7 +25023,7 @@ dependencies = [
 [[package]]
 name = "sui-indexer-alt-framework-store-traits"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -25034,7 +25034,7 @@ dependencies = [
 [[package]]
 name = "sui-indexer-alt-graphql"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -25096,7 +25096,7 @@ dependencies = [
 [[package]]
 name = "sui-indexer-alt-metrics"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "axum 0.8.9",
@@ -25112,7 +25112,7 @@ dependencies = [
 [[package]]
 name = "sui-indexer-alt-reader"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -25149,7 +25149,7 @@ dependencies = [
 [[package]]
 name = "sui-indexer-alt-schema"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -25166,7 +25166,7 @@ dependencies = [
 [[package]]
 name = "sui-json"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -25200,7 +25200,7 @@ dependencies = [
 [[package]]
 name = "sui-json-rpc"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -25255,7 +25255,7 @@ dependencies = [
 [[package]]
 name = "sui-json-rpc-api"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
@@ -25295,7 +25295,7 @@ dependencies = [
 [[package]]
 name = "sui-json-rpc-types"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -25363,7 +25363,7 @@ dependencies = [
 [[package]]
 name = "sui-keys"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -25416,7 +25416,7 @@ dependencies = [
 [[package]]
 name = "sui-kvstore"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -25452,7 +25452,7 @@ dependencies = [
 [[package]]
 name = "sui-macros"
 version = "0.7.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "futures",
  "once_cell",
@@ -25474,7 +25474,7 @@ dependencies = [
 [[package]]
 name = "sui-metrics-push-client"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
@@ -25491,7 +25491,7 @@ dependencies = [
 [[package]]
 name = "sui-move"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bin-version",
@@ -25531,7 +25531,7 @@ dependencies = [
 [[package]]
 name = "sui-move-build"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
@@ -25557,7 +25557,7 @@ dependencies = [
 [[package]]
 name = "sui-move-natives-latest"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "better_any",
@@ -25578,7 +25578,7 @@ dependencies = [
 [[package]]
 name = "sui-move-natives-v0"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "better_any",
@@ -25599,7 +25599,7 @@ dependencies = [
 [[package]]
 name = "sui-move-natives-v1"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "better_any",
@@ -25620,7 +25620,7 @@ dependencies = [
 [[package]]
 name = "sui-move-natives-v2"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "better_any",
@@ -25641,7 +25641,7 @@ dependencies = [
 [[package]]
 name = "sui-move-natives-v3"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "better_any",
@@ -25664,7 +25664,7 @@ dependencies = [
 [[package]]
 name = "sui-name-service"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -25676,7 +25676,7 @@ dependencies = [
 [[package]]
 name = "sui-network"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
  "anemo-build",
@@ -25730,7 +25730,7 @@ dependencies = [
 [[package]]
 name = "sui-node"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
  "anemo-tower 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
@@ -25798,7 +25798,7 @@ dependencies = [
 [[package]]
 name = "sui-open-rpc"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "schemars 0.8.22",
@@ -25810,7 +25810,7 @@ dependencies = [
 [[package]]
 name = "sui-open-rpc-macros"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "derive-syn-parse",
  "itertools 0.13.0",
@@ -25836,7 +25836,7 @@ dependencies = [
 [[package]]
 name = "sui-package-alt"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "indexmap 2.14.0",
@@ -25851,7 +25851,7 @@ dependencies = [
 [[package]]
 name = "sui-package-management"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "sui-framework-snapshot",
@@ -25863,7 +25863,7 @@ dependencies = [
 [[package]]
 name = "sui-package-resolver"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "async-trait",
  "bcs",
@@ -25898,7 +25898,7 @@ dependencies = [
 [[package]]
 name = "sui-pg-db"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -25927,7 +25927,7 @@ dependencies = [
 [[package]]
 name = "sui-proc-macros"
 version = "0.7.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "msim-macros 0.1.0 (git+https://github.com/MystenLabs/mysten-sim.git?rev=213e543d83b91c4aa904166bef255a6c0054c8a7)",
  "proc-macro2",
@@ -25951,7 +25951,7 @@ dependencies = [
 [[package]]
 name = "sui-protocol-config"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "clap",
  "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
@@ -25989,7 +25989,7 @@ dependencies = [
 [[package]]
 name = "sui-protocol-config-macros"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -26043,7 +26043,7 @@ dependencies = [
 [[package]]
 name = "sui-replay-2"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -26148,7 +26148,7 @@ dependencies = [
 [[package]]
 name = "sui-rpc-api"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -26232,7 +26232,7 @@ dependencies = [
 [[package]]
 name = "sui-sdk"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -26370,7 +26370,7 @@ dependencies = [
 [[package]]
 name = "sui-simulator"
 version = "0.7.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
  "anemo-tower 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
@@ -26395,7 +26395,7 @@ dependencies = [
 [[package]]
 name = "sui-snapshot"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -26423,7 +26423,7 @@ dependencies = [
 [[package]]
 name = "sui-source-validation"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "colored",
@@ -26457,7 +26457,7 @@ dependencies = [
 [[package]]
 name = "sui-sql-macro"
 version = "1.71.1"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -26467,7 +26467,7 @@ dependencies = [
 [[package]]
 name = "sui-storage"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -26520,7 +26520,7 @@ dependencies = [
 [[package]]
 name = "sui-swarm"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "futures",
@@ -26547,7 +26547,7 @@ dependencies = [
 [[package]]
 name = "sui-swarm-config"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
  "anyhow",
@@ -26572,7 +26572,7 @@ dependencies = [
 [[package]]
 name = "sui-telemetry"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
@@ -26583,7 +26583,7 @@ dependencies = [
 [[package]]
 name = "sui-test-transaction-builder"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "bcs",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -26598,7 +26598,7 @@ dependencies = [
 [[package]]
 name = "sui-tls"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -26620,7 +26620,7 @@ dependencies = [
 [[package]]
 name = "sui-transaction-builder"
 version = "0.0.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -26667,7 +26667,7 @@ dependencies = [
 [[package]]
 name = "sui-transaction-checks"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
  "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -26681,7 +26681,7 @@ dependencies = [
 [[package]]
 name = "sui-types"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
  "anyhow",
@@ -26832,7 +26832,7 @@ dependencies = [
 [[package]]
 name = "sui-verifier-latest"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-abstract-stack 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -26849,7 +26849,7 @@ dependencies = [
 [[package]]
 name = "sui-verifier-v0"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-abstract-stack 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -26865,7 +26865,7 @@ dependencies = [
 [[package]]
 name = "sui-verifier-v1"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-abstract-stack 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -26880,7 +26880,7 @@ dependencies = [
 [[package]]
 name = "sui-verifier-v2"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-abstract-stack 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -26896,7 +26896,7 @@ dependencies = [
 [[package]]
 name = "sui-verifier-v3"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-abstract-stack 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -27583,7 +27583,7 @@ dependencies = [
 [[package]]
 name = "telemetry-subscribers"
 version = "0.2.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "atomic_float",
  "bytes",
@@ -27853,7 +27853,7 @@ dependencies = [
 [[package]]
 name = "test-cluster"
 version = "0.1.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "bcs",
@@ -29350,7 +29350,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
  "cfg-if",
- "rand 0.7.3",
+ "rand 0.8.5",
  "static_assertions",
 ]
 
@@ -29392,7 +29392,7 @@ dependencies = [
 [[package]]
 name = "typed-store"
 version = "0.4.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
  "backoff",
@@ -29421,7 +29421,7 @@ dependencies = [
 [[package]]
 name = "typed-store-derive"
 version = "0.3.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "itertools 0.13.0",
  "proc-macro2",
@@ -29432,7 +29432,7 @@ dependencies = [
 [[package]]
 name = "typed-store-error"
 version = "0.4.0"
-source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#8f0c1ce2263af28440ab3243e53ed1443b13f48c"
+source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
