@@ -9,7 +9,7 @@ use crate::{
     sui::{args::CfgArgs, project::CliContext, runners::run_build},
 };
 use peregrine_sui_mcp_protocol::{
-    BytecodeViewResponse, MoveBytecodeControlFlowView, MoveBytecodeFunctionView,
+    BytecodeViewArgs, BytecodeViewResponse, MoveBytecodeControlFlowView, MoveBytecodeFunctionView,
     MoveBytecodeModuleView, PackageArgs, tool_name,
 };
 use serde_json::{Value, json};
@@ -52,9 +52,14 @@ pub fn run_cfg(context: &CliContext, args: &CfgArgs) -> CliStep {
     let response = match McpToolClient::call_blocking::<_, BytecodeViewResponse>(
         &context.project_root,
         tool_name::BYTECODE_VIEW,
-        &PackageArgs {
-            project_root: Some(context.project_root.display().to_string()),
-            package_path: Some(context.package_path.clone()),
+        &BytecodeViewArgs {
+            package: PackageArgs {
+                project_root: Some(context.project_root.display().to_string()),
+                package_path: Some(context.package_path.clone()),
+            },
+            modules: args.module.clone().into_iter().collect(),
+            include_external: false,
+            response_format: Some("json".to_string()),
         },
     ) {
         Ok(response) => response,

@@ -1,4 +1,6 @@
 use crate::command;
+use crate::cache::{EagerCache, PackageState};
+use rmcp::model::{ServerNotification, LoggingMessageNotification, LoggingMessageNotificationParam, LoggingLevel};
 use crate::{
     adapter::{SecuritySuiCommandKind, build_sui_move_new_command, build_sui_package_command},
     analysis::{
@@ -24,13 +26,13 @@ use peregrine_sui_import_engine::{
 };
 use peregrine_sui_mcp_protocol::{
     AnalysisRuleCatalog as ProtocolAnalysisRuleCatalog, AnalyzeArgs, AnalyzeTargetArgs,
-    BytecodeViewResponse, CreatePackageArgs, DEFAULT_COMMAND_TIMEOUT_MS,
+    BytecodeViewArgs, BytecodeViewResponse, CreatePackageArgs, DEFAULT_COMMAND_TIMEOUT_MS,
     DEFAULT_FORMAL_VERIFY_TIMEOUT_SECONDS, DEFAULT_MOVY_FUZZ_SEED,
     DEFAULT_MOVY_FUZZ_TIME_LIMIT_SECONDS, DEFAULT_PAGE_SIZE, EngineAnalysisResponse,
     FormalVerifyArgs, FunctionStateGraphArgs, FunctionStateGraphResponse, GraphsResponse,
     ImportArtifact, ImportPackageArgs, ImportPackageResponse, MAX_PAGE_SIZE, ModulesArgs,
     ModulesPage, MoveBytecodePackageView, MovyFuzzArgs, PackageArgs, PackageSummary,
-    SignaturesArgs, SignaturesPage, StaticAnalysisArgs, StaticAnalysisResponse,
+    ProjectGraphsArgs, SignaturesArgs, SignaturesPage, StaticAnalysisArgs, StaticAnalysisResponse,
     StaticRuleCatalogResponse, SuiAdapterSettings, SuiAdapterSource, SuiCommandArgs,
     TestScannerArgs, TestScannerResponse, tool_definitions, tool_name,
 };
@@ -57,15 +59,19 @@ pub struct PeregrineMcpServer {
     workspace_root: PathBuf,
     adapter_settings: SuiAdapterSettings,
     analysis_engine: AnalysisEngine,
+    cache: EagerCache,
 }
 
 impl PeregrineMcpServer {
     pub fn new(workspace_root: PathBuf) -> anyhow::Result<Self> {
         let workspace_root = workspace_root.canonicalize()?;
+        let analysis_engine = sui_analysis_engine()?;
+        let cache = EagerCache::new(analysis_engine.clone());
         Ok(Self {
             workspace_root,
             adapter_settings: SuiAdapterSettings::default(),
-            analysis_engine: sui_analysis_engine()?,
+            analysis_engine,
+            cache,
         })
     }
 
@@ -75,6 +81,7 @@ impl PeregrineMcpServer {
     ) -> anyhow::Result<Self> {
         self.analysis_engine =
             sui_analysis_engine_with_settings(to_adapter_settings(&adapter_settings))?;
+        self.cache = EagerCache::new(self.analysis_engine.clone());
         self.adapter_settings = adapter_settings;
         Ok(self)
     }
@@ -87,26 +94,34 @@ impl PeregrineMcpServer {
 
     async fn run_package_analysis(
         &self,
-        context: &MovePackageContext,
-        stages: Vec<AnalysisStage>,
-        graph_kinds: Vec<GraphKind>,
-        dynamic_capabilities: Vec<String>,
-        mut options: AnalysisOptions,
+        ctx: &MovePackageContext,
+        _stages: Vec<AnalysisStage>,
+        _graph_kinds: Vec<GraphKind>,
+        _dynamic_capabilities: Vec<String>,
+        _options: AnalysisOptions,
+        context: &RequestContext<RoleServer>,
     ) -> EngineAnalysisReport {
-        options.insert("projectRoot".to_string(), json!(context.project_root));
-        options.insert("packagePath".to_string(), json!(context.package_path));
-        let mut request = AnalysisRequest::safe(
-            peregrine_analysis::ChainId::new("sui"),
-            AnalysisTarget::LocalPackage {
-                path: context.package_root.clone(),
-            },
-        );
-        request.stages = stages;
-        request.graph_kinds = graph_kinds;
-        request.dynamic_capabilities = dynamic_capabilities;
-        request.options = options;
-        ensure_required_stages(&mut request.stages);
-        self.analysis_engine.run(request).await
+        self.cache.ensure_watched(ctx).await;
+        
+        loop {
+            let state = self.cache.get_state(&ctx.package_root).await;
+            match state {
+                Some(PackageState::Ready(report)) => return (*report).clone(),
+                Some(PackageState::Analyzing(mut rx)) => {
+                    let _ = context.session().send_notification(rmcp::model::ServerNotification::CustomNotification("notifications/message".into(), serde_json::json!({
+                        "level": "info",
+                        "logger": "peregrine",
+                        "data": "Background analysis in progress. Blocking until graph is ready..."
+                    }))).await;
+                    
+                    let _ = rx.changed().await;
+                }
+                _ => {
+                    // Fallback, should not happen since ensure_watched creates it
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                }
+            }
+        }
     }
 
     fn resolve_project_root(&self, project_root: Option<&str>) -> Result<PathBuf, String> {
@@ -130,7 +145,7 @@ impl PeregrineMcpServer {
         Ok(project_root)
     }
 
-    async fn dispatch(&self, request: CallToolRequestParams) -> Result<CallToolResult, ErrorData> {
+    async fn dispatch(&self, request: CallToolRequestParams, context: &RequestContext<RoleServer>) -> Result<CallToolResult, ErrorData> {
         let arguments = request.arguments.unwrap_or_default();
         let value = match request.name.as_ref() {
             tool_name::PACKAGE_RESOLVE => {
@@ -389,8 +404,16 @@ impl PeregrineMcpServer {
                 })
             }
             tool_name::GRAPHS => {
-                let args = parse_args::<PackageArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args).map_err(tool_error)?;
+                let args = parse_args::<ProjectGraphsArgs>(&arguments)?;
+                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                
+                let mut options = AnalysisOptions::new();
+                // Since `modules` is an array and the legacy engine might expect a single string `moduleName`
+                // we can just pass the first module if it exists, or let our new filter handle it natively.
+                if let Some(module) = args.modules.first() {
+                    options.insert("moduleName".to_string(), json!(module));
+                }
+
                 let report = self
                     .run_package_analysis(
                         &ctx,
@@ -400,16 +423,35 @@ impl PeregrineMcpServer {
                             .map(GraphKind::new)
                             .collect(),
                         Vec::new(),
-                        AnalysisOptions::new(),
+                        options,
                     )
                     .await;
+                    
                 let graphs = legacy_project_graphs(&report)?;
-                serde_json::to_value(GraphsResponse {
-                    status: "ok".to_string(),
-                    package: package_summary(&ctx),
-                    graphs,
-                })
-                .map_err(serialization_error)?
+                
+                let filtered_graphs = crate::graphs::filter_project_graphs(
+                    graphs, 
+                    &args.modules, 
+                    args.include_external, 
+                    args.depth
+                );
+
+                let format = args.response_format.unwrap_or_else(|| "json".to_string());
+                if format == "json" {
+                    serde_json::to_value(GraphsResponse {
+                        status: "ok".to_string(),
+                        package: package_summary(&ctx),
+                        graphs: filtered_graphs,
+                    })
+                    .map_err(serialization_error)?
+                } else {
+                    let rendered = crate::graphs::render_project_graphs(&filtered_graphs, &format);
+                    json!({
+                        "status": "ok",
+                        "package": package_summary(&ctx),
+                        "graphs": rendered
+                    })
+                }
             }
             tool_name::FUNCTION_STATE_GRAPH => {
                 let args = parse_args::<FunctionStateGraphArgs>(&arguments)?;
@@ -436,15 +478,34 @@ impl PeregrineMcpServer {
                 .map_err(serialization_error)?
             }
             tool_name::BYTECODE_VIEW => {
-                let args = parse_args::<PackageArgs>(&arguments)?;
-                let ctx = self.resolve_context(&args).map_err(tool_error)?;
-                let bytecode = serde_json::from_value::<MoveBytecodePackageView>(
+                let args = parse_args::<BytecodeViewArgs>(&arguments)?;
+                let ctx = self.resolve_context(&args.package).map_err(tool_error)?;
+                let mut bytecode = serde_json::from_value::<MoveBytecodePackageView>(
                     serde_json::to_value(
                         sui_bytecode_view(&ctx).map_err(|error| tool_error(error.to_string()))?,
                     )
                     .map_err(serialization_error)?,
                 )
                 .map_err(serialization_error)?;
+                
+                let include_external = args.include_external;
+                let modules = &args.modules;
+                bytecode.modules.retain(|m| {
+                    if !include_external && m.is_dependency {
+                        return false;
+                    }
+                    if modules.is_empty() {
+                        return true;
+                    }
+                    modules.iter().any(|req| {
+                        if req.contains("::") {
+                            m.name == *req || m.name.contains(req)
+                        } else {
+                            m.name == *req
+                        }
+                    })
+                });
+                
                 serde_json::to_value(BytecodeViewResponse {
                     status: "ok".to_string(),
                     package: package_summary(&ctx),
@@ -682,9 +743,9 @@ impl ServerHandler for PeregrineMcpServer {
     async fn call_tool(
         &self,
         request: CallToolRequestParams,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
-        match self.dispatch(request).await {
+        match self.dispatch(request, &context).await {
             Ok(result) => Ok(result),
             Err(error) => Ok(CallToolResult::structured_error(json!({
                 "status": "error",

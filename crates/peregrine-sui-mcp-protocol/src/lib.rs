@@ -190,6 +190,31 @@ pub struct PackageArgs {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ProjectGraphsArgs {
+    #[serde(flatten)]
+    pub package: PackageArgs,
+    #[serde(default)]
+    pub modules: Vec<String>,
+    #[serde(default)]
+    pub include_external: bool,
+    #[serde(default)]
+    pub depth: Option<usize>,
+    #[serde(default)]
+    pub response_format: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct BytecodeViewArgs {
+    #[serde(flatten)]
+    pub package: PackageArgs,
+    #[serde(default)]
+    pub modules: Vec<String>,
+    #[serde(default)]
+    pub include_external: bool,
+    #[serde(default)]
+    pub response_format: Option<String>,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignaturesArgs {
     #[serde(flatten)]
     pub package: PackageArgs,

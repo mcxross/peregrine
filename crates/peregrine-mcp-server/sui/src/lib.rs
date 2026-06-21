@@ -1,6 +1,7 @@
 mod adapter;
 mod analysis;
 mod artifacts;
+mod cache;
 mod command;
 mod dynamic;
 mod error;

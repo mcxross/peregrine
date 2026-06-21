@@ -19074,6 +19074,7 @@ name = "peregrine-sui-mcp-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "notify",
  "peregrine-analysis",
  "peregrine-analysis-engine",
  "peregrine-helper-protocol",

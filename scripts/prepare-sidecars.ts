@@ -42,11 +42,35 @@ const destinationDirectory = join(root, "src-tauri", "binaries");
 validateTauriExternalBins();
 
 const cargoArgs = ["build", "--locked"];
+
+// Fix movy-replay build by pointing it to the local sui checkout
+if (!process.env.MOVY_SUI_ROOT) {
+  try {
+    const metadata = JSON.parse(
+      require("node:child_process").execSync("cargo metadata --format-version 1 --locked", {
+        encoding: "utf8",
+        maxBuffer: 1024 * 1024 * 100, // 100MB buffer for large metadata
+      }),
+    );
+    const suiPackage = metadata.packages.find((p: any) => p.name === "sui" && p.source?.includes("git"));
+    if (suiPackage && suiPackage.manifest_path) {
+      process.env.MOVY_SUI_ROOT = require("node:path").resolve(
+        require("node:path").dirname(suiPackage.manifest_path),
+        "..",
+        "..",
+      );
+      console.log(`Resolved MOVY_SUI_ROOT to ${process.env.MOVY_SUI_ROOT}`);
+    }
+  } catch (e) {
+    console.warn("Failed to automatically resolve MOVY_SUI_ROOT from cargo metadata");
+  }
+}
+
 for (const sidecar of sidecars) {
   cargoArgs.push("-p", sidecar.packageName);
 }
 if (includeTui) {
-  cargoArgs.push("-p", "peregrine-tui", "--bin", "peregrine-tui");
+  cargoArgs.push("-p", "peregrine-tui");
 }
 if (release) {
   cargoArgs.push("--release");

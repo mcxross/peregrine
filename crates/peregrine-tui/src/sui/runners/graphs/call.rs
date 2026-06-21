@@ -1,7 +1,6 @@
 use super::{
-    common::{DIM, EDGE, FUNCTION, HEADER, KIND, MODULE, RESET, graph_step, requested_modules},
+    common::{DIM, EDGE, FUNCTION, HEADER, KIND, MODULE, RESET, graph_step},
     dot::{DotEdgeStyle, dot_edge_attrs, dot_id, dot_label},
-    project::module_matches,
 };
 use crate::{
     output::{CliDiagnostic, CliStep},
@@ -10,11 +9,11 @@ use crate::{
 };
 use peregrine_sui_mcp_protocol::{
     GraphsResponse, MoveCallGraph, MoveCallGraphEdge, MoveCallGraphNode, MoveUnresolvedCall,
-    PackageArgs, tool_name,
+    PackageArgs, ProjectGraphsArgs, tool_name,
 };
 use serde_json::json;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     time::Instant,
 };
 
@@ -23,9 +22,15 @@ pub fn run_call_graph(context: &CliContext, args: &CallGraphArgs) -> CliStep {
     let response = match McpToolClient::call_blocking::<_, GraphsResponse>(
         &context.project_root,
         tool_name::GRAPHS,
-        &PackageArgs {
-            project_root: Some(context.project_root.display().to_string()),
-            package_path: Some(context.package_path.clone()),
+        &ProjectGraphsArgs {
+            package: PackageArgs {
+                project_root: Some(context.project_root.display().to_string()),
+                package_path: Some(context.package_path.clone()),
+            },
+            modules: args.modules.clone(),
+            include_external: args.include_external,
+            depth: None,
+            response_format: Some("json".to_string()),
         },
     ) {
         Ok(response) => response,
@@ -38,7 +43,6 @@ pub fn run_call_graph(context: &CliContext, args: &CallGraphArgs) -> CliStep {
         }
     };
     let graph = response.graphs.call_graph;
-    let graph = filter_call_graph(graph, args);
 
     if graph.nodes.is_empty() {
         return CliStep::failed(
@@ -74,51 +78,6 @@ pub fn run_call_graph(context: &CliContext, args: &CallGraphArgs) -> CliStep {
         ]),
         json!({ "graph": graph }),
     )
-}
-
-fn filter_call_graph(graph: MoveCallGraph, args: &CallGraphArgs) -> MoveCallGraph {
-    let requested_modules = requested_modules(&args.modules);
-    let mut node_ids = graph
-        .nodes
-        .iter()
-        .filter(|node| args.include_external || !node.is_external)
-        .filter(|node| {
-            requested_modules.is_empty()
-                || requested_modules.iter().any(|requested| {
-                    module_matches(requested, node.address.as_deref(), &node.module_name)
-                })
-        })
-        .map(|node| node.id.clone())
-        .collect::<BTreeSet<_>>();
-
-    let edges = graph
-        .edges
-        .into_iter()
-        .filter(|edge| node_ids.contains(&edge.source) && node_ids.contains(&edge.target))
-        .collect::<Vec<_>>();
-
-    let unresolved_calls = graph
-        .unresolved_calls
-        .into_iter()
-        .filter(|call| node_ids.contains(&call.source))
-        .collect::<Vec<_>>();
-
-    for edge in &edges {
-        node_ids.insert(edge.source.clone());
-        node_ids.insert(edge.target.clone());
-    }
-
-    let nodes = graph
-        .nodes
-        .into_iter()
-        .filter(|node| node_ids.contains(&node.id))
-        .collect::<Vec<_>>();
-
-    MoveCallGraph {
-        nodes,
-        edges,
-        unresolved_calls,
-    }
 }
 
 fn render_call_graph_text(graph: &MoveCallGraph) -> String {
