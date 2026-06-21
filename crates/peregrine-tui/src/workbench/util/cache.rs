@@ -48,7 +48,7 @@ fn bytecode_cache_relevant_file(path: &Path) -> bool {
         || path
             .file_name()
             .and_then(OsStr::to_str)
-            .is_some_and(|name| matches!(name, "Move.toml" | "Move.lock"))
+            .is_some_and(|name| matches!(name, "Move.toml"))
 }
 
 fn bytecode_cache_skipped_dir(path: &Path) -> bool {

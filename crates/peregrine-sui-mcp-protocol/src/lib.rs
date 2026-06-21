@@ -21,7 +21,7 @@ pub const DEFAULT_COMMAND_TIMEOUT_MS: u64 = 600_000;
 pub const DEFAULT_MOVY_FUZZ_TIME_LIMIT_SECONDS: u64 = 30;
 pub const DEFAULT_MOVY_FUZZ_SEED: u64 = 1;
 pub const DEFAULT_FORMAL_VERIFY_TIMEOUT_SECONDS: usize = 45;
-pub const MAX_OUTPUT_BYTES: usize = 256 * 1024;
+pub const MAX_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 pub const DEFAULT_PAGE_SIZE: usize = 100;
 pub const MAX_PAGE_SIZE: usize = 200;
 
