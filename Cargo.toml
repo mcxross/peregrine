@@ -190,20 +190,20 @@ lru = "0.16.3"
 maplit = "1.0.2"
 mcp_test_support = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 mime_guess = "2.0.5"
-move-analyzer = { path = "../oss/sui/external-crates/move/crates/move-analyzer" }
-move-binary-format = { path = "../oss/sui/external-crates/move/crates/move-binary-format" }
-move-bytecode-source-map = { path = "../oss/sui/external-crates/move/crates/move-bytecode-source-map" }
-move-cli = { path = "../oss/sui/external-crates/move/crates/move-cli" }
-move-command-line-common = { path = "../oss/sui/external-crates/move/crates/move-command-line-common" }
-move-compiler = { path = "../oss/sui/external-crates/move/crates/move-compiler" }
-move-decompiler = { path = "../oss/sui/external-crates/move/crates/move-decompiler" }
-move-disassembler = { path = "../oss/sui/external-crates/move/crates/move-disassembler" }
-move-ir-types = { path = "../oss/sui/external-crates/move/crates/move-ir-types" }
-move-model-2 = { path = "../oss/sui/external-crates/move/crates/move-model-2" }
-move-package-alt-compilation = { path = "../oss/sui/external-crates/move/crates/move-package-alt-compilation" }
-move-prover-boogie-backend = { path = "../oss/sui-prover/crates/move-prover-boogie-backend" }
-move-stackless-bytecode = { path = "../oss/sui-prover/crates/move-stackless-bytecode" }
-movy = { path = "../oss/movy/crates/movy", default-features = false, features = ["sui-fuzz"] }
+move-analyzer = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+move-binary-format = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+move-bytecode-source-map = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+move-cli = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+move-command-line-common = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+move-compiler = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+move-decompiler = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+move-disassembler = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+move-ir-types = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+move-model-2 = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+move-package-alt-compilation = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+move-prover-boogie-backend = { git = "https://github.com/mcxross/sui-prover.git", branch = "mcxross/compat" }
+move-stackless-bytecode = { git = "https://github.com/mcxross/sui-prover.git", branch = "mcxross/compat" }
+movy = { git = "https://github.com/astinz/movy.git", branch = "mcxross/compat", default-features = false, features = ["sui-fuzz"] }
 multimap = "0.10.0"
 notify = "8.2.0"
 nucleo = { git = "https://github.com/helix-editor/nucleo.git", rev = "4253de9faabb4e5c6d81d946a5e35a90f87347ee" }
@@ -393,13 +393,13 @@ sqlx = { version = "0.9.0", default-features = false, features = ["chrono", "jso
 starlark = "0.13.0"
 strum = "0.27.2"
 strum_macros = "0.28.0"
-sui = { path = "../oss/sui/crates/sui", package = "sui", features = ["tracing"] }
-sui-config = { path = "../oss/sui/crates/sui-config" }
-sui-keys = { path = "../oss/sui/crates/sui-keys" }
-sui-package-alt = { path = "../oss/sui/crates/sui-package-alt" }
-sui-prover = { path = "../oss/sui-prover/crates/sui-prover" }
-sui-sdk = { path = "../oss/sui/crates/sui-sdk" }
-sui-types = { path = "../oss/sui/crates/sui-types" }
+sui = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat", package = "sui", features = ["tracing"] }
+sui-config = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+sui-keys = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+sui-package-alt = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+sui-prover = { git = "https://github.com/mcxross/sui-prover.git", branch = "mcxross/compat" }
+sui-sdk = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
+sui-types = { git = "https://github.com/mcxross/sui.git", branch = "mcxross/movy-compat" }
 supports-color = "3.0.2"
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 sys-locale = "0.3.2"
