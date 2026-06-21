@@ -1,4 +1,4 @@
-use codex_features::FEATURES;
+
 use lazy_static::lazy_static;
 use peregrine_types::account::PlanType;
 use rand::Rng;
@@ -33,16 +33,8 @@ lazy_static! {
     static ref ALL_TOOLTIPS: Vec<&'static str> = {
         let mut tips = Vec::new();
         tips.extend(TOOLTIPS.iter().copied());
-        tips.extend(experimental_tooltips());
         tips
     };
-}
-
-fn experimental_tooltips() -> Vec<&'static str> {
-    FEATURES
-        .iter()
-        .filter_map(|spec| spec.stage.experimental_announcement())
-        .collect()
 }
 
 /// Pick a random tooltip to show to the user when starting Peregrine.
