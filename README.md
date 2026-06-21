@@ -16,6 +16,18 @@
 >
 > Thing are changing rapidly, and the current state of the project may not be stable. Use with caution and expect breaking changes.
 
+## Features
+
+- **Customizable Audit Workflows** — Tailor research and auditing processes to your methodology and requirements
+- **Model Agnostic** — Use frontier or open-source models without vendor lock-in
+- **Unified Tooling** — Single installation with integrated static analysis and formal verification tooling out of the box
+- **TUI/CLI & Desktop** — Run in the terminal, desktop app, or both
+- **Built-in Expert Skills** — Specialized capabilities for static analysis, formal verification, and security research tasks
+- **Integrated Blockchain Knowledge Base** — Curated blockchain and smart contract knowledge available during analysis
+- **Portable Memory** — Preserve context across long-running investigations and research sessions
+- **Designed for Long-Running Tasks** — Built to support deep, iterative audits that span multiple sessions
+- **Shared Memory** — Shared memory across sessions and other agents to preserve context and avoid redundant analysis
+
 ## Quickstart
 
 ### Installing and running Peregrine
