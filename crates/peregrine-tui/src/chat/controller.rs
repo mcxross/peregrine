@@ -898,6 +898,7 @@ impl ChatController {
             session_telemetry: new_session_telemetry(context),
         });
         chat.set_session_header_directory_visible(false);
+        chat.set_session_header_visible(false);
         chat.set_status_line_visible(false);
         chat.set_queue_submissions_until_session_configured(true);
         chat.set_mcp_startup_expected_servers(enabled_mcp_server_names(&context.config));

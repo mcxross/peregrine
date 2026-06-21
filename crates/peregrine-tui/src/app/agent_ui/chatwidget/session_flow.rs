@@ -121,7 +121,9 @@ impl ChatWidget {
                 show_fast_status,
                 self.show_session_header_directory,
             );
-            self.apply_session_info_cell(session_info_cell);
+            if self.show_session_header {
+                self.apply_session_info_cell(session_info_cell);
+            }
         } else if self
             .transcript
             .active_cell

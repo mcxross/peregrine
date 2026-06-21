@@ -187,6 +187,7 @@ impl ChatWidget {
             show_welcome_banner: is_first_run,
             startup_tooltip_override,
             show_session_header_directory: true,
+            show_session_header: true,
             show_status_line: true,
             suppress_session_configured_redraw: false,
             suppress_initial_user_message_submit: false,

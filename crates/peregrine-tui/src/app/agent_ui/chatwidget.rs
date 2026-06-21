@@ -638,6 +638,8 @@ pub(crate) struct ChatWidget {
     // Embedded surfaces can provide the current working context elsewhere and keep the session
     // header compact.
     show_session_header_directory: bool,
+    // Whether to show the session header (the Hero banner or simple model header) at all
+    show_session_header: bool,
     // Embedded surfaces can own their own status bar instead of duplicating the configurable
     // agent status line below the composer.
     show_status_line: bool,
@@ -1399,6 +1401,10 @@ impl ChatWidget {
 
     pub(crate) fn set_pending_thread_approvals(&mut self, threads: Vec<String>) {
         self.bottom_pane.set_pending_thread_approvals(threads);
+    }
+
+    pub(crate) fn set_session_header_visible(&mut self, visible: bool) {
+        self.show_session_header = visible;
     }
 
     pub(crate) fn clear_thread_rename_block(&mut self) {
