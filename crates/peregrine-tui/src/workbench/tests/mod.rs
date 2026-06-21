@@ -125,6 +125,16 @@ fn invalid_package_screen_renders_create_and_proceed_options() {
     assert!(rendered.contains("does not appear to contain a valid Move package"));
     assert!(rendered.contains("Create a new Move package"));
     assert!(rendered.contains("Proceed anyway using the selected directory"));
+    assert!(rendered.contains("Go back to the previous screen or exit"));
+}
+
+#[test]
+fn invalid_package_screen_go_back_switches_to_agent() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let mut app = app_with_startup(temp.path(), None);
+
+    app.handle_key_event(key(KeyCode::Char('3')));
+    assert_eq!(app.exit, Some(WorkbenchExit::SwitchToAgent));
 }
 
 #[test]

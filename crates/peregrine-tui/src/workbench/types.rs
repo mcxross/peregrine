@@ -107,13 +107,23 @@ pub enum WorkbenchExit {
 pub(crate) enum InvalidPackageAction {
     CreatePackage,
     ProceedAnyway,
+    GoBack,
 }
 
 impl InvalidPackageAction {
     pub(crate) fn toggle(self) -> Self {
         match self {
             Self::CreatePackage => Self::ProceedAnyway,
+            Self::ProceedAnyway => Self::GoBack,
+            Self::GoBack => Self::CreatePackage,
+        }
+    }
+    
+    pub(crate) fn toggle_back(self) -> Self {
+        match self {
+            Self::CreatePackage => Self::GoBack,
             Self::ProceedAnyway => Self::CreatePackage,
+            Self::GoBack => Self::ProceedAnyway,
         }
     }
 }

@@ -92,7 +92,11 @@ impl App {
                 self.startup = WorkbenchStartupState::Workbench;
             }
             WorkbenchStartupState::InvalidPackageChoice(mut prompt) => match key.code {
-                KeyCode::Up | KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('k') if plain => {
+                KeyCode::Up | KeyCode::Char('k') if plain => {
+                    prompt.selected = prompt.selected.toggle_back();
+                    self.startup = WorkbenchStartupState::InvalidPackageChoice(prompt);
+                }
+                KeyCode::Down | KeyCode::Char('j') if plain => {
                     prompt.selected = prompt.selected.toggle();
                     self.startup = WorkbenchStartupState::InvalidPackageChoice(prompt);
                 }
@@ -107,12 +111,19 @@ impl App {
                         TrustPostAction::EnterWorkbench,
                     );
                 }
+                KeyCode::Char('3') | KeyCode::Esc if plain => {
+                    prompt.selected = InvalidPackageAction::GoBack;
+                    self.exit = Some(WorkbenchExit::SwitchToAgent);
+                }
                 KeyCode::Enter => match prompt.selected {
                     InvalidPackageAction::CreatePackage => self.open_package_name_prompt(prompt),
                     InvalidPackageAction::ProceedAnyway => self.apply_trust_resolution(
                         prompt.trust_resolution,
                         TrustPostAction::EnterWorkbench,
                     ),
+                    InvalidPackageAction::GoBack => {
+                        self.exit = Some(WorkbenchExit::SwitchToAgent);
+                    }
                 },
                 _ => {
                     self.startup = WorkbenchStartupState::InvalidPackageChoice(prompt);

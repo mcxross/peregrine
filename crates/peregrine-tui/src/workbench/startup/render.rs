@@ -62,6 +62,12 @@ impl App {
                 "2",
                 "Proceed anyway using the selected directory",
             ),
+            startup_option_line(
+                self,
+                prompt.selected == InvalidPackageAction::GoBack,
+                "3",
+                "Go back to the previous screen or exit",
+            ),
             Line::from(""),
             Line::styled("Use Up/Down or j/k, then Enter.", self.muted_style()),
         ];
