@@ -136,7 +136,7 @@ impl App {
             ));
         frame.render_widget(paragraph, text_area);
 
-        if show_cursor && self.focus == FocusPane::Editor && self.active_tab == WorkbenchTab::Code {
+        if show_cursor && self.focus == FocusPane::Editor && self.active_tab == WorkbenchTab::Editor {
             let row = self.editor.cursor.row.saturating_sub(self.editor.scroll);
             let col = self
                 .editor

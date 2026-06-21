@@ -1,4 +1,5 @@
 use crate::workbench::PendingVimCommand;
+use crate::workbench::GraphTab;
 use crate::workbench::prelude::*;
 
 use crate::keybinds;
@@ -29,7 +30,7 @@ impl App {
             NavigationCommand::PreviousTheme => self.previous_theme(),
             NavigationCommand::NextTheme => self.next_theme(),
             NavigationCommand::Focus(FocusPane::FileTabs) => {
-                self.active_tab = WorkbenchTab::Code;
+                self.active_tab = WorkbenchTab::Editor;
                 self.set_focus(FocusPane::FileTabs);
             }
             NavigationCommand::Focus(pane) => self.set_focus(pane),
@@ -79,7 +80,7 @@ impl App {
             KeyCode::Left | KeyCode::Char('h') => self.previous_tab(),
             KeyCode::Right | KeyCode::Char('l') => self.next_tab(),
             KeyCode::Down | KeyCode::Enter | KeyCode::Esc => {
-                self.set_focus(if self.active_tab == WorkbenchTab::Code {
+                self.set_focus(if self.active_tab == WorkbenchTab::Editor {
                     FocusPane::FileTabs
                 } else {
                     FocusPane::Editor
@@ -91,7 +92,7 @@ impl App {
 
     pub(crate) fn handle_editor_key(&mut self, key: KeyEvent) {
         match self.active_tab {
-            WorkbenchTab::Code => {
+            WorkbenchTab::Editor => {
                 match self.editor_mode {
                     EditorMode::Standard => self.handle_standard_editor_key(key),
                     EditorMode::Vim => {
@@ -112,9 +113,7 @@ impl App {
                 }
             }
             WorkbenchTab::Bytecode => self.handle_bytecode_key(key),
-            WorkbenchTab::Cfg | WorkbenchTab::CallGraph | WorkbenchTab::TypeGraph => {
-                self.handle_graph_key(key)
-            }
+            WorkbenchTab::Graphs => self.handle_graph_key(key),
             WorkbenchTab::Chat => {
                 let action = self.chat.handle_key(&self.explorer.root, key);
                 self.apply_chat_action(action);
@@ -156,12 +155,10 @@ impl App {
             KeyCode::Char('e') if plain => self.set_focus(FocusPane::Explorer),
             KeyCode::Char('t') if plain => self.set_focus(FocusPane::Tabs),
             KeyCode::Char('c') if plain => self.focus_code_editor(),
-            KeyCode::Char('1') if plain => self.set_active_tab(WorkbenchTab::Code),
-            KeyCode::Char('2') if plain => self.set_active_tab(WorkbenchTab::Bytecode),
-            KeyCode::Char('3') if plain => self.set_active_tab(WorkbenchTab::Cfg),
-            KeyCode::Char('4') if plain => self.set_active_tab(WorkbenchTab::CallGraph),
-            KeyCode::Char('5') if plain => self.set_active_tab(WorkbenchTab::TypeGraph),
-            KeyCode::Char('6') if plain => self.set_active_tab(WorkbenchTab::Chat),
+            KeyCode::Char('1') if plain => self.set_active_tab(WorkbenchTab::Chat),
+            KeyCode::Char('2') if plain => self.set_active_tab(WorkbenchTab::Editor),
+            KeyCode::Char('3') if plain => self.set_active_tab(WorkbenchTab::Bytecode),
+            KeyCode::Char('4') if plain => self.set_active_tab(WorkbenchTab::Graphs),
             KeyCode::PageUp if plain => self.editor.page_up(),
             KeyCode::PageDown if plain => self.editor.page_down(),
             KeyCode::Home if plain => self.editor.move_line_start(),
@@ -178,7 +175,7 @@ impl App {
 
     pub(crate) fn handle_bytecode_key(&mut self, key: KeyEvent) {
         if matches!(key.code, KeyCode::Esc | KeyCode::Char('q')) {
-            self.active_tab = WorkbenchTab::Code;
+            self.active_tab = WorkbenchTab::Editor;
             self.standard_editor_editing = false;
             self.set_focus(FocusPane::Editor);
             self.status = String::from("Closed bytecode viewer");
@@ -230,9 +227,18 @@ impl App {
     }
 
     pub(crate) fn handle_graph_key(&mut self, key: KeyEvent) {
+        if key.code == KeyCode::Char('[') {
+            self.prev_graph_tab();
+            return;
+        }
+        if key.code == KeyCode::Char(']') {
+            self.next_graph_tab();
+            return;
+        }
+
         if matches!(key.code, KeyCode::Esc | KeyCode::Char('q')) {
             let title = self.active_tab.title();
-            self.active_tab = WorkbenchTab::Code;
+            self.active_tab = WorkbenchTab::Editor;
             self.standard_editor_editing = false;
             self.set_focus(FocusPane::Editor);
             self.status = format!("Closed {title} viewer");
@@ -240,11 +246,11 @@ impl App {
         }
 
         if key.code == KeyCode::Enter {
-            self.ensure_graph_tab(self.active_tab);
+            self.ensure_graph_tab(self.graphs.active_tab);
             return;
         }
 
-        let Some(GraphPane::Ready(document)) = self.graphs.get_mut(self.active_tab) else {
+        let Some(GraphPane::Ready(document)) = self.graphs.get_mut(self.graphs.active_tab) else {
             return;
         };
         document.handle_key(key);
@@ -313,13 +319,24 @@ impl App {
 
     pub(crate) fn focus_code_editor(&mut self) {
         self.standard_editor_editing = false;
-        self.active_tab = WorkbenchTab::Code;
+        self.active_tab = WorkbenchTab::Editor;
         self.set_focus(FocusPane::Editor);
+    }
+
+    pub(crate) fn next_graph_tab(&mut self) {
+        let index = self.graphs.active_tab.index();
+        self.graphs.active_tab = GraphTab::ALL[(index + 1) % GraphTab::ALL.len()];
+    }
+
+    pub(crate) fn prev_graph_tab(&mut self) {
+        let index = self.graphs.active_tab.index();
+        self.graphs.active_tab =
+            GraphTab::ALL[(index + GraphTab::ALL.len() - 1) % GraphTab::ALL.len()];
     }
 
     pub(crate) fn set_active_tab(&mut self, tab: WorkbenchTab) {
         self.active_tab = tab;
-        if tab != WorkbenchTab::Code {
+        if tab != WorkbenchTab::Editor {
             self.standard_editor_editing = false;
         }
         if tab == WorkbenchTab::Chat {
@@ -334,10 +351,10 @@ impl App {
     pub(crate) fn set_focus(&mut self, pane: FocusPane) {
         let focus = match pane {
             FocusPane::Input if self.active_tab != WorkbenchTab::Chat => FocusPane::Editor,
-            FocusPane::FileTabs if self.active_tab != WorkbenchTab::Code => FocusPane::Editor,
+            FocusPane::FileTabs if self.active_tab != WorkbenchTab::Editor => FocusPane::Editor,
             other => other,
         };
-        if focus != FocusPane::Editor || self.active_tab != WorkbenchTab::Code {
+        if focus != FocusPane::Editor || self.active_tab != WorkbenchTab::Editor {
             self.standard_editor_editing = false;
         }
         self.focus = focus;
@@ -419,7 +436,7 @@ impl App {
             Ok(activation) => {
                 self.apply_document_interaction(activation.interaction);
                 self.invalidate_workbench_views();
-                self.active_tab = WorkbenchTab::Code;
+                self.active_tab = WorkbenchTab::Editor;
                 self.set_focus(FocusPane::Editor);
                 self.status = if activation.opened {
                     format!("Opened {}", path.display())

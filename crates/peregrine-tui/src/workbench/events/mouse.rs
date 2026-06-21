@@ -67,7 +67,7 @@ impl App {
 
         if rect_contains(self.layout.editor, x, y) {
             match self.active_tab {
-                WorkbenchTab::Code => {
+                WorkbenchTab::Editor => {
                     self.set_focus(FocusPane::Editor);
                     self.scroll_editor(direction);
                 }
@@ -75,7 +75,7 @@ impl App {
                     self.set_focus(FocusPane::Editor);
                     self.scroll_bytecode(direction);
                 }
-                WorkbenchTab::Cfg | WorkbenchTab::CallGraph | WorkbenchTab::TypeGraph => {
+                WorkbenchTab::Graphs => {
                     self.set_focus(FocusPane::Editor);
                     self.scroll_graph(direction);
                 }
@@ -155,7 +155,7 @@ impl App {
     }
 
     pub(crate) fn scroll_graph(&mut self, direction: ScrollDirection) {
-        let Some(GraphPane::Ready(document)) = self.graphs.get_mut(self.active_tab) else {
+        let Some(GraphPane::Ready(document)) = self.graphs.get_mut(self.graphs.active_tab) else {
             return;
         };
 
@@ -184,6 +184,12 @@ impl App {
                     self.editor.page_right(self.layout.file_tabs.width);
                 }
             }
+            return;
+        }
+
+        if let Some(tab) = self.clicked_graph_tab(x, y) {
+            self.graphs.active_tab = tab;
+            self.set_focus(FocusPane::Editor);
             return;
         }
 
@@ -216,6 +222,13 @@ impl App {
     pub(crate) fn clicked_tab(&self, x: u16, y: u16) -> Option<WorkbenchTab> {
         self.layout
             .tab_hit_areas
+            .iter()
+            .find_map(|(tab, area)| rect_contains(*area, x, y).then_some(*tab))
+    }
+
+    pub(crate) fn clicked_graph_tab(&self, x: u16, y: u16) -> Option<crate::workbench::types::GraphTab> {
+        self.layout
+            .graph_tab_hit_areas
             .iter()
             .find_map(|(tab, area)| rect_contains(*area, x, y).then_some(*tab))
     }
@@ -257,7 +270,7 @@ impl App {
             return;
         }
         self.set_focus(FocusPane::Editor);
-        if self.active_tab == WorkbenchTab::Code {
+        if self.active_tab == WorkbenchTab::Editor {
             if self.markdown_preview_enabled() {
                 return;
             }

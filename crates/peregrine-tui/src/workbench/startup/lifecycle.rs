@@ -108,7 +108,7 @@ impl App {
             application_config,
             mode: AppMode::default(),
             focus: FocusPane::Explorer,
-            active_tab: WorkbenchTab::Code,
+            active_tab: WorkbenchTab::Editor,
             editor_mode,
             standard_editor_editing: false,
             vim_state: VimState::Normal,
@@ -400,7 +400,7 @@ impl App {
             .map(|(config, runtime)| chat::ChatController::new(config, runtime))
             .unwrap_or_default();
         self.focus = FocusPane::Explorer;
-        self.active_tab = WorkbenchTab::Code;
+        self.active_tab = WorkbenchTab::Editor;
         self.standard_editor_editing = false;
         self.vim_state = VimState::Normal;
         self.package_load_report = None;

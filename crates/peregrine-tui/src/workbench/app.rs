@@ -2,7 +2,7 @@ use super::{
     AppMode, BytecodeCacheEntry, BytecodeLoadResult, BytecodePane, BytecodeTargetKey,
     CloseConfirmation, EditorMode, EditorRenderCache, EditorWorkspace, Explorer, FocusPane,
     GraphLoadResult, GraphPanes, StartupTaskResult, VimState, WorkbenchExit, WorkbenchLayout,
-    WorkbenchStartupState, WorkbenchTab,
+    WorkbenchStartupState, WorkbenchTab, GraphTab,
 };
 use crate::agent;
 use crate::app;
@@ -36,7 +36,7 @@ pub struct App {
     pub(crate) bytecode_loader_rx: Option<mpsc::Receiver<BytecodeLoadResult>>,
     pub(crate) bytecode_load_epoch: u64,
     pub(crate) graphs: GraphPanes,
-    pub(crate) graph_loader_rx: Option<(WorkbenchTab, mpsc::Receiver<GraphLoadResult>)>,
+    pub(crate) graph_loader_rx: Option<(GraphTab, mpsc::Receiver<GraphLoadResult>)>,
     pub(crate) chat: chat::ChatController,
     pub(crate) startup: WorkbenchStartupState,
     pub(crate) startup_task_rx: Option<mpsc::Receiver<StartupTaskResult>>,

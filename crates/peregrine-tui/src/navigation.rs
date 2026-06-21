@@ -48,16 +48,16 @@ impl Navigation {
                     self.pending_chord = Some(NavigationChord::Workbench);
                     NavigationCommand::BeginWorkbenchNavigation
                 }
-                KeyBindEvent::SelectCodeTab => NavigationCommand::SelectTab(WorkbenchTab::Code),
+                KeyBindEvent::SelectCodeTab => NavigationCommand::SelectTab(WorkbenchTab::Editor),
                 KeyBindEvent::SelectBytecodeTab => {
                     NavigationCommand::SelectTab(WorkbenchTab::Bytecode)
                 }
-                KeyBindEvent::SelectCfgTab => NavigationCommand::SelectTab(WorkbenchTab::Cfg),
+                KeyBindEvent::SelectCfgTab => NavigationCommand::SelectTab(WorkbenchTab::Graphs),
                 KeyBindEvent::SelectCallGraphTab => {
-                    NavigationCommand::SelectTab(WorkbenchTab::CallGraph)
+                    NavigationCommand::SelectTab(WorkbenchTab::Graphs)
                 }
                 KeyBindEvent::SelectTypeGraphTab => {
-                    NavigationCommand::SelectTab(WorkbenchTab::TypeGraph)
+                    NavigationCommand::SelectTab(WorkbenchTab::Graphs)
                 }
                 KeyBindEvent::SelectChatTab => NavigationCommand::SelectTab(WorkbenchTab::Chat),
                 _ => continue,
@@ -172,14 +172,14 @@ fn global_command(key: KeyEvent, focus: FocusPane) -> Option<NavigationCommand> 
             KeyBindEvent::Undo => NavigationCommand::Undo,
             KeyBindEvent::FocusNext if focus != FocusPane::Editor => NavigationCommand::FocusNext,
             KeyBindEvent::FocusPrevious => NavigationCommand::FocusPrevious,
-            KeyBindEvent::SelectCodeTab => NavigationCommand::SelectTab(WorkbenchTab::Code),
+            KeyBindEvent::SelectCodeTab => NavigationCommand::SelectTab(WorkbenchTab::Editor),
             KeyBindEvent::SelectBytecodeTab => NavigationCommand::SelectTab(WorkbenchTab::Bytecode),
-            KeyBindEvent::SelectCfgTab => NavigationCommand::SelectTab(WorkbenchTab::Cfg),
+            KeyBindEvent::SelectCfgTab => NavigationCommand::SelectTab(WorkbenchTab::Graphs),
             KeyBindEvent::SelectCallGraphTab => {
-                NavigationCommand::SelectTab(WorkbenchTab::CallGraph)
+                NavigationCommand::SelectTab(WorkbenchTab::Graphs)
             }
             KeyBindEvent::SelectTypeGraphTab => {
-                NavigationCommand::SelectTab(WorkbenchTab::TypeGraph)
+                NavigationCommand::SelectTab(WorkbenchTab::Graphs)
             }
             KeyBindEvent::SelectChatTab => NavigationCommand::SelectTab(WorkbenchTab::Chat),
             _ => continue,
@@ -214,17 +214,17 @@ fn workbench_command(key: KeyEvent) -> NavigationCommand {
             KeyBindEvent::WorkbenchPreviousTheme => NavigationCommand::PreviousTheme,
             KeyBindEvent::WorkbenchNextTheme => NavigationCommand::NextTheme,
             KeyBindEvent::WorkbenchSelectCodeTab => {
-                NavigationCommand::SelectTab(WorkbenchTab::Code)
+                NavigationCommand::SelectTab(WorkbenchTab::Editor)
             }
             KeyBindEvent::WorkbenchSelectBytecodeTab => {
                 NavigationCommand::SelectTab(WorkbenchTab::Bytecode)
             }
-            KeyBindEvent::WorkbenchSelectCfgTab => NavigationCommand::SelectTab(WorkbenchTab::Cfg),
+            KeyBindEvent::WorkbenchSelectCfgTab => NavigationCommand::SelectTab(WorkbenchTab::Graphs),
             KeyBindEvent::WorkbenchSelectCallGraphTab => {
-                NavigationCommand::SelectTab(WorkbenchTab::CallGraph)
+                NavigationCommand::SelectTab(WorkbenchTab::Graphs)
             }
             KeyBindEvent::WorkbenchSelectTypeGraphTab => {
-                NavigationCommand::SelectTab(WorkbenchTab::TypeGraph)
+                NavigationCommand::SelectTab(WorkbenchTab::Graphs)
             }
             KeyBindEvent::WorkbenchSelectChatTab => {
                 NavigationCommand::SelectTab(WorkbenchTab::Chat)

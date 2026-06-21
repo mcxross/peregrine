@@ -30,32 +30,52 @@ pub enum FocusPane {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorkbenchTab {
-    Code,
+    Chat,
+    Editor,
     Bytecode,
+    Graphs,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphTab {
     Cfg,
     CallGraph,
     TypeGraph,
-    Chat,
+}
+
+impl GraphTab {
+    pub(crate) const ALL: [Self; 3] = [Self::Cfg, Self::CallGraph, Self::TypeGraph];
+
+    pub(crate) fn title(self) -> &'static str {
+        match self {
+            Self::Cfg => "cfg",
+            Self::CallGraph => "call graph",
+            Self::TypeGraph => "type graph",
+        }
+    }
+
+    pub(crate) fn index(self) -> usize {
+        Self::ALL
+            .iter()
+            .position(|tab| *tab == self)
+            .unwrap_or_default()
+    }
 }
 
 impl WorkbenchTab {
-    pub(crate) const ALL: [Self; 6] = [
-        Self::Code,
-        Self::Bytecode,
-        Self::Cfg,
-        Self::CallGraph,
-        Self::TypeGraph,
+    pub(crate) const ALL: [Self; 4] = [
         Self::Chat,
+        Self::Editor,
+        Self::Bytecode,
+        Self::Graphs,
     ];
 
     pub(crate) fn title(self) -> &'static str {
         match self {
-            Self::Code => "code",
-            Self::Bytecode => "bytecode",
-            Self::Cfg => "cfg",
-            Self::CallGraph => "call graph",
-            Self::TypeGraph => "type graph",
             Self::Chat => "chat",
+            Self::Editor => "editor",
+            Self::Bytecode => "bytecode",
+            Self::Graphs => "graphs",
         }
     }
 
@@ -69,7 +89,7 @@ impl WorkbenchTab {
 
 impl Default for WorkbenchTab {
     fn default() -> Self {
-        Self::Code
+        Self::Chat
     }
 }
 
@@ -285,6 +305,8 @@ pub(crate) struct WorkbenchLayout {
     pub(crate) tab_hit_areas: Vec<(WorkbenchTab, Rect)>,
     pub(crate) file_tabs: Rect,
     pub(crate) file_tab_hit_areas: Vec<FileTabHitArea>,
+    pub(crate) graph_tabs: Rect,
+    pub(crate) graph_tab_hit_areas: Vec<(GraphTab, Rect)>,
     pub(crate) close_dialog_hit_areas: Vec<(CloseChoice, Rect)>,
     pub(crate) editor: Rect,
     pub(crate) bottom_bar: Rect,

@@ -5,6 +5,7 @@ use crate::session;
 use crate::sui::args::{CallGraphArgs, CfgArgs};
 use crate::sui::project::{bytecode_targets, resolve_context};
 use crate::sui::runners::{run_call_graph, run_cfg};
+use crate::workbench::GraphTab;
 use crate::workbench::prelude::*;
 use peregrine_sui_mcp_protocol::{
     GraphsResponse, PackageArgs as McpPackageArgs, tool_name,
@@ -15,7 +16,7 @@ use std::sync::mpsc;
 use std::thread;
 
 impl App {
-    pub(crate) fn ensure_graph_tab(&mut self, tab: WorkbenchTab) {
+    pub(crate) fn ensure_graph_tab(&mut self, tab: GraphTab) {
         match self.graphs.get(tab) {
             Some(GraphPane::Ready(_)) => {
                 self.status = format!("{} already loaded", tab.title());
@@ -102,16 +103,13 @@ impl App {
     }
 
     pub(crate) fn load_graph_document(
-        tab: WorkbenchTab,
+        tab: GraphTab,
         context: &WorkbenchGraphContext,
     ) -> Result<GraphDocument, String> {
         match tab {
-            WorkbenchTab::Cfg => Self::load_cfg_graph_document(context),
-            WorkbenchTab::CallGraph => Self::load_call_graph_document(context),
-            WorkbenchTab::TypeGraph => Self::load_type_graph_document(context),
-            WorkbenchTab::Code | WorkbenchTab::Bytecode | WorkbenchTab::Chat => {
-                Err(format!("{} is not a graph tab.", tab.title()))
-            }
+            GraphTab::Cfg => Self::load_cfg_graph_document(context),
+            GraphTab::CallGraph => Self::load_call_graph_document(context),
+            GraphTab::TypeGraph => Self::load_type_graph_document(context),
         }
     }
 
@@ -171,7 +169,7 @@ impl App {
             output: text_graph_output_args(),
         };
 
-        graph_step_document(WorkbenchTab::Cfg, run_cfg(&graph_context.context, &args))
+        graph_step_document(GraphTab::Cfg, run_cfg(&graph_context.context, &args))
     }
 
     pub(crate) fn load_call_graph_document(
@@ -184,7 +182,7 @@ impl App {
         };
 
         graph_step_document(
-            WorkbenchTab::CallGraph,
+            GraphTab::CallGraph,
             run_call_graph(&graph_context.context, &args),
         )
     }
@@ -208,7 +206,7 @@ impl App {
         }
 
         Ok(GraphDocument::new(
-            WorkbenchTab::TypeGraph.title(),
+            GraphTab::TypeGraph.title(),
             render_type_graph_text(&graph),
         ))
     }

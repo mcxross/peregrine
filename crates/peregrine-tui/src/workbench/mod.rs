@@ -27,7 +27,7 @@ pub use settings::{
     TuiSettings, configured_editor_mode, configured_theme, configured_tui_settings,
     load_editor_mode_from_home, load_theme_from_home, load_tui_settings_from_home,
 };
-pub use types::{AppMode, EditorMode, FocusPane, VimState, WorkbenchExit, WorkbenchTab};
+pub use types::{AppMode, EditorMode, FocusPane, VimState, WorkbenchExit, WorkbenchTab, GraphTab};
 
 pub(crate) use constants::*;
 pub(crate) use editor::{

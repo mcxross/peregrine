@@ -29,7 +29,7 @@ impl App {
         frame.render_widget(tabs, rows[0]);
 
         match self.active_tab {
-            WorkbenchTab::Code => {
+            WorkbenchTab::Editor => {
                 let code_rows = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([Constraint::Length(1), Constraint::Min(2)])
@@ -40,15 +40,15 @@ impl App {
                 self.render_editor(frame, code_rows[1]);
             }
             WorkbenchTab::Bytecode => self.render_bytecode(frame, rows[1]),
-            WorkbenchTab::Cfg | WorkbenchTab::CallGraph | WorkbenchTab::TypeGraph => {
-                self.render_graph(frame, rows[1], self.active_tab)
+            WorkbenchTab::Graphs => {
+                self.render_graph(frame, rows[1])
             }
             WorkbenchTab::Chat => {
                 self.chat
                     .render(frame, rows[1], self.focus == FocusPane::Input, palette);
             }
         }
-        if self.active_tab != WorkbenchTab::Code {
+        if self.active_tab != WorkbenchTab::Editor {
             self.layout.file_tabs = Rect::default();
             self.layout.file_tab_hit_areas.clear();
             self.layout.editor = rows[1];

@@ -1,12 +1,24 @@
-use super::super::{PAGE_SIZE, WorkbenchTab, char_len};
+use super::super::{PAGE_SIZE, GraphTab, char_len};
 use crate::sui::project::CliContext;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct GraphPanes {
+    pub(crate) active_tab: GraphTab,
     pub(crate) cfg: GraphPane,
     pub(crate) call_graph: GraphPane,
     pub(crate) type_graph: GraphPane,
+}
+
+impl Default for GraphPanes {
+    fn default() -> Self {
+        Self {
+            active_tab: GraphTab::Cfg,
+            cfg: GraphPane::default(),
+            call_graph: GraphPane::default(),
+            type_graph: GraphPane::default(),
+        }
+    }
 }
 
 impl GraphPanes {
@@ -14,37 +26,35 @@ impl GraphPanes {
         *self = Self::default();
     }
 
-    pub(crate) fn get(&self, tab: WorkbenchTab) -> Option<&GraphPane> {
+    pub(crate) fn get(&self, tab: GraphTab) -> Option<&GraphPane> {
         match tab {
-            WorkbenchTab::Cfg => Some(&self.cfg),
-            WorkbenchTab::CallGraph => Some(&self.call_graph),
-            WorkbenchTab::TypeGraph => Some(&self.type_graph),
-            WorkbenchTab::Code | WorkbenchTab::Bytecode | WorkbenchTab::Chat => None,
+            GraphTab::Cfg => Some(&self.cfg),
+            GraphTab::CallGraph => Some(&self.call_graph),
+            GraphTab::TypeGraph => Some(&self.type_graph),
         }
     }
 
-    pub(crate) fn get_mut(&mut self, tab: WorkbenchTab) -> Option<&mut GraphPane> {
+    pub(crate) fn get_mut(&mut self, tab: GraphTab) -> Option<&mut GraphPane> {
         match tab {
-            WorkbenchTab::Cfg => Some(&mut self.cfg),
-            WorkbenchTab::CallGraph => Some(&mut self.call_graph),
-            WorkbenchTab::TypeGraph => Some(&mut self.type_graph),
-            WorkbenchTab::Code | WorkbenchTab::Bytecode | WorkbenchTab::Chat => None,
+            GraphTab::Cfg => Some(&mut self.cfg),
+            GraphTab::CallGraph => Some(&mut self.call_graph),
+            GraphTab::TypeGraph => Some(&mut self.type_graph),
         }
     }
 
-    pub(crate) fn set_ready(&mut self, tab: WorkbenchTab, document: GraphDocument) {
+    pub(crate) fn set_ready(&mut self, tab: GraphTab, document: GraphDocument) {
         if let Some(pane) = self.get_mut(tab) {
             *pane = GraphPane::Ready(document);
         }
     }
 
-    pub(crate) fn set_message(&mut self, tab: WorkbenchTab, message: String) {
+    pub(crate) fn set_message(&mut self, tab: GraphTab, message: String) {
         if let Some(pane) = self.get_mut(tab) {
             *pane = GraphPane::Message(message);
         }
     }
 
-    pub(crate) fn set_loading(&mut self, tab: WorkbenchTab) {
+    pub(crate) fn set_loading(&mut self, tab: GraphTab) {
         if let Some(pane) = self.get_mut(tab) {
             *pane = GraphPane::Loading;
         }
@@ -162,6 +172,6 @@ pub(crate) struct WorkbenchGraphContext {
 
 #[derive(Debug)]
 pub(crate) struct GraphLoadResult {
-    pub(crate) tab: WorkbenchTab,
+    pub(crate) tab: GraphTab,
     pub(crate) result: Result<GraphDocument, String>,
 }

@@ -21,7 +21,7 @@ impl App {
     }
 
     pub(crate) fn next_focus_pane(&self) -> FocusPane {
-        if self.active_tab == WorkbenchTab::Code {
+        if self.active_tab == WorkbenchTab::Editor {
             navigation::next_focus(self.focus)
         } else {
             match self.focus {
@@ -33,7 +33,7 @@ impl App {
     }
 
     pub(crate) fn previous_focus_pane(&self) -> FocusPane {
-        if self.active_tab == WorkbenchTab::Code {
+        if self.active_tab == WorkbenchTab::Editor {
             navigation::previous_focus(self.focus)
         } else {
             match self.focus {
@@ -45,7 +45,7 @@ impl App {
     }
 
     pub(crate) fn move_focus_pane(&self, direction: navigation::FocusDirection) -> FocusPane {
-        if self.active_tab == WorkbenchTab::Code {
+        if self.active_tab == WorkbenchTab::Editor {
             return navigation::move_focus(self.focus, direction);
         }
         match direction {
@@ -79,7 +79,7 @@ impl App {
             .editor
             .activate(id, self.current_document_interaction());
         self.apply_document_interaction(interaction);
-        self.active_tab = WorkbenchTab::Code;
+        self.active_tab = WorkbenchTab::Editor;
         self.invalidate_workbench_views();
     }
 
