@@ -56,6 +56,7 @@ pub fn run_cfg(context: &CliContext, args: &CfgArgs) -> CliStep {
             package: PackageArgs {
                 project_root: Some(context.project_root.display().to_string()),
                 package_path: Some(context.package_path.clone()),
+                unbounded: true,
             },
             modules: args.module.clone().into_iter().collect(),
             include_external: false,

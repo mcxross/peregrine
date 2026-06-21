@@ -149,6 +149,7 @@ impl PeregrineMcpServer {
     }
 
     async fn dispatch(&self, request: CallToolRequestParams, context: &RequestContext<RoleServer>) -> Result<CallToolResult, ErrorData> {
+        let unbounded = request.arguments.as_ref().and_then(|args| args.get("unbounded").and_then(|v| v.as_bool())).unwrap_or(false);
         let arguments = request.arguments.unwrap_or_default();
         let value = match request.name.as_ref() {
             tool_name::PACKAGE_RESOLVE => {
@@ -644,7 +645,7 @@ impl PeregrineMcpServer {
             }
         };
 
-        bounded_structured_result(value)
+        bounded_structured_result(value, unbounded)
     }
 }
 
@@ -791,9 +792,9 @@ fn package_summary(ctx: &MovePackageContext) -> PackageSummary {
     }
 }
 
-fn bounded_structured_result(value: Value) -> Result<CallToolResult, ErrorData> {
+fn bounded_structured_result(value: Value, unbounded: bool) -> Result<CallToolResult, ErrorData> {
     let text = serde_json::to_string_pretty(&value).unwrap_or_else(|error| error.to_string());
-    if text.len() > peregrine_sui_mcp_protocol::MAX_OUTPUT_BYTES {
+    if !unbounded && text.len() > peregrine_sui_mcp_protocol::MAX_OUTPUT_BYTES {
         return Err(ErrorData::invalid_params(
             format!(
                 "tool response exceeds the {} byte limit; narrow the request or use pagination",

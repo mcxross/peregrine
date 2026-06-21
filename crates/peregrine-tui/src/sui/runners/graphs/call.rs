@@ -26,6 +26,7 @@ pub fn run_call_graph(context: &CliContext, args: &CallGraphArgs) -> CliStep {
             package: PackageArgs {
                 project_root: Some(context.project_root.display().to_string()),
                 package_path: Some(context.package_path.clone()),
+                unbounded: true,
             },
             modules: args.modules.clone(),
             include_external: args.include_external,

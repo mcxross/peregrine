@@ -196,6 +196,7 @@ impl App {
             &McpPackageArgs {
                 project_root: Some(graph_context.context.project_root.display().to_string()),
                 package_path: Some(graph_context.context.package_path.clone()),
+                unbounded: true,
             },
         )?;
         let graph = response.graphs.type_graph;

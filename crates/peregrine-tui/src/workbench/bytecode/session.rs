@@ -50,6 +50,7 @@ impl BytecodeSession {
             &McpPackageArgs {
                 project_root: Some(request.context.project_root.display().to_string()),
                 package_path: Some(request.context.package_path.clone()),
+                unbounded: true,
             },
         )?;
         let compiled_package_name = response.bytecode.package_name;

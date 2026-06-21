@@ -25,6 +25,7 @@ pub fn run_object_graph(context: &CliContext, args: &ObjectGraphArgs) -> CliStep
             package: PackageArgs {
                 project_root: Some(context.project_root.display().to_string()),
                 package_path: Some(context.package_path.clone()),
+                unbounded: true,
             },
             modules: args.modules.clone(),
             include_external: args.include_external,
