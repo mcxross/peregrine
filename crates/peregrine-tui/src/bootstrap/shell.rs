@@ -43,9 +43,10 @@ pub(crate) fn run_mode_shell_with_async_runtime(
                     .application_runtime
                     .as_ref()
                     .map(app::ApplicationRuntime::async_runtime);
-                let agent_args = args::AgentArgs {
-                    config_overrides: Default::default(),
-                    inner: agent::Cli::parse_from(["peregrine"]),
+                let app_cli = args::ApplicationCli::parse_from(["peregrine", "agent"]);
+                let agent_args = match app_cli.command {
+                    Some(args::ApplicationCommand::Agent(args)) => args,
+                    _ => unreachable!(),
                 };
                 match run_agent(
                     agent_args,
