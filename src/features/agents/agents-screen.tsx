@@ -1,4 +1,6 @@
 import React from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { ServerRequest } from "@peregrine/app-server-protocol";
 import {
   Archive,
@@ -21,7 +23,13 @@ import {
   Square,
   Terminal,
   X,
+  Send,
+  ArrowUp,
+  ShieldAlert,
+  AlertCircle,
+  AlertTriangle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,10 +51,11 @@ import {
   loadAgentStudioStateFromProjectMetadata,
   ensurePrimaryAgentThreadState,
   markAgentThreadClosed,
-  runAgentWorkflowWithAppServer,
-  saveAgentServerSettings,
   saveAgentStudioState,
+  saveAgentServerSettings,
   syncAgentStudioStateWithServerThread,
+  PersistentAgentSession,
+  selectAgentServerModelProvider,
 } from "@peregrine/desktop-runtime";
 import type {
   AgentDefinition,
@@ -71,6 +80,7 @@ import {
 import { cn } from "@/lib/utils";
 import { SlashCommandPopup } from "./slash-command-popup";
 import { SlashCommandDef, SLASH_COMMANDS } from "./slash-commands";
+import { SessionsSidebar } from "./sessions-sidebar";
 type AgentCategory = "Primary" | "Subagent";
 type AgentFilter = "all" | AgentCategory;
 type MainTab = "agents" | "details";
@@ -92,6 +102,10 @@ type AgentRunDetail = {
   displayName: string;
   events: RunEvent[];
   id: string;
+  pendingRequest?: {
+    request: ServerRequest;
+    resolve: (resolution: AgentServerRequestResolution) => void;
+  };
   reasoningText: string;
   responseText: string;
   startedAt: number;
@@ -133,7 +147,8 @@ export function AgentsScreen({
   );
   const [activeMainTab, setActiveMainTab] = React.useState<MainTab>("agents");
   const [agentFilter, setAgentFilter] = React.useState<AgentFilter>("all");
-  const [isInspectorOpen, setIsInspectorOpen] = React.useState(true);
+  const [isInspectorOpen, setIsInspectorOpen] = React.useState(false);
+  const [isSessionsSidebarOpen, setIsSessionsSidebarOpen] = React.useState(false);
   const [runDetailsByAgentId, setRunDetailsByAgentId] = React.useState<
     Record<string, AgentRunDetail>
   >({});
@@ -145,6 +160,7 @@ export function AgentsScreen({
   const [selectedModelId, setSelectedModelId] = React.useState<string | null>(null);
   const [isProjectStateLoaded, setIsProjectStateLoaded] = React.useState(false);
   const activeRunControllerRef = React.useRef<AbortController | null>(null);
+  const activeSessionRef = React.useRef<PersistentAgentSession | null>(null);
   const [slashInput, setSlashInput] = React.useState("");
   const [slashSelectedIndex, setSlashSelectedIndex] = React.useState(0);
   const [isPopupOpen, setIsPopupOpen] = React.useState(false);
@@ -167,6 +183,47 @@ export function AgentsScreen({
     console.log("Executing slash command via app server:", cmd.command);
     // TODO: Dispatch to app server RPC using Tauri invoke or sendAgentTurn
     setSlashInput("");
+  }
+
+  async function handleSendMessage(msg: string) {
+    if (!activeSessionRef.current) return;
+    const session = activeSessionRef.current;
+    
+    setState((current) => ({
+      ...current,
+      agents: current.agents.map((agent) =>
+        agent.id === session.agent.id ? { ...agent, status: "running" } : agent,
+      ),
+      workflows: current.workflows.map((workflow) =>
+        workflow.id === session.workflow.id
+          ? markWorkflowStatus(workflow, "running")
+          : workflow,
+      ),
+    }));
+
+    appendRunDetailText(
+      session.agent.id,
+      "responseText",
+      `\n\n**User:** ${msg}\n\n**Agent:** `
+    );
+    appendRunDetailText(
+      session.agent.id,
+      "reasoningText",
+      `\n\n**TURN:**\n\n`
+    );
+
+    try {
+      await session.sendTurn(msg);
+    } catch (e) {
+      console.error(e);
+      appendRunDetailEvent(session.agent.id, {
+        level: "error",
+        message: e instanceof Error ? e.message : String(e),
+        title: "Failed to send message",
+      });
+    } finally {
+      setRunCompletedState(session.agent, session.workflow, "running", "idle", "info");
+    }
   }
   const selectedAgent =
     state.agents.find((agent) => agent.id === state.selectedAgentId) ??
@@ -297,25 +354,25 @@ export function AgentsScreen({
     <div
       className={cn(
         "grid h-full min-h-0 min-w-0 overflow-hidden bg-[var(--app-window)] text-foreground transition-[grid-template-columns] duration-200",
-        isInspectorOpen
-          ? "grid-cols-[minmax(0,1fr)_clamp(340px,26vw,390px)]"
-          : "grid-cols-[minmax(0,1fr)_44px]",
+        isSessionsSidebarOpen
+          ? isInspectorOpen ? "grid-cols-[270px_minmax(0,1fr)_clamp(340px,26vw,390px)]" : "grid-cols-[270px_minmax(0,1fr)_48px]"
+          : isInspectorOpen ? "grid-cols-[0px_minmax(0,1fr)_clamp(340px,26vw,390px)]" : "grid-cols-[0px_minmax(0,1fr)_48px]"
       )}
     >
+      <div className="overflow-hidden border-r border-[color:var(--app-border)]">
+        {isSessionsSidebarOpen && <SessionsSidebar onSelectThread={(threadId) => {}} />}
+      </div>
       <main className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden border-r border-[color:var(--app-border)]">
         {activeMainTab === "details" ? null : (
           <PageHeader
             agentFilter={agentFilter}
             isRunInProgress={isRunInProgress}
             modelSummary={modelSummary}
+            isSessionsSidebarOpen={isSessionsSidebarOpen}
+            onToggleSessions={() => setIsSessionsSidebarOpen(!isSessionsSidebarOpen)}
             onFilterChange={setAgentFilter}
             onRefreshModels={refreshModels}
-            onRunWorkflow={() => {
-              if (selectedAgent && selectedWorkflow) {
-                void runWorkflowFor(selectedAgent, selectedWorkflow);
-              }
-            }}
-            onStopRun={stopWorkflowRun}
+            warningEvents={selectedRunDetail?.events?.filter((e) => (e.level === "error" || e.level === "warning") && e.title !== "Run stopped") ?? []}
           />
         )}
         {activeMainTab === "details" ? (
@@ -328,16 +385,37 @@ export function AgentsScreen({
                 void runWorkflowFor(selectedAgent, selectedWorkflow);
               }
             }}
-            onStopRun={stopWorkflowRun}
+            onSendMessage={handleSendMessage}
+            onStopRun={interruptWorkflowTurn}
             run={selectedRunDetail}
             workflow={selectedWorkflow}
           />
         ) : (
-          <section className="grid min-h-0 place-items-center overflow-hidden">
-            <div className="flex w-2/3 max-w-3xl flex-col items-center gap-8 mb-[20vh]">
-              <h1 className="text-3xl font-bold text-foreground">
-                Which package are we dealing with today?
-              </h1>
+          <section className="flex flex-col h-full min-h-0 overflow-hidden relative">
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {(isRunInProgress || selectedRunDetail) ? (
+                <AgentDetailScreen
+                  agent={selectedAgent}
+                  run={selectedRunDetail}
+                  workflow={selectedWorkflow}
+                />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-8 pb-[10vh]">
+                  <h1 className="text-3xl font-bold text-foreground transition-opacity duration-500">
+                    Which package are we dealing with today?
+                  </h1>
+                </div>
+              )}
+            </div>
+
+            <div className={cn(
+              "shrink-0 transition-all duration-500 ease-in-out px-4 pb-4 w-full flex justify-center",
+              (isRunInProgress || selectedRunDetail) ? "pt-2" : "absolute top-1/2 left-0 -translate-y-1/2 mt-10"
+            )}>
+              <div className={cn(
+                "w-full transition-all duration-500",
+                (isRunInProgress || selectedRunDetail) ? "max-w-4xl" : "max-w-3xl w-2/3"
+              )}>
               <div
                 ref={slashContainerRef}
                 className="relative flex w-full flex-col rounded-2xl border border-[color:var(--app-border)] bg-[var(--app-panel)] shadow-sm transition-colors focus-within:border-ring focus-within:ring-[2px] focus-within:ring-ring/35"
@@ -382,30 +460,86 @@ export function AgentsScreen({
                           executeSlashCommand(filtered[slashSelectedIndex]);
                         }
                       }
+                    } else if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (slashInput.trim() && selectedAgent && selectedWorkflow) {
+                        const input = slashInput.trim();
+                        setSlashInput("");
+                        void runWorkflowFor(selectedAgent, selectedWorkflow).then(() => {
+                           handleSendMessage(input);
+                        });
+                      }
                     }
                   }}
                 />
                 <div className="flex items-center justify-between px-3 pb-2 pt-1">
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-1 min-w-0 items-center gap-1">
                     <Button
-                      className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground"
+                      className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground shrink-0"
                       size="icon"
                       type="button"
                       variant="ghost"
                     >
                       <Plus className="size-5" />
                     </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          className="h-8 gap-1.5 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground"
-                          type="button"
-                          variant="ghost"
-                        >
-                          {modelSummary.label}
-                          <ChevronDown className="size-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
+                    <div className="flex flex-1 min-w-0 items-center gap-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            className="h-8 gap-1.5 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground shrink-0 max-w-[120px]"
+                            type="button"
+                            variant="ghost"
+                          >
+                            <span className="truncate">{settings.provider || "ollama"}</span>
+                            <ChevronDown className="size-3.5 shrink-0" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-[180px]">
+                          <DropdownMenuLabel>Provider</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuGroup>
+                            {["ollama", "google_ai", "anthropic", "openai", "bedrock"].map((provider) => (
+                              <DropdownMenuItem
+                                key={provider}
+                                onClick={async () => {
+                                  try {
+                                    const resp = await selectAgentServerModelProvider({ providerId: provider });
+                                    if (resp && resp.success) {
+                                      setSettings((prev) => ({ ...prev, provider: provider as any }));
+                                      // Trigger a model refresh
+                                      setModelSummary((s) => ({ ...s, status: "loading" }));
+                                      listAgentServerModels()
+                                        .then((catalog) => {
+                                          setModelCatalog(catalog.models.data);
+                                          setModelSummary({ label: "Select model", status: "ready", count: catalog.models.data.length });
+                                        })
+                                        .catch(() => setModelSummary({ label: "Error", status: "error" }));
+                                    }
+                                  } catch (e) {
+                                    console.error("Failed to set provider", e);
+                                  }
+                                }}
+                                className="flex w-full items-center justify-between p-2"
+                              >
+                                <span className="font-medium">{provider}</span>
+                                {settings.provider === provider && <CheckCircle2 className="size-4 text-primary" />}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            className="h-8 gap-1.5 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground shrink-0 max-w-[300px]"
+                            type="button"
+                            variant="ghost"
+                          >
+                            <span className="truncate">{modelSummary.label}</span>
+                            <ChevronDown className="size-3.5 shrink-0" />
+                          </Button>
+                        </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" className="w-[300px]">
                         <DropdownMenuLabel>Available Models</DropdownMenuLabel>
                         {modelSummary.status === "error" && modelSummary.error && (
@@ -439,19 +573,57 @@ export function AgentsScreen({
                             </DropdownMenuItem>
                           ))}
                         </DropdownMenuGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-                  <Button
-                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground"
-                    size="icon"
-                    type="button"
-                    variant="ghost"
-                  >
-                    <Mic className="size-4" />
-                  </Button>
+                  <div className="flex shrink-0 items-center">
+                    <Button
+                      className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground shrink-0"
+                      size="icon"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Mic className="size-4" />
+                    </Button>
+                    <div
+                      className={cn(
+                        "overflow-hidden transition-all duration-300 ease-in-out flex items-center",
+                        slashInput.trim() || isRunInProgress ? "w-8 ml-1 opacity-100" : "w-0 ml-0 opacity-0"
+                      )}
+                    >
+                      {isRunInProgress ? (
+                        <Button
+                          className="h-8 w-8 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 shrink-0"
+                          size="icon"
+                          type="button"
+                          onClick={interruptWorkflowTurn}
+                        >
+                          <Square className="size-4 fill-current" />
+                        </Button>
+                      ) : (
+                        <Button
+                          className="h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
+                          size="icon"
+                          type="button"
+                          onClick={() => {
+                            if (slashInput.trim() && selectedAgent && selectedWorkflow) {
+                              const input = slashInput.trim();
+                              setSlashInput("");
+                              void runWorkflowFor(selectedAgent, selectedWorkflow).then(() => {
+                                handleSendMessage(input);
+                              });
+                            }
+                          }}
+                        >
+                          <ArrowUp className="size-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
             </div>
           </section>
         )}
@@ -521,39 +693,63 @@ export function AgentsScreen({
         }),
       ].slice(-120),
     }));
-    try {
-      const result = await runAgentWorkflowWithAppServer({
-        agent: runAgent,
-        onServerRequest: resolveServerRequestWithPrompt,
-        onStream: (event) => recordRunStreamEvent(runAgent.id, event),
-        onTrace: (event) => {
-          appendRunLog(runAgent.id, runWorkflowState.id, event);
-          appendRunDetailEvent(runAgent.id, {
-            level: event.level,
-            message: event.message,
-            title: event.level === "trace" ? "Runtime trace" : "Runtime update",
+    const session = new PersistentAgentSession(
+      runAgent,
+      runWorkflowState,
+      settings.target,
+      projectContext ?? null,
+      (event) => recordRunStreamEvent(runAgent.id, event),
+      (event) => {
+        appendRunLog(runAgent.id, runWorkflowState.id, event);
+        appendRunDetailEvent(runAgent.id, {
+          level: event.level,
+          message: event.message,
+          title: event.level === "trace" ? "Runtime trace" : "Runtime update",
+        });
+      },
+      (request) =>
+        new Promise<AgentServerRequestResolution>((resolve) => {
+          setRunDetailsByAgentId((current) => {
+            const detail = current[runAgent.id];
+            if (!detail) return current;
+            return {
+              ...current,
+              [runAgent.id]: {
+                ...detail,
+                pendingRequest: {
+                  request,
+                  resolve: (resolution) => {
+                    resolve(resolution);
+                    setRunDetailsByAgentId((curr) => {
+                      const d = curr[runAgent.id];
+                      if (!d) return curr;
+                      return {
+                        ...curr,
+                        [runAgent.id]: {
+                          ...d,
+                          pendingRequest: undefined,
+                        },
+                      };
+                    });
+                  },
+                },
+              },
+            };
           });
-        },
-        projectContext,
-        signal: controller.signal,
-        target: settings.target,
-        workflow: runWorkflowState,
-      });
+        }),
+    );
+    activeSessionRef.current = session;
+
+    try {
+      const result = await session.start(controller.signal);
       if (result.text) {
         appendRunDetailText(runAgent.id, "responseText", result.text);
       }
-      finishRunDetail(runAgent.id, "completed", {
+      appendRunDetailEvent(runAgent.id, {
         level: "info",
-        message: `${runWorkflowState.name} completed through the Rust app-server.`,
-        title: "Run completed",
+        message: `${runWorkflowState.name} initial turn completed. Session is open for chat.`,
+        title: "Turn completed",
       });
-      setRunCompletedState(
-        runAgent,
-        runWorkflowState,
-        previousStatus,
-        "completed",
-        "info",
-      );
     } catch (error) {
       const aborted = isAbortError(error);
       finishRunDetail(runAgent.id, aborted ? "stopped" : "blocked", {
@@ -570,15 +766,15 @@ export function AgentsScreen({
         aborted ? "idle" : "blocked",
         aborted ? "warning" : "error",
       );
-    } finally {
       if (activeRunControllerRef.current === controller) {
         activeRunControllerRef.current = null;
+        activeSessionRef.current = null;
       }
     }
   }
   function startRunDetail(runAgent: AgentDefinition, workflow: AgentWorkflow) {
     const timestamp = Date.now();
-    setActiveMainTab("details");
+    // Do not route to 'details', keep the user on the main screen.
     setIsInspectorOpen(false);
     setRunDetailsByAgentId((current) => ({
       ...current,
@@ -680,18 +876,8 @@ export function AgentsScreen({
         appendRunDetailText(agentId, "reasoningText", event.text);
         break;
       case "status":
-        appendRunDetailEvent(agentId, {
-          level: event.level,
-          message: event.message,
-          title: event.title,
-        });
         break;
       case "server-request":
-        appendRunDetailEvent(agentId, {
-          level: "warning",
-          message: serverRequestSummary(event.request),
-          title: "Approval requested",
-        });
         break;
       case "thread-started":
         setState((current) =>
@@ -699,19 +885,9 @@ export function AgentsScreen({
             isPrimary: event.isPrimary,
           }),
         );
-        appendRunDetailEvent(agentId, {
-          level: "trace",
-          message: event.thread.id,
-          title: event.thread.agentRole ? "Subagent started" : "Thread started",
-        });
         break;
       case "thread-closed":
         setState((current) => markAgentThreadClosed(current, event.threadId));
-        appendRunDetailEvent(agentId, {
-          level: "trace",
-          message: event.threadId,
-          title: "Thread closed",
-        });
         break;
       case "error":
         appendRunDetailEvent(agentId, {
@@ -721,11 +897,6 @@ export function AgentsScreen({
         });
         break;
       case "finish":
-        appendRunDetailEvent(agentId, {
-          level: "info",
-          message: `Finish reason: ${event.finishReason ?? "completed"}.`,
-          title: "Stream finished",
-        });
         break;
       case "abort":
         appendRunDetailEvent(agentId, {
@@ -789,8 +960,27 @@ export function AgentsScreen({
       ].slice(-120),
     }));
   }
-  function stopWorkflowRun() {
+  function interruptWorkflowTurn() {
     activeRunControllerRef.current?.abort();
+    activeSessionRef.current?.interrupt();
+
+    if (selectedAgent && isRunInProgress) {
+      const previousStatus = selectedAgent.status;
+      finishRunDetail(selectedAgent.id, "stopped", {
+        level: "warning",
+        message: "Turn interrupted by user.",
+        title: "Turn interrupted",
+      });
+      if (selectedWorkflow) {
+        setRunCompletedState(
+          selectedAgent,
+          selectedWorkflow,
+          previousStatus,
+          "idle",
+          "warning",
+        );
+      }
+    }
   }
 }
 type ModelSummary = {
@@ -803,66 +993,89 @@ function PageHeader({
   agentFilter,
   isRunInProgress,
   modelSummary,
+  isSessionsSidebarOpen,
+  onToggleSessions,
   onFilterChange,
   onRefreshModels,
-  onRunWorkflow,
-  onStopRun,
+  warningEvents,
 }: {
   agentFilter: AgentFilter;
   isRunInProgress: boolean;
   modelSummary: ModelSummary;
+  isSessionsSidebarOpen: boolean;
+  onToggleSessions: () => void;
   onFilterChange: (filter: AgentFilter) => void;
   onRefreshModels: () => void;
-  onRunWorkflow: () => void;
-  onStopRun: () => void;
+  warningEvents: RunEvent[];
 }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 py-3">
+    <header className="@container flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 py-3">
       <div className="flex items-center gap-2">
         <Button
-          className="h-8 gap-1.5 text-xs text-muted-foreground"
+          className={cn("h-8 gap-1.5 text-xs px-2 @[550px]:px-3", isSessionsSidebarOpen ? "bg-accent text-accent-foreground" : "text-muted-foreground")}
           variant="ghost"
+          onClick={onToggleSessions}
         >
           <History className="size-3.5" />
-          Sessions
+          <span className="hidden @[550px]:inline">Sessions</span>
         </Button>
         <Button
-          className="h-8 gap-1.5 text-xs text-muted-foreground"
+          className="h-8 gap-1.5 text-xs px-2 @[550px]:px-3 text-muted-foreground"
           variant="ghost"
         >
           <Database className="size-3.5" />
-          Memory
+          <span className="hidden @[550px]:inline">Memory</span>
         </Button>
         <Button
-          className="h-8 gap-1.5 text-xs text-muted-foreground"
+          className="h-8 gap-1.5 text-xs px-2 @[550px]:px-3 text-muted-foreground"
           variant="ghost"
         >
           <Archive className="size-3.5" />
-          Artifacts
+          <span className="hidden @[550px]:inline">Artifacts</span>
         </Button>
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {isRunInProgress ? (
-          <Button
-            className="h-8 gap-1.5 text-xs"
-            onClick={onStopRun}
-            type="button"
-            variant="outline"
-          >
-            <Square className="size-3.5" />
-            Stop
-          </Button>
-        ) : null}
-        <Button
-          className="h-8 gap-1.5 text-xs"
-          disabled={isRunInProgress}
-          onClick={onRunWorkflow}
-          type="button"
-        >
-          <Play className="size-3.5" />
-          Run
-        </Button>
-      </div>
+      {warningEvents.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10">
+              <AlertTriangle className="size-4" />
+              <Badge variant="secondary" className="bg-amber-500/20 text-amber-500 hover:bg-amber-500/30">
+                {warningEvents.length}
+              </Badge>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[400px] max-h-[400px] overflow-y-auto bg-[var(--app-panel)] border-[color:var(--app-border)]">
+            <div className="px-2 py-1.5 text-sm font-semibold text-foreground">Warnings & Errors</div>
+            <DropdownMenuSeparator />
+            <div className="flex flex-col gap-2 p-2">
+              {warningEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className={cn(
+                    "rounded border-l-4 p-3",
+                    event.level === "error"
+                      ? "border-red-500 bg-red-500/10"
+                      : "border-amber-500 bg-amber-500/10",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 mb-1 font-semibold text-xs",
+                      event.level === "error" ? "text-red-500" : "text-amber-500",
+                    )}
+                  >
+                    <AlertCircle className="size-3.5" />
+                    {event.title}
+                  </div>
+                  <p className="text-[11px] text-foreground leading-relaxed whitespace-pre-wrap">
+                    {event.message}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </header>
   );
 }
@@ -1084,6 +1297,7 @@ function AgentDetailRouteScreen({
   isRunInProgress,
   onBack,
   onRunWorkflow,
+  onSendMessage,
   onStopRun,
   run,
   workflow,
@@ -1092,12 +1306,32 @@ function AgentDetailRouteScreen({
   isRunInProgress: boolean;
   onBack: () => void;
   onRunWorkflow: () => void;
+  onSendMessage?: (msg: string) => void;
   onStopRun: () => void;
   run?: AgentRunDetail;
   workflow: AgentWorkflow;
 }) {
   const agentIsRunning =
     agent.status === "running" || run?.status === "running";
+  
+  const events = run?.events ?? [];
+  const warningEvents = events.filter((e) => (e.level === "error" || e.level === "warning") && e.title !== "Run stopped");
+
+  const prevEventsRef = React.useRef(events);
+  React.useEffect(() => {
+    const prevEvents = prevEventsRef.current;
+    const currentEvents = events;
+    if (currentEvents.length > prevEvents.length) {
+      const newEvents = currentEvents.slice(prevEvents.length);
+      for (const event of newEvents) {
+        if (event.title === "Run stopped") {
+          toast.warning("Run stopped", { description: event.message });
+        }
+      }
+    }
+    prevEventsRef.current = currentEvents;
+  }, [events]);
+
   return (
     <section className="grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
       <header className="flex min-w-0 items-center border-b border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 py-2">
@@ -1128,30 +1362,51 @@ function AgentDetailRouteScreen({
               {agent.name}
             </span>
           </div>
-          {agentIsRunning ? (
-            <Button
-              className="h-8 shrink-0 gap-1.5 text-xs"
-              onClick={onStopRun}
-              type="button"
-              variant="outline"
-            >
-              <Square className="size-3.5" />
-              Stop
-            </Button>
-          ) : (
-            <Button
-              className="h-8 shrink-0 gap-1.5 text-xs"
-              disabled={isRunInProgress}
-              onClick={onRunWorkflow}
-              type="button"
-            >
-              <Play className="size-3.5" />
-              Run
-            </Button>
+          {warningEvents.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10">
+                  <AlertTriangle className="size-4" />
+                  <Badge variant="secondary" className="bg-amber-500/20 text-amber-500 hover:bg-amber-500/30">
+                    {warningEvents.length}
+                  </Badge>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[400px] max-h-[400px] overflow-y-auto bg-[var(--app-panel)] border-[color:var(--app-border)]">
+                <div className="px-2 py-1.5 text-sm font-semibold text-foreground">Warnings & Errors</div>
+                <DropdownMenuSeparator />
+                <div className="flex flex-col gap-2 p-2">
+                  {warningEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className={cn(
+                        "rounded border-l-4 p-3",
+                        event.level === "error"
+                          ? "border-red-500 bg-red-500/10"
+                          : "border-amber-500 bg-amber-500/10",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "flex items-center gap-2 mb-1 font-semibold text-xs",
+                          event.level === "error" ? "text-red-500" : "text-amber-500",
+                        )}
+                      >
+                        <AlertCircle className="size-3.5" />
+                        {event.title}
+                      </div>
+                      <p className="text-[11px] text-foreground leading-relaxed whitespace-pre-wrap">
+                        {event.message}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </header>
-      <AgentDetailScreen agent={agent} run={run} workflow={workflow} />
+      <AgentDetailScreen agent={agent} run={run} workflow={workflow} onSendMessage={onSendMessage} onStopRun={onStopRun} />
     </section>
   );
 }
@@ -1159,10 +1414,14 @@ function AgentDetailScreen({
   agent,
   run,
   workflow,
+  onSendMessage,
+  onStopRun,
 }: {
   agent: AgentDefinition;
   run?: AgentRunDetail;
   workflow: AgentWorkflow;
+  onSendMessage?: (msg: string) => void;
+  onStopRun?: () => void;
 }) {
   const agentIsRunning =
     agent.status === "running" || run?.status === "running";
@@ -1173,124 +1432,220 @@ function AgentDetailScreen({
     : "Not run";
   return (
     <section className="grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
-      <div className="grid shrink-0 grid-cols-2 gap-2 border-b border-[color:var(--app-border)] bg-[var(--app-panel)] p-3 sm:grid-cols-4">
-        <MetricTile
-          label="Workflow"
-          value={run?.displayName ?? workflow.name}
-        />
-        <MetricTile label="Status" value={run?.status ?? agent.status} />
-        <MetricTile label="Duration" value={duration} />
-        <MetricTile label="Runtime" value="Rust app-server" />
-      </div>
-      <section className="grid min-h-0 min-w-0 md:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
-        <AgentResponsePanel
+
+      <section className="flex min-h-0 min-w-0 flex-col">
+        <UnifiedActivityPanel
           agentIsRunning={agentIsRunning}
           reasoningText={reasoningText}
           responseText={responseText}
+          events={run?.events ?? []}
+          pendingRequest={run?.pendingRequest}
+          onSendMessage={onSendMessage}
+          onStopRun={onStopRun}
         />
-        <RunActivityPanel events={run?.events ?? []} />
       </section>
     </section>
   );
 }
-function AgentResponsePanel({
+function UnifiedActivityPanel({
   agentIsRunning,
   reasoningText,
   responseText,
+  events,
+  pendingRequest,
+  onSendMessage,
+  onStopRun,
 }: {
   agentIsRunning: boolean;
   reasoningText?: string;
   responseText?: string;
+  events: RunEvent[];
+  pendingRequest?: {
+    request: ServerRequest;
+    resolve: (resolution: AgentServerRequestResolution) => void;
+  };
+  onSendMessage?: (msg: string) => void;
+  onStopRun?: () => void;
 }) {
+  const [input, setInput] = React.useState("");
+  const inputRef = React.useRef<HTMLInputElement>(null);
   return (
-    <section className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden border-r border-[color:var(--app-border)] bg-[var(--app-window)]">
-      <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <MessageSquareText className="size-4 text-muted-foreground" />
-          <h3 className="truncate text-sm font-semibold">Agent Response</h3>
-        </div>
-        {agentIsRunning ? (
-          <span className="text-[11px] text-sky-300">Streaming</span>
-        ) : null}
-      </header>
-      <div className="min-h-0 overflow-auto p-3">
-        {responseText ? (
-          <pre className="whitespace-pre-wrap break-words rounded border border-[color:var(--app-border)] bg-black/10 p-3 text-xs leading-5 text-foreground">
-            {responseText}
-          </pre>
-        ) : (
-          <div className="grid min-h-full place-items-center rounded border border-dashed border-[color:var(--app-border)] bg-black/10 p-6 text-center text-xs leading-5 text-muted-foreground">
-            {agentIsRunning
-              ? "Waiting for streamed app-server text."
-              : "Run this thread to stream a response here."}
-          </div>
-        )}
-        {reasoningText ? (
-          <section className="mt-3 rounded border border-[color:var(--app-border)] bg-black/10 p-3">
-            <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase text-muted-foreground">
-              <Terminal className="size-3.5" />
-              Reasoning
-            </div>
-            <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-4 text-muted-foreground">
-              {reasoningText}
-            </pre>
-          </section>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-function RunActivityPanel({ events }: { events: RunEvent[] }) {
-  return (
-    <section className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-panel)]">
-      <header className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <CircleDot className="size-4 text-muted-foreground" />
-          <h3 className="truncate text-sm font-semibold">Run Activity</h3>
-        </div>
-        <span className="text-[11px] text-muted-foreground">
-          {events.length}
-        </span>
-      </header>
-      <div className="min-h-0 overflow-auto p-3">
-        {events.length ? (
-          <div className="grid gap-2">
-            {events
-              .slice()
-              .reverse()
-              .map((event) => (
-                <div
-                  className="rounded border border-[color:var(--app-border)] bg-[var(--app-window)] p-2"
-                  key={event.id}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={cn(
-                        "text-xs font-semibold",
-                        eventLevelClass(event.level),
-                      )}
-                    >
-                      {event.title}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {timeLabel(event.timestamp)}
-                    </span>
+    <section className="flex flex-col min-h-0 min-w-0 overflow-hidden border-r border-[color:var(--app-border)] bg-[var(--app-window)]">
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="min-h-0 overflow-auto p-3 flex-1 flex flex-col gap-4">
+          {responseText || reasoningText || agentIsRunning ? (
+            <div className="flex flex-col gap-4">
+              {(() => {
+                const reasoningBlocks = (reasoningText || "").split(/\n\n\*\*TURN:\*\*\n\n/);
+                let agentTurnIndex = 0;
+                
+                const msgs = [];
+                const responseStr = responseText || "";
+                const regex = /\*\*(User|Agent):\*\*/g;
+                let match;
+                let lastIndex = 0;
+                let currentRole = null;
+                
+                while ((match = regex.exec(responseStr)) !== null) {
+                  if (currentRole) {
+                    const r = currentRole === 'agent' ? reasoningBlocks[agentTurnIndex++] : undefined;
+                    msgs.push({
+                      role: currentRole,
+                      text: responseStr.slice(lastIndex, match.index).trim(),
+                      reasoning: r,
+                    });
+                  } else {
+                    const text = responseStr.slice(lastIndex, match.index).trim();
+                    if (text) {
+                      msgs.push({ role: 'agent', text, reasoning: undefined });
+                    }
+                  }
+                  currentRole = match[1].toLowerCase();
+                  lastIndex = regex.lastIndex;
+                }
+                
+                if (currentRole) {
+                  const r = currentRole === 'agent' ? reasoningBlocks[agentTurnIndex++] : undefined;
+                  msgs.push({
+                    role: currentRole,
+                    text: responseStr.slice(lastIndex).trim(),
+                    reasoning: r,
+                  });
+                } else if (responseStr.trim()) {
+                  msgs.push({ role: 'agent', text: responseStr.trim(), reasoning: reasoningBlocks[0] });
+                } else if (reasoningText?.trim()) {
+                  msgs.push({ role: 'agent', text: "", reasoning: reasoningBlocks[0] });
+                } else if (agentIsRunning) {
+                  msgs.push({ role: 'agent', text: "", reasoning: undefined });
+                }
+                
+                return msgs.map((msg, i) => (
+                  <div key={i} className={cn("flex flex-col", msg.role === "user" ? "items-end" : "items-start")}>
+                    {msg.reasoning ? (
+                      <details open className="rounded border border-[color:var(--app-border)] bg-black/5 p-3 open:pb-4 group mb-2 max-w-[85%] w-full">
+                        <summary className="flex cursor-pointer items-center gap-2 text-[10px] font-semibold uppercase text-muted-foreground select-none">
+                          <Terminal className="size-3.5" />
+                          Reasoning
+                          <span className="ml-auto text-[10px] group-open:hidden">Show</span>
+                          <span className="ml-auto text-[10px] hidden group-open:inline">Hide</span>
+                        </summary>
+                        <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-4 text-muted-foreground font-sans">
+                          {msg.reasoning.trim()}
+                        </pre>
+                      </details>
+                    ) : null}
+                    
+                    {msg.text ? (
+                      <div className={cn("flex w-full", msg.role === "user" ? "justify-end" : "justify-start")}>
+                        <div className="max-w-[85%] text-sm leading-6 text-foreground prose prose-sm dark:prose-invert">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {msg.text}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    ) : (
+                      /* If agent is generating but hasn't output text yet, show thinking here */
+                      msg.role === 'agent' && agentIsRunning && i === msgs.length - 1 && !msg.reasoning ? (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse p-2 w-full justify-start">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+                          </span>
+                          Thinking...
+                        </div>
+                      ) : null
+                    )}
                   </div>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-[11px] leading-4 text-muted-foreground">
-                    {event.message}
-                  </p>
-                </div>
-              ))}
-          </div>
-        ) : (
-          <div className="grid min-h-full place-items-center rounded border border-dashed border-[color:var(--app-border)] p-4 text-center text-xs text-muted-foreground">
-            No run activity yet.
+                ));
+              })()}
+            </div>
+          ) : (
+            !agentIsRunning && (
+              <div className="grid min-h-full place-items-center rounded border border-dashed border-[color:var(--app-border)] bg-black/5 p-6 text-center text-xs leading-5 text-muted-foreground">
+                Run this thread to stream a response here.
+              </div>
+            )
+          )}
+
+          {/* Pending Approval Card */}
+          {pendingRequest && (
+            <div className="mt-4 rounded border-l-4 border-amber-500 bg-amber-500/10 p-4">
+              <div className="flex items-center gap-2 text-amber-500 mb-2 font-semibold text-sm">
+                <ShieldAlert className="size-4" />
+                Approval Required
+              </div>
+              <p className="text-xs text-foreground mb-4">
+                {pendingRequest.request.method === "item/commandExecution/requestApproval"
+                  ? `Allow app-server command?\n\n${pendingRequest.request.params.command ?? "command"}`
+                  : pendingRequest.request.method === "item/fileChange/requestApproval"
+                    ? `Allow app-server file change?\n\n${pendingRequest.request.params.reason ?? "File change requested."}`
+                    : `Action requested: ${pendingRequest.request.method}`}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  className="px-3 py-1.5 text-xs font-semibold rounded bg-amber-500 text-black hover:bg-amber-400"
+                  onClick={() => pendingRequest.resolve({ type: "resolve", result: { decision: "accept" } })}
+                >
+                  Allow
+                </button>
+                <button
+                  className="px-3 py-1.5 text-xs font-semibold rounded border border-amber-500/50 text-amber-500 hover:bg-amber-500/20"
+                  onClick={() => pendingRequest.resolve({ type: "resolve", result: { decision: "decline" } })}
+                >
+                  Deny
+                </button>
+              </div>
+            </div>
+          )}
+
+        </div>
+        {onSendMessage && (
+          <div className="shrink-0 border-t border-[color:var(--app-border)] p-3 bg-[var(--app-window)]">
+            <div className="relative">
+              <input
+                ref={inputRef}
+                className="w-full bg-black/10 border border-[color:var(--app-border)] rounded-md pl-3 pr-10 py-2 text-sm outline-none placeholder:text-muted-foreground/50 focus:ring-1 focus:ring-ring transition-all"
+                placeholder="Send a message to this agent..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && input.trim()) {
+                    e.preventDefault();
+                    onSendMessage(input.trim());
+                    setInput("");
+                  }
+                }}
+              />
+              {agentIsRunning ? (
+                <button
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-red-500 hover:bg-red-500/10 transition-colors"
+                  onClick={() => onStopRun?.()}
+                >
+                  <Square className="size-4 fill-current" />
+                </button>
+              ) : (
+                <button
+                  disabled={!input.trim()}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-muted-foreground hover:bg-black/20 hover:text-foreground disabled:opacity-50 transition-colors"
+                  onClick={() => {
+                    if (input.trim()) {
+                      onSendMessage(input.trim());
+                      setInput("");
+                    }
+                  }}
+                >
+                  <ArrowUp className="size-4" />
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
+
     </section>
   );
 }
+
 function AgentInspector({
   agent,
   isOpen,
@@ -1545,44 +1900,5 @@ function serverRequestSummary(request: ServerRequest) {
       return "MCP server requested user input.";
     default:
       return request.method;
-  }
-}
-function resolveServerRequestWithPrompt(
-  request: ServerRequest,
-): AgentServerRequestResolution {
-  switch (request.method) {
-    case "item/commandExecution/requestApproval": {
-      const command = request.params.command ?? "command";
-      const approved = window.confirm(
-        `Allow app-server command?\n\n${command}`,
-      );
-      return {
-        type: "resolve",
-        result: { decision: approved ? "accept" : "decline" },
-      };
-    }
-    case "item/fileChange/requestApproval": {
-      const approved = window.confirm(
-        `Allow app-server file change?\n\n${request.params.reason ?? "File change requested."}`,
-      );
-      return {
-        type: "resolve",
-        result: { decision: approved ? "accept" : "decline" },
-      };
-    }
-    case "item/tool/requestUserInput": {
-      const answers = Object.fromEntries(
-        request.params.questions.map((question) => {
-          const answer = window.prompt(question.question) ?? "";
-          return [question.id, { answers: [answer] }];
-        }),
-      );
-      return { type: "resolve", result: { answers } };
-    }
-    default:
-      return {
-        type: "reject",
-        message: `${request.method} is not supported by the desktop app-server UI yet.`,
-      };
   }
 }

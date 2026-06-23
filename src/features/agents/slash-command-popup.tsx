@@ -37,7 +37,6 @@ export function SlashCommandPopup({
             <button
               key={command.command}
               ref={idx === selectedIndex ? selectedRef : null}
-              onMouseDown={() => onSelect(command)}
               onMouseDown={(e) => {
                 e.preventDefault();
                 onSelect(command);

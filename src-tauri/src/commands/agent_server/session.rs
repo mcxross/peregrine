@@ -264,7 +264,6 @@ pub(crate) async fn start_agent_session(
         agent_role,
         agent_instructions,
         workflow_name,
-        prompt,
         cwd,
         workspace_roots,
         target,
@@ -315,35 +314,10 @@ pub(crate) async fn start_agent_session(
     let thread_id = thread_response.thread.id.clone();
     sessions.set_thread(&session_id, thread_id.clone()).await;
 
-    let turn_request_id = next_request_id(&sessions, &session_id).await?;
-    let turn_response: TurnStartResponse = request_handle
-        .request_typed(ClientRequest::TurnStart {
-            request_id: turn_request_id,
-            params: TurnStartParams {
-                thread_id: thread_id.clone(),
-                input: vec![UserInput::Text {
-                    text: prompt,
-                    text_elements: Vec::new(),
-                }],
-                cwd: if target.uses_remote_workspace() {
-                    None
-                } else {
-                    cwd
-                },
-                runtime_workspace_roots: Some(workspace_roots).filter(|roots| !roots.is_empty()),
-                ..Default::default()
-            },
-        })
-        .await
-        .map_err(|err| err.to_string())?;
-    let turn_id = turn_response.turn.id.clone();
-    sessions.set_active_turn(&session_id, turn_id.clone()).await;
-
     Ok(AgentServerStartResponse {
         session_id,
         thread_id,
         thread: thread_response.thread,
-        turn_id,
         model: thread_response.model,
         model_provider: thread_response.model_provider,
     })
@@ -399,8 +373,9 @@ async fn start_embedded_client(
 
     let peregrine_home =
         find_peregrine_home().map_err(|err| format!("failed to resolve PEREGRINE_HOME: {err}"))?;
+    let codex_self_exe = crate::helper_args::resolve_helper_executable().ok();
     let local_runtime_paths =
-        ExecServerRuntimePaths::from_optional_paths(None, None).map_err(|err| err.to_string())?;
+        ExecServerRuntimePaths::from_optional_paths(codex_self_exe.clone(), None).map_err(|err| err.to_string())?;
     let environment_manager =
         EnvironmentManager::from_codex_home(peregrine_home, Some(local_runtime_paths))
             .await
@@ -423,7 +398,7 @@ async fn start_embedded_client(
 
     InProcessAppServerClient::start(InProcessClientStartArgs {
         arg0_paths: Arg0DispatchPaths {
-            codex_self_exe: crate::helper_args::resolve_helper_executable().ok(),
+            codex_self_exe,
             ..Default::default()
         },
         config: Arc::new(config),

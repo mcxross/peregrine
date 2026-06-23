@@ -40,6 +40,7 @@ import {
 } from "@/features/project-workspace/indexer/use-launch-indexer";
 import { defaultLayoutSettings } from "@/layout/layout-store";
 import { titlebarHeight } from "@/layout/window-chrome";
+import { Toaster } from "@/components/ui/sonner";
 
 const ProjectConfigDialog = React.lazy(() =>
   import("@/features/project-workspace/project-config-dialog").then((module) => ({
@@ -838,6 +839,7 @@ export function AppShell({
       <LaunchStatusToasts
         indexState={launchIndex}
       />
+      <Toaster />
     </main>
   );
 }

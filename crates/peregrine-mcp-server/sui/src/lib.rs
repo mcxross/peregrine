@@ -24,6 +24,7 @@ pub enum TransportKind {
 
 pub fn run_server(transport: TransportKind) -> anyhow::Result<()> {
     tokio::runtime::Builder::new_multi_thread()
+        .thread_stack_size(16 * 1024 * 1024)
         .enable_all()
         .build()
         .context("create Peregrine MCP runtime")?

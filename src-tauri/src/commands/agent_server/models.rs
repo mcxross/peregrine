@@ -13,7 +13,6 @@ pub(crate) struct AgentServerStartRequest {
     pub(crate) agent_role: Option<String>,
     pub(crate) agent_instructions: String,
     pub(crate) workflow_name: String,
-    pub(crate) prompt: String,
     pub(crate) cwd: Option<PathBuf>,
     #[serde(default)]
     pub(crate) workspace_roots: Vec<PathBuf>,
@@ -27,7 +26,6 @@ pub(crate) struct AgentServerStartResponse {
     pub(crate) session_id: String,
     pub(crate) thread_id: String,
     pub(crate) thread: Thread,
-    pub(crate) turn_id: String,
     pub(crate) model: String,
     pub(crate) model_provider: String,
 }
@@ -90,3 +88,37 @@ pub(crate) struct AgentServerModelListResponse {
     pub(crate) models: ModelListResponse,
     pub(crate) providers: ModelProviderListResponse,
 }
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AgentServerModelProviderSelectRequest {
+    pub(crate) provider_id: String,
+    pub(crate) model: Option<String>,
+    pub(crate) cwd: Option<PathBuf>,
+    #[serde(default)]
+    pub(crate) target: AgentServerTargetConfig,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AgentServerModelProviderSelectResponse {
+    pub(crate) success: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AgentServerThreadListRequest {
+    pub(crate) cwd: Option<PathBuf>,
+    #[serde(default)]
+    pub(crate) target: AgentServerTargetConfig,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AgentServerThreadReadRequest {
+    pub(crate) thread_id: String,
+    pub(crate) cwd: Option<PathBuf>,
+    #[serde(default)]
+    pub(crate) target: AgentServerTargetConfig,
+}
+

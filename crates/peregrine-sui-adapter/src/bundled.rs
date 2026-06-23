@@ -16,6 +16,7 @@ pub(crate) fn run_blocking(args: Vec<OsString>) -> Result<SuiCommandOutput, SuiA
     let command = sui::sui_commands::SuiCommand::try_parse_from(args)
         .map_err(|error| SuiAdapterError::CommandParse(error.to_string()))?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
+        .thread_stack_size(16 * 1024 * 1024)
         .enable_all()
         .build()
         .map_err(|error| SuiAdapterError::Runtime(error.to_string()))?;

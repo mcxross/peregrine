@@ -102,6 +102,7 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
 
 pub fn run_stdio() -> anyhow::Result<()> {
     tokio::runtime::Builder::new_multi_thread()
+        .thread_stack_size(16 * 1024 * 1024)
         .enable_all()
         .build()
         .context("create Sui Move knowledge MCP runtime")?

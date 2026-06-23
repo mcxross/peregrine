@@ -134,6 +134,7 @@ fn run_bytecode_viewer_helper(mut args: impl Iterator<Item = std::ffi::OsString>
         bytecode_map,
     };
     let runtime = tokio::runtime::Builder::new_multi_thread()
+        .thread_stack_size(16 * 1024 * 1024)
         .enable_all()
         .build()
         .expect("bytecode viewer runtime");

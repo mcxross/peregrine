@@ -7,13 +7,16 @@ use crate::state::AgentServerCommandState;
 use models::{
     AgentServerModelListRequest, AgentServerModelListResponse, AgentServerRejectRequest,
     AgentServerResolveRequest, AgentServerStartRequest, AgentServerStartResponse,
-    AgentServerStopRequest, AgentServerTurnInterruptRequest, AgentServerTurnRequest,
-    AgentServerTurnResponse,
+    AgentServerStopRequest, AgentServerThreadListRequest, AgentServerThreadReadRequest,
+    AgentServerTurnInterruptRequest, AgentServerTurnRequest, AgentServerTurnResponse,
 };
 use peregrine_app_server_protocol::{
-    ClientRequest, JSONRPCErrorError, ModelListParams, ModelListResponse, ModelProviderListParams,
-    ModelProviderListResponse, RequestId, TurnInterruptParams, TurnInterruptResponse,
-    TurnStartParams, TurnStartResponse, TurnSteerParams, TurnSteerResponse, UserInput,
+    ClientRequest, JSONRPCErrorError, Model, ModelListParams, ModelListResponse,
+    ModelProviderKind, ModelProviderListParams, ModelProviderListResponse,
+    ModelProviderModelsListParams, ModelProviderModelsListResponse, RequestId, ThreadListParams,
+    ThreadListResponse, ThreadReadParams, ThreadReadResponse, TurnInterruptParams,
+    TurnInterruptResponse, TurnStartParams, TurnStartResponse, TurnSteerParams, TurnSteerResponse,
+    UserInput,
 };
 use tauri::{AppHandle, State};
 
@@ -169,7 +172,7 @@ pub(crate) async fn agent_server_model_list(
 ) -> Result<AgentServerModelListResponse, String> {
     let (client, _) =
         session::create_app_server_client(request.target, request.cwd, Vec::new()).await?;
-    let models: ModelListResponse = match client
+    let mut models: ModelListResponse = match client
         .request_typed(ClientRequest::ModelList {
             request_id: RequestId::Integer(1),
             params: ModelListParams {
@@ -199,9 +202,118 @@ pub(crate) async fn agent_server_model_list(
             return Err(err.to_string());
         }
     };
+
+    if let Some(selected) = providers
+        .data
+        .iter()
+        .find(|p| p.id == providers.selected_provider_id)
+    {
+        if selected.kind == ModelProviderKind::Ollama {
+            let provider_models_response = client
+                .request_typed::<ModelProviderModelsListResponse>(ClientRequest::ModelProviderModelsList {
+                    request_id: RequestId::Integer(3),
+                    params: ModelProviderModelsListParams {
+                        provider_id: providers.selected_provider_id.clone(),
+                    },
+                })
+                .await;
+
+            if let Ok(provider_models) = provider_models_response {
+                models.data = provider_models
+                    .data
+                    .into_iter()
+                    .map(|pm| Model {
+                        id: pm.id,
+                        model: pm.model,
+                        upgrade: None,
+                        upgrade_info: None,
+                        availability_nux: None,
+                        display_name: pm.display_name,
+                        description: pm.description.unwrap_or_default(),
+                        hidden: false,
+                        supported_reasoning_efforts: vec![],
+                        default_reasoning_effort: Default::default(),
+                        input_modalities: vec![],
+                        supports_personality: false,
+                        additional_speed_tiers: vec![],
+                        service_tiers: vec![],
+                        default_service_tier: None,
+                        is_default: pm.is_default,
+                    })
+                    .collect();
+            }
+        }
+    }
+
     client.shutdown().await.map_err(|err| err.to_string())?;
 
     Ok(AgentServerModelListResponse { models, providers })
+}
+
+#[tauri::command]
+pub(crate) async fn agent_server_thread_list(
+    request: models::AgentServerThreadListRequest,
+) -> Result<ThreadListResponse, String> {
+    let (client, _) =
+        session::create_app_server_client(request.target, request.cwd, Vec::new()).await?;
+
+    let response = match client
+        .request_typed::<ThreadListResponse>(ClientRequest::ThreadList {
+            request_id: RequestId::Integer(1),
+            params: ThreadListParams {
+                cursor: None,
+                limit: None,
+                sort_key: None,
+                sort_direction: None,
+                model_providers: None,
+                source_kinds: None,
+                archived: Some(false),
+                cwd: None,
+                use_state_db_only: false,
+                search_term: None,
+            },
+        })
+        .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            let _ = client.shutdown().await;
+            return Err(err.to_string());
+        }
+    };
+
+    client.shutdown().await.map_err(|err| err.to_string())?;
+
+    Ok(response)
+}
+
+#[tauri::command]
+pub(crate) async fn agent_server_thread_read(
+    request: models::AgentServerThreadReadRequest,
+) -> Result<ThreadReadResponse, String> {
+    let (client, _) =
+        session::create_app_server_client(request.target, request.cwd, Vec::new()).await?;
+
+    let response = match client
+        .request_typed::<ThreadReadResponse>(ClientRequest::ThreadRead {
+            request_id: RequestId::Integer(1),
+            params: ThreadReadParams {
+                thread_id: request.thread_id,
+                include_turns: false,
+            },
+        })
+        .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            let _ = client.shutdown().await;
+            return Err(err.to_string());
+        }
+    };
+
+    client.shutdown().await.map_err(|err| err.to_string())?;
+
+    Ok(response)
 }
 
 fn text_input(text: String) -> Vec<UserInput> {
@@ -209,4 +321,35 @@ fn text_input(text: String) -> Vec<UserInput> {
         text,
         text_elements: Vec::new(),
     }]
+}
+
+#[tauri::command]
+pub(crate) async fn agent_server_model_provider_select(
+    request: models::AgentServerModelProviderSelectRequest,
+) -> Result<models::AgentServerModelProviderSelectResponse, String> {
+    use peregrine_app_server_protocol::ModelProviderSelectParams;
+
+    let (client, _) =
+        session::create_app_server_client(request.target, request.cwd, Vec::new()).await?;
+
+    let _response = match client
+        .request_typed::<peregrine_app_server_protocol::ModelProviderSelectResponse>(ClientRequest::ModelProviderSelect {
+            request_id: RequestId::Integer(1),
+            params: ModelProviderSelectParams {
+                provider_id: request.provider_id,
+                model: request.model,
+            },
+        })
+        .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            let _ = client.shutdown().await;
+            return Err(err.to_string());
+        }
+    };
+
+    client.shutdown().await.map_err(|err| err.to_string())?;
+
+    Ok(models::AgentServerModelProviderSelectResponse { success: true })
 }

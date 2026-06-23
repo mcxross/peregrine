@@ -9,6 +9,8 @@ import type {
   ModelListResponse,
   ModelProviderListResponse,
   Thread,
+  ThreadListResponse,
+  ThreadReadResponse,
 } from "@peregrine/app-server-protocol/v2";
 
 import type {
@@ -30,6 +32,7 @@ export type AgentServerTarget =
 
 export type AgentServerSettings = {
   target: AgentServerTarget;
+  provider?: string;
 };
 
 export type AgentRunResult = {
@@ -82,7 +85,6 @@ type AgentServerStartResponse = {
   sessionId: string;
   threadId: string;
   thread: Thread;
-  turnId: string;
   model: string;
   modelProvider: string;
 };
@@ -126,6 +128,39 @@ export async function listAgentServerModels({
 } = {}) {
   return invoke<AgentServerModelListResponse>("agent_server_model_list", {
     request: {
+      cwd,
+      target: target ?? loadAgentServerSettings().target,
+    },
+  });
+}
+
+export async function listAgentServerThreads({
+  cwd,
+  target,
+}: {
+  cwd?: string;
+  target?: AgentServerTarget;
+} = {}) {
+  return invoke<ThreadListResponse>("agent_server_thread_list", {
+    request: {
+      cwd,
+      target: target ?? loadAgentServerSettings().target,
+    },
+  });
+}
+
+export async function readAgentServerThread({
+  threadId,
+  cwd,
+  target,
+}: {
+  threadId: string;
+  cwd?: string;
+  target?: AgentServerTarget;
+}) {
+  return invoke<ThreadReadResponse>("agent_server_thread_read", {
+    request: {
+      threadId,
       cwd,
       target: target ?? loadAgentServerSettings().target,
     },
@@ -177,16 +212,165 @@ export async function sendAgentTurn({
   });
 }
 
-export async function runAgentWorkflowWithAppServer({
-  agent,
-  onServerRequest,
-  onStream,
-  onTrace,
-  projectContext,
-  signal,
-  target,
-  workflow,
-}: {
+export class PersistentAgentSession {
+  public sessionId: string;
+  private unlisten: UnlistenFn[] = [];
+  private currentTurnResolve?: (result: AgentRunResult) => void;
+  private currentTurnReject?: (error: unknown) => void;
+  private responseText = "";
+  private reasoningText = "";
+  private settled = false;
+
+  constructor(
+    public agent: AgentDefinition,
+    public workflow: AgentWorkflow,
+    private target?: AgentServerTarget,
+    private projectContext?: AgentToolProjectContext | null,
+    private onStream?: (event: AgentRunStreamEvent) => void,
+    private onTrace?: (event: AgentRunTraceEvent) => void,
+    private onServerRequest?: (request: ServerRequest) => AgentServerRequestResolution | Promise<AgentServerRequestResolution>,
+  ) {
+    this.sessionId = createRunSessionId(agent.id);
+  }
+
+  async start(signal?: AbortSignal): Promise<AgentRunResult> {
+    this.responseText = "";
+    this.reasoningText = "";
+    this.settled = false;
+
+    const abort = () => {
+      void interruptAgentRun(this.sessionId).catch(() => undefined);
+      this.onStream?.({ type: "abort", reason: "Run stopped by user." });
+      this.settleReject(new DOMException("Run stopped by user.", "AbortError"));
+    };
+
+    if (signal?.aborted) {
+      abort();
+      return Promise.reject(new DOMException("Run stopped by user.", "AbortError"));
+    }
+
+    signal?.addEventListener("abort", abort, { once: true });
+
+    const listeners = await Promise.all([
+      listen<AgentServerEventEnvelope>(AGENT_SERVER_EVENT, (event) => {
+        if (event.payload.sessionId !== this.sessionId) {
+          return;
+        }
+        handleAgentServerEvent({
+          envelope: event.payload,
+          onStream: this.onStream,
+          onTrace: this.onTrace,
+          settleReject: this.settleReject.bind(this),
+          settleResolve: this.settleResolve.bind(this),
+          updateReasoning: (delta) => {
+            this.reasoningText += delta;
+          },
+          updateResponse: (delta) => {
+            this.responseText += delta;
+          },
+        });
+      }),
+      listen<AgentServerRequestEnvelope>(AGENT_SERVER_REQUEST, (event) => {
+        if (event.payload.sessionId !== this.sessionId) {
+          return;
+        }
+        const { request } = event.payload;
+        this.onStream?.({ type: "server-request", request });
+        void resolveServerRequestFromUi(this.sessionId, request, this.onServerRequest)
+          .catch((error) => {
+            this.onTrace?.({
+              level: "error",
+              message: `Server request handling failed: ${formatError(error)}`,
+            });
+          });
+      }),
+      listen<AgentServerDisconnectedEnvelope>(AGENT_SERVER_DISCONNECTED, (event) => {
+        if (event.payload.sessionId !== this.sessionId) {
+          return;
+        }
+        this.settleReject(new Error(event.payload.message));
+        void this.stop();
+      }),
+    ]);
+    
+    this.unlisten.push(...listeners);
+
+    this.onTrace?.({
+      level: "trace",
+      message: `Starting app-server run for ${this.agent.name}.`,
+    });
+    
+    const startResponse = await invoke<AgentServerStartResponse>("agent_server_start", {
+      request: {
+        sessionId: this.sessionId,
+        agentName: this.agent.name,
+        agentRole: this.agent.isPrimary ? undefined : this.agent.roleName,
+        agentInstructions: this.agent.systemPrompt,
+        workflowName: this.workflow.name,
+        cwd: this.projectContext?.rootPath,
+        workspaceRoots: this.projectContext?.rootPath ? [this.projectContext.rootPath] : [],
+        target: this.target ?? loadAgentServerSettings().target,
+      },
+    }).catch((error) => {
+      this.settleReject(error);
+      throw error;
+    });
+    
+    this.onStream?.({ type: "thread-started", isPrimary: true, thread: startResponse.thread });
+    this.onTrace?.({
+      level: "info",
+      message: `Connected to app-server model ${startResponse.modelProvider}/${startResponse.model}.`,
+    });
+
+    return { text: "", toolRuns: [] };
+  }
+
+  async sendTurn(prompt: string): Promise<AgentRunResult> {
+    this.responseText = "";
+    this.reasoningText = "";
+    this.settled = false;
+    await sendAgentTurn({ sessionId: this.sessionId, prompt });
+    return new Promise<AgentRunResult>((resolve, reject) => {
+      this.currentTurnResolve = resolve;
+      this.currentTurnReject = reject;
+    });
+  }
+
+  private settleResolve(result: AgentRunResult) {
+    if (!this.settled) {
+      this.settled = true;
+      if (this.currentTurnResolve) {
+        this.currentTurnResolve({
+          ...result,
+          text: result.text || this.responseText,
+          toolRuns: [],
+        });
+      }
+    }
+  }
+
+  private settleReject(error: unknown) {
+    if (!this.settled) {
+      this.settled = true;
+      if (this.currentTurnReject) {
+        this.currentTurnReject(error);
+      }
+    }
+  }
+
+  async stop() {
+    this.unlisten.forEach((u) => u());
+    this.unlisten = [];
+    void stopAgentRun(this.sessionId).catch(() => undefined);
+    this.settleReject(new Error("Agent session stopped"));
+  }
+
+  async interrupt() {
+    await interruptAgentRun(this.sessionId).catch(() => undefined);
+  }
+}
+
+export async function runAgentWorkflowWithAppServer(args: {
   agent: AgentDefinition;
   onServerRequest?: (request: ServerRequest) => AgentServerRequestResolution | Promise<AgentServerRequestResolution>;
   onStream?: (event: AgentRunStreamEvent) => void;
@@ -196,125 +380,19 @@ export async function runAgentWorkflowWithAppServer({
   target?: AgentServerTarget;
   workflow: AgentWorkflow;
 }): Promise<AgentRunResult> {
-  const sessionId = createRunSessionId(agent.id);
-  let responseText = "";
-  let reasoningText = "";
-  let settled = false;
-  let startResponse: AgentServerStartResponse | null = null;
-  const unlisten: UnlistenFn[] = [];
-
-  const finish = new Promise<AgentRunResult>((resolve, reject) => {
-    const settleResolve = (result: AgentRunResult) => {
-      if (!settled) {
-        settled = true;
-        resolve(result);
-      }
-    };
-    const settleReject = (error: unknown) => {
-      if (!settled) {
-        settled = true;
-        reject(error);
-      }
-    };
-
-    const abort = () => {
-      void interruptAgentRun(sessionId, startResponse?.turnId).catch(() => undefined);
-      void stopAgentRun(sessionId).catch(() => undefined);
-      onStream?.({ type: "abort", reason: "Run stopped by user." });
-      settleReject(new DOMException("Run stopped by user.", "AbortError"));
-    };
-
-    if (signal?.aborted) {
-      abort();
-      return;
-    }
-
-    signal?.addEventListener("abort", abort, { once: true });
-
-    void Promise.all([
-      listen<AgentServerEventEnvelope>(AGENT_SERVER_EVENT, (event) => {
-        if (event.payload.sessionId !== sessionId) {
-          return;
-        }
-        handleAgentServerEvent({
-          envelope: event.payload,
-          onStream,
-          onTrace,
-          settleReject,
-          settleResolve,
-          updateReasoning: (delta) => {
-            reasoningText += delta;
-          },
-          updateResponse: (delta) => {
-            responseText += delta;
-          },
-        });
-      }),
-      listen<AgentServerRequestEnvelope>(AGENT_SERVER_REQUEST, (event) => {
-        if (event.payload.sessionId !== sessionId) {
-          return;
-        }
-        const { request } = event.payload;
-        onStream?.({ type: "server-request", request });
-        void resolveServerRequestFromUi(sessionId, request, onServerRequest)
-          .catch((error) => {
-            onTrace?.({
-              level: "error",
-              message: `Server request handling failed: ${formatError(error)}`,
-            });
-          });
-      }),
-      listen<AgentServerDisconnectedEnvelope>(AGENT_SERVER_DISCONNECTED, (event) => {
-        if (event.payload.sessionId !== sessionId) {
-          return;
-        }
-        settleReject(new Error(event.payload.message));
-      }),
-    ])
-      .then((listeners) => {
-        unlisten.push(...listeners);
-      })
-      .then(async () => {
-        const prompt = buildAgentPrompt(agent, workflow, projectContext ?? null);
-        onTrace?.({
-          level: "trace",
-          message: `Starting app-server run for ${agent.name}.`,
-        });
-        startResponse = await invoke<AgentServerStartResponse>("agent_server_start", {
-          request: {
-            sessionId,
-            agentName: agent.name,
-            agentRole: agent.isPrimary ? undefined : agent.roleName,
-            agentInstructions: agent.systemPrompt,
-            workflowName: workflow.name,
-            prompt,
-            cwd: projectContext?.rootPath,
-            workspaceRoots: projectContext?.rootPath ? [projectContext.rootPath] : [],
-            target: target ?? loadAgentServerSettings().target,
-          },
-        });
-        onStream?.({ type: "thread-started", isPrimary: true, thread: startResponse.thread });
-        onTrace?.({
-          level: "info",
-          message: `Connected to app-server model ${startResponse.modelProvider}/${startResponse.model}.`,
-        });
-      })
-      .catch(settleReject);
-  });
-
+  const session = new PersistentAgentSession(
+    args.agent,
+    args.workflow,
+    args.target,
+    args.projectContext,
+    args.onStream,
+    args.onTrace,
+    args.onServerRequest,
+  );
   try {
-    const result = await finish;
-    return {
-      ...result,
-      text: result.text || responseText,
-      toolRuns: [],
-    };
+    return await session.start(args.signal);
   } finally {
-    for (const stopListening of unlisten) {
-      stopListening();
-    }
-    await stopAgentRun(sessionId).catch(() => undefined);
-    void reasoningText;
+    await session.stop();
   }
 }
 
@@ -467,40 +545,6 @@ function describeThreadItem(item: { type: string } & Record<string, unknown>) {
       return item.type;
   }
 }
-
-function buildAgentPrompt(
-  agent: AgentDefinition,
-  workflow: AgentWorkflow,
-  projectContext: AgentToolProjectContext | null,
-) {
-  const projectText = projectContext
-    ? [
-        `Project root: ${projectContext.rootPath}`,
-        `Package: ${projectContext.packageName}`,
-        `Package path: ${projectContext.packagePath}`,
-        `Manifest: ${projectContext.manifestPath}`,
-      ].join("\n")
-    : "No Move package is currently open.";
-
-  return [
-    `Run the ${agent.name} desktop workflow.`,
-    agent.roleName ? `App-server role: ${agent.roleName}` : "",
-    "",
-    `Workflow: ${workflow.name}`,
-    workflow.description ? `Workflow description: ${workflow.description}` : "",
-    "",
-    "Project context:",
-    projectText,
-    "",
-    "Agent instructions:",
-    agent.systemPrompt,
-    "",
-    "Return a concise, evidence-aware response. The TypeScript deterministic audit tools are not available in this desktop path; use the app-server capabilities and ask for approvals when required.",
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
 function normalizeAgentServerSettings(
   settings: Partial<AgentServerSettings>,
 ): AgentServerSettings {
@@ -535,4 +579,25 @@ function createRunSessionId(agentId: string) {
 
 function formatError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+export async function selectAgentServerModelProvider({
+  providerId,
+  model,
+  cwd,
+  target,
+}: {
+  providerId: string;
+  model?: string;
+  cwd?: string;
+  target?: AgentServerTarget;
+}) {
+  return invoke<{ success: boolean }>("agent_server_model_provider_select", {
+    request: {
+      providerId,
+      model,
+      cwd,
+      target: target ?? loadAgentServerSettings().target,
+    },
+  });
 }
