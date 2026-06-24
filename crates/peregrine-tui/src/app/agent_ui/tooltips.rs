@@ -1,4 +1,3 @@
-
 use lazy_static::lazy_static;
 use peregrine_types::account::PlanType;
 use rand::Rng;
@@ -7,12 +6,8 @@ const IS_MACOS: bool = cfg!(target_os = "macos");
 const IS_WINDOWS: bool = cfg!(target_os = "windows");
 
 const APP_TOOLTIP: &str = "Open **Peregrine Desktop** with `peregrine app`.";
-const FAST_TOOLTIP: &str =
-    "*New* Use **/fast** to enable our fastest inference with increased plan usage.";
-const OTHER_TOOLTIP: &str = "*New* Build faster with **Peregrine Desktop**. Run `peregrine app`.";
-const OTHER_TOOLTIP_NON_MAC: &str = "*New* Build faster with Peregrine.";
-const FREE_GO_TOOLTIP: &str =
-    "*New* For a limited time, Peregrine is included in your plan for free – let’s build together.";
+const OTHER_TOOLTIP: &str = "Use the Peregrine App for a Desktop experience. Run `peregrine app`.";
+const OTHER_TOOLTIP_NON_MAC: &str = "Use the Peregrine App for a Desktop experience.";
 
 const RAW_TOOLTIPS: &str = include_str!("tooltips.txt");
 
@@ -56,7 +51,7 @@ pub(crate) fn get_tooltip(plan: Option<PlanType>, fast_mode_enabled: bool) -> Op
                 }
             }
             Some(PlanType::Go) | Some(PlanType::Free) => {
-                return Some(FREE_GO_TOOLTIP.to_string());
+                return None;
             }
             _ => {
                 let tooltip = if IS_MACOS {
@@ -91,7 +86,7 @@ fn pick_paid_tooltip<R: Rng + ?Sized>(
     if fast_mode_enabled || rng.random_bool(0.5) {
         paid_app_tooltip()
     } else {
-        Some(FAST_TOOLTIP)
+        None
     }
 }
 
@@ -304,7 +299,7 @@ mod tests {
             ));
         }
 
-        let expected = std::collections::BTreeSet::from([paid_app_tooltip(), Some(FAST_TOOLTIP)]);
+        let expected = std::collections::BTreeSet::from([paid_app_tooltip(), None]);
         assert_eq!(seen, expected);
     }
 
@@ -318,7 +313,7 @@ mod tests {
 
         let expected = std::collections::BTreeSet::from([paid_app_tooltip()]);
         assert_eq!(seen, expected);
-        assert!(!seen.contains(&Some(FAST_TOOLTIP)));
+        assert!(!seen.contains(&None));
     }
 
     #[test]
