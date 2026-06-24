@@ -7,10 +7,10 @@ use codex_login::AuthManager;
 use codex_login::CodexAuth;
 use codex_model_provider_info::CHATGPT_CODEX_BASE_URL;
 use codex_model_provider_info::ModelProviderInfo;
-use codex_models_manager::AuthMode;
-use codex_models_manager::manager::OpenAiModelsManager;
-use codex_models_manager::manager::SharedModelsManager;
-use codex_models_manager::manager::StaticModelsManager;
+use peregrine_models_manager::AuthMode;
+use peregrine_models_manager::manager::OpenAiModelsManager;
+use peregrine_models_manager::manager::SharedModelsManager;
+use peregrine_models_manager::manager::StaticModelsManager;
 use codex_protocol::account::ProviderAccount;
 use codex_protocol::openai_models::ModelsResponse;
 use http::HeaderMap;
@@ -205,7 +205,14 @@ pub trait ModelProvider: fmt::Debug + Send + Sync {
     /// Returns provider configuration adapted for the API client.
     async fn api_provider(&self) -> codex_protocol::error::Result<Provider> {
         let auth = self.auth().await;
-        api_provider_from_info(self.info(), auth.as_ref().map(CodexAuth::auth_mode))
+        api_provider_from_info(self.info(), auth.as_ref().map(|a| a.auth_mode()).map(|mode| {
+            match format!("{:?}", mode).as_str() {
+                "Chatgpt" => AuthMode::Chatgpt,
+                "ChatgptAuthTokens" => AuthMode::ChatgptAuthTokens,
+                "AgentIdentity" => AuthMode::AgentIdentity,
+                _ => AuthMode::Chatgpt,
+            }
+        }))
     }
 
     /// Returns the provider base URL that will be used at request time.
@@ -353,7 +360,7 @@ mod tests {
 
     use codex_model_provider_info::ModelProviderAwsAuthInfo;
     use codex_model_provider_info::WireApi;
-    use codex_models_manager::manager::RefreshStrategy;
+    use peregrine_models_manager::manager::RefreshStrategy;
     use codex_protocol::config_types::ModelProviderAuthInfo;
     use codex_protocol::openai_models::ModelInfo;
     use codex_protocol::openai_models::ModelsResponse;
@@ -608,7 +615,7 @@ mod tests {
 
     #[tokio::test]
     async fn configured_bedrock_catalog_only_allows_default_service_tier() {
-        let configured_model = codex_models_manager::bundled_models_response()
+        let configured_model = peregrine_models_manager::bundled_models_response()
             .expect("bundled models should parse")
             .models
             .into_iter()

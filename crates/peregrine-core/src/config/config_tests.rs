@@ -11,7 +11,7 @@ use codex_features::FeaturesToml;
 use codex_model_provider_info::LMSTUDIO_OSS_PROVIDER_ID;
 use codex_model_provider_info::OLLAMA_OSS_PROVIDER_ID;
 use codex_model_provider_info::WireApi;
-use codex_models_manager::bundled_models_response;
+use peregrine_models_manager::bundled_models_response;
 use codex_network_proxy::NetworkMode;
 use peregrine_config::CONFIG_TOML_FILE;
 use peregrine_config::ConfigLayerEntry;

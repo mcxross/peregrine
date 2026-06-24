@@ -1,7 +1,7 @@
 use anyhow::Result;
 use codex_features::Feature;
 use codex_login::CodexAuth as PeregrineAuth;
-use codex_models_manager::manager::RefreshStrategy;
+use peregrine_models_manager::manager::RefreshStrategy;
 use core_test_support::responses::ev_completed_with_tokens;
 use core_test_support::responses::ev_image_generation_call;
 use core_test_support::responses::ev_response_created;

@@ -10,7 +10,7 @@ use codex_login::CodexAuth;
 use codex_login::collect_auth_env_telemetry;
 use codex_login::default_client::build_reqwest_client;
 use codex_model_provider_info::ModelProviderInfo;
-use codex_models_manager::manager::ModelsEndpointClient;
+use peregrine_models_manager::manager::ModelsEndpointClient;
 use codex_otel::TelemetryAuthMode;
 use codex_protocol::error::CodexErr;
 use codex_protocol::error::Result as CoreResult;
@@ -86,8 +86,16 @@ impl ModelsEndpointClient for OpenAiModelsEndpoint {
         let _timer =
             codex_otel::start_global_timer("codex.remote_models.fetch_update.duration_ms", &[]);
         let auth = self.auth().await;
-        let auth_mode = auth.as_ref().map(CodexAuth::auth_mode);
-        let api_provider = api_provider_from_info(&self.provider_info, auth_mode)?;
+        let auth_mode = auth.as_ref().map(|a| a.auth_mode());
+        let api_auth_mode = auth_mode.clone().map(|mode| {
+            match format!("{:?}", mode).as_str() {
+                "Chatgpt" => peregrine_models_manager::AuthMode::Chatgpt,
+                "ChatgptAuthTokens" => peregrine_models_manager::AuthMode::ChatgptAuthTokens,
+                "AgentIdentity" => peregrine_models_manager::AuthMode::AgentIdentity,
+                _ => peregrine_models_manager::AuthMode::Chatgpt,
+            }
+        });
+        let api_provider = api_provider_from_info(&self.provider_info, api_auth_mode)?;
         let api_auth = resolve_provider_auth(auth.as_ref(), &self.provider_info)?;
         let transport = ReqwestTransport::new(build_reqwest_client());
         let auth_telemetry = auth_header_telemetry(api_auth.as_ref());

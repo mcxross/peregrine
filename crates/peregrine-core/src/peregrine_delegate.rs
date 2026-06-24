@@ -49,7 +49,7 @@ use crate::session::emit_subagent_session_started;
 use crate::session::session::Session;
 use crate::session::turn_context::TurnContext;
 use codex_login::AuthManager;
-use codex_models_manager::manager::SharedModelsManager;
+use peregrine_models_manager::manager::SharedModelsManager;
 use peregrine_types::error::PeregrineErr;
 use peregrine_types::protocol::InitialHistory;
 

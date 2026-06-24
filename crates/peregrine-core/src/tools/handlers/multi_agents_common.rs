@@ -9,7 +9,7 @@ use crate::tools::context::FunctionToolOutput;
 use crate::tools::context::ToolOutput;
 use crate::tools::context::ToolPayload;
 use codex_features::Feature;
-use codex_models_manager::manager::RefreshStrategy;
+use peregrine_models_manager::manager::RefreshStrategy;
 use peregrine_types::AgentPath;
 use peregrine_types::ThreadId;
 use peregrine_types::error::PeregrineErr;

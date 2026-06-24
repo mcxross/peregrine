@@ -1,9 +1,9 @@
 use anyhow::Result;
 use codex_features::Feature;
 use codex_login::CodexAuth as PeregrineAuth;
-use codex_models_manager::manager::RefreshStrategy;
-use codex_models_manager::manager::SharedModelsManager;
-use codex_models_manager::model_info::model_info_from_slug;
+use peregrine_models_manager::manager::RefreshStrategy;
+use peregrine_models_manager::manager::SharedModelsManager;
+use peregrine_models_manager::model_info::model_info_from_slug;
 use core_test_support::responses;
 use core_test_support::responses::ev_assistant_message;
 use core_test_support::responses::ev_completed;

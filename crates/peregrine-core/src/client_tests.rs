@@ -16,7 +16,7 @@ use codex_model_provider_info::CHATGPT_CODEX_BASE_URL as CHATGPT_PEREGRINE_BASE_
 use codex_model_provider_info::ModelProviderInfo;
 use codex_model_provider_info::WireApi;
 use codex_model_provider_info::create_oss_provider_with_base_url;
-use codex_models_manager::AuthMode;
+use peregrine_models_manager::AuthMode;
 use codex_otel::SessionTelemetry;
 use codex_rollout_trace::ExecutionStatus;
 use codex_rollout_trace::InferenceTraceAttempt;

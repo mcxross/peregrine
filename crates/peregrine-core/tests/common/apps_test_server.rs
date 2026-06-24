@@ -3,7 +3,7 @@ use crate::test_codex::test_codex;
 use anyhow::Result;
 use codex_features::Feature;
 use codex_login::CodexAuth;
-use codex_models_manager::bundled_models_response;
+use peregrine_models_manager::bundled_models_response;
 use peregrine_core::config::Config;
 use serde_json::Value;
 use serde_json::json;

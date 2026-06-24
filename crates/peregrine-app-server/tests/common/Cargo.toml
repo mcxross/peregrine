@@ -22,7 +22,7 @@ peregrine-config = { workspace = true }
 peregrine-core = { workspace = true }
 codex-features = { workspace = true }
 codex-login = { workspace = true }
-codex-models-manager = { workspace = true }
+peregrine-models-manager = { workspace = true }
 peregrine-types = { workspace = true }
 codex-utils-cargo-bin = { workspace = true }
 serde = { workspace = true }

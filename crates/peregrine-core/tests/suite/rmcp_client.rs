@@ -22,7 +22,7 @@ use codex_exec_server::Environment;
 use codex_exec_server::HttpRequestParams;
 use codex_login::CodexAuth as PeregrineAuth;
 use codex_mcp::MCP_SANDBOX_STATE_META_CAPABILITY;
-use codex_models_manager::manager::RefreshStrategy;
+use peregrine_models_manager::manager::RefreshStrategy;
 use peregrine_config::types::McpServerConfig;
 use peregrine_config::types::McpServerEnvVar;
 use peregrine_config::types::McpServerTransportConfig;

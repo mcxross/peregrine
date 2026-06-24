@@ -5,7 +5,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use codex_features::Feature;
 use codex_login::CodexAuth as PeregrineAuth;
-use codex_models_manager::bundled_models_response;
+use peregrine_models_manager::bundled_models_response;
 use core_test_support::apps_test_server::AppsTestServer;
 use core_test_support::apps_test_server::AppsTestToolLoading;
 use core_test_support::apps_test_server::DIRECT_CALENDAR_APP_ONLY_TOOL;

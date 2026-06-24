@@ -1,4 +1,4 @@
-use codex_models_manager::collaboration_mode_presets::builtin_collaboration_mode_presets;
+use peregrine_models_manager::collaboration_mode_presets::builtin_collaboration_mode_presets;
 use peregrine_types::config_types::CollaborationModeMask;
 use peregrine_types::config_types::ModeKind;
 

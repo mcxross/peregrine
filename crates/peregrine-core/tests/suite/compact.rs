@@ -3,7 +3,7 @@ use codex_features::Feature;
 use codex_login::CodexAuth as PeregrineAuth;
 use codex_model_provider_info::ModelProviderInfo;
 use codex_model_provider_info::built_in_model_providers;
-use codex_models_manager::bundled_models_response;
+use peregrine_models_manager::bundled_models_response;
 use core_test_support::context_snapshot;
 use core_test_support::context_snapshot::ContextSnapshotOptions;
 use core_test_support::context_snapshot::ContextSnapshotRenderMode;

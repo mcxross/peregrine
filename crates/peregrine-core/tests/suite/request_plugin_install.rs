@@ -4,7 +4,7 @@
 use anyhow::Result;
 use codex_features::Feature;
 use codex_login::CodexAuth as PeregrineAuth;
-use codex_models_manager::bundled_models_response;
+use peregrine_models_manager::bundled_models_response;
 use core_test_support::apps_test_server::AppsTestServer;
 use core_test_support::responses::ev_assistant_message;
 use core_test_support::responses::ev_completed;

@@ -400,7 +400,7 @@ export function AgentsScreen({
                   workflow={selectedWorkflow}
                 />
               ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-8 pb-[10vh]">
+                <div className="flex h-full flex-col items-center justify-center gap-8 pb-[12vh]">
                   <h1 className="text-3xl font-bold text-foreground transition-opacity duration-500">
                     Which package are we dealing with today?
                   </h1>
@@ -410,7 +410,7 @@ export function AgentsScreen({
 
             <div className={cn(
               "shrink-0 transition-all duration-500 ease-in-out px-4 pb-4 w-full flex justify-center",
-              (isRunInProgress || selectedRunDetail) ? "pt-2" : "absolute top-1/2 left-0 -translate-y-1/2 mt-10"
+              (isRunInProgress || selectedRunDetail) ? "pt-2" : "absolute top-1/2 left-0 -translate-y-1/2 mt-24"
             )}>
               <div className={cn(
                 "w-full transition-all duration-500",

@@ -9,7 +9,7 @@ use crate::tasks::InterruptedTurnHistoryMarker;
 use crate::tasks::interrupted_turn_history_marker;
 use codex_extension_api::empty_extension_registry;
 use codex_features::Feature;
-use codex_models_manager::manager::RefreshStrategy;
+use peregrine_models_manager::manager::RefreshStrategy;
 use core_test_support::PathBufExt;
 use core_test_support::PathExt;
 use core_test_support::responses::mount_models_once;

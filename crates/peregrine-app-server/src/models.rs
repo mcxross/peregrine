@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use codex_models_manager::manager::RefreshStrategy;
+use peregrine_models_manager::manager::RefreshStrategy;
 use peregrine_app_server_protocol::Model;
 use peregrine_app_server_protocol::ModelServiceTier;
 use peregrine_app_server_protocol::ModelUpgradeInfo;

@@ -19,7 +19,7 @@ codex-aws-auth = { workspace = true }
 codex-feedback = { workspace = true }
 codex-login = { workspace = true }
 codex-model-provider-info = { workspace = true }
-codex-models-manager = { workspace = true }
+peregrine-models-manager = { workspace = true }
 codex-otel = { workspace = true }
 codex-protocol = { workspace = true }
 http = { workspace = true }

@@ -40,6 +40,7 @@ members = [
   "crates/peregrine-app-server-types",
   "crates/peregrine-api",
   "crates/peregrine-model-provider",
+  "crates/peregrine-models-manager",
   "crates/peregrine-anthropic",
   "crates/peregrine-provider-registry",
   "crates/peregrine-app-server",
@@ -286,7 +287,7 @@ peregrine-memories-read = { path = "crates/memories/read" }
 peregrine-memories-write = { path = "crates/memories/write" }
 codex-message-history = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-model-provider-info = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
-codex-models-manager = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
+peregrine-models-manager = { path = "crates/peregrine-models-manager" }
 peregrine-model-provider = { path = "crates/peregrine-model-provider" }
 peregrine-anthropic = { path = "crates/peregrine-anthropic" }
 peregrine-provider-registry = { path = "crates/peregrine-provider-registry" }

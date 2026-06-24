@@ -1,7 +1,7 @@
-use codex_models_manager::ModelsManagerConfig;
-use codex_models_manager::manager::ModelsManager;
-use codex_models_manager::manager::RefreshStrategy;
-use codex_models_manager::manager::SharedModelsManager;
+use peregrine_models_manager::ModelsManagerConfig;
+use peregrine_models_manager::manager::ModelsManager;
+use peregrine_models_manager::manager::RefreshStrategy;
+use peregrine_models_manager::manager::SharedModelsManager;
 use codex_protocol::config_types::CollaborationModeMask;
 use codex_protocol::openai_models::ModelInfo;
 use codex_protocol::openai_models::ModelsResponse;

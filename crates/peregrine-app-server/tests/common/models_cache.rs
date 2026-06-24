@@ -1,6 +1,6 @@
 use chrono::DateTime;
 use chrono::Utc;
-use codex_models_manager::client_version_to_whole;
+use peregrine_models_manager::client_version_to_whole;
 use peregrine_core::test_support::all_model_presets;
 use peregrine_types::config_types::ReasoningSummary;
 use peregrine_types::openai_models::ConfigShellToolType;

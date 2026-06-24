@@ -1,6 +1,6 @@
 use codex_features::Feature;
-use codex_models_manager::manager::RefreshStrategy;
-use codex_models_manager::manager::SharedModelsManager;
+use peregrine_models_manager::manager::RefreshStrategy;
+use peregrine_models_manager::manager::SharedModelsManager;
 use core_test_support::load_default_config_for_test;
 use core_test_support::responses::mount_models_once;
 use core_test_support::responses::mount_sse_once;
