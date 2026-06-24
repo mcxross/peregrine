@@ -27,6 +27,8 @@ pub enum ThemeName {
     InvariantPine,
     /// Zero Day — bold neon security theme for exploit simulation and demos.
     ZeroDay,
+    /// Peregrine Dark — minimalist dark theme matching the clean worktree/launch UI aesthetic.
+    PeregrineDark,
     /// Evidence Light — clean light mode for findings, evidence packs, and reports.
     EvidenceLight,
     /// Whitebox — minimal light analysis theme for code review and diagrams.
@@ -46,6 +48,7 @@ impl ThemeName {
             Self::SandboxGraphite,
             Self::InvariantPine,
             Self::ZeroDay,
+            Self::PeregrineDark,
             Self::EvidenceLight,
             Self::Whitebox,
         ]
@@ -63,6 +66,7 @@ impl ThemeName {
             Self::SandboxGraphite => "Sandbox Graphite",
             Self::InvariantPine => "Invariant Pine",
             Self::ZeroDay => "Zero Day",
+            Self::PeregrineDark => "Peregrine Dark",
             Self::EvidenceLight => "Evidence Light",
             Self::Whitebox => "Whitebox",
         }
@@ -80,6 +84,7 @@ impl ThemeName {
             Self::SandboxGraphite => "sandbox-graphite",
             Self::InvariantPine => "invariant-pine",
             Self::ZeroDay => "zero-day",
+            Self::PeregrineDark => "peregrine-dark",
             Self::EvidenceLight => "evidence-light",
             Self::Whitebox => "whitebox",
         }
@@ -482,6 +487,53 @@ impl ThemeName {
                     cluster: Color::Rgb(39, 21, 58),
                 },
             },
+            Self::PeregrineDark => ThemePalette {
+                accent: Color::Rgb(56, 189, 248),
+                secondary: Color::Rgb(148, 163, 184),
+                bg: Color::Rgb(6, 7, 10),
+                fg: Color::Rgb(235, 237, 242),
+                muted: Color::Rgb(100, 107, 120),
+                selection: Color::Rgb(22, 24, 30),
+                error: Color::Rgb(248, 113, 113),
+                warning: Color::Rgb(250, 204, 21),
+                success: Color::Rgb(52, 211, 153),
+                info: Color::Rgb(103, 232, 249),
+                syntax: SyntaxPalette {
+                    text: Color::Rgb(235, 237, 242),
+                    gutter: Color::Rgb(82, 88, 102),
+                    active_line: Color::Rgb(15, 16, 21),
+                    comment: Color::Rgb(100, 107, 120),
+                    keyword: Color::Rgb(103, 232, 249),
+                    type_name: Color::Rgb(167, 139, 250),
+                    function: Color::Rgb(125, 211, 252),
+                    variable: Color::Rgb(235, 237, 242),
+                    string: Color::Rgb(134, 239, 172),
+                    number: Color::Rgb(253, 186, 116),
+                    operator: Color::Rgb(148, 163, 184),
+                    macro_name: Color::Rgb(216, 180, 254),
+                    diff_add: Color::Rgb(52, 211, 153),
+                    diff_delete: Color::Rgb(248, 113, 113),
+                    diff_change: Color::Rgb(250, 204, 21),
+                    security_sensitive: Color::Rgb(251, 113, 133),
+                },
+                graph: GraphPalette {
+                    node: Color::Rgb(56, 189, 248),
+                    node_secondary: Color::Rgb(100, 107, 120),
+                    selected_node: Color::Rgb(103, 232, 249),
+                    entry_node: Color::Rgb(52, 211, 153),
+                    exit_node: Color::Rgb(148, 163, 184),
+                    critical_node: Color::Rgb(248, 113, 113),
+                    warning_node: Color::Rgb(250, 204, 21),
+                    safe_node: Color::Rgb(52, 211, 153),
+                    edge: Color::Rgb(60, 65, 80),
+                    data_flow: Color::Rgb(103, 232, 249),
+                    control_flow: Color::Rgb(56, 189, 248),
+                    call_edge: Color::Rgb(125, 211, 252),
+                    ownership_edge: Color::Rgb(52, 211, 153),
+                    attack_edge: Color::Rgb(248, 113, 113),
+                    cluster: Color::Rgb(22, 24, 30),
+                },
+            },
             Self::EvidenceLight => ThemePalette {
                 accent: Color::Rgb(37, 99, 235),
                 secondary: Color::Rgb(79, 70, 229),
@@ -605,6 +657,7 @@ impl std::str::FromStr for ThemeName {
             "sandboxgraphite" | "sandbox" | "graphite" => Ok(Self::SandboxGraphite),
             "invariantpine" | "invariant" | "pine" | "spec" => Ok(Self::InvariantPine),
             "zeroday" | "zero" | "neon" => Ok(Self::ZeroDay),
+            "peregrinedark" | "peregrine-dark" => Ok(Self::PeregrineDark),
             "evidencelight" | "evidence" | "report" => Ok(Self::EvidenceLight),
             "whitebox" | "white" | "light" => Ok(Self::Whitebox),
             _ => Err(format!("Unknown theme: {s}")),
@@ -680,6 +733,9 @@ impl std::fmt::Display for Theme {
     }
 }
 
+// Ensure the PeregrineDark palette definition compiles and is constructible.
+const _PEREGRINE_DARK_PALETTE: ThemePalette = ThemeName::PeregrineDark.palette();
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -731,6 +787,7 @@ mod tests {
         assert!(ThemeName::SandboxGraphite.palette().is_dark());
         assert!(ThemeName::InvariantPine.palette().is_dark());
         assert!(ThemeName::ZeroDay.palette().is_dark());
+        assert!(ThemeName::PeregrineDark.palette().is_dark());
     }
 
     #[test]
@@ -738,6 +795,7 @@ mod tests {
         assert_eq!(ThemeName::PeregrineNight.display_name(), "Peregrine Night");
         assert_eq!(ThemeName::ThreatMatrix.display_name(), "Threat Matrix");
         assert_eq!(ThemeName::BytecodeEmber.display_name(), "Bytecode Ember");
+        assert_eq!(ThemeName::PeregrineDark.display_name(), "Peregrine Dark");
     }
 
     #[test]
@@ -773,7 +831,7 @@ mod tests {
 
     #[test]
     fn test_theme_count() {
-        assert_eq!(ThemeName::all().len(), 10);
+        assert_eq!(ThemeName::all().len(), 11);
     }
 
     #[test]
@@ -793,6 +851,14 @@ mod tests {
         assert_eq!(
             "report".parse::<ThemeName>().unwrap(),
             ThemeName::EvidenceLight
+        );
+        assert_eq!(
+            "peregrine-dark".parse::<ThemeName>().unwrap(),
+            ThemeName::PeregrineDark
+        );
+        assert_eq!(
+            "peregrinedark".parse::<ThemeName>().unwrap(),
+            ThemeName::PeregrineDark
         );
     }
 }

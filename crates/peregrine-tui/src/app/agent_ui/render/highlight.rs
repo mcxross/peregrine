@@ -134,6 +134,7 @@ fn embedded_theme_for_peregrine_theme(theme: PeregrineThemeName) -> EmbeddedThem
         PeregrineThemeName::SandboxGraphite => EmbeddedThemeName::OneHalfDark,
         PeregrineThemeName::InvariantPine => EmbeddedThemeName::SolarizedDark,
         PeregrineThemeName::ZeroDay => EmbeddedThemeName::Leet,
+        PeregrineThemeName::PeregrineDark => EmbeddedThemeName::OneHalfDark,
         PeregrineThemeName::EvidenceLight => EmbeddedThemeName::Github,
         PeregrineThemeName::Whitebox => EmbeddedThemeName::OneHalfLight,
     }
