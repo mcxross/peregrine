@@ -54,6 +54,16 @@ export const sidecars = [
     ],
     smokeTool: "status",
   },
+  {
+    binaryName: "peregrine-sui-move-knowledge",
+    packageName: "peregrine-sui-move-knowledge-plugin",
+    tools: [
+      "knowledge_search",
+      "knowledge_read",
+      "security_rules",
+    ],
+    smokeTool: undefined,
+  },
 ] as const;
 
 export function platformBinaryName(binaryName: string) {
