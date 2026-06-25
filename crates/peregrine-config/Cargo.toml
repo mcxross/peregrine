@@ -72,3 +72,7 @@ tonic-prost-build = { version = "=0.14.3", default-features = false, features = 
 
 [lib]
 doctest = false
+
+[[bin]]
+name = "test_plugin_edit"
+path = "src/bin.rs"

@@ -18358,6 +18358,7 @@ dependencies = [
  "peregrine-models-manager",
  "peregrine-provider-registry",
  "peregrine-security-tools",
+ "peregrine-sui-move-knowledge-plugin",
  "peregrine-sui-security-adapter",
  "peregrine-types",
  "pretty_assertions",

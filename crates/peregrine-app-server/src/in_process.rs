@@ -421,6 +421,7 @@ async fn start_uninitialized(args: InProcessStartArgs) -> IoResult<InProcessClie
             args.arg0_paths.clone(),
             args.thread_config_loader,
         );
+        crate::execute_plugin_startup_tasks(&args.config, crate::PluginStartupTasks::Start).await;
         let (processor_tx, mut processor_rx) = mpsc::channel::<ProcessorCommand>(channel_capacity);
         let mut processor_handle = tokio::spawn(Box::pin(async move {
             let processor = Arc::new(MessageProcessor::new(MessageProcessorArgs {
