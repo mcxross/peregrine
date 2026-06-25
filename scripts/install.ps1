@@ -591,7 +591,13 @@ try {
             $expectedDigest = Get-ReleaseAssetDigest -AssetName $packageAsset -ResolvedVersion $resolvedVersion
             $downloadUrl = Get-ReleaseUrl -AssetName $packageAsset -ResolvedVersion $resolvedVersion
             
-            Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath
+            $oldProgress = $ProgressPreference
+            $ProgressPreference = "Continue"
+            try {
+                Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath
+            } finally {
+                $ProgressPreference = $oldProgress
+            }
             Test-ArchiveDigest -ArchivePath $archivePath -ExpectedDigest $expectedDigest
 
             New-Item -ItemType Directory -Force -Path $releasesDir | Out-Null
