@@ -11,6 +11,8 @@
    <br>
 </p>
 
+![Peregrine CLI](./assets/peregrine-cli.png)
+
 > [!WARNING]
 > **This project is under active development**
 >
