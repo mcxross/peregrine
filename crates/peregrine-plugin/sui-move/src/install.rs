@@ -49,9 +49,15 @@ pub fn bundled_cache_root_dir(peregrine_home: &Path) -> PathBuf {
 pub fn install_bundled_plugin(
     peregrine_home: &Path,
 ) -> Result<InstalledKnowledgePlugin, KnowledgeInstallError> {
+    let server_executable = crate::resolve_server_executable_from(
+        std::env::current_exe().ok().as_deref(),
+        std::env::var_os(crate::SERVER_PATH_ENV),
+        std::env::var_os("PATH"),
+    );
+
     let index = KnowledgeIndex::bundled()?;
     let root = bundled_cache_root_dir(peregrine_home);
-    let marker = marker_for_hash(&index.corpus.corpus_hash);
+    let marker = marker_for_hash(&index.corpus.corpus_hash, &server_executable);
     if root.is_dir() && read_marker(&root) == Some(marker.clone()) {
         return Ok(InstalledKnowledgePlugin {
             root,
@@ -78,7 +84,7 @@ pub fn install_bundled_plugin(
     // Write files into the temp staging dir, but embed the final install
     // path in .mcp.json so env vars point to the correct location after
     // the atomic rename.
-    write_runtime_files(&temporary, &root, &index)?;
+    write_runtime_files(&temporary, &root, &index, &server_executable)?;
     fs::write(temporary.join(MARKER_FILE), format!("{marker}\n"))
         .map_err(|source| KnowledgeInstallError::io("write install marker", source))?;
 
@@ -95,6 +101,7 @@ fn write_runtime_files(
     write_dir: &Path,
     final_root: &Path,
     index: &KnowledgeIndex,
+    server_executable: &Path,
 ) -> Result<(), KnowledgeInstallError> {
     write_json(write_dir.join("index.json"), &index.corpus)?;
     write_json(
@@ -112,13 +119,6 @@ fn write_runtime_files(
             }
         }),
     )?;
-
-    // Resolve absolute path to the sidecar binary.
-    let server_executable = crate::resolve_server_executable_from(
-        std::env::current_exe().ok().as_deref(),
-        std::env::var_os(crate::SERVER_PATH_ENV),
-        std::env::var_os("PATH"),
-    );
 
     // Use final_root (not write_dir) so the env var survives the atomic rename.
     let mcp_json = serde_json::json!({
@@ -208,10 +208,11 @@ fn read_marker(root: &Path) -> Option<String> {
         .map(|value| value.trim().to_string())
 }
 
-fn marker_for_hash(corpus_hash: &str) -> String {
+fn marker_for_hash(corpus_hash: &str, executable_path: &Path) -> String {
     let mut hasher = Sha256::new();
     hasher.update(INSTALLER_SALT.as_bytes());
     hasher.update(corpus_hash.as_bytes());
+    hasher.update(executable_path.to_string_lossy().as_bytes());
     format!("{:x}", hasher.finalize())
 }
 
