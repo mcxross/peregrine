@@ -102,6 +102,7 @@ toml_edit = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "json"] }
 uuid = { workspace = true, features = ["serde", "v7"] }
+peregrine-sui-move-knowledge-plugin = { version = "0.1.0", path = "../peregrine-plugin/sui-move" }
 
 [target.'cfg(windows)'.dependencies]
 codex-windows-sandbox = { workspace = true }

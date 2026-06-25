@@ -422,6 +422,36 @@ impl Default for AppServerRuntimeOptions {
     }
 }
 
+pub async fn execute_plugin_startup_tasks(
+    config: &peregrine_core::config::Config,
+    plugin_startup_tasks: PluginStartupTasks,
+) {
+    if plugin_startup_tasks != PluginStartupTasks::Skip {
+        let effective_toml: peregrine_config::config_toml::ConfigToml = config
+            .config_layer_stack
+            .effective_config()
+            .try_into()
+            .unwrap_or_default();
+        if !effective_toml.plugins.contains_key(peregrine_sui_move_knowledge_plugin::PLUGIN_CONFIG_KEY) {
+            info!("Auto-enabling bundled peregrine-sui-move-knowledge plugin");
+            if let Err(e) = peregrine_config::set_user_plugin_enabled(
+                &config.peregrine_home,
+                peregrine_sui_move_knowledge_plugin::PLUGIN_CONFIG_KEY.to_string(),
+                true,
+            )
+            .await
+            {
+                warn!("Failed to auto-enable peregrine-sui-move-knowledge: {e}");
+            }
+        }
+        if let Err(e) = peregrine_sui_move_knowledge_plugin::install_bundled_plugin(
+            &config.peregrine_home,
+        ) {
+            warn!("Failed to install bundled peregrine-sui-move-knowledge: {e}");
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn run_main_with_transport_options(
     arg0_paths: Arg0DispatchPaths,
@@ -608,6 +638,7 @@ pub async fn run_main_with_transport_options(
             range: None,
         });
     }
+
     if let Some(warning) =
         peregrine_core::config::system_bwrap_warning(config.permissions.permission_profile())
     {
@@ -618,6 +649,10 @@ pub async fn run_main_with_transport_options(
             range: None,
         });
     }
+
+
+
+    execute_plugin_startup_tasks(&config, runtime_options.plugin_startup_tasks).await;
 
     let feedback = CodexFeedback::new();
 

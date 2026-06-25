@@ -12,7 +12,8 @@ use std::{
 };
 use thiserror::Error;
 
-const BUNDLED_PLUGIN_ROOT: &str = "plugins/cache/peregrine-bundled/sui-move-knowledge/local";
+pub const PLUGIN_CONFIG_KEY: &str = "peregrine-sui-move-knowledge@peregrine-bundled";
+const BUNDLED_PLUGIN_ROOT: &str = "plugins/cache/peregrine-bundled/peregrine-sui-move-knowledge/local";
 const MARKER_FILE: &str = ".peregrine-sui-move-knowledge.marker";
 const INSTALLER_SALT: &str = "v1";
 
@@ -24,14 +25,21 @@ pub struct InstalledKnowledgePlugin {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-struct InstallManifest {
-    schema_version: u8,
-    plugin_id: String,
-    package_name: String,
-    binary_name: String,
-    corpus_hash: String,
-    tools: Vec<String>,
-    advisory_only: bool,
+struct PluginManifest {
+    name: String,
+    version: String,
+    description: String,
+    mcp_servers: String,
+    interface: PluginInterface,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct PluginInterface {
+    display_name: String,
+    developer_name: String,
+    category: String,
+    capabilities: Vec<String>,
 }
 
 pub fn bundled_cache_root_dir(peregrine_home: &Path) -> PathBuf {
@@ -67,7 +75,10 @@ pub fn install_bundled_plugin(
     fs::create_dir_all(&temporary)
         .map_err(|source| KnowledgeInstallError::io("create temporary install dir", source))?;
 
-    write_runtime_files(&temporary, &index)?;
+    // Write files into the temp staging dir, but embed the final install
+    // path in .mcp.json so env vars point to the correct location after
+    // the atomic rename.
+    write_runtime_files(&temporary, &root, &index)?;
     fs::write(temporary.join(MARKER_FILE), format!("{marker}\n"))
         .map_err(|source| KnowledgeInstallError::io("write install marker", source))?;
 
@@ -78,25 +89,55 @@ pub fn install_bundled_plugin(
     })
 }
 
-fn write_runtime_files(root: &Path, index: &KnowledgeIndex) -> Result<(), KnowledgeInstallError> {
-    write_json(root.join("index.json"), &index.corpus)?;
+/// Write plugin files into `write_dir`. Paths embedded in `.mcp.json`
+/// reference `final_root` (the location after the atomic rename).
+fn write_runtime_files(
+    write_dir: &Path,
+    final_root: &Path,
+    index: &KnowledgeIndex,
+) -> Result<(), KnowledgeInstallError> {
+    write_json(write_dir.join("index.json"), &index.corpus)?;
     write_json(
-        root.join("harness-plugin.json"),
-        &InstallManifest {
-            schema_version: 1,
-            plugin_id: crate::SERVER_NAME.to_string(),
-            package_name: env!("CARGO_PKG_NAME").to_string(),
-            binary_name: crate::SERVER_BINARY_NAME.to_string(),
-            corpus_hash: index.corpus.corpus_hash.clone(),
-            tools: vec![
-                crate::tool_name::KNOWLEDGE_SEARCH.to_string(),
-                crate::tool_name::KNOWLEDGE_READ.to_string(),
-                crate::tool_name::SECURITY_RULES.to_string(),
-            ],
-            advisory_only: true,
-        },
+        write_dir.join(".codex-plugin/plugin.json"),
+        &serde_json::json!({
+            "name": crate::SERVER_NAME,
+            "version": env!("CARGO_PKG_VERSION"),
+            "mcpServers": "./.mcp.json",
+            "interface": {
+                "displayName": "Sui Move Knowledge",
+                "shortDescription": "Provides Sui Move framework knowledge.",
+                "longDescription": "Provides vector search and exact match search for Sui Move framework and by-example code snippets.",
+                "developerName": "Sui Foundation",
+                "category": "Blockchain",
+            }
+        }),
     )?;
-    write_selected_corpus_files(&BUNDLED_CORPUS, root)?;
+
+    // Resolve absolute path to the sidecar binary.
+    let server_executable = crate::resolve_server_executable_from(
+        std::env::current_exe().ok().as_deref(),
+        std::env::var_os(crate::SERVER_PATH_ENV),
+        std::env::var_os("PATH"),
+    );
+
+    // Use final_root (not write_dir) so the env var survives the atomic rename.
+    let mcp_json = serde_json::json!({
+        "mcpServers": {
+            crate::SERVER_NAME: {
+                "command": server_executable.to_string_lossy().into_owned(),
+                "args": [],
+                "env": {
+                    crate::KNOWLEDGE_ROOT_ENV: final_root.to_string_lossy().into_owned(),
+                    "NO_COLOR": "1",
+                    "CLICOLOR": "0",
+                    "TERM": "dumb"
+                }
+            }
+        }
+    });
+    write_json(write_dir.join(".mcp.json"), &mcp_json)?;
+
+    write_selected_corpus_files(&BUNDLED_CORPUS, write_dir)?;
     Ok(())
 }
 
@@ -207,7 +248,7 @@ mod tests {
         let installed = install_bundled_plugin(home.path()).expect("install");
 
         assert!(installed.root.join("index.json").is_file());
-        assert!(installed.root.join("harness-plugin.json").is_file());
+        assert!(installed.root.join(".codex-plugin/plugin.json").is_file());
         assert!(
             !installed
                 .root
