@@ -113,7 +113,10 @@ pub fn resolve_external_helper_executable_from(
         return Some(candidate);
     }
 
-    let sibling = current_exe.with_file_name(helper_binary_file_name());
+    let resolved_current_exe = current_exe
+        .canonicalize()
+        .unwrap_or_else(|_| current_exe.to_path_buf());
+    let sibling = resolved_current_exe.with_file_name(helper_binary_file_name());
 
     if is_distinct_file(&sibling, current_exe) {
         Some(sibling)
