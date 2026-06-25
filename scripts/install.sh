@@ -92,12 +92,12 @@ download_file() {
   output="$2"
 
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$url" -o "$output"
+    curl -# -fSL "$url" -o "$output"
     return
   fi
 
   if command -v wget >/dev/null 2>&1; then
-    wget -q -O "$output" "$url"
+    wget -q --show-progress -O "$output" "$url"
     return
   fi
 
@@ -516,7 +516,11 @@ print_launch_instructions() {
 maybe_launch_peregrine_now() {
   if prompt_yes_no "Start Peregrine now?"; then
     step "Launching Peregrine"
-    "$BIN_PATH"
+    if ( : </dev/tty ) 2>/dev/null; then
+      "$BIN_PATH" </dev/tty
+    else
+      "$BIN_PATH"
+    fi
   fi
 }
 
