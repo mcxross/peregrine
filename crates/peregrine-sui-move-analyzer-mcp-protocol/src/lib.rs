@@ -195,7 +195,10 @@ pub fn resolve_server_executable_from(
         }
     }
     if let Some(current_exe) = current_exe {
-        let sibling = current_exe.with_file_name(server_binary_file_name());
+        let resolved_current_exe = current_exe
+            .canonicalize()
+            .unwrap_or_else(|_| current_exe.to_path_buf());
+        let sibling = resolved_current_exe.with_file_name(server_binary_file_name());
         if sibling.is_file() {
             return sibling;
         }
@@ -209,7 +212,10 @@ pub fn resolve_server_executable_from(
         }
     }
     if let Some(current_exe) = current_exe {
-        return current_exe.with_file_name(server_binary_file_name());
+        let resolved_current_exe = current_exe
+            .canonicalize()
+            .unwrap_or_else(|_| current_exe.to_path_buf());
+        return resolved_current_exe.with_file_name(server_binary_file_name());
     }
     PathBuf::from(SERVER_BINARY_NAME)
 }
