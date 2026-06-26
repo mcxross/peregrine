@@ -141,7 +141,7 @@ release_asset_digest() {
 
   digest_url="$(release_url_for_asset "${asset}.sha256" "$resolved_version")"
   digest_text="$(download_text "$digest_url" 2>/dev/null || true)"
-  
+
   if [ -z "$digest_text" ] || echo "$digest_text" | grep -qi "not found"; then
     echo "Could not find SHA-256 digest for release asset $asset." >&2
     exit 1
@@ -524,6 +524,80 @@ maybe_launch_peregrine_now() {
   fi
 }
 
+install_eidetic() {
+  eidetic_arch="$arch"
+  if [ "$arch" = "x86_64" ]; then
+    eidetic_arch="amd64"
+  elif [ "$arch" = "aarch64" ]; then
+    eidetic_arch="arm64"
+  fi
+  
+  eidetic_version="$(download_text "https://api.github.com/repos/mcxross/eidetic/releases/latest" | sed -n 's/.*"tag_name":[[:space:]]*"v\([^"]*\)".*/\1/p' | head -n 1)"
+  
+  if [ -z "$eidetic_version" ]; then
+    warn "Failed to resolve the latest Eidetic Memory MCP Server version."
+    if ! command -v eidetic >/dev/null 2>&1; then
+      return
+    fi
+  fi
+
+  install_or_update="no"
+
+  if command -v eidetic >/dev/null 2>&1; then
+    current_eidetic_version="$(eidetic --version 2>/dev/null | awk '{print $NF}' | sed 's/^v//' || true)"
+    
+    if [ -n "$eidetic_version" ] && [ -n "$current_eidetic_version" ] && [ "$current_eidetic_version" != "$eidetic_version" ]; then
+      if prompt_yes_no "Eidetic Memory MCP Server is installed (v$current_eidetic_version) but a newer version (v$eidetic_version) is available. Update now?"; then
+        step "Updating Eidetic Memory MCP Server to v$eidetic_version..."
+        install_or_update="yes"
+      else
+        step "Leaving existing Eidetic Memory MCP Server (v$current_eidetic_version) unchanged."
+      fi
+    else
+      step "Eidetic Memory MCP Server is already installed and up to date."
+    fi
+  else
+    step "Installing Eidetic Memory MCP Server..."
+    install_or_update="yes"
+  fi
+
+  if [ "$install_or_update" = "yes" ] && [ -n "$eidetic_version" ]; then
+    eidetic_asset="eidetic-${os}-${eidetic_arch}.tar.gz"
+    eidetic_url="https://github.com/mcxross/eidetic/releases/download/v${eidetic_version}/${eidetic_asset}"
+    eidetic_archive="$tmp_dir/$eidetic_asset"
+
+    step "Downloading Eidetic Memory MCP Server (v${eidetic_version})"
+    if download_file "$eidetic_url" "$eidetic_archive"; then
+      mkdir -p "$BIN_DIR"
+      tar -xzf "$eidetic_archive" -C "$BIN_DIR" || warn "Failed to extract Eidetic binary."
+      chmod 0755 "$BIN_DIR/eidetic" 2>/dev/null || true
+    else
+      warn "Failed to download Eidetic Memory MCP Server from $eidetic_url"
+    fi
+  fi
+
+  CONFIG_FILE="$HOME/.peregrine/config.toml"
+  if [ -f "$CONFIG_FILE" ]; then
+    if ! grep -q '\[mcp_servers\.eidetic\]' "$CONFIG_FILE"; then
+      step "Configuring Eidetic Memory MCP Server for Peregrine"
+      cat << 'EOF' >> "$CONFIG_FILE"
+
+[mcp_servers.eidetic]
+command = "eidetic"
+args = ["serve"]
+EOF
+    fi
+  else
+    mkdir -p "$HOME/.peregrine"
+    step "Configuring Eidetic Memory MCP Server for Peregrine"
+    cat << 'EOF' > "$CONFIG_FILE"
+[mcp_servers.eidetic]
+command = "eidetic"
+args = ["serve"]
+EOF
+  fi
+}
+
 detect_conflicting_install() {
   existing_path="$(resolve_existing_peregrine)"
   manager="$(classify_existing_peregrine "$existing_path" || true)"
@@ -571,7 +645,7 @@ install_package_release() {
   rm -rf "$stage_release"
   mkdir -p "$stage_release"
   tar -xzf "$archive_path" -C "$stage_release"
-  
+
   # Ensure the binaries are executable. The artifacts from release.yml contain multiple files starting with 'peregrine-'.
   chmod 0755 "$stage_release"/peregrine-* 2>/dev/null || true
 
@@ -698,7 +772,7 @@ if ! release_dir_is_complete "$release_dir" "$resolved_version" "$vendor_target"
 
   step "Downloading Peregrine CLI"
   expected_digest="$(release_asset_digest "$asset" "$resolved_version")"
-  
+
   download_file "$download_url" "$archive_path"
   verify_archive_digest "$archive_path" "$expected_digest"
 
@@ -728,6 +802,8 @@ case "$path_action" in
     print_launch_instructions
     ;;
 esac
+
+install_eidetic
 
 printf 'Peregrine CLI %s installed successfully.\n' "$resolved_version"
 maybe_launch_peregrine_now

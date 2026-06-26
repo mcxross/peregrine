@@ -508,6 +508,84 @@ function Test-VisiblePeregrineCommand {
     }
 }
 
+function Install-Eidetic {
+    try {
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/mcxross/eidetic/releases/latest" -ErrorAction Stop
+        if (-not $release.tag_name) {
+            Write-WarningStep "Failed to resolve the latest Eidetic Memory MCP Server version."
+            if (-not (Get-Command eidetic -ErrorAction SilentlyContinue)) {
+                return
+            }
+        } else {
+            $eideticVersion = $release.tag_name
+            if ($eideticVersion.StartsWith("v")) {
+                $eideticVersion = $eideticVersion.Substring(1)
+            }
+        }
+        
+        $installOrUpdate = $false
+
+        if (Get-Command eidetic -ErrorAction SilentlyContinue) {
+            $currentEideticOutput = & eidetic --version 2>&1
+            $currentEideticVersion = ""
+            if ($currentEideticOutput -match "(\d+\.\d+\.\d+)") {
+                $currentEideticVersion = $matches[1]
+            }
+
+            if ($eideticVersion -and $currentEideticVersion -and ($currentEideticVersion -ne $eideticVersion)) {
+                if (Prompt-YesNo "Eidetic Memory MCP Server is installed (v$currentEideticVersion) but a newer version (v$eideticVersion) is available. Update now?") {
+                    Write-Step "Updating Eidetic Memory MCP Server to v$eideticVersion..."
+                    $installOrUpdate = $true
+                } else {
+                    Write-Step "Leaving existing Eidetic Memory MCP Server (v$currentEideticVersion) unchanged."
+                }
+            } else {
+                Write-Step "Eidetic Memory MCP Server is already installed and up to date."
+            }
+        } else {
+            Write-Step "Installing Eidetic Memory MCP Server..."
+            $installOrUpdate = $true
+        }
+
+        if ($installOrUpdate -and $eideticVersion) {
+            $eideticAsset = "eidetic-windows-amd64.zip"
+            $downloadUrl = "https://github.com/mcxross/eidetic/releases/download/v$eideticVersion/$eideticAsset"
+            $archivePath = Join-Path $tempDir $eideticAsset
+            
+            Write-Step "Downloading Eidetic Memory MCP Server (v$eideticVersion)"
+            $oldProgress = $ProgressPreference
+            $ProgressPreference = "Continue"
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath
+            $ProgressPreference = $oldProgress
+
+            Expand-Archive -Path $archivePath -DestinationPath $visibleBinDir -Force
+        }
+    } catch {
+        Write-WarningStep "Failed to download or install Eidetic Memory MCP Server: $_"
+    }
+
+    $peregrineHomeDir = if ([string]::IsNullOrWhiteSpace($env:PEREGRINE_HOME)) {
+        Join-Path $env:USERPROFILE ".peregrine"
+    } else {
+        $env:PEREGRINE_HOME
+    }
+
+    $configFile = Join-Path $peregrineHomeDir "config.toml"
+    if (Test-Path -LiteralPath $configFile) {
+        $configContent = Get-Content -LiteralPath $configFile -Raw -ErrorAction SilentlyContinue
+        if ($configContent -notmatch '\[mcp_servers\.eidetic\]') {
+            Write-Step "Configuring Eidetic Memory MCP Server for Peregrine"
+            $appendContent = "`r`n[mcp_servers.eidetic]`r`ncommand = `"eidetic`"`r`nargs = [`"serve`"]`r`n"
+            Add-Content -Path $configFile -Value $appendContent -NoNewline
+        }
+    } else {
+        New-Item -ItemType Directory -Force -Path $peregrineHomeDir | Out-Null
+        Write-Step "Configuring Eidetic Memory MCP Server for Peregrine"
+        $newContent = "[mcp_servers.eidetic]`r`ncommand = `"eidetic`"`r`nargs = [`"serve`"]`r`n"
+        Set-Content -Path $configFile -Value $newContent -NoNewline
+    }
+}
+
 if ($env:OS -ne "Windows_NT") {
     Write-Error "install.ps1 supports Windows only. Use install.sh on macOS or Linux."
     exit 1
@@ -590,7 +668,7 @@ try {
             Write-Step "Downloading Peregrine CLI"
             $expectedDigest = Get-ReleaseAssetDigest -AssetName $packageAsset -ResolvedVersion $resolvedVersion
             $downloadUrl = Get-ReleaseUrl -AssetName $packageAsset -ResolvedVersion $resolvedVersion
-            
+
             $oldProgress = $ProgressPreference
             $ProgressPreference = "Continue"
             try {
@@ -605,7 +683,7 @@ try {
                 Remove-Item -LiteralPath $stagingDir -Recurse -Force
             }
             New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
-            
+
             Expand-Archive -Path $archivePath -DestinationPath $stagingDir -Force
 
             if (Test-Path -LiteralPath $releaseDir) {
@@ -619,24 +697,24 @@ try {
 
         $visibleParent = Split-Path -Parent $visibleBinDir
         New-Item -ItemType Directory -Force -Path $visibleParent | Out-Null
-        
+
         # In Windows we link to the directory containing peregrine.exe. Wait, no.
-        # Actually, in Peregrine we need `peregrine-tui.exe` to be callable as `peregrine.exe` 
+        # Actually, in Peregrine we need `peregrine-tui.exe` to be callable as `peregrine.exe`
         # But Junctions only link directories.
         # To make it callable as peregrine, we could create a script wrapper, or just symlink the dir
         # and tell them to use peregrine-tui.
-        # Wait, if we use a directory junction, $visibleBinDir links to $currentDir. 
-        # Then `peregrine-tui.exe` is in $visibleBinDir. If the user expects `peregrine.exe`, 
+        # Wait, if we use a directory junction, $visibleBinDir links to $currentDir.
+        # Then `peregrine-tui.exe` is in $visibleBinDir. If the user expects `peregrine.exe`,
         # we can copy or HardLink the exe?
         # Actually, in `install.sh` we symlink `~/.local/bin/peregrine` directly to the `peregrine-tui` binary.
-        # In Windows, we can create a simple `peregrine.cmd` wrapper or rename it inside `currentDir`? No, because it needs to find sidecars alongside `peregrine-tui.exe`. 
+        # In Windows, we can create a simple `peregrine.cmd` wrapper or rename it inside `currentDir`? No, because it needs to find sidecars alongside `peregrine-tui.exe`.
         # If we create `peregrine.cmd` in $visibleBinDir:
         $cmdScriptPath = Join-Path $visibleBinDir "peregrine.cmd"
         $cmdScriptContent = "@ECHO OFF`n`"%~dp0peregrine-tui.exe`" %*"
-        
+
         Ensure-Junction -LinkPath $visibleBinDir -TargetPath $currentDir -InstallerOwnedTargetPrefix $standaloneRoot
         Set-Content -Path $cmdScriptPath -Value $cmdScriptContent
-        
+
         Test-VisiblePeregrineCommand -VisibleBinDir $visibleBinDir
     }
 } finally {
@@ -682,6 +760,9 @@ if ($prioritizeVisibleBin) {
 
 Write-Step "Current PowerShell session: peregrine"
 Write-Step "Future PowerShell windows: open a new PowerShell window and run: peregrine"
+
+Install-Eidetic
+
 Write-Host "Peregrine CLI $resolvedVersion installed successfully."
 
 $peregrineCommand = Join-Path $visibleBinDir "peregrine.cmd"
