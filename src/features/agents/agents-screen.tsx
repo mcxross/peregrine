@@ -148,7 +148,8 @@ export function AgentsScreen({
   const [activeMainTab, setActiveMainTab] = React.useState<MainTab>("agents");
   const [agentFilter, setAgentFilter] = React.useState<AgentFilter>("all");
   const [isInspectorOpen, setIsInspectorOpen] = React.useState(false);
-  const [isSessionsSidebarOpen, setIsSessionsSidebarOpen] = React.useState(false);
+  const [isSessionsSidebarOpen, setIsSessionsSidebarOpen] =
+    React.useState(false);
   const [runDetailsByAgentId, setRunDetailsByAgentId] = React.useState<
     Record<string, AgentRunDetail>
   >({});
@@ -157,7 +158,9 @@ export function AgentsScreen({
     status: "idle",
   });
   const [modelCatalog, setModelCatalog] = React.useState<Model[]>([]);
-  const [selectedModelId, setSelectedModelId] = React.useState<string | null>(null);
+  const [selectedModelId, setSelectedModelId] = React.useState<string | null>(
+    null,
+  );
   const [isProjectStateLoaded, setIsProjectStateLoaded] = React.useState(false);
   const activeRunControllerRef = React.useRef<AbortController | null>(null);
   const activeSessionRef = React.useRef<PersistentAgentSession | null>(null);
@@ -188,7 +191,7 @@ export function AgentsScreen({
   async function handleSendMessage(msg: string) {
     if (!activeSessionRef.current) return;
     const session = activeSessionRef.current;
-    
+
     setState((current) => ({
       ...current,
       agents: current.agents.map((agent) =>
@@ -204,13 +207,9 @@ export function AgentsScreen({
     appendRunDetailText(
       session.agent.id,
       "responseText",
-      `\n\n**User:** ${msg}\n\n**Agent:** `
+      `\n\n**User:** ${msg}\n\n**Agent:** `,
     );
-    appendRunDetailText(
-      session.agent.id,
-      "reasoningText",
-      `\n\n**TURN:**\n\n`
-    );
+    appendRunDetailText(session.agent.id, "reasoningText", `\n\n**TURN:**\n\n`);
 
     try {
       await session.sendTurn(msg);
@@ -222,7 +221,13 @@ export function AgentsScreen({
         title: "Failed to send message",
       });
     } finally {
-      setRunCompletedState(session.agent, session.workflow, "running", "idle", "info");
+      setRunCompletedState(
+        session.agent,
+        session.workflow,
+        "running",
+        "idle",
+        "info",
+      );
     }
   }
   const selectedAgent =
@@ -355,12 +360,18 @@ export function AgentsScreen({
       className={cn(
         "grid h-full min-h-0 min-w-0 overflow-hidden bg-[var(--app-window)] text-foreground transition-[grid-template-columns] duration-200",
         isSessionsSidebarOpen
-          ? isInspectorOpen ? "grid-cols-[270px_minmax(0,1fr)_clamp(340px,26vw,390px)]" : "grid-cols-[270px_minmax(0,1fr)_48px]"
-          : isInspectorOpen ? "grid-cols-[0px_minmax(0,1fr)_clamp(340px,26vw,390px)]" : "grid-cols-[0px_minmax(0,1fr)_48px]"
+          ? isInspectorOpen
+            ? "grid-cols-[270px_minmax(0,1fr)_clamp(340px,26vw,390px)]"
+            : "grid-cols-[270px_minmax(0,1fr)_48px]"
+          : isInspectorOpen
+            ? "grid-cols-[0px_minmax(0,1fr)_clamp(340px,26vw,390px)]"
+            : "grid-cols-[0px_minmax(0,1fr)_48px]",
       )}
     >
       <div className="overflow-hidden border-r border-[color:var(--app-border)]">
-        {isSessionsSidebarOpen && <SessionsSidebar onSelectThread={(threadId) => {}} />}
+        {isSessionsSidebarOpen && (
+          <SessionsSidebar onSelectThread={(threadId) => {}} />
+        )}
       </div>
       <main className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden border-r border-[color:var(--app-border)]">
         {activeMainTab === "details" ? null : (
@@ -369,10 +380,18 @@ export function AgentsScreen({
             isRunInProgress={isRunInProgress}
             modelSummary={modelSummary}
             isSessionsSidebarOpen={isSessionsSidebarOpen}
-            onToggleSessions={() => setIsSessionsSidebarOpen(!isSessionsSidebarOpen)}
+            onToggleSessions={() =>
+              setIsSessionsSidebarOpen(!isSessionsSidebarOpen)
+            }
             onFilterChange={setAgentFilter}
             onRefreshModels={refreshModels}
-            warningEvents={selectedRunDetail?.events?.filter((e) => (e.level === "error" || e.level === "warning") && e.title !== "Run stopped") ?? []}
+            warningEvents={
+              selectedRunDetail?.events?.filter(
+                (e) =>
+                  (e.level === "error" || e.level === "warning") &&
+                  e.title !== "Run stopped",
+              ) ?? []
+            }
           />
         )}
         {activeMainTab === "details" ? (
@@ -393,7 +412,7 @@ export function AgentsScreen({
         ) : (
           <section className="flex flex-col h-full min-h-0 overflow-hidden relative">
             <div className="flex-1 min-h-0 overflow-y-auto">
-              {(isRunInProgress || selectedRunDetail) ? (
+              {isRunInProgress || selectedRunDetail ? (
                 <AgentDetailScreen
                   agent={selectedAgent}
                   run={selectedRunDetail}
@@ -401,229 +420,311 @@ export function AgentsScreen({
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-8 pb-[12vh]">
-                  <h1 className="text-3xl font-bold text-foreground transition-opacity duration-500">
-                    Which package are we dealing with today?
+                  <h1 className="text-3xl font-medium text-foreground transition-opacity duration-500">
+                    What are we securing in{" "}
+                    {activeMovePackage?.name
+                      ? activeMovePackage.name.slice(0, 7)
+                      : "package"}{" "}
+                    today?
                   </h1>
                 </div>
               )}
             </div>
 
-            <div className={cn(
-              "shrink-0 transition-all duration-500 ease-in-out px-4 pb-4 w-full flex justify-center",
-              (isRunInProgress || selectedRunDetail) ? "pt-2" : "absolute top-1/2 left-0 -translate-y-1/2 mt-24"
-            )}>
-              <div className={cn(
-                "w-full transition-all duration-500",
-                (isRunInProgress || selectedRunDetail) ? "max-w-4xl" : "max-w-3xl w-2/3"
-              )}>
+            <div
+              className={cn(
+                "shrink-0 transition-all duration-500 ease-in-out px-4 pb-4 w-full flex justify-center",
+                isRunInProgress || selectedRunDetail
+                  ? "pt-2"
+                  : "absolute top-1/2 left-0 -translate-y-1/2 mt-12",
+              )}
+            >
               <div
-                ref={slashContainerRef}
-                className="relative flex w-full flex-col rounded-2xl border border-[color:var(--app-border)] bg-[var(--app-panel)] shadow-sm transition-colors focus-within:border-ring focus-within:ring-[2px] focus-within:ring-ring/35"
-              >
-                {isPopupOpen && (
-                  <SlashCommandPopup
-                    input={slashInput}
-                    selectedIndex={slashSelectedIndex}
-                    onSelect={(cmd) => {
-                      executeSlashCommand(cmd);
-                      setIsPopupOpen(false);
-                    }}
-                  />
+                className={cn(
+                  "w-full transition-all duration-500",
+                  isRunInProgress || selectedRunDetail
+                    ? "max-w-4xl"
+                    : "max-w-3xl w-2/3",
                 )}
-                <input
-                  className="h-16 w-full bg-transparent px-6 text-lg outline-none placeholder:text-muted-foreground/50 placeholder:font-light"
-                  placeholder="Surgical analysis"
-                  value={slashInput}
-                  onChange={(e) => {
-                    setSlashInput(e.target.value);
-                    setSlashSelectedIndex(0);
-                    setIsPopupOpen(true);
-                  }}
-                  onFocus={() => setIsPopupOpen(true)}
-                  onKeyDown={(e) => {
-                    if (slashInput.startsWith("/")) {
-                      const query = slashInput.slice(1).toLowerCase();
-                      const filtered = SLASH_COMMANDS.filter((c) =>
-                        c.command.toLowerCase().includes(query),
-                      );
-                      if (e.key === "ArrowDown") {
-                        e.preventDefault();
-                        setSlashSelectedIndex((prev) =>
-                          Math.min(prev + 1, filtered.length - 1),
+              >
+                <div
+                  ref={slashContainerRef}
+                  className="relative flex w-full flex-col rounded-2xl border border-[color:var(--app-border)] bg-[var(--app-panel)] shadow-sm transition-colors focus-within:border-ring focus-within:ring-[2px] focus-within:ring-ring/35"
+                >
+                  {isPopupOpen && (
+                    <SlashCommandPopup
+                      input={slashInput}
+                      selectedIndex={slashSelectedIndex}
+                      onSelect={(cmd) => {
+                        executeSlashCommand(cmd);
+                        setIsPopupOpen(false);
+                      }}
+                    />
+                  )}
+                  <input
+                    className="h-16 w-full bg-transparent px-6 text-lg outline-none placeholder:text-muted-foreground/50"
+                    placeholder="Surgical analysis"
+                    value={slashInput}
+                    onChange={(e) => {
+                      setSlashInput(e.target.value);
+                      setSlashSelectedIndex(0);
+                      setIsPopupOpen(true);
+                    }}
+                    onFocus={() => setIsPopupOpen(true)}
+                    onKeyDown={(e) => {
+                      if (slashInput.startsWith("/")) {
+                        const query = slashInput.slice(1).toLowerCase();
+                        const filtered = SLASH_COMMANDS.filter((c) =>
+                          c.command.toLowerCase().includes(query),
                         );
-                      } else if (e.key === "ArrowUp") {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setSlashSelectedIndex((prev) =>
+                            Math.min(prev + 1, filtered.length - 1),
+                          );
+                        } else if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setSlashSelectedIndex((prev) =>
+                            Math.max(prev - 1, 0),
+                          );
+                        } else if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (filtered[slashSelectedIndex]) {
+                            executeSlashCommand(filtered[slashSelectedIndex]);
+                          }
+                        }
+                      } else if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        setSlashSelectedIndex((prev) => Math.max(prev - 1, 0));
-                      } else if (e.key === "Enter") {
-                        e.preventDefault();
-                        if (filtered[slashSelectedIndex]) {
-                          executeSlashCommand(filtered[slashSelectedIndex]);
+                        if (
+                          slashInput.trim() &&
+                          selectedAgent &&
+                          selectedWorkflow
+                        ) {
+                          const input = slashInput.trim();
+                          setSlashInput("");
+                          void runWorkflowFor(
+                            selectedAgent,
+                            selectedWorkflow,
+                          ).then(() => {
+                            handleSendMessage(input);
+                          });
                         }
                       }
-                    } else if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      if (slashInput.trim() && selectedAgent && selectedWorkflow) {
-                        const input = slashInput.trim();
-                        setSlashInput("");
-                        void runWorkflowFor(selectedAgent, selectedWorkflow).then(() => {
-                           handleSendMessage(input);
-                        });
-                      }
-                    }
-                  }}
-                />
-                <div className="flex items-center justify-between px-3 pb-2 pt-1">
-                  <div className="flex flex-1 min-w-0 items-center gap-1">
-                    <Button
-                      className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground shrink-0"
-                      size="icon"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Plus className="size-5" />
-                    </Button>
+                    }}
+                  />
+                  <div className="flex items-center justify-between px-3 pb-2 pt-1">
                     <div className="flex flex-1 min-w-0 items-center gap-1">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            className="h-8 gap-1.5 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground shrink-0 max-w-[120px]"
-                            type="button"
-                            variant="ghost"
-                          >
-                            <span className="truncate">{settings.provider || "ollama"}</span>
-                            <ChevronDown className="size-3.5 shrink-0" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-[180px]">
-                          <DropdownMenuLabel>Provider</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuGroup>
-                            {["ollama", "google_ai", "anthropic", "openai", "bedrock"].map((provider) => (
-                              <DropdownMenuItem
-                                key={provider}
-                                onClick={async () => {
-                                  try {
-                                    const resp = await selectAgentServerModelProvider({ providerId: provider });
-                                    if (resp && resp.success) {
-                                      setSettings((prev) => ({ ...prev, provider: provider as any }));
-                                      // Trigger a model refresh
-                                      setModelSummary((s) => ({ ...s, status: "loading" }));
-                                      listAgentServerModels()
-                                        .then((catalog) => {
-                                          setModelCatalog(catalog.models.data);
-                                          setModelSummary({ label: "Select model", status: "ready", count: catalog.models.data.length });
-                                        })
-                                        .catch(() => setModelSummary({ label: "Error", status: "error" }));
-                                    }
-                                  } catch (e) {
-                                    console.error("Failed to set provider", e);
-                                  }
-                                }}
-                                className="flex w-full items-center justify-between p-2"
-                              >
-                                <span className="font-medium">{provider}</span>
-                                {settings.provider === provider && <CheckCircle2 className="size-4 text-primary" />}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuGroup>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            className="h-8 gap-1.5 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground shrink-0 max-w-[300px]"
-                            type="button"
-                            variant="ghost"
-                          >
-                            <span className="truncate">{modelSummary.label}</span>
-                            <ChevronDown className="size-3.5 shrink-0" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-[300px]">
-                        <DropdownMenuLabel>Available Models</DropdownMenuLabel>
-                        {modelSummary.status === "error" && modelSummary.error && (
-                          <div className="px-2 py-1 text-xs text-destructive">
-                            Error: {modelSummary.error}
-                          </div>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuGroup>
-                          {modelCatalog.filter(m => !m.hidden).map((model) => (
-                            <DropdownMenuItem
-                              key={model.id}
-                              onClick={() => {
-                                setSelectedModelId(model.id);
-                                setModelSummary((current) => ({
-                                  ...current,
-                                  label: model.displayName || model.model,
-                                }));
-                              }}
-                              className="flex flex-col items-start gap-1 p-2"
+                      <Button
+                        className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground shrink-0"
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Plus className="size-5" />
+                      </Button>
+                      <div className="flex flex-1 min-w-0 items-center gap-1">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              className="h-8 gap-1.5 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground shrink-0 max-w-[120px]"
+                              type="button"
+                              variant="ghost"
                             >
-                              <div className="flex w-full items-center justify-between">
-                                <span className="font-medium">{model.displayName || model.model}</span>
-                                {model.id === selectedModelId && <CheckCircle2 className="size-4 text-primary" />}
-                              </div>
-                              {model.description && (
-                                <span className="text-xs text-muted-foreground line-clamp-2">
-                                  {model.description}
-                                </span>
+                              <span className="truncate">
+                                {settings.provider || "ollama"}
+                              </span>
+                              <ChevronDown className="size-3.5 shrink-0" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="start"
+                            className="w-[180px]"
+                          >
+                            <DropdownMenuLabel>Provider</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuGroup>
+                              {[
+                                "ollama",
+                                "google_ai",
+                                "anthropic",
+                                "openai",
+                                "bedrock",
+                              ].map((provider) => (
+                                <DropdownMenuItem
+                                  key={provider}
+                                  onClick={async () => {
+                                    try {
+                                      const resp =
+                                        await selectAgentServerModelProvider({
+                                          providerId: provider,
+                                        });
+                                      if (resp && resp.success) {
+                                        setSettings((prev) => ({
+                                          ...prev,
+                                          provider: provider as any,
+                                        }));
+                                        // Trigger a model refresh
+                                        setModelSummary((s) => ({
+                                          ...s,
+                                          status: "loading",
+                                        }));
+                                        listAgentServerModels()
+                                          .then((catalog) => {
+                                            setModelCatalog(
+                                              catalog.models.data,
+                                            );
+                                            setModelSummary({
+                                              label: "Select model",
+                                              status: "ready",
+                                              count: catalog.models.data.length,
+                                            });
+                                          })
+                                          .catch(() =>
+                                            setModelSummary({
+                                              label: "Error",
+                                              status: "error",
+                                            }),
+                                          );
+                                      }
+                                    } catch (e) {
+                                      console.error(
+                                        "Failed to set provider",
+                                        e,
+                                      );
+                                    }
+                                  }}
+                                  className="flex w-full items-center justify-between p-2"
+                                >
+                                  <span className="font-medium">
+                                    {provider}
+                                  </span>
+                                  {settings.provider === provider && (
+                                    <CheckCircle2 className="size-4 text-primary" />
+                                  )}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              className="h-8 gap-1.5 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground shrink-0 max-w-[300px]"
+                              type="button"
+                              variant="ghost"
+                            >
+                              <span className="truncate">
+                                {modelSummary.label}
+                              </span>
+                              <ChevronDown className="size-3.5 shrink-0" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="start"
+                            className="w-[300px]"
+                          >
+                            <DropdownMenuLabel>
+                              Available Models
+                            </DropdownMenuLabel>
+                            {modelSummary.status === "error" &&
+                              modelSummary.error && (
+                                <div className="px-2 py-1 text-xs text-destructive">
+                                  Error: {modelSummary.error}
+                                </div>
                               )}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuGroup>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuGroup>
+                              {modelCatalog
+                                .filter((m) => !m.hidden)
+                                .map((model) => (
+                                  <DropdownMenuItem
+                                    key={model.id}
+                                    onClick={() => {
+                                      setSelectedModelId(model.id);
+                                      setModelSummary((current) => ({
+                                        ...current,
+                                        label: model.displayName || model.model,
+                                      }));
+                                    }}
+                                    className="flex flex-col items-start gap-1 p-2"
+                                  >
+                                    <div className="flex w-full items-center justify-between">
+                                      <span className="font-medium">
+                                        {model.displayName || model.model}
+                                      </span>
+                                      {model.id === selectedModelId && (
+                                        <CheckCircle2 className="size-4 text-primary" />
+                                      )}
+                                    </div>
+                                    {model.description && (
+                                      <span className="text-xs text-muted-foreground line-clamp-2">
+                                        {model.description}
+                                      </span>
+                                    )}
+                                  </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 items-center">
-                    <Button
-                      className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground shrink-0"
-                      size="icon"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Mic className="size-4" />
-                    </Button>
-                    <div
-                      className={cn(
-                        "overflow-hidden transition-all duration-300 ease-in-out flex items-center",
-                        slashInput.trim() || isRunInProgress ? "w-8 ml-1 opacity-100" : "w-0 ml-0 opacity-0"
-                      )}
-                    >
-                      {isRunInProgress ? (
-                        <Button
-                          className="h-8 w-8 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 shrink-0"
-                          size="icon"
-                          type="button"
-                          onClick={interruptWorkflowTurn}
-                        >
-                          <Square className="size-4 fill-current" />
-                        </Button>
-                      ) : (
-                        <Button
-                          className="h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
-                          size="icon"
-                          type="button"
-                          onClick={() => {
-                            if (slashInput.trim() && selectedAgent && selectedWorkflow) {
-                              const input = slashInput.trim();
-                              setSlashInput("");
-                              void runWorkflowFor(selectedAgent, selectedWorkflow).then(() => {
-                                handleSendMessage(input);
-                              });
-                            }
-                          }}
-                        >
-                          <ArrowUp className="size-4" />
-                        </Button>
-                      )}
+                    <div className="flex shrink-0 items-center">
+                      <Button
+                        className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground shrink-0"
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Mic className="size-4" />
+                      </Button>
+                      <div
+                        className={cn(
+                          "overflow-hidden transition-all duration-300 ease-in-out flex items-center",
+                          slashInput.trim() || isRunInProgress
+                            ? "w-8 ml-1 opacity-100"
+                            : "w-0 ml-0 opacity-0",
+                        )}
+                      >
+                        {isRunInProgress ? (
+                          <Button
+                            className="h-8 w-8 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 shrink-0"
+                            size="icon"
+                            type="button"
+                            onClick={interruptWorkflowTurn}
+                          >
+                            <Square className="size-4 fill-current" />
+                          </Button>
+                        ) : (
+                          <Button
+                            className="h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
+                            size="icon"
+                            type="button"
+                            onClick={() => {
+                              if (
+                                slashInput.trim() &&
+                                selectedAgent &&
+                                selectedWorkflow
+                              ) {
+                                const input = slashInput.trim();
+                                setSlashInput("");
+                                void runWorkflowFor(
+                                  selectedAgent,
+                                  selectedWorkflow,
+                                ).then(() => {
+                                  handleSendMessage(input);
+                                });
+                              }
+                            }}
+                          >
+                            <ArrowUp className="size-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
             </div>
           </section>
         )}
@@ -1012,7 +1113,12 @@ function PageHeader({
     <header className="@container flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] bg-[var(--app-chrome)] px-4 py-3">
       <div className="flex items-center gap-2">
         <Button
-          className={cn("h-8 gap-1.5 text-xs px-2 @[550px]:px-3", isSessionsSidebarOpen ? "bg-accent text-accent-foreground" : "text-muted-foreground")}
+          className={cn(
+            "h-8 gap-1.5 text-xs px-2 @[550px]:px-3",
+            isSessionsSidebarOpen
+              ? "bg-accent text-accent-foreground"
+              : "text-muted-foreground",
+          )}
           variant="ghost"
           onClick={onToggleSessions}
         >
@@ -1037,15 +1143,27 @@ function PageHeader({
       {warningEvents.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
+            >
               <AlertTriangle className="size-4" />
-              <Badge variant="secondary" className="bg-amber-500/20 text-amber-500 hover:bg-amber-500/30">
+              <Badge
+                variant="secondary"
+                className="bg-amber-500/20 text-amber-500 hover:bg-amber-500/30"
+              >
                 {warningEvents.length}
               </Badge>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[400px] max-h-[400px] overflow-y-auto bg-[var(--app-panel)] border-[color:var(--app-border)]">
-            <div className="px-2 py-1.5 text-sm font-semibold text-foreground">Warnings & Errors</div>
+          <DropdownMenuContent
+            align="end"
+            className="w-[400px] max-h-[400px] overflow-y-auto bg-[var(--app-panel)] border-[color:var(--app-border)]"
+          >
+            <div className="px-2 py-1.5 text-sm font-semibold text-foreground">
+              Warnings & Errors
+            </div>
             <DropdownMenuSeparator />
             <div className="flex flex-col gap-2 p-2">
               {warningEvents.map((event) => (
@@ -1061,7 +1179,9 @@ function PageHeader({
                   <div
                     className={cn(
                       "flex items-center gap-2 mb-1 font-semibold text-xs",
-                      event.level === "error" ? "text-red-500" : "text-amber-500",
+                      event.level === "error"
+                        ? "text-red-500"
+                        : "text-amber-500",
                     )}
                   >
                     <AlertCircle className="size-3.5" />
@@ -1313,9 +1433,13 @@ function AgentDetailRouteScreen({
 }) {
   const agentIsRunning =
     agent.status === "running" || run?.status === "running";
-  
+
   const events = run?.events ?? [];
-  const warningEvents = events.filter((e) => (e.level === "error" || e.level === "warning") && e.title !== "Run stopped");
+  const warningEvents = events.filter(
+    (e) =>
+      (e.level === "error" || e.level === "warning") &&
+      e.title !== "Run stopped",
+  );
 
   const prevEventsRef = React.useRef(events);
   React.useEffect(() => {
@@ -1365,15 +1489,27 @@ function AgentDetailRouteScreen({
           {warningEvents.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
+                >
                   <AlertTriangle className="size-4" />
-                  <Badge variant="secondary" className="bg-amber-500/20 text-amber-500 hover:bg-amber-500/30">
+                  <Badge
+                    variant="secondary"
+                    className="bg-amber-500/20 text-amber-500 hover:bg-amber-500/30"
+                  >
                     {warningEvents.length}
                   </Badge>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[400px] max-h-[400px] overflow-y-auto bg-[var(--app-panel)] border-[color:var(--app-border)]">
-                <div className="px-2 py-1.5 text-sm font-semibold text-foreground">Warnings & Errors</div>
+              <DropdownMenuContent
+                align="end"
+                className="w-[400px] max-h-[400px] overflow-y-auto bg-[var(--app-panel)] border-[color:var(--app-border)]"
+              >
+                <div className="px-2 py-1.5 text-sm font-semibold text-foreground">
+                  Warnings & Errors
+                </div>
                 <DropdownMenuSeparator />
                 <div className="flex flex-col gap-2 p-2">
                   {warningEvents.map((event) => (
@@ -1389,7 +1525,9 @@ function AgentDetailRouteScreen({
                       <div
                         className={cn(
                           "flex items-center gap-2 mb-1 font-semibold text-xs",
-                          event.level === "error" ? "text-red-500" : "text-amber-500",
+                          event.level === "error"
+                            ? "text-red-500"
+                            : "text-amber-500",
                         )}
                       >
                         <AlertCircle className="size-3.5" />
@@ -1406,7 +1544,13 @@ function AgentDetailRouteScreen({
           )}
         </div>
       </header>
-      <AgentDetailScreen agent={agent} run={run} workflow={workflow} onSendMessage={onSendMessage} onStopRun={onStopRun} />
+      <AgentDetailScreen
+        agent={agent}
+        run={run}
+        workflow={workflow}
+        onSendMessage={onSendMessage}
+        onStopRun={onStopRun}
+      />
     </section>
   );
 }
@@ -1432,7 +1576,6 @@ function AgentDetailScreen({
     : "Not run";
   return (
     <section className="grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[var(--app-window)]">
-
       <section className="flex min-h-0 min-w-0 flex-col">
         <UnifiedActivityPanel
           agentIsRunning={agentIsRunning}
@@ -1476,85 +1619,122 @@ function UnifiedActivityPanel({
           {responseText || reasoningText || agentIsRunning ? (
             <div className="flex flex-col gap-4">
               {(() => {
-                const reasoningBlocks = (reasoningText || "").split(/\n\n\*\*TURN:\*\*\n\n/);
+                const reasoningBlocks = (reasoningText || "").split(
+                  /\n\n\*\*TURN:\*\*\n\n/,
+                );
                 let agentTurnIndex = 0;
-                
+
                 const msgs = [];
                 const responseStr = responseText || "";
                 const regex = /\*\*(User|Agent):\*\*/g;
                 let match;
                 let lastIndex = 0;
                 let currentRole = null;
-                
+
                 while ((match = regex.exec(responseStr)) !== null) {
                   if (currentRole) {
-                    const r = currentRole === 'agent' ? reasoningBlocks[agentTurnIndex++] : undefined;
+                    const r =
+                      currentRole === "agent"
+                        ? reasoningBlocks[agentTurnIndex++]
+                        : undefined;
                     msgs.push({
                       role: currentRole,
                       text: responseStr.slice(lastIndex, match.index).trim(),
                       reasoning: r,
                     });
                   } else {
-                    const text = responseStr.slice(lastIndex, match.index).trim();
+                    const text = responseStr
+                      .slice(lastIndex, match.index)
+                      .trim();
                     if (text) {
-                      msgs.push({ role: 'agent', text, reasoning: undefined });
+                      msgs.push({ role: "agent", text, reasoning: undefined });
                     }
                   }
                   currentRole = match[1].toLowerCase();
                   lastIndex = regex.lastIndex;
                 }
-                
+
                 if (currentRole) {
-                  const r = currentRole === 'agent' ? reasoningBlocks[agentTurnIndex++] : undefined;
+                  const r =
+                    currentRole === "agent"
+                      ? reasoningBlocks[agentTurnIndex++]
+                      : undefined;
                   msgs.push({
                     role: currentRole,
                     text: responseStr.slice(lastIndex).trim(),
                     reasoning: r,
                   });
                 } else if (responseStr.trim()) {
-                  msgs.push({ role: 'agent', text: responseStr.trim(), reasoning: reasoningBlocks[0] });
+                  msgs.push({
+                    role: "agent",
+                    text: responseStr.trim(),
+                    reasoning: reasoningBlocks[0],
+                  });
                 } else if (reasoningText?.trim()) {
-                  msgs.push({ role: 'agent', text: "", reasoning: reasoningBlocks[0] });
+                  msgs.push({
+                    role: "agent",
+                    text: "",
+                    reasoning: reasoningBlocks[0],
+                  });
                 } else if (agentIsRunning) {
-                  msgs.push({ role: 'agent', text: "", reasoning: undefined });
+                  msgs.push({ role: "agent", text: "", reasoning: undefined });
                 }
-                
+
                 return msgs.map((msg, i) => (
-                  <div key={i} className={cn("flex flex-col", msg.role === "user" ? "items-end" : "items-start")}>
+                  <div
+                    key={i}
+                    className={cn(
+                      "flex flex-col",
+                      msg.role === "user" ? "items-end" : "items-start",
+                    )}
+                  >
                     {msg.reasoning ? (
-                      <details open className="rounded border border-[color:var(--app-border)] bg-black/5 p-3 open:pb-4 group mb-2 max-w-[85%] w-full">
+                      <details
+                        open
+                        className="rounded border border-[color:var(--app-border)] bg-black/5 p-3 open:pb-4 group mb-2 max-w-[85%] w-full"
+                      >
                         <summary className="flex cursor-pointer items-center gap-2 text-[10px] font-semibold uppercase text-muted-foreground select-none">
                           <Terminal className="size-3.5" />
                           Reasoning
-                          <span className="ml-auto text-[10px] group-open:hidden">Show</span>
-                          <span className="ml-auto text-[10px] hidden group-open:inline">Hide</span>
+                          <span className="ml-auto text-[10px] group-open:hidden">
+                            Show
+                          </span>
+                          <span className="ml-auto text-[10px] hidden group-open:inline">
+                            Hide
+                          </span>
                         </summary>
                         <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-4 text-muted-foreground font-sans">
                           {msg.reasoning.trim()}
                         </pre>
                       </details>
                     ) : null}
-                    
+
                     {msg.text ? (
-                      <div className={cn("flex w-full", msg.role === "user" ? "justify-end" : "justify-start")}>
+                      <div
+                        className={cn(
+                          "flex w-full",
+                          msg.role === "user" ? "justify-end" : "justify-start",
+                        )}
+                      >
                         <div className="max-w-[85%] text-sm leading-6 text-foreground prose prose-sm dark:prose-invert">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {msg.text}
                           </ReactMarkdown>
                         </div>
                       </div>
-                    ) : (
-                      /* If agent is generating but hasn't output text yet, show thinking here */
-                      msg.role === 'agent' && agentIsRunning && i === msgs.length - 1 && !msg.reasoning ? (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse p-2 w-full justify-start">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
-                          </span>
-                          Thinking...
-                        </div>
-                      ) : null
-                    )}
+                    ) : /* If agent is generating but hasn't output text yet, show thinking here */
+                    msg.role === "agent" &&
+                      agentIsRunning &&
+                      i === msgs.length - 1 &&
+                      !msg.reasoning ? (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse p-2 w-full justify-start">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+                        </span>
+                        Thinking...
+                      </div>
+                    ) : null}
                   </div>
                 ));
               })()}
@@ -1575,29 +1755,40 @@ function UnifiedActivityPanel({
                 Approval Required
               </div>
               <p className="text-xs text-foreground mb-4">
-                {pendingRequest.request.method === "item/commandExecution/requestApproval"
+                {pendingRequest.request.method ===
+                "item/commandExecution/requestApproval"
                   ? `Allow app-server command?\n\n${pendingRequest.request.params.command ?? "command"}`
-                  : pendingRequest.request.method === "item/fileChange/requestApproval"
+                  : pendingRequest.request.method ===
+                      "item/fileChange/requestApproval"
                     ? `Allow app-server file change?\n\n${pendingRequest.request.params.reason ?? "File change requested."}`
                     : `Action requested: ${pendingRequest.request.method}`}
               </p>
               <div className="flex gap-2">
                 <button
                   className="px-3 py-1.5 text-xs font-semibold rounded bg-amber-500 text-black hover:bg-amber-400"
-                  onClick={() => pendingRequest.resolve({ type: "resolve", result: { decision: "accept" } })}
+                  onClick={() =>
+                    pendingRequest.resolve({
+                      type: "resolve",
+                      result: { decision: "accept" },
+                    })
+                  }
                 >
                   Allow
                 </button>
                 <button
                   className="px-3 py-1.5 text-xs font-semibold rounded border border-amber-500/50 text-amber-500 hover:bg-amber-500/20"
-                  onClick={() => pendingRequest.resolve({ type: "resolve", result: { decision: "decline" } })}
+                  onClick={() =>
+                    pendingRequest.resolve({
+                      type: "resolve",
+                      result: { decision: "decline" },
+                    })
+                  }
                 >
                   Deny
                 </button>
               </div>
             </div>
           )}
-
         </div>
         {onSendMessage && (
           <div className="shrink-0 border-t border-[color:var(--app-border)] p-3 bg-[var(--app-window)]">
@@ -1641,7 +1832,6 @@ function UnifiedActivityPanel({
           </div>
         )}
       </div>
-
     </section>
   );
 }
