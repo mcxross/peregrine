@@ -48,6 +48,39 @@ powershell -ExecutionPolicy ByPass -c "irm https://mcxross.xyz/peregrine/install
 
 Then simply run `peregrine` to get started.
 
+## Autonomous Audit Flow
+
+Peregrine runs an audit as a coordinator-led investigation. The coordinator keeps the audit plan moving, assigns specialist agents, uses the best available tools for evidence, and only promotes findings that survive adversarial review.
+
+```mermaid
+flowchart TD
+    classDef core fill:#E8F5EE,stroke:#0F7A4F,color:#161616
+    classDef agent fill:#FEF3C7,stroke:#B45309,color:#161616
+    classDef tool fill:#FFF7ED,stroke:#C2410C,color:#161616
+    classDef evidence fill:#EEF2FF,stroke:#4F46E5,color:#161616
+    classDef report fill:#DCFCE7,stroke:#15803D,color:#161616
+    classDef gap fill:#FEE2E2,stroke:#B91C1C,color:#161616
+
+    Target["Audit target"]:::core --> Coordinator["Coordinator agent<br/>plans, schedules, and tracks progress"]:::core
+    Coordinator --> Understand["Build understanding<br/>code shape, trust boundaries, invariants"]:::core
+    Understand --> Hypotheses["Generate attack hypotheses"]:::core
+
+    Hypotheses --> Researcher["Researcher<br/>finds plausible issues"]:::agent
+    Researcher --> Tools["Available toolchains<br/>static, graphs, bytecode, fuzzing,<br/>formal checks, knowledge lookup"]:::tool
+    Tools --> Evidence["Evidence packets<br/>observations, traces, artifacts, gaps"]:::evidence
+
+    Evidence --> Skeptic["Skeptic<br/>tries to disprove candidates"]:::agent
+    Evidence --> Exploiter["Exploiter<br/>tries to build a reproducible attack"]:::agent
+    Skeptic --> Judge["Judge<br/>scores evidence and role conclusions"]:::agent
+    Exploiter --> Judge
+
+    Judge --> Decision{"Enough evidence?"}:::evidence
+    Decision -->|"No"| FollowUp["Refine hypothesis<br/>or record coverage gap"]:::gap
+    FollowUp --> Coordinator
+    Decision -->|"Yes"| Finding["Evidence-backed finding"]:::report
+    Finding --> Report["Final report<br/>confirmed findings and remaining gaps"]:::report
+```
+
 ## License
 
     Copyright 2026 McXross
