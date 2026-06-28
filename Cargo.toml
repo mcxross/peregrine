@@ -33,7 +33,7 @@ members = [
   "crates/peregrine-types",
   "crates/peregrine-core",
   "crates/peregrine-skills",
-  "crates/memories/read",
+  "crates/peregrine-memories/read",
   "crates/peregrine-client",
   "crates/peregrine-config",
   "crates/peregrine-app-server-types",
@@ -48,7 +48,7 @@ members = [
   "crates/peregrine-app-server-protocol",
   "crates/peregrine-app-server-test-client",
   "crates/peregrine-app-server-transport",
-  "crates/memories/write",
+  "crates/peregrine-memories/write",
   "crates/peregrine-utils/home-dir",
   "crates/peregrine-core/tests/common",
   "crates/peregrine-app-server/tests/common",
@@ -282,8 +282,8 @@ codex-login = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-al
 codex-mcp = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-mcp-server = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-memories-extension = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
-peregrine-memories-read = { path = "crates/memories/read" }
-peregrine-memories-write = { path = "crates/memories/write" }
+peregrine-memories-read = { path = "crates/peregrine-memories/read" }
+peregrine-memories-write = { path = "crates/peregrine-memories/write" }
 codex-message-history = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 codex-model-provider-info = { git = "https://github.com/openai/codex", tag = "rust-v0.136.0-alpha.2" }
 peregrine-models-manager = { path = "crates/peregrine-models-manager" }
