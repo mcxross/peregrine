@@ -23,7 +23,6 @@ members = [
   "crates/peregrine-mcp-client",
   "crates/peregrine-mcp-server/sui",
   "crates/peregrine-mcp-server/sui-move-analyzer",
-  "crates/peregrine-memwal",
   "crates/peregrine-sui-package-resolution",
   "crates/peregrine-sui-project-loader",
   "crates/peregrine-plugins",

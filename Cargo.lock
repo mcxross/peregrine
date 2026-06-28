@@ -253,7 +253,7 @@ checksum = "a07d86e4272c093c88caf7864a2d09af52a5159180848ca4832a3cdbd7d014d5"
 dependencies = [
  "age-core",
  "base64 0.21.7",
- "bech32 0.9.1",
+ "bech32",
  "chacha20poly1305",
  "cookie-factory",
  "hmac 0.12.1",
@@ -1095,42 +1095,7 @@ dependencies = [
  "http 1.4.2",
  "matchit 0.5.0",
  "pin-project-lite",
- "pkcs8 0.10.2",
- "quinn",
- "quinn-proto",
- "rand 0.8.5",
- "rcgen 0.13.2",
- "ring",
- "rustls",
- "rustls-webpki",
- "serde",
- "serde_json",
- "socket2 0.5.10",
- "tap",
- "thiserror 1.0.69",
- "tokio",
- "tokio-util 0.7.18",
- "tower 0.4.13",
- "tracing",
- "x509-parser 0.17.0",
-]
-
-[[package]]
-name = "anemo"
-version = "0.0.0"
-source = "git+https://github.com/mystenlabs/anemo.git?rev=9c52c3c7946532163a79129db15180cdb984bab4#9c52c3c7946532163a79129db15180cdb984bab4"
-dependencies = [
- "anyhow",
- "async-trait",
- "bincode 1.3.3",
- "bytes",
- "ed25519",
- "futures",
- "hex",
- "http 1.4.2",
- "matchit 0.5.0",
- "pin-project-lite",
- "pkcs8 0.10.2",
+ "pkcs8",
  "quinn",
  "quinn-proto",
  "rand 0.8.5",
@@ -1166,25 +1131,7 @@ name = "anemo-tower"
 version = "0.0.0"
 source = "git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0#9248f8d3951df750360308df22618e5978ad6dc0"
 dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
- "bytes",
- "dashmap 5.5.3",
- "futures",
- "governor",
- "nonzero_ext",
- "pin-project-lite",
- "tokio",
- "tower 0.4.13",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "anemo-tower"
-version = "0.0.0"
-source = "git+https://github.com/mystenlabs/anemo.git?rev=9c52c3c7946532163a79129db15180cdb984bab4#9c52c3c7946532163a79129db15180cdb984bab4"
-dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9c52c3c7946532163a79129db15180cdb984bab4)",
+ "anemo",
  "bytes",
  "dashmap 5.5.3",
  "futures",
@@ -1780,7 +1727,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.118",
- "synstructure 0.13.2",
+ "synstructure",
 ]
 
 [[package]]
@@ -2986,12 +2933,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d86b93f97252c47b41663388e6d155714a9d0c398b99f1005cbc5f978b29f445"
 
 [[package]]
-name = "bech32"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32637268377fc7b10a8c6d51de3e7fba1ce5dd371a96e342b34e6078db558e7f"
-
-[[package]]
 name = "beef"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3431,91 +3372,9 @@ dependencies = [
 
 [[package]]
 name = "bnum"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f781dba93de3a5ef6dc5b17c9958b208f6f3f021623b360fb605ea51ce443f10"
-
-[[package]]
-name = "bnum"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "119771309b95163ec7aaf79810da82f7cd0599c19722d48b9c03894dca833966"
-
-[[package]]
-name = "bollard"
-version = "0.19.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "899ca34eb6924d6ec2a77c6f7f5c7339e60fd68235eaf91edd5a15f12958bb06"
-dependencies = [
- "async-stream",
- "base64 0.22.1",
- "bitflags 2.13.0",
- "bollard-buildkit-proto",
- "bollard-stubs",
- "bytes",
- "chrono",
- "futures-core",
- "futures-util",
- "hex",
- "home",
- "http 1.4.2",
- "http-body-util",
- "hyper 1.10.1",
- "hyper-named-pipe",
- "hyper-rustls",
- "hyper-util",
- "hyperlocal",
- "log",
- "num",
- "pin-project-lite",
- "rand 0.9.4",
- "rustls",
- "rustls-native-certs",
- "rustls-pemfile 2.2.0",
- "rustls-pki-types",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_repr",
- "serde_urlencoded",
- "thiserror 2.0.18",
- "tokio",
- "tokio-stream",
- "tokio-util 0.7.18",
- "tonic 0.13.1",
- "tower-service",
- "url",
- "winapi",
-]
-
-[[package]]
-name = "bollard-buildkit-proto"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40b3e79f8bd0f25f32660e3402afca46fd91bebaf135af017326d905651f8107"
-dependencies = [
- "prost 0.13.5",
- "prost-types 0.13.5",
- "tonic 0.13.1",
- "ureq 2.12.1",
-]
-
-[[package]]
-name = "bollard-stubs"
-version = "1.48.3-rc.28.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64ea257e555d16a2c01e5593f40b73865cdf12efbceda33c6d14a2d8d1490368"
-dependencies = [
- "base64 0.22.1",
- "bollard-buildkit-proto",
- "bytes",
- "chrono",
- "prost 0.13.5",
- "serde",
- "serde_json",
- "serde_repr",
- "serde_with",
-]
 
 [[package]]
 name = "borsh"
@@ -5930,23 +5789,11 @@ name = "consensus-config"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "mysten-network 0.2.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "fastcrypto",
+ "mysten-network",
  "rand 0.8.5",
  "serde",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
-]
-
-[[package]]
-name = "consensus-config"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "mysten-network 0.2.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "rand 0.8.5",
- "serde",
- "shared-crypto 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "shared-crypto",
 ]
 
 [[package]]
@@ -5961,19 +5808,19 @@ dependencies = [
  "bcs",
  "bytes",
  "cfg-if",
- "consensus-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "consensus-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "consensus-config",
+ "consensus-types",
  "dashmap 5.5.3",
  "enum_dispatch",
  "eyre",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "futures",
  "http 1.4.2",
  "itertools 0.13.0",
  "mockall",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-network 0.2.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-metrics",
+ "mysten-network",
  "nom 7.1.3",
  "parking_lot 0.12.5",
  "prometheus 0.14.0",
@@ -5982,10 +5829,10 @@ dependencies = [
  "rand 0.8.5",
  "rustls",
  "serde",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
  "strum_macros 0.27.2",
- "sui-http 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-http",
+ "sui-macros",
  "sui-tls",
  "tap",
  "tempfile",
@@ -6009,19 +5856,8 @@ version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "base64 0.21.7",
- "consensus-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "serde",
-]
-
-[[package]]
-name = "consensus-types"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "base64 0.21.7",
- "consensus-config 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
+ "consensus-config",
+ "fastcrypto",
  "serde",
 ]
 
@@ -6270,13 +6106,6 @@ dependencies = [
  "bitflags 2.13.0",
  "core-foundation 0.10.1",
  "libc",
-]
-
-[[package]]
-name = "core2"
-version = "0.4.0"
-dependencies = [
- "memchr",
 ]
 
 [[package]]
@@ -6678,22 +6507,6 @@ name = "crunchy"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
-
-[[package]]
-name = "crypto"
-version = "0.5.12"
-source = "git+https://github.com/mystenlabs/seal?rev=6755476d6f2eb4e7069f073228516a8eb7c7c1ea#6755476d6f2eb4e7069f073228516a8eb7c7c1ea"
-dependencies = [
- "bcs",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "hex",
- "itertools 0.14.0",
- "rand 0.8.5",
- "serde",
- "serde_with",
- "sui-sdk-types 0.0.8",
- "typenum",
-]
 
 [[package]]
 name = "crypto-bigint"
@@ -7371,8 +7184,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1a467a65c5e759bce6e65eaf91cc29f466cdc57cb65777bd646872a8a1fd4de"
 dependencies = [
  "const-oid 0.9.6",
- "pem-rfc7468 0.6.0",
- "zeroize",
 ]
 
 [[package]]
@@ -7845,17 +7656,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "docker_credential"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29547a1dc60885a552306986316bc9701ba120c1a8db6769fa68691529ad373d"
-dependencies = [
- "base64 0.22.1",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "document-features"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8015,7 +7815,7 @@ dependencies = [
  "rfc6979 0.4.0",
  "serdect",
  "signature 2.2.0",
- "spki 0.7.3",
+ "spki",
 ]
 
 [[package]]
@@ -8024,7 +7824,7 @@ version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
 dependencies = [
- "pkcs8 0.10.2",
+ "pkcs8",
  "signature 2.2.0",
  "zeroize",
 ]
@@ -8123,7 +7923,7 @@ dependencies = [
  "generic-array",
  "group 0.13.0",
  "pem-rfc7468 0.7.0",
- "pkcs8 0.10.2",
+ "pkcs8",
  "rand_core 0.6.4",
  "sec1 0.7.3",
  "serdect",
@@ -8229,14 +8029,6 @@ dependencies = [
 name = "enum-compat-util"
 version = "0.1.0"
 source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
-dependencies = [
- "serde_yaml 0.8.26",
-]
-
-[[package]]
-name = "enum-compat-util"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
 dependencies = [
  "serde_yaml 0.8.26",
 ]
@@ -8390,17 +8182,6 @@ name = "error-code"
 version = "3.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dea2df4cf52843e0452895c455a1a2cfbb842a1e7329671acf418fdc53ed4c59"
-
-[[package]]
-name = "etcetera"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26c7b13d0780cb82722fd59f6f57f925e143427e4a75313a6c77243bf5326ae6"
-dependencies = [
- "cfg-if",
- "home",
- "windows-sys 0.59.0",
-]
 
 [[package]]
 name = "etcetera"
@@ -8562,7 +8343,7 @@ dependencies = [
  "auto_ops",
  "base64ct",
  "bcs",
- "bech32 0.9.1",
+ "bech32",
  "bincode 1.3.3",
  "blake2",
  "blst",
@@ -8576,7 +8357,7 @@ dependencies = [
  "ecdsa 0.16.9",
  "ed25519-consensus",
  "elliptic-curve 0.13.8",
- "fastcrypto-derive 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto-derive",
  "generic-array",
  "hex",
  "hex-literal",
@@ -8590,7 +8371,7 @@ dependencies = [
  "rand 0.8.5",
  "readonly",
  "rfc6979 0.4.0",
- "rsa 0.9.10",
+ "rsa",
  "schemars 0.8.22",
  "secp256k1 0.27.0",
  "serde",
@@ -8608,75 +8389,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "fastcrypto"
-version = "0.1.9"
-source = "git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b#d1fcb853196c3de7888ed8fad74f419b8c8fbe3b"
-dependencies = [
- "aes",
- "aes-gcm",
- "aes-gcm-siv",
- "ark-ec",
- "ark-ff 0.4.2",
- "ark-secp256k1",
- "ark-secp256r1",
- "ark-serialize 0.4.2",
- "auto_ops",
- "base64ct",
- "bcs",
- "bech32 0.9.1",
- "bincode 1.3.3",
- "blake2",
- "blst",
- "bs58 0.4.0",
- "cbc",
- "ctr",
- "curve25519-dalek-ng",
- "derive_more 0.99.20",
- "digest 0.10.7",
- "ecdsa 0.16.9",
- "ed25519-consensus",
- "elliptic-curve 0.13.8",
- "fastcrypto-derive 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "generic-array",
- "hex",
- "hex-literal",
- "hkdf 0.12.4",
- "lazy_static",
- "num-bigint 0.4.6",
- "once_cell",
- "p256",
- "rand 0.8.5",
- "readonly",
- "rfc6979 0.4.0",
- "rsa 0.8.2",
- "schemars 0.8.22",
- "secp256k1 0.27.0",
- "serde",
- "serde_json",
- "serde_with",
- "sha2 0.10.9",
- "sha3 0.10.9",
- "signature 2.2.0",
- "static_assertions",
- "thiserror 1.0.69",
- "tokio",
- "typenum",
- "zeroize",
-]
-
-[[package]]
 name = "fastcrypto-derive"
 version = "0.1.3"
 source = "git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c#5f87e04bb21d295ef6b39375a06615d45cbb906c"
-dependencies = [
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "fastcrypto-derive"
-version = "0.1.3"
-source = "git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b#d1fcb853196c3de7888ed8fad74f419b8c8fbe3b"
 dependencies = [
  "quote",
  "syn 1.0.109",
@@ -8689,27 +8404,7 @@ source = "git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39
 dependencies = [
  "bcs",
  "digest 0.10.7",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "hex",
- "itertools 0.10.5",
- "rand 0.8.5",
- "serde",
- "serde-big-array",
- "sha3 0.10.9",
- "tap",
- "tracing",
- "typenum",
- "zeroize",
-]
-
-[[package]]
-name = "fastcrypto-tbls"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b#d1fcb853196c3de7888ed8fad74f419b8c8fbe3b"
-dependencies = [
- "bcs",
- "digest 0.10.7",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
+ "fastcrypto",
  "hex",
  "itertools 0.10.5",
  "rand 0.8.5",
@@ -8728,7 +8423,7 @@ version = "0.1.0"
 source = "git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c#5f87e04bb21d295ef6b39375a06615d45cbb906c"
 dependencies = [
  "bcs",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "lazy_static",
  "num-bigint 0.4.6",
  "num-integer",
@@ -8754,38 +8449,7 @@ dependencies = [
  "bcs",
  "byte-slice-cast",
  "derive_more 0.99.20",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "ff 0.13.1",
- "im",
- "itertools 0.12.1",
- "lazy_static",
- "neptune",
- "num-bigint 0.4.6",
- "once_cell",
- "regex",
- "reqwest 0.12.28",
- "schemars 0.8.22",
- "serde",
- "serde_json",
- "typenum",
-]
-
-[[package]]
-name = "fastcrypto-zkp"
-version = "0.1.3"
-source = "git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b#d1fcb853196c3de7888ed8fad74f419b8c8fbe3b"
-dependencies = [
- "ark-bn254",
- "ark-ec",
- "ark-ff 0.4.2",
- "ark-groth16",
- "ark-relations",
- "ark-serialize 0.4.2",
- "ark-snark",
- "bcs",
- "byte-slice-cast",
- "derive_more 0.99.20",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
+ "fastcrypto",
  "ff 0.13.1",
  "im",
  "itertools 0.12.1",
@@ -11348,21 +11012,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hyper-named-pipe"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73b7d8abf35697b81a825e386fc151e0d503e8cb5fcb93cc8669c376dfd6f278"
-dependencies = [
- "hex",
- "hyper 1.10.1",
- "hyper-util",
- "pin-project-lite",
- "tokio",
- "tower-service",
- "winapi",
-]
-
-[[package]]
 name = "hyper-rustls"
 version = "0.27.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11445,21 +11094,6 @@ dependencies = [
  "tower-service",
  "tracing",
  "windows-registry",
-]
-
-[[package]]
-name = "hyperlocal"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "986c5ce3b994526b3cd75578e62554abd09f0899d6206de48b3e96ab34ccc8c7"
-dependencies = [
- "hex",
- "http-body-util",
- "hyper 1.10.1",
- "hyper-util",
- "pin-project-lite",
- "tokio",
- "tower-service",
 ]
 
 [[package]]
@@ -12480,18 +12114,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jsonrpc"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "jsonrpsee"
 version = "0.24.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13083,7 +12705,7 @@ checksum = "9525f3831544f7ae497bde79adf114ef127b0fbbb97edbbf692a80408636421c"
 dependencies = [
  "bs58 0.5.1",
  "hkdf 0.12.4",
- "multihash 0.19.5",
+ "multihash",
  "sha2 0.10.9",
  "thiserror 2.0.18",
  "tracing",
@@ -13980,13 +13602,10 @@ version = "0.12.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8261cd88c312e0004c1d51baad2980c66528dfdb2bee62003e643a4d8f86b077"
 dependencies = [
- "async-lock",
  "crossbeam-channel",
  "crossbeam-epoch",
  "crossbeam-utils",
  "equivalent",
- "event-listener",
- "futures-util",
  "parking_lot 0.12.5",
  "portable-atomic",
  "rustc_version 0.4.1",
@@ -14004,11 +13623,6 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 name = "move-abstract-interpreter"
 version = "0.1.0"
 source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
-
-[[package]]
-name = "move-abstract-interpreter"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
 
 [[package]]
 name = "move-abstract-interpreter-v2"
@@ -14032,11 +13646,6 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 name = "move-abstract-stack"
 version = "0.0.1"
 source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
-
-[[package]]
-name = "move-abstract-stack"
-version = "0.0.1"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
 
 [[package]]
 name = "move-analyzer"
@@ -14103,22 +13712,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-binary-format"
-version = "0.0.3"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "enum-compat-util 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "indexmap 2.14.0",
- "move-abstract-interpreter 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-proc-macros 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "ref-cast",
- "serde",
- "variant_count",
-]
-
-[[package]]
 name = "move-borrow-graph"
 version = "0.0.1"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
@@ -14127,11 +13720,6 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 name = "move-borrow-graph"
 version = "0.0.1"
 source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
-
-[[package]]
-name = "move-borrow-graph"
-version = "0.0.1"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
 
 [[package]]
 name = "move-bytecode-source-map"
@@ -14166,22 +13754,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-bytecode-source-map"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "bcs",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-command-line-common 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-ir-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-symbol-pool 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "move-bytecode-utils"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
@@ -14203,19 +13775,6 @@ dependencies = [
  "indexmap 2.14.0",
  "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
- "petgraph 0.8.3",
- "serde-reflection",
-]
-
-[[package]]
-name = "move-bytecode-utils"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "indexmap 2.14.0",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
  "petgraph 0.8.3",
  "serde-reflection",
 ]
@@ -14255,21 +13814,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-bytecode-verifier"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "move-abstract-interpreter 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-abstract-stack 0.0.1 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-borrow-graph 0.0.1 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-bytecode-verifier-meter 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-vm-config 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "petgraph 0.8.3",
-]
-
-[[package]]
 name = "move-bytecode-verifier-meter"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
@@ -14287,16 +13831,6 @@ dependencies = [
  "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "move-vm-config 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
-]
-
-[[package]]
-name = "move-bytecode-verifier-meter"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-vm-config 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
 ]
 
 [[package]]
@@ -14406,7 +13940,7 @@ dependencies = [
  "move-trace-format 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-unit-test",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "move-vm-profiler 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "move-vm-profiler",
  "move-vm-runtime",
  "path-clean",
  "serde",
@@ -14454,27 +13988,6 @@ dependencies = [
  "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
- "packed_struct",
- "serde",
- "sha2 0.9.9",
- "vfs",
- "walkdir",
-]
-
-[[package]]
-name = "move-command-line-common"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "bcs",
- "colored",
- "dirs-next",
- "hex",
- "insta",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "once_cell",
  "packed_struct",
  "serde",
  "sha2 0.9.9",
@@ -14553,42 +14066,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-compiler"
-version = "0.0.1"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "bcs",
- "clap",
- "codespan-reporting 0.11.1",
- "dunce",
- "hex",
- "insta",
- "lsp-types 0.95.1",
- "move-abstract-interpreter 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-borrow-graph 0.0.1 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-bytecode-source-map 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-bytecode-verifier 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-command-line-common 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-ir-to-bytecode 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-ir-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-proc-macros 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-symbol-pool 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "once_cell",
- "petgraph 0.8.3",
- "rayon",
- "regex",
- "serde",
- "serde_json",
- "similar",
- "stacker",
- "tempfile",
- "vfs",
-]
-
-[[package]]
 name = "move-core-types"
 version = "0.0.4"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
@@ -14624,31 +14101,6 @@ dependencies = [
  "leb128",
  "move-proc-macros 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "num",
- "primitive-types 0.10.1",
- "rand 0.8.5",
- "ref-cast",
- "serde",
- "serde_bytes",
- "serde_with",
- "thiserror 1.0.69",
- "uint",
-]
-
-[[package]]
-name = "move-core-types"
-version = "0.0.4"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "bcs",
- "enum-compat-util 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "ethnum",
- "hex",
- "indexmap 2.14.0",
- "leb128",
- "move-proc-macros 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "num",
- "once_cell",
  "primitive-types 0.10.1",
  "rand 0.8.5",
  "ref-cast",
@@ -14706,31 +14158,6 @@ dependencies = [
  "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "move-trace-format 0.0.1 (git+https://github.com/asymptotic-code/sui?branch=next)",
- "petgraph 0.8.3",
- "serde",
-]
-
-[[package]]
-name = "move-coverage"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "bcs",
- "clap",
- "codespan",
- "colored",
- "indexmap 2.14.0",
- "lcov",
- "move-abstract-interpreter 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-bytecode-source-map 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-bytecode-verifier 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-command-line-common 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-compiler 0.0.1 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-ir-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-trace-format 0.0.1 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
  "petgraph 0.8.3",
  "serde",
 ]
@@ -14794,27 +14221,6 @@ dependencies = [
  "move-coverage 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "move-ir-types 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
-]
-
-[[package]]
-name = "move-disassembler"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "bcs",
- "clap",
- "hex",
- "inline_colorization",
- "move-abstract-interpreter 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-bytecode-source-map 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-command-line-common 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-compiler 0.0.1 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-coverage 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-ir-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-symbol-pool 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
 ]
 
 [[package]]
@@ -14895,24 +14301,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-ir-to-bytecode"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "codespan-reporting 0.11.1",
- "log",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-bytecode-source-map 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-command-line-common 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-ir-to-bytecode-syntax 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-ir-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-symbol-pool 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "ouroboros 0.17.2",
-]
-
-[[package]]
 name = "move-ir-to-bytecode-syntax"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
@@ -14939,19 +14327,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-ir-to-bytecode-syntax"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "hex",
- "move-command-line-common 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-ir-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-symbol-pool 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
-]
-
-[[package]]
 name = "move-ir-types"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
@@ -14972,19 +14347,6 @@ dependencies = [
  "move-command-line-common 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "move-symbol-pool 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
- "serde",
-]
-
-[[package]]
-name = "move-ir-types"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "hex",
- "move-command-line-common 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-symbol-pool 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "once_cell",
  "serde",
 ]
 
@@ -15188,7 +14550,7 @@ dependencies = [
  "indexmap 2.14.0",
  "indoc",
  "itertools 0.10.5",
- "jsonrpc 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "jsonrpc",
  "move-command-line-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-compiler 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -15253,16 +14615,6 @@ version = "0.1.0"
 source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d281f4b1095508f59cf7ad6cce"
 dependencies = [
  "enum-compat-util 0.1.0 (git+https://github.com/asymptotic-code/sui?branch=next)",
- "quote",
- "syn 2.0.118",
-]
-
-[[package]]
-name = "move-proc-macros"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "enum-compat-util 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
  "quote",
  "syn 2.0.118",
 ]
@@ -15491,16 +14843,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-symbol-pool"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "once_cell",
- "phf 0.11.3",
- "serde",
-]
-
-[[package]]
 name = "move-trace-format"
 version = "0.0.1"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
@@ -15519,18 +14861,6 @@ source = "git+https://github.com/asymptotic-code/sui?branch=next#512c3ff9a14608d
 dependencies = [
  "move-binary-format 0.0.3 (git+https://github.com/asymptotic-code/sui?branch=next)",
  "move-core-types 0.0.4 (git+https://github.com/asymptotic-code/sui?branch=next)",
- "serde",
- "serde_json",
- "zstd 0.13.3",
-]
-
-[[package]]
-name = "move-trace-format"
-version = "0.0.1"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
  "serde",
  "serde_json",
  "zstd 0.13.3",
@@ -15577,34 +14907,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-vm-config"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "once_cell",
-]
-
-[[package]]
 name = "move-vm-profiler"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "move-trace-format 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "serde",
- "serde_json",
- "tracing",
-]
-
-[[package]]
-name = "move-vm-profiler"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "move-trace-format 0.0.1 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-vm-config 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "once_cell",
  "serde",
  "serde_json",
  "tracing",
@@ -15713,33 +15021,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-vm-test-utils"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-vm-profiler 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-vm-types",
- "once_cell",
- "serde",
-]
-
-[[package]]
-name = "move-vm-types"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "bcs",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-vm-profiler 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "serde",
- "smallvec",
-]
-
-[[package]]
 name = "move-vm-types-v0"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
@@ -15805,7 +15086,7 @@ dependencies = [
  "movy-types",
  "serde",
  "serde_json",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tokio",
  "toml 0.9.12+spec-1.1.0",
 ]
@@ -15819,7 +15100,7 @@ dependencies = [
  "anyhow",
  "color-eyre",
  "const-hex",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "itertools 0.14.0",
  "libafl",
  "libafl_bolts",
@@ -15840,8 +15121,8 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_json_any_key",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-json-rpc-types",
+ "sui-types",
  "tokio",
  "z3",
  "z3-sys",
@@ -15881,7 +15162,7 @@ dependencies = [
  "color-eyre",
  "const-hex",
  "cynic",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "itertools 0.14.0",
  "libafl",
  "libafl_bolts",
@@ -15901,8 +15182,8 @@ dependencies = [
  "serde_json",
  "serde_json_any_key",
  "sui-execution",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-json-rpc-types",
+ "sui-types",
  "tempfile",
  "tokio",
  "tokio-stream",
@@ -15921,7 +15202,7 @@ dependencies = [
  "const-hex",
  "cynic",
  "cynic-codegen",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "itertools 0.14.0",
  "log",
  "mdbx-derive",
@@ -15937,14 +15218,14 @@ dependencies = [
  "reqwest 0.12.28",
  "serde",
  "serde_json",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
  "sui-execution",
  "sui-move-build",
  "sui-package-management",
- "sui-rpc 0.3.0",
- "sui-sdk 1.71.1",
- "sui-sdk-types 0.3.0",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-rpc",
+ "sui-sdk",
+ "sui-sdk-types",
+ "sui-types",
  "tempfile",
  "tokio",
  "tokio-stream",
@@ -15964,7 +15245,7 @@ dependencies = [
  "bitflags 2.13.0",
  "color-eyre",
  "const-hex",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "glob",
  "itertools 0.14.0",
  "libafl",
@@ -15976,8 +15257,8 @@ dependencies = [
  "reqwest 0.12.28",
  "serde",
  "serde_json",
- "sui-sdk 1.71.1",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-sdk",
+ "sui-types",
  "thiserror 2.0.18",
  "tokio",
  "toml 0.9.12+spec-1.1.0",
@@ -16009,7 +15290,7 @@ dependencies = [
  "futures",
  "lazy_static",
  "libc",
- "msim-macros 0.1.0 (git+https://github.com/MystenLabs/mysten-sim.git?rev=213e543d83b91c4aa904166bef255a6c0054c8a7)",
+ "msim-macros",
  "naive-timer",
  "pin-project-lite",
  "rand 0.8.5",
@@ -16027,17 +15308,6 @@ dependencies = [
 name = "msim-macros"
 version = "0.1.0"
 source = "git+https://github.com/MystenLabs/mysten-sim.git?rev=213e543d83b91c4aa904166bef255a6c0054c8a7#213e543d83b91c4aa904166bef255a6c0054c8a7"
-dependencies = [
- "darling 0.14.4",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "msim-macros"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/mysten-sim.git?rev=45b88cffa3f50d6f2022d0b422ca4a077ac96a98#45b88cffa3f50d6f2022d0b422ca4a077ac96a98"
 dependencies = [
  "darling 0.14.4",
  "proc-macro2",
@@ -16085,25 +15355,6 @@ dependencies = [
 
 [[package]]
 name = "multiaddr"
-version = "0.17.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b36f567c7099511fa8612bbbb52dda2419ce0bdbacf31714e3a5ffdb766d3bd"
-dependencies = [
- "arrayref",
- "byteorder",
- "data-encoding",
- "log",
- "multibase",
- "multihash 0.17.0",
- "percent-encoding",
- "serde",
- "static_assertions",
- "unsigned-varint 0.7.2",
- "url",
-]
-
-[[package]]
-name = "multiaddr"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe6351f60b488e04c1d21bc69e56b89cb3f5e8f5d22557d6e8031bdfd79b6961"
@@ -16113,11 +15364,11 @@ dependencies = [
  "data-encoding",
  "libp2p-identity",
  "multibase",
- "multihash 0.19.5",
+ "multihash",
  "percent-encoding",
  "serde",
  "static_assertions",
- "unsigned-varint 0.8.0",
+ "unsigned-varint",
  "url",
 ]
 
@@ -16135,36 +15386,11 @@ dependencies = [
 
 [[package]]
 name = "multihash"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "835d6ff01d610179fbce3de1694d007e500bf33a7f29689838941d6bf783ae40"
-dependencies = [
- "core2",
- "multihash-derive",
- "unsigned-varint 0.7.2",
-]
-
-[[package]]
-name = "multihash"
 version = "0.19.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "577c63b00ad74d57e8c9aa870b5fccebf2fd64a308a5aee9f1bb88e4aea19447"
 dependencies = [
- "unsigned-varint 0.8.0",
-]
-
-[[package]]
-name = "multihash-derive"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d6d4752e6230d8ef7adf7bd5d8c4b1f6561c1014c5ba9a37445ccefe18aa1db"
-dependencies = [
- "proc-macro-crate 1.1.3",
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
- "synstructure 0.12.6",
+ "unsigned-varint",
 ]
 
 [[package]]
@@ -16184,35 +15410,12 @@ dependencies = [
  "antithesis_sdk",
  "either",
  "futures",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-metrics",
  "once_cell",
  "parking_lot 0.12.5",
  "rand 0.8.5",
  "serde_json",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "tempfile",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "mysten-common"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "antithesis_sdk",
- "anyhow",
- "either",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "futures",
- "mysten-metrics 0.7.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "once_cell",
- "parking_lot 0.12.5",
- "rand 0.8.5",
- "reqwest 0.12.28",
- "serde_json",
- "snap",
- "sui-macros 0.7.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "sui-macros",
  "tempfile",
  "tokio",
  "tracing",
@@ -16230,28 +15433,7 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.5",
  "prometheus 0.14.0",
- "prometheus-closure-metric 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "scopeguard",
- "simple-server-timing-header",
- "tap",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "mysten-metrics"
-version = "0.7.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "async-trait",
- "axum 0.8.9",
- "dashmap 5.5.3",
- "futures",
- "once_cell",
- "parking_lot 0.12.5",
- "prometheus 0.13.4",
- "prometheus-closure-metric 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "prometheus-closure-metric",
  "scopeguard",
  "simple-server-timing-header",
  "tap",
@@ -16265,8 +15447,8 @@ name = "mysten-network"
 version = "0.2.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
- "anemo-tower 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
+ "anemo",
+ "anemo-tower",
  "anyhow",
  "bcs",
  "bytes",
@@ -16277,8 +15459,8 @@ dependencies = [
  "http-body 1.0.1",
  "hyper-rustls",
  "hyper-util",
- "multiaddr 0.18.2",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "multiaddr",
+ "mysten-metrics",
  "once_cell",
  "pin-project-lite",
  "prometheus 0.14.0",
@@ -16287,46 +15469,10 @@ dependencies = [
  "rustls",
  "serde",
  "snap",
- "sui-http 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-http",
  "tokio",
  "tokio-rustls",
  "tonic 0.14.6",
- "tower 0.5.3",
- "tower-http 0.5.2",
- "tracing",
-]
-
-[[package]]
-name = "mysten-network"
-version = "0.2.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9c52c3c7946532163a79129db15180cdb984bab4)",
- "anemo-tower 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9c52c3c7946532163a79129db15180cdb984bab4)",
- "async-stream",
- "bcs",
- "bytes",
- "eyre",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "futures",
- "http 1.4.2",
- "http-body 1.0.1",
- "hyper-rustls",
- "hyper-util",
- "multiaddr 0.17.1",
- "once_cell",
- "pin-project-lite",
- "prometheus 0.13.4",
- "rand 0.8.5",
- "rustls",
- "serde",
- "snap",
- "sui-http 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "tokio",
- "tokio-rustls",
- "tokio-stream",
- "tonic 0.13.1",
- "tonic-health 0.13.1",
  "tower 0.5.3",
  "tower-http 0.5.2",
  "tracing",
@@ -16339,7 +15485,7 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "anyhow",
  "axum 0.8.9",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-metrics",
  "prometheus 0.14.0",
  "serde",
  "simple-server-timing-header",
@@ -17144,24 +16290,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cfccb68961a56facde1163f9319e0d15743352344e7808a11795fb99698dcaf"
 dependencies = [
  "async-trait",
- "base64 0.22.1",
  "bytes",
  "chrono",
  "futures",
- "httparse",
  "humantime",
- "hyper 1.10.1",
  "itertools 0.13.0",
- "md-5 0.10.6",
  "parking_lot 0.12.5",
  "percent-encoding",
- "quick-xml 0.37.5",
- "rand 0.8.5",
- "reqwest 0.12.28",
- "ring",
- "rustls-pemfile 2.2.0",
- "serde",
- "serde_json",
  "snafu",
  "tokio",
  "tracing",
@@ -17959,31 +17094,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "parse-display"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "914a1c2265c98e2446911282c6ac86d8524f495792c38c5bd884f80499c7538a"
-dependencies = [
- "parse-display-derive",
- "regex",
- "regex-syntax 0.8.11",
-]
-
-[[package]]
-name = "parse-display-derive"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ae7800a4c974efd12df917266338e79a7a74415173caf7e70aa0a0707345281"
-dependencies = [
- "proc-macro2",
- "quote",
- "regex",
- "regex-syntax 0.8.11",
- "structmeta",
- "syn 2.0.118",
-]
-
-[[package]]
 name = "parse-zoneinfo"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -18133,15 +17243,6 @@ checksum = "1d30c53c26bc5b31a98cd02d20f25a7c8567146caf63ed593a9d87b2775291be"
 dependencies = [
  "base64 0.22.1",
  "serde_core",
-]
-
-[[package]]
-name = "pem-rfc7468"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24d159833a9105500e0398934e205e0773f0b27529557134ecfc51c27646adac"
-dependencies = [
- "base64ct",
 ]
 
 [[package]]
@@ -18842,40 +17943,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "peregrine-memwal"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "bcs",
- "bytes",
- "chrono",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "futures",
- "hex",
- "http 1.4.2",
- "rand 0.9.4",
- "reqwest 0.12.28",
- "seal-sdk-rs",
- "semver 1.0.28",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "sui-crypto 0.3.0 (git+https://github.com/mystenlabs/sui-rust-sdk?rev=49345f1ca16cee967e8d045ad965e0a764d7e95b)",
- "sui-rpc 0.3.1",
- "sui-sdk-types 0.3.1",
- "sui-transaction-builder 0.3.1",
- "thiserror 2.0.18",
- "tokio",
- "tonic 0.14.6",
- "tracing",
- "url",
- "uuid",
- "wiremock",
- "zeroize",
-]
-
-[[package]]
 name = "peregrine-model-provider"
 version = "0.1.0"
 dependencies = [
@@ -18991,21 +18058,21 @@ dependencies = [
  "alloy-transport-ws",
  "alloy-trie",
  "alloy-tx-macros",
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
+ "anemo",
  "anyhow",
  "bip32",
  "clap",
  "dirs 4.0.0",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "peregrine-analysis",
  "peregrine-sui-package-resolution",
  "serde",
  "serde_json",
  "sui",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-keys 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-sdk 1.71.1",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-config",
+ "sui-keys",
+ "sui-sdk",
+ "sui-types",
  "tempfile",
  "tiny-bip39",
  "tokio",
@@ -19644,35 +18711,13 @@ dependencies = [
 
 [[package]]
 name = "pkcs1"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eff33bdbdfc54cc98a2eca766ebdec3e1b8fb7387523d5c9c9a2891da856f719"
-dependencies = [
- "der 0.6.1",
- "pkcs8 0.9.0",
- "spki 0.6.0",
- "zeroize",
-]
-
-[[package]]
-name = "pkcs1"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8ffb9f10fa047879315e6625af03c164b16962a5368d724ed16323b68ace47f"
 dependencies = [
  "der 0.7.10",
- "pkcs8 0.10.2",
- "spki 0.7.3",
-]
-
-[[package]]
-name = "pkcs8"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9eca2c590a5f85da82668fa685c09ce2888b9430e83299debf1f34b65fd4a4ba"
-dependencies = [
- "der 0.6.1",
- "spki 0.6.0",
+ "pkcs8",
+ "spki",
 ]
 
 [[package]]
@@ -19682,7 +18727,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f950b2377845cebe5cf8b5165cb3cc1a5e0fa5cfa3e1f7f55707d8fd82e0a7b7"
 dependencies = [
  "der 0.7.10",
- "spki 0.7.3",
+ "spki",
 ]
 
 [[package]]
@@ -20157,16 +19202,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prometheus-closure-metric"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "prometheus 0.13.4",
- "protobuf 2.28.0",
-]
-
-[[package]]
 name = "proptest"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -20351,9 +19386,6 @@ name = "protobuf"
 version = "2.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
-dependencies = [
- "bytes",
-]
 
 [[package]]
 name = "protobuf"
@@ -20528,16 +19560,6 @@ name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
-
-[[package]]
-name = "quick-xml"
-version = "0.37.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "331e97a1af0bf59823e6eadffe373d7b27f485be8748f71471c662c1f269b7fb"
-dependencies = [
- "memchr",
- "serde",
-]
 
 [[package]]
 name = "quick-xml"
@@ -21380,15 +20402,6 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "567664f262709473930a4bf9e51bf2ebf3348f2e748ccc50dea20646858f8f29"
-dependencies = [
- "bitflags 1.3.2",
-]
-
-[[package]]
-name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
@@ -21526,7 +20539,7 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
- "rustls-pemfile 1.0.4",
+ "rustls-pemfile",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -21813,27 +20826,6 @@ checksum = "afab94fb28594581f62d981211a9a4d53cc8130bbcbbb89a0440d9b8e81a7746"
 
 [[package]]
 name = "rsa"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55a77d189da1fee555ad95b7e50e7457d91c0e089ec68ca69ad2989413bbdab4"
-dependencies = [
- "byteorder",
- "digest 0.10.7",
- "num-bigint-dig",
- "num-integer",
- "num-iter",
- "num-traits",
- "pkcs1 0.4.1",
- "pkcs8 0.9.0",
- "rand_core 0.6.4",
- "sha2 0.10.9",
- "signature 2.2.0",
- "subtle",
- "zeroize",
-]
-
-[[package]]
-name = "rsa"
 version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8573f03f5883dcaebdfcf4725caa1ecb9c15b2ef50c43a07b816e06799bb12d"
@@ -21843,12 +20835,12 @@ dependencies = [
  "num-bigint-dig",
  "num-integer",
  "num-traits",
- "pkcs1 0.7.5",
- "pkcs8 0.10.2",
+ "pkcs1",
+ "pkcs8",
  "rand_core 0.6.4",
  "sha2 0.10.9",
  "signature 2.2.0",
- "spki 0.7.3",
+ "spki",
  "subtle",
  "zeroize",
 ]
@@ -22081,15 +21073,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c74cae0a4cf6ccbbf5f359f08efdf8ee7e1dc532573bf0db71968cb56b1448c"
 dependencies = [
  "base64 0.21.7",
-]
-
-[[package]]
-name = "rustls-pemfile"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dce314e5fee3f39953d46bb63bb8a46d40c2f8fb7cc5a3b6cab2bde9721d6e50"
-dependencies = [
- "rustls-pki-types",
 ]
 
 [[package]]
@@ -22391,37 +21374,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "seal-sdk-rs"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.22.1",
- "bcs",
- "chrono",
- "crypto",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "futures",
- "hex",
- "http 0.2.12",
- "log",
- "moka",
- "rand 0.8.5",
- "reqwest 0.11.27",
- "serde",
- "serde_json",
- "shared-crypto 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-keys 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-sdk 1.58.0",
- "sui-sdk-types 0.0.2",
- "sui-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "testcontainers",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
 name = "sec1"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -22443,7 +21395,7 @@ dependencies = [
  "base16ct 0.2.0",
  "der 0.7.10",
  "generic-array",
- "pkcs8 0.10.2",
+ "pkcs8",
  "serdect",
  "subtle",
  "zeroize",
@@ -23213,19 +22165,7 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "bcs",
  "eyre",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "serde",
- "serde_repr",
-]
-
-[[package]]
-name = "shared-crypto"
-version = "0.0.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "bcs",
- "eyre",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
+ "fastcrypto",
  "serde",
  "serde_repr",
 ]
@@ -23579,16 +22519,6 @@ dependencies = [
 
 [[package]]
 name = "spki"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67cf02bbac7a337dc36e4f5a693db6c21e7863f45070f7064577eb4367a3212b"
-dependencies = [
- "base64ct",
- "der 0.6.1",
-]
-
-[[package]]
-name = "spki"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d91ed6c858b01f942cd56b37a94b3e0a1798290327d1236e4d9cf4eaca44d29d"
@@ -23736,7 +22666,7 @@ dependencies = [
  "chrono",
  "crc",
  "dotenvy",
- "etcetera 0.11.0",
+ "etcetera",
  "futures-channel",
  "futures-core",
  "futures-util",
@@ -24006,29 +22936,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
-name = "structmeta"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e1575d8d40908d70f6fd05537266b90ae71b15dbbe7a8b7dffa2b759306d329"
-dependencies = [
- "proc-macro2",
- "quote",
- "structmeta-derive",
- "syn 2.0.118",
-]
-
-[[package]]
-name = "structmeta-derive"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "152a0b65a590ff6c3da95cabe2353ee04e6167c896b28e3b14478c2636c922fc"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.118",
-]
-
-[[package]]
 name = "strum"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -24131,7 +23038,7 @@ name = "sui"
 version = "1.71.1"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
+ "anemo",
  "anyhow",
  "async-recursion",
  "async-trait",
@@ -24146,8 +23053,8 @@ dependencies = [
  "colored",
  "csv",
  "datatest-stable",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
+ "fastcrypto-zkp",
  "futures",
  "http 1.4.2",
  "im",
@@ -24168,9 +23075,9 @@ dependencies = [
  "move-package-alt-compilation",
  "move-symbol-pool 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-trace-format 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "move-vm-profiler 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "move-vm-profiler",
  "msim",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
  "normalize-line-endings",
  "num-bigint 0.4.6",
  "prometheus 0.14.0",
@@ -24180,11 +23087,11 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
  "shlex 1.3.0",
  "signature 1.6.4",
  "sui-bridge",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-config",
  "sui-data-store",
  "sui-execution",
  "sui-faucet",
@@ -24195,24 +23102,24 @@ dependencies = [
  "sui-indexer-alt-framework",
  "sui-indexer-alt-graphql",
  "sui-indexer-alt-reader",
- "sui-json 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-keys 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-json",
+ "sui-json-rpc-types",
+ "sui-keys",
  "sui-move",
  "sui-move-build",
  "sui-package-alt",
  "sui-package-management",
  "sui-pg-db",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
  "sui-replay-2",
- "sui-rpc 0.3.0",
+ "sui-rpc",
  "sui-rpc-api",
- "sui-sdk 1.71.1",
+ "sui-sdk",
  "sui-source-validation",
  "sui-swarm",
  "sui-swarm-config",
- "sui-transaction-builder 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-transaction-builder",
+ "sui-types",
  "tabled",
  "tap",
  "telemetry-subscribers 0.2.0",
@@ -24243,19 +23150,19 @@ dependencies = [
  "move-regex-borrow-graph 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-trace-format 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "move-vm-profiler 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "move-vm-profiler",
  "move-vm-runtime",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-metrics",
  "nonempty 0.9.0",
  "parking_lot 0.12.5",
  "quick_cache",
  "serde",
  "serde_json",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-macros",
  "sui-move-natives-latest",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "sui-verifier-latest",
  "tracing",
 ]
@@ -24274,16 +23181,16 @@ dependencies = [
  "move-bytecode-verifier-v0",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "move-vm-profiler 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "move-vm-profiler",
  "move-vm-runtime-v0",
  "move-vm-types-v0",
  "once_cell",
  "parking_lot 0.12.5",
  "serde",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-macros",
  "sui-move-natives-v0",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "sui-verifier-v0",
  "tracing",
 ]
@@ -24302,15 +23209,15 @@ dependencies = [
  "move-bytecode-verifier-v1",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "move-vm-profiler 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "move-vm-profiler",
  "move-vm-runtime-v1",
  "move-vm-types-v1",
  "parking_lot 0.12.5",
  "serde",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-macros",
  "sui-move-natives-v1",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "sui-verifier-v1",
  "tracing",
 ]
@@ -24329,15 +23236,15 @@ dependencies = [
  "move-bytecode-verifier-v2",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "move-vm-profiler 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "move-vm-profiler",
  "move-vm-runtime-v2",
  "move-vm-types-v2",
  "parking_lot 0.12.5",
  "serde",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-macros",
  "sui-move-natives-v2",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "sui-verifier-v2",
  "tracing",
 ]
@@ -24360,19 +23267,19 @@ dependencies = [
  "move-regex-borrow-graph 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-trace-format 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "move-vm-profiler 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "move-vm-profiler",
  "move-vm-runtime-v3",
  "move-vm-types-v3",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-metrics",
  "nonempty 0.9.0",
  "parking_lot 0.12.5",
  "serde",
  "serde_json",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-macros",
  "sui-move-natives-v3",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "sui-verifier-v3",
  "tracing",
 ]
@@ -24383,8 +23290,8 @@ version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "futures",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-metrics",
+ "sui-types",
  "tokio",
  "tracing",
 ]
@@ -24406,11 +23313,11 @@ dependencies = [
  "clap",
  "enum_dispatch",
  "eyre",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "futures",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-metrics",
  "num_enum 0.6.1",
  "once_cell",
  "prometheus 0.14.0",
@@ -24419,20 +23326,20 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
  "strum_macros 0.27.2",
  "sui-authority-aggregation",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-json-rpc-api 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-keys 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-config",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-keys",
  "sui-metrics-push-client",
- "sui-rpc 0.3.0",
+ "sui-rpc",
  "sui-rpc-api",
- "sui-sdk 1.71.1",
- "sui-sdk-types 0.3.0",
+ "sui-sdk",
+ "sui-sdk-types",
  "sui-test-transaction-builder",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tap",
  "telemetry-subscribers 0.2.0",
  "tempfile",
@@ -24450,16 +23357,16 @@ name = "sui-config"
 version = "0.0.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
+ "anemo",
  "anyhow",
  "bcs",
  "clap",
- "consensus-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "consensus-config",
  "csv",
  "dirs 4.0.0",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
  "nonzero_ext",
  "object_store 0.13.2",
  "once_cell",
@@ -24471,41 +23378,8 @@ dependencies = [
  "serde_with",
  "serde_yaml 0.8.26",
  "starlark",
- "sui-keys 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "sui-config"
-version = "0.0.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9c52c3c7946532163a79129db15180cdb984bab4)",
- "anyhow",
- "bcs",
- "clap",
- "consensus-config 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "csv",
- "dirs 4.0.0",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "move-vm-config 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "mysten-common 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "nonzero_ext",
- "object_store 0.11.2",
- "once_cell",
- "prometheus 0.13.4",
- "rand 0.8.5",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "serde_with",
- "serde_yaml 0.8.26",
- "starlark",
- "sui-keys 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-protocol-config 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "sui-keys",
+ "sui-types",
  "thiserror 1.0.69",
  "tracing",
 ]
@@ -24515,7 +23389,7 @@ name = "sui-core"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
+ "anemo",
  "antithesis_sdk",
  "anyhow",
  "arc-swap",
@@ -24525,18 +23399,18 @@ dependencies = [
  "bcs",
  "bincode 1.3.3",
  "bytes",
- "consensus-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "consensus-config",
  "consensus-core",
- "consensus-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "consensus-types",
  "count-min-sketch",
  "dashmap 5.5.3",
  "diffy 0.3.0",
  "either",
  "enum_dispatch",
  "eyre",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "fastcrypto-tbls 0.1.0 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
+ "fastcrypto-tbls",
+ "fastcrypto-zkp",
  "futures",
  "governor",
  "im",
@@ -24548,9 +23422,9 @@ dependencies = [
  "move-bytecode-utils 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-symbol-pool 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-network 0.2.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-metrics",
+ "mysten-network",
  "nonempty 0.9.0",
  "nonzero_ext",
  "num_cpus",
@@ -24570,27 +23444,27 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
  "simple_moving_average",
  "static_assertions",
  "strum 0.27.2",
  "strum_macros 0.27.2",
  "sui-authority-aggregation",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-config",
  "sui-execution",
  "sui-framework",
  "sui-genesis-builder",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-json-rpc-types",
+ "sui-macros",
  "sui-network",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-rpc 0.3.0",
+ "sui-protocol-config",
+ "sui-rpc",
  "sui-simulator",
  "sui-storage",
  "sui-swarm-config",
  "sui-tls",
  "sui-transaction-checks",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "sysinfo",
  "tap",
  "telemetry-subscribers 0.2.0",
@@ -24608,18 +23482,6 @@ dependencies = [
 [[package]]
 name = "sui-crypto"
 version = "0.3.0"
-source = "git+https://github.com/mystenlabs/sui-rust-sdk?rev=49345f1ca16cee967e8d045ad965e0a764d7e95b#49345f1ca16cee967e8d045ad965e0a764d7e95b"
-dependencies = [
- "bech32 0.11.1",
- "ed25519-dalek",
- "rand_core 0.6.4",
- "signature 2.2.0",
- "sui-sdk-types 0.3.1",
-]
-
-[[package]]
-name = "sui-crypto"
-version = "0.3.0"
 source = "git+https://github.com/MystenLabs/sui-rust-sdk.git?rev=e494a36a76a0aab8c5d66d5557995faee5c1fb09#e494a36a76a0aab8c5d66d5557995faee5c1fb09"
 dependencies = [
  "ark-bn254",
@@ -24628,7 +23490,7 @@ dependencies = [
  "ark-snark",
  "ark-std 0.4.0",
  "base64ct",
- "bnum 0.13.0",
+ "bnum",
  "ed25519-dalek",
  "itertools 0.14.0",
  "k256 0.13.4",
@@ -24639,7 +23501,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "signature 2.2.0",
- "sui-sdk-types 0.3.0",
+ "sui-sdk-types",
 ]
 
 [[package]]
@@ -24653,12 +23515,12 @@ dependencies = [
  "csv",
  "cynic",
  "cynic-codegen",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "lru 0.10.1",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
  "reqwest 0.12.28",
  "serde",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tokio",
  "tracing",
 ]
@@ -24687,11 +23549,11 @@ dependencies = [
  "indexmap 2.14.0",
  "itertools 0.13.0",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
  "serde",
  "serde_json",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-json-rpc-types",
+ "sui-types",
  "thiserror 1.0.69",
 ]
 
@@ -24699,14 +23561,6 @@ dependencies = [
 name = "sui-enum-compat-util"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
-dependencies = [
- "serde_yaml 0.8.26",
-]
-
-[[package]]
-name = "sui-enum-compat-util"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
 dependencies = [
  "serde_yaml 0.8.26",
 ]
@@ -24747,8 +23601,8 @@ dependencies = [
  "sui-move-natives-v1",
  "sui-move-natives-v2",
  "sui-move-natives-v3",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "sui-verifier-latest",
  "sui-verifier-v0",
  "sui-verifier-v1",
@@ -24769,11 +23623,11 @@ dependencies = [
  "reqwest 0.12.28",
  "serde",
  "serde_json",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-keys 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
+ "sui-config",
+ "sui-keys",
  "sui-rpc-api",
- "sui-sdk 1.71.1",
+ "sui-sdk",
  "thiserror 1.0.69",
  "tokio",
  "tower 0.5.3",
@@ -24807,7 +23661,7 @@ dependencies = [
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "serde",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tracing",
 ]
 
@@ -24822,8 +23676,8 @@ dependencies = [
  "serde",
  "serde_json",
  "sui-framework",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
 ]
 
 [[package]]
@@ -24847,22 +23701,22 @@ dependencies = [
  "anyhow",
  "bcs",
  "camino",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
  "prometheus 0.14.0",
  "rand 0.8.5",
  "serde",
  "serde_with",
  "serde_yaml 0.8.26",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
+ "sui-config",
  "sui-execution",
  "sui-framework",
  "sui-framework-snapshot",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
  "sui-simulator",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tempfile",
  "tracing",
 ]
@@ -24871,26 +23725,6 @@ dependencies = [
 name = "sui-http"
 version = "0.0.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
-dependencies = [
- "bytes",
- "http 1.4.2",
- "http-body 1.0.1",
- "http-body-util",
- "hyper 1.10.1",
- "hyper-util",
- "pin-project-lite",
- "socket2 0.5.10",
- "tokio",
- "tokio-rustls",
- "tokio-util 0.7.18",
- "tower 0.5.3",
- "tracing",
-]
-
-[[package]]
-name = "sui-http"
-version = "0.0.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
 dependencies = [
  "bytes",
  "http 1.4.2",
@@ -24928,8 +23762,8 @@ dependencies = [
  "sui-indexer-alt-framework",
  "sui-indexer-alt-metrics",
  "sui-indexer-alt-schema",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "telemetry-subscribers 0.2.0",
  "tokio",
  "toml 0.7.8",
@@ -24964,13 +23798,13 @@ dependencies = [
  "bytes",
  "clap",
  "const-str 0.5.7",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "futures",
  "http 1.4.2",
  "integer-encoding",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-network 0.2.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-network",
  "object_store 0.13.2",
  "ouroboros 0.17.2",
  "pin-project",
@@ -24992,7 +23826,7 @@ dependencies = [
  "tokio-stream",
  "toml 0.7.8",
  "tonic 0.14.6",
- "tonic-health 0.14.6",
+ "tonic-health",
  "tonic-reflection",
  "tower 0.5.3",
  "tracing",
@@ -25017,7 +23851,7 @@ dependencies = [
  "diesel_migrations",
  "futures",
  "http 1.4.2",
- "mysten-network 0.2.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-network",
  "num_cpus",
  "object_store 0.13.2",
  "prometheus 0.14.0",
@@ -25033,8 +23867,8 @@ dependencies = [
  "sui-indexer-alt-framework-store-traits",
  "sui-indexer-alt-metrics",
  "sui-pg-db",
- "sui-rpc 0.3.0",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-rpc",
+ "sui-types",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
@@ -25075,8 +23909,8 @@ dependencies = [
  "clap",
  "const-str 0.5.7",
  "diesel",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
+ "fastcrypto-zkp",
  "futures",
  "headers",
  "im",
@@ -25091,7 +23925,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
  "sui-default-config",
  "sui-display",
  "sui-futures",
@@ -25099,13 +23933,13 @@ dependencies = [
  "sui-indexer-alt-reader",
  "sui-indexer-alt-schema",
  "sui-name-service",
- "sui-package-resolver 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-package-resolver",
  "sui-pg-db",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-rpc 0.3.0",
- "sui-sdk-types 0.3.0",
+ "sui-protocol-config",
+ "sui-rpc",
+ "sui-sdk-types",
  "sui-sql-macro",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "telemetry-subscribers 0.2.0",
  "thiserror 1.0.69",
  "timeout-tracing",
@@ -25127,7 +23961,7 @@ dependencies = [
  "axum 0.8.9",
  "clap",
  "prometheus 0.14.0",
- "prometheus-closure-metric 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "prometheus-closure-metric",
  "sui-futures",
  "sui-pg-db",
  "tokio",
@@ -25149,7 +23983,7 @@ dependencies = [
  "futures",
  "http 1.4.2",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
  "prometheus 0.14.0",
  "prost-types 0.14.4",
  "sui-futures",
@@ -25157,12 +23991,12 @@ dependencies = [
  "sui-indexer-alt-metrics",
  "sui-indexer-alt-schema",
  "sui-kvstore",
- "sui-package-resolver 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-package-resolver",
  "sui-pg-db",
- "sui-rpc 0.3.0",
- "sui-sdk-types 0.3.0",
+ "sui-rpc",
+ "sui-sdk-types",
  "sui-sql-macro",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "thiserror 1.0.69",
  "tokio",
  "tonic 0.14.6",
@@ -25184,8 +24018,8 @@ dependencies = [
  "serde",
  "siphasher",
  "sui-field-count",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
 ]
 
 [[package]]
@@ -25195,31 +24029,14 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "anyhow",
  "bcs",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-bytecode-utils 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "schemars 0.8.22",
  "serde",
  "serde_json",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
-]
-
-[[package]]
-name = "sui-json"
-version = "0.0.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "bcs",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-bytecode-utils 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "schemars 0.8.22",
- "serde",
- "serde_json",
- "sui-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "sui-types",
 ]
 
 [[package]]
@@ -25236,8 +24053,8 @@ dependencies = [
  "bcs",
  "cached 0.43.0",
  "eyre",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
+ "fastcrypto-zkp",
  "futures",
  "hyper 1.10.1",
  "im",
@@ -25247,26 +24064,26 @@ dependencies = [
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-bytecode-utils 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-metrics",
  "once_cell",
  "prometheus 0.14.0",
  "serde",
  "serde_json",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
  "signature 1.6.4",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-config",
  "sui-core",
  "sui-display",
- "sui-json 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-json-rpc-api 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-json",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
  "sui-name-service",
- "sui-open-rpc 1.71.1",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-open-rpc",
+ "sui-protocol-config",
  "sui-storage",
- "sui-transaction-builder 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-transaction-builder",
+ "sui-types",
  "tap",
  "thiserror 1.0.69",
  "tokio",
@@ -25274,7 +24091,7 @@ dependencies = [
  "tower 0.5.3",
  "tower-http 0.5.2",
  "tracing",
- "typed-store-error 0.4.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "typed-store-error",
 ]
 
 [[package]]
@@ -25283,36 +24100,16 @@ version = "0.0.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "jsonrpsee",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-metrics",
  "once_cell",
  "prometheus 0.14.0",
- "sui-json 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-open-rpc 1.71.1",
- "sui-open-rpc-macros 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "tap",
- "tracing",
-]
-
-[[package]]
-name = "sui-json-rpc-api"
-version = "0.0.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "jsonrpsee",
- "mysten-metrics 0.7.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "once_cell",
- "prometheus 0.13.4",
- "sui-json 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-open-rpc 1.58.0",
- "sui-open-rpc-macros 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "sui-json",
+ "sui-json-rpc-types",
+ "sui-open-rpc",
+ "sui-open-rpc-macros",
+ "sui-types",
  "tap",
  "tracing",
 ]
@@ -25326,7 +24123,7 @@ dependencies = [
  "bcs",
  "colored",
  "enum_dispatch",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "itertools 0.13.0",
  "json_to_table",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -25335,52 +24132,19 @@ dependencies = [
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-disassembler 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-ir-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-metrics",
  "nonempty 0.9.0",
  "schemars 0.8.22",
  "serde",
  "serde_json",
  "serde_with",
- "sui-enum-compat-util 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-json 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-package-resolver 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "tabled",
- "tracing",
-]
-
-[[package]]
-name = "sui-json-rpc-types"
-version = "0.0.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "bcs",
- "colored",
- "enum_dispatch",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "itertools 0.13.0",
- "json_to_table",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-bytecode-utils 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-command-line-common 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-disassembler 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-ir-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "mysten-metrics 0.7.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "schemars 0.8.22",
- "serde",
- "serde_json",
- "serde_with",
- "sui-enum-compat-util 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-json 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-macros 0.7.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-package-resolver 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-protocol-config 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "sui-enum-compat-util",
+ "sui-json",
+ "sui-macros",
+ "sui-package-resolver",
+ "sui-protocol-config",
+ "sui-types",
  "tabled",
  "tracing",
 ]
@@ -25396,44 +24160,18 @@ dependencies = [
  "bcs",
  "bip32",
  "colored",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "jsonrpc 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "fastcrypto",
+ "jsonrpc",
  "mockall",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
  "rand 0.8.5",
  "regex",
  "serde",
  "serde_json",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
  "signature 1.6.4",
  "slip10_ed25519",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "tiny-bip39",
- "tokio",
-]
-
-[[package]]
-name = "sui-keys"
-version = "0.0.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.21.7",
- "bcs",
- "bip32",
- "colored",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "jsonrpc 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "mockall",
- "rand 0.8.5",
- "regex",
- "serde",
- "serde_json",
- "shared-crypto 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "signature 1.6.4",
- "slip10_ed25519",
- "sui-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "sui-types",
  "tiny-bip39",
  "tokio",
 ]
@@ -25464,8 +24202,8 @@ dependencies = [
  "sui-indexer-alt-framework",
  "sui-indexer-alt-framework-store-traits",
  "sui-indexer-alt-metrics",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "telemetry-subscribers 0.2.0",
  "tokio",
  "toml 0.7.8",
@@ -25481,18 +24219,7 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "futures",
  "once_cell",
- "sui-proc-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "tracing",
-]
-
-[[package]]
-name = "sui-macros"
-version = "0.7.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "futures",
- "once_cell",
- "sui-proc-macros 0.7.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "sui-proc-macros",
  "tracing",
 ]
 
@@ -25502,13 +24229,13 @@ version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "fastcrypto",
+ "mysten-metrics",
  "prometheus 0.14.0",
  "reqwest 0.12.28",
  "snap",
  "sui-tls",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tokio",
  "tracing",
 ]
@@ -25539,13 +24266,13 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "sui-adapter-latest",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-config",
  "sui-move-build",
  "sui-move-natives-latest",
  "sui-package-alt",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-sdk 1.71.1",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-sdk",
+ "sui-types",
  "telemetry-subscribers 0.2.0",
  "tikv-jemalloc-ctl",
  "tokio",
@@ -25559,7 +24286,7 @@ version = "1.71.1"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "anyhow",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-bytecode-utils 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-bytecode-verifier 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -25568,11 +24295,11 @@ dependencies = [
  "move-package-alt",
  "move-package-alt-compilation",
  "move-symbol-pool 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
  "serde-reflection",
  "sui-package-alt",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "sui-verifier-latest",
  "tempfile",
  "thiserror 1.0.69",
@@ -25586,17 +24313,17 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "bcs",
  "better_any",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "fastcrypto-vdf",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto-zkp",
  "indexmap 2.14.0",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-runtime",
  "rand 0.8.5",
  "smallvec",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "tracing",
 ]
 
@@ -25607,8 +24334,8 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "bcs",
  "better_any",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
+ "fastcrypto-zkp",
  "linked-hash-map",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -25616,8 +24343,8 @@ dependencies = [
  "move-vm-runtime-v0",
  "move-vm-types-v0",
  "smallvec",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "tracing",
 ]
 
@@ -25628,8 +24355,8 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "bcs",
  "better_any",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
+ "fastcrypto-zkp",
  "linked-hash-map",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -25637,8 +24364,8 @@ dependencies = [
  "move-vm-runtime-v1",
  "move-vm-types-v1",
  "smallvec",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "tracing",
 ]
 
@@ -25649,8 +24376,8 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "bcs",
  "better_any",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
+ "fastcrypto-zkp",
  "indexmap 2.14.0",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -25658,8 +24385,8 @@ dependencies = [
  "move-vm-runtime-v2",
  "move-vm-types-v2",
  "smallvec",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "tracing",
 ]
 
@@ -25670,9 +24397,9 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "bcs",
  "better_any",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "fastcrypto-vdf",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto-zkp",
  "indexmap 2.14.0",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
@@ -25681,8 +24408,8 @@ dependencies = [
  "move-vm-types-v3",
  "rand 0.8.5",
  "smallvec",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "tracing",
 ]
 
@@ -25694,7 +24421,7 @@ dependencies = [
  "bcs",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "serde",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "thiserror 1.0.69",
 ]
 
@@ -25703,23 +24430,23 @@ name = "sui-network"
 version = "0.0.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
+ "anemo",
  "anemo-build",
- "anemo-tower 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
+ "anemo-tower",
  "anyhow",
  "arc-swap",
  "bcs",
  "bytes",
  "dashmap 5.5.3",
  "eyre",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "fastcrypto-tbls 0.1.0 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
+ "fastcrypto-tbls",
  "futures",
  "governor",
  "http 1.4.2",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-network 0.2.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-metrics",
+ "mysten-network",
  "object_store 0.13.2",
  "once_cell",
  "prometheus 0.14.0",
@@ -25727,23 +24454,23 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_yaml 0.8.26",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-http 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-rpc 0.3.0",
+ "shared-crypto",
+ "sui-config",
+ "sui-http",
+ "sui-macros",
+ "sui-protocol-config",
+ "sui-rpc",
  "sui-simulator",
  "sui-storage",
  "sui-swarm-config",
  "sui-tls",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tap",
  "tokio",
  "tokio-rustls",
  "tonic 0.14.6",
  "tonic-build",
- "tonic-health 0.14.6",
+ "tonic-health",
  "tonic-prost",
  "tower 0.5.3",
  "tower-http 0.5.2",
@@ -25757,8 +24484,8 @@ name = "sui-node"
 version = "1.71.1"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
- "anemo-tower 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
+ "anemo",
+ "anemo-tower",
  "antithesis_sdk",
  "anyhow",
  "arc-swap",
@@ -25767,36 +24494,36 @@ dependencies = [
  "bcs",
  "bin-version",
  "clap",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
+ "fastcrypto-zkp",
  "futures",
  "http 1.4.2",
  "humantime",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-network 0.2.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-metrics",
+ "mysten-network",
  "mysten-service",
  "prometheus 0.14.0",
  "reqwest 0.12.28",
  "serde",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-config",
  "sui-core",
- "sui-http 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-http",
  "sui-json-rpc",
- "sui-json-rpc-api 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-json-rpc-api",
+ "sui-macros",
  "sui-metrics-push-client",
  "sui-name-service",
  "sui-network",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
  "sui-rpc-api",
  "sui-simulator",
  "sui-snapshot",
  "sui-storage",
  "sui-telemetry",
  "sui-tls",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tap",
  "telemetry-subscribers 0.2.0",
  "tikv-jemallocator",
@@ -25806,18 +24533,6 @@ dependencies = [
  "tracing",
  "typed-store",
  "url",
-]
-
-[[package]]
-name = "sui-open-rpc"
-version = "1.58.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "bcs",
- "schemars 0.8.22",
- "serde",
- "serde_json",
- "versions",
 ]
 
 [[package]]
@@ -25836,19 +24551,6 @@ dependencies = [
 name = "sui-open-rpc-macros"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
-dependencies = [
- "derive-syn-parse",
- "itertools 0.13.0",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
- "unescape",
-]
-
-[[package]]
-name = "sui-open-rpc-macros"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
 dependencies = [
  "derive-syn-parse",
  "itertools 0.13.0",
@@ -25869,7 +24571,7 @@ dependencies = [
  "move-package-alt",
  "serde",
  "sui-package-management",
- "sui-sdk 1.71.1",
+ "sui-sdk",
  "toml 0.7.8",
 ]
 
@@ -25880,8 +24582,8 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "anyhow",
  "sui-framework-snapshot",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
  "thiserror 1.0.69",
 ]
 
@@ -25897,25 +24599,7 @@ dependencies = [
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-command-line-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "sui-package-resolver"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "async-trait",
- "bcs",
- "eyre",
- "lru 0.10.1",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-command-line-common 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "serde",
- "sui-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "sui-types",
  "thiserror 1.0.69",
  "tokio",
 ]
@@ -25954,22 +24638,10 @@ name = "sui-proc-macros"
 version = "0.7.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
- "msim-macros 0.1.0 (git+https://github.com/MystenLabs/mysten-sim.git?rev=213e543d83b91c4aa904166bef255a6c0054c8a7)",
+ "msim-macros",
  "proc-macro2",
  "quote",
- "sui-enum-compat-util 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "syn 2.0.118",
-]
-
-[[package]]
-name = "sui-proc-macros"
-version = "0.7.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "msim-macros 0.1.0 (git+https://github.com/MystenLabs/mysten-sim.git?rev=45b88cffa3f50d6f2022d0b422ca4a077ac96a98)",
- "proc-macro2",
- "quote",
- "sui-enum-compat-util 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "sui-enum-compat-util",
  "syn 2.0.118",
 ]
 
@@ -25979,35 +24651,18 @@ version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
  "clap",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
  "rand 0.8.5",
  "schemars 0.8.22",
  "serde",
  "serde-env",
  "serde_json",
  "serde_with",
- "sui-protocol-config-macros 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "tracing",
-]
-
-[[package]]
-name = "sui-protocol-config"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "clap",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-vm-config 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "schemars 0.8.22",
- "serde",
- "serde-env",
- "serde_with",
- "sui-protocol-config-macros 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "sui-protocol-config-macros",
  "tracing",
 ]
 
@@ -26015,16 +24670,6 @@ dependencies = [
 name = "sui-protocol-config-macros"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "sui-protocol-config-macros"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -26089,39 +24734,19 @@ dependencies = [
  "serde",
  "serde_json",
  "similar",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-config",
  "sui-data-store",
  "sui-execution",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-json-rpc-types",
  "sui-move-build",
  "sui-package-alt",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tabled",
  "telemetry-subscribers 0.2.0",
  "tokio",
  "toml 0.7.8",
  "tracing",
  "zstd 0.12.4",
-]
-
-[[package]]
-name = "sui-rpc"
-version = "0.0.7"
-source = "git+https://github.com/MystenLabs/sui-rust-sdk.git?rev=8eee97380cac1a1899d3cca427bde7ac906abdb9#8eee97380cac1a1899d3cca427bde7ac906abdb9"
-dependencies = [
- "base64 0.22.1",
- "bcs",
- "bytes",
- "futures",
- "http 1.4.2",
- "prost 0.13.5",
- "prost-types 0.13.5",
- "serde",
- "serde_json",
- "sui-sdk-types 0.0.7",
- "tap",
- "tokio",
- "tonic 0.13.1",
 ]
 
 [[package]]
@@ -26139,30 +24764,7 @@ dependencies = [
  "prost-types 0.14.4",
  "serde",
  "serde_json",
- "sui-sdk-types 0.3.0",
- "tap",
- "tokio",
- "tonic 0.14.6",
- "tonic-prost",
- "tower 0.5.3",
-]
-
-[[package]]
-name = "sui-rpc"
-version = "0.3.1"
-source = "git+https://github.com/mystenlabs/sui-rust-sdk?rev=49345f1ca16cee967e8d045ad965e0a764d7e95b#49345f1ca16cee967e8d045ad965e0a764d7e95b"
-dependencies = [
- "base64 0.22.1",
- "bcs",
- "bytes",
- "futures",
- "http 1.4.2",
- "http-body 1.0.1",
- "prost 0.14.4",
- "prost-types 0.14.4",
- "serde",
- "serde_json",
- "sui-sdk-types 0.3.1",
+ "sui-sdk-types",
  "tap",
  "tokio",
  "tonic 0.14.6",
@@ -26181,14 +24783,14 @@ dependencies = [
  "axum 0.8.9",
  "bcs",
  "bytes",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "futures",
  "http 1.4.2",
  "itertools 0.13.0",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-network 0.2.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-network",
  "prometheus 0.14.0",
  "prost 0.14.4",
  "prost-types 0.14.4",
@@ -26196,22 +24798,22 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-crypto 0.3.0 (git+https://github.com/MystenLabs/sui-rust-sdk.git?rev=e494a36a76a0aab8c5d66d5557995faee5c1fb09)",
+ "sui-config",
+ "sui-crypto",
  "sui-display",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-macros",
  "sui-name-service",
- "sui-package-resolver 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-rpc 0.3.0",
- "sui-sdk-types 0.3.0",
- "sui-transaction-builder 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-package-resolver",
+ "sui-protocol-config",
+ "sui-rpc",
+ "sui-sdk-types",
+ "sui-transaction-builder",
  "sui-transaction-checks",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tap",
  "tokio",
  "tonic 0.14.6",
- "tonic-health 0.14.6",
+ "tonic-health",
  "tonic-prost",
  "tonic-prost-build",
  "tonic-reflection",
@@ -26223,39 +24825,6 @@ dependencies = [
 
 [[package]]
 name = "sui-sdk"
-version = "1.58.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.21.7",
- "bcs",
- "clap",
- "colored",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "futures",
- "futures-core",
- "jsonrpsee",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "serde_with",
- "shared-crypto 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-config 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-json 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-json-rpc-api 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-keys 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-transaction-builder 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "sui-sdk"
 version = "1.71.1"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
@@ -26263,91 +24832,31 @@ dependencies = [
  "async-trait",
  "base64 0.21.7",
  "bcs",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "futures",
  "futures-core",
  "jsonrpsee",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
  "serde_with",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-crypto 0.3.0 (git+https://github.com/MystenLabs/sui-rust-sdk.git?rev=e494a36a76a0aab8c5d66d5557995faee5c1fb09)",
- "sui-json 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-json-rpc-api 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-keys 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-rpc 0.3.0",
+ "shared-crypto",
+ "sui-config",
+ "sui-crypto",
+ "sui-json",
+ "sui-json-rpc-api",
+ "sui-json-rpc-types",
+ "sui-keys",
+ "sui-rpc",
  "sui-rpc-api",
- "sui-sdk-types 0.3.0",
- "sui-transaction-builder 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-sdk-types",
+ "sui-transaction-builder",
+ "sui-types",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "sui-sdk-types"
-version = "0.0.2"
-source = "git+https://github.com/mystenlabs/sui-rust-sdk?rev=86a9e06#86a9e06cde84671e96e776d926a85fc1f229314d"
-dependencies = [
- "base64ct",
- "bcs",
- "bnum 0.12.1",
- "bs58 0.5.1",
- "hex",
- "roaring 0.10.12",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_with",
- "winnow 0.6.26",
-]
-
-[[package]]
-name = "sui-sdk-types"
-version = "0.0.7"
-source = "git+https://github.com/MystenLabs/sui-rust-sdk.git?rev=8eee97380cac1a1899d3cca427bde7ac906abdb9#8eee97380cac1a1899d3cca427bde7ac906abdb9"
-dependencies = [
- "base64ct",
- "bcs",
- "blake2",
- "bnum 0.12.1",
- "bs58 0.5.1",
- "bytes",
- "bytestring",
- "itertools 0.13.0",
- "roaring 0.10.12",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_with",
- "winnow 0.7.15",
-]
-
-[[package]]
-name = "sui-sdk-types"
-version = "0.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b43c85a0d7f0e349f79a32a620d82648997f1681107389b178f34c4e460a23a2"
-dependencies = [
- "base64ct",
- "bcs",
- "bnum 0.12.1",
- "bs58 0.5.1",
- "bytes",
- "bytestring",
- "itertools 0.13.0",
- "roaring 0.10.12",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_with",
- "winnow 0.7.15",
 ]
 
 [[package]]
@@ -26358,28 +24867,7 @@ dependencies = [
  "base64ct",
  "bcs",
  "blake2",
- "bnum 0.13.0",
- "bs58 0.5.1",
- "bytes",
- "bytestring",
- "itertools 0.14.0",
- "roaring 0.11.4",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_with",
- "winnow 0.7.15",
-]
-
-[[package]]
-name = "sui-sdk-types"
-version = "0.3.1"
-source = "git+https://github.com/mystenlabs/sui-rust-sdk?rev=49345f1ca16cee967e8d045ad965e0a764d7e95b#49345f1ca16cee967e8d045ad965e0a764d7e95b"
-dependencies = [
- "base64ct",
- "bcs",
- "blake2",
- "bnum 0.13.0",
+ "bnum",
  "bs58 0.5.1",
  "bytes",
  "bytestring",
@@ -26397,20 +24885,20 @@ name = "sui-simulator"
 version = "0.7.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
- "anemo-tower 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
+ "anemo",
+ "anemo-tower",
  "bcs",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "lru 0.10.1",
  "move-package-alt",
  "move-package-alt-compilation",
  "msim",
- "mysten-network 0.2.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-network",
  "rand 0.8.5",
  "serde",
  "sui-framework",
  "sui-move-build",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "telemetry-subscribers 0.2.0",
  "tempfile",
  "tower 0.5.3",
@@ -26426,7 +24914,7 @@ dependencies = [
  "bcs",
  "byteorder",
  "bytes",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "futures",
  "indicatif",
  "integer-encoding",
@@ -26434,12 +24922,12 @@ dependencies = [
  "object_store 0.13.2",
  "prometheus 0.14.0",
  "serde",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-config",
  "sui-core",
  "sui-futures",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
  "sui-storage",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -26463,14 +24951,14 @@ dependencies = [
  "move-package-alt-compilation",
  "move-symbol-pool 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "msim",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
  "serde",
  "sui-move-build",
  "sui-package-alt",
  "sui-package-management",
  "sui-rpc-api",
- "sui-sdk 1.71.1",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-sdk",
+ "sui-types",
  "tar",
  "tempfile",
  "thiserror 1.0.69",
@@ -26504,7 +24992,7 @@ dependencies = [
  "chrono",
  "clap",
  "eyre",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "futures",
  "hyper 1.10.1",
  "hyper-rustls",
@@ -26516,8 +25004,8 @@ dependencies = [
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-bytecode-utils 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-metrics",
  "num_enum 0.6.1",
  "object_store 0.13.2",
  "parking_lot 0.12.5",
@@ -26527,11 +25015,11 @@ dependencies = [
  "reqwest 0.12.28",
  "serde",
  "serde_json",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-rpc 0.3.0",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-config",
+ "sui-json-rpc-types",
+ "sui-protocol-config",
+ "sui-rpc",
+ "sui-types",
  "tap",
  "telemetry-subscribers 0.2.0",
  "tempfile",
@@ -26549,23 +25037,23 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "anyhow",
  "futures",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-network 0.2.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-metrics",
+ "mysten-network",
  "prometheus 0.14.0",
  "rand 0.8.5",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-config",
+ "sui-macros",
  "sui-node",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
  "sui-simulator",
  "sui-swarm-config",
  "sui-tls",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tap",
  "telemetry-subscribers 0.2.0",
  "tempfile",
  "tokio",
- "tonic-health 0.14.6",
+ "tonic-health",
  "tracing",
 ]
 
@@ -26574,23 +25062,23 @@ name = "sui-swarm-config"
 version = "0.0.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
+ "anemo",
  "anyhow",
  "bcs",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "fastcrypto",
+ "mysten-common",
  "prometheus 0.14.0",
  "rand 0.8.5",
  "serde",
  "serde_with",
  "serde_yaml 0.8.26",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
+ "sui-config",
  "sui-genesis-builder",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
  "sui-rpc-api",
  "sui-simulator",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tracing",
 ]
 
@@ -26612,12 +25100,12 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "bcs",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
  "sui-genesis-builder",
  "sui-move-build",
  "sui-rpc-api",
- "sui-sdk 1.71.1",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-sdk",
+ "sui-types",
 ]
 
 [[package]]
@@ -26630,8 +25118,8 @@ dependencies = [
  "axum 0.8.9",
  "axum-server",
  "ed25519",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "pkcs8 0.10.2",
+ "fastcrypto",
+ "pkcs8",
  "rcgen 0.13.2",
  "reqwest 0.12.28",
  "rustls",
@@ -26653,40 +25141,9 @@ dependencies = [
  "futures",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-json 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
-]
-
-[[package]]
-name = "sui-transaction-builder"
-version = "0.0.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anyhow",
- "async-trait",
- "bcs",
- "futures",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-json 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-protocol-config 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
-]
-
-[[package]]
-name = "sui-transaction-builder"
-version = "0.3.1"
-source = "git+https://github.com/mystenlabs/sui-rust-sdk?rev=49345f1ca16cee967e8d045ad965e0a764d7e95b#49345f1ca16cee967e8d045ad965e0a764d7e95b"
-dependencies = [
- "async-trait",
- "bcs",
- "futures",
- "serde",
- "sui-rpc 0.3.1",
- "sui-sdk-types 0.3.1",
- "thiserror 2.0.18",
+ "sui-json",
+ "sui-json-rpc-types",
+ "sui-types",
 ]
 
 [[package]]
@@ -26694,12 +25151,12 @@ name = "sui-transaction-checks"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "fastcrypto-zkp",
+ "sui-config",
  "sui-execution",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-macros",
+ "sui-protocol-config",
+ "sui-types",
  "tracing",
 ]
 
@@ -26708,7 +25165,7 @@ name = "sui-types"
 version = "0.1.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
 dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9248f8d3951df750360308df22618e5978ad6dc0)",
+ "anemo",
  "anyhow",
  "async-trait",
  "base64 0.21.7",
@@ -26719,14 +25176,14 @@ dependencies = [
  "bytes",
  "chrono",
  "ciborium",
- "consensus-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "consensus-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "consensus-config",
+ "consensus-types",
  "derive_more 1.0.0",
  "enum_dispatch",
  "eyre",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "fastcrypto-tbls 0.1.0 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
+ "fastcrypto-tbls",
+ "fastcrypto-zkp",
  "im",
  "indexmap 2.14.0",
  "itertools 0.13.0",
@@ -26735,10 +25192,10 @@ dependencies = [
  "move-bytecode-utils 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-trace-format 0.0.1 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "move-vm-profiler 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-network 0.2.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "move-vm-profiler",
+ "mysten-common",
+ "mysten-metrics",
+ "mysten-network",
  "nonempty 0.9.0",
  "num-bigint 0.4.6",
  "num-traits",
@@ -26760,97 +25217,21 @@ dependencies = [
  "serde-name",
  "serde_json",
  "serde_with",
- "shared-crypto 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "shared-crypto",
  "signature 1.6.4",
  "static_assertions",
  "strum 0.27.2",
  "strum_macros 0.27.2",
- "sui-enum-compat-util 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-rpc 0.3.0",
- "sui-sdk-types 0.3.0",
+ "sui-enum-compat-util",
+ "sui-macros",
+ "sui-protocol-config",
+ "sui-rpc",
+ "sui-sdk-types",
  "tap",
  "thiserror 1.0.69",
  "tonic 0.14.6",
  "tracing",
- "typed-store-error 0.4.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "x509-parser 0.17.0",
-]
-
-[[package]]
-name = "sui-types"
-version = "0.1.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
-dependencies = [
- "anemo 0.0.0 (git+https://github.com/mystenlabs/anemo.git?rev=9c52c3c7946532163a79129db15180cdb984bab4)",
- "anyhow",
- "async-trait",
- "base64 0.21.7",
- "bcs",
- "better_any",
- "bincode 1.3.3",
- "byteorder",
- "bytes",
- "chrono",
- "ciborium",
- "consensus-config 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "consensus-types 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "derive_more 1.0.0",
- "enum_dispatch",
- "eyre",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "fastcrypto-tbls 0.1.0 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=d1fcb853196c3de7888ed8fad74f419b8c8fbe3b)",
- "im",
- "indexmap 2.14.0",
- "itertools 0.13.0",
- "lru 0.10.1",
- "move-binary-format 0.0.3 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-bytecode-utils 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-core-types 0.0.4 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-trace-format 0.0.1 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-vm-profiler 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "move-vm-test-utils",
- "mysten-common 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "mysten-metrics 0.7.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "mysten-network 0.2.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "nonempty 0.9.0",
- "num-bigint 0.4.6",
- "num-traits",
- "num_enum 0.6.1",
- "once_cell",
- "p384",
- "parking_lot 0.12.5",
- "passkey-types",
- "prometheus 0.13.4",
- "proptest",
- "proptest-derive",
- "prost 0.13.5",
- "prost-types 0.13.5",
- "rand 0.8.5",
- "roaring 0.10.12",
- "rustls-pemfile 2.2.0",
- "schemars 0.8.22",
- "serde",
- "serde-name",
- "serde_json",
- "serde_with",
- "shared-crypto 0.0.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "signature 1.6.4",
- "static_assertions",
- "strum 0.27.2",
- "strum_macros 0.27.2",
- "sui-enum-compat-util 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-macros 0.7.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-protocol-config 0.1.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
- "sui-rpc 0.0.7",
- "sui-sdk-types 0.0.7",
- "tap",
- "thiserror 1.0.69",
- "tonic 0.13.1",
- "tracing",
- "typed-store-error 0.4.0 (git+https://github.com/MystenLabs/sui?rev=22642cf)",
+ "typed-store-error",
  "x509-parser 0.17.0",
 ]
 
@@ -26866,9 +25247,9 @@ dependencies = [
  "move-bytecode-verifier-meter 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "sui-protocol-config",
+ "sui-types",
 ]
 
 [[package]]
@@ -26883,8 +25264,8 @@ dependencies = [
  "move-bytecode-verifier-v0",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
 ]
 
 [[package]]
@@ -26899,7 +25280,7 @@ dependencies = [
  "move-bytecode-verifier-v1",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
 ]
 
 [[package]]
@@ -26914,8 +25295,8 @@ dependencies = [
  "move-bytecode-verifier-v2",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
 ]
 
 [[package]]
@@ -26930,8 +25311,8 @@ dependencies = [
  "move-bytecode-verifier-v3",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-vm-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
+ "sui-types",
 ]
 
 [[package]]
@@ -27029,18 +25410,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bf256ce5efdfa370213c1dabab5935a12e49f2c58d15e9eac2870d3b4f27263"
 dependencies = [
  "futures-core",
-]
-
-[[package]]
-name = "synstructure"
-version = "0.12.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f36bdaa60a83aca3921b5259d5400cbf5e90fc51931376a9bd4a0eb79aa7210f"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
- "unicode-xid",
 ]
 
 [[package]]
@@ -27882,28 +26251,28 @@ source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35
 dependencies = [
  "anyhow",
  "bcs",
- "fastcrypto-zkp 0.1.3 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto-zkp",
  "futures",
  "jsonrpsee",
  "move-binary-format 0.0.3 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
  "move-core-types 0.0.4 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
  "prometheus 0.14.0",
  "rand 0.8.5",
- "sui-config 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-config",
  "sui-core",
  "sui-framework",
- "sui-json-rpc-types 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "sui-keys 0.0.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-json-rpc-types",
+ "sui-keys",
  "sui-node",
- "sui-protocol-config 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-protocol-config",
  "sui-rpc-api",
- "sui-sdk 1.71.1",
+ "sui-sdk",
  "sui-simulator",
  "sui-swarm",
  "sui-swarm-config",
  "sui-test-transaction-builder",
- "sui-types 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-types",
  "tokio",
  "tonic 0.14.6",
  "tracing",
@@ -27939,36 +26308,6 @@ checksum = "944ad38adcbb71eaa682c56bceeb079e4ca82b4b3edc2a0fde5cb297b77dac8d"
 dependencies = [
  "syn 2.0.118",
  "test-log-core",
-]
-
-[[package]]
-name = "testcontainers"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b92bce247dc9260a19808321e11b51ea6a0293d02b48ab1c6578960610cfa2a7"
-dependencies = [
- "async-trait",
- "bollard",
- "bollard-stubs",
- "bytes",
- "docker_credential",
- "either",
- "etcetera 0.10.0",
- "futures",
- "log",
- "memchr",
- "parse-display",
- "pin-project-lite",
- "serde",
- "serde_json",
- "serde_with",
- "thiserror 2.0.18",
- "tokio",
- "tokio-stream",
- "tokio-tar",
- "tokio-util 0.7.18",
- "ulid",
- "url",
 ]
 
 [[package]]
@@ -28370,21 +26709,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-tar"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d5714c010ca3e5c27114c1cdeb9d14641ace49874aa5626d7149e47aedace75"
-dependencies = [
- "filetime",
- "futures-core",
- "libc",
- "redox_syscall 0.3.5",
- "tokio",
- "tokio-stream",
- "xattr",
-]
-
-[[package]]
 name = "tokio-test"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -28689,38 +27013,6 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e581ba15a835f4d9ea06c55ab1bd4dce26fc53752c69a04aac00703bfb49ba9"
-dependencies = [
- "async-trait",
- "axum 0.8.9",
- "base64 0.22.1",
- "bytes",
- "h2 0.4.15",
- "http 1.4.2",
- "http-body 1.0.1",
- "http-body-util",
- "hyper 1.10.1",
- "hyper-timeout",
- "hyper-util",
- "percent-encoding",
- "pin-project",
- "prost 0.13.5",
- "socket2 0.5.10",
- "tokio",
- "tokio-rustls",
- "tokio-stream",
- "tower 0.5.3",
- "tower-layer",
- "tower-service",
- "tracing",
- "webpki-roots 0.26.11",
- "zstd 0.13.3",
-]
-
-[[package]]
-name = "tonic"
 version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac2a5518c70fa84342385732db33fb3f44bc4cc748936eb5833d2df34d6445ef"
@@ -28762,18 +27054,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.118",
-]
-
-[[package]]
-name = "tonic-health"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb87334d340313fefa513b6e60794d44a86d5f039b523229c99c323e4e19ca4b"
-dependencies = [
- "prost 0.13.5",
- "tokio",
- "tokio-stream",
- "tonic 0.13.1",
 ]
 
 [[package]]
@@ -29424,23 +27704,23 @@ dependencies = [
  "bcs",
  "bincode 1.3.3",
  "eyre",
- "fastcrypto 0.1.9 (git+https://github.com/MystenLabs/fastcrypto?rev=5f87e04bb21d295ef6b39375a06615d45cbb906c)",
+ "fastcrypto",
  "fdlimit",
  "hdrhistogram",
  "msim",
- "mysten-common 0.1.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
- "mysten-metrics 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "mysten-common",
+ "mysten-metrics",
  "once_cell",
  "prometheus 0.14.0",
  "rocksdb",
  "serde",
- "sui-macros 0.7.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "sui-macros",
  "tap",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
  "typed-store-derive",
- "typed-store-error 0.4.0 (git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat)",
+ "typed-store-error",
 ]
 
 [[package]]
@@ -29458,15 +27738,6 @@ dependencies = [
 name = "typed-store-error"
 version = "0.4.0"
 source = "git+https://github.com/mcxross/sui.git?branch=mcxross%2Fmovy-compat#35d497d72a55073304c43ea7f173577bed8261da"
-dependencies = [
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "typed-store-error"
-version = "0.4.0"
-source = "git+https://github.com/MystenLabs/sui?rev=22642cf#22642cfb2c813024ab2b137ae6a01cf038a6a0fd"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
@@ -29548,16 +27819,6 @@ dependencies = [
  "crunchy",
  "hex",
  "static_assertions",
-]
-
-[[package]]
-name = "ulid"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "470dbf6591da1b39d43c14523b2b469c86879a53e8b758c8e090a470fe7b1fbe"
-dependencies = [
- "rand 0.9.4",
- "web-time",
 ]
 
 [[package]]
@@ -29753,12 +28014,6 @@ name = "unsafe-libyaml"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
-
-[[package]]
-name = "unsigned-varint"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6889a77d49f1f013504cec6bf97a2c730394adedaeb1deb5ea08949a50541105"
 
 [[package]]
 name = "unsigned-varint"
@@ -31636,15 +29891,6 @@ dependencies = [
 
 [[package]]
 name = "winnow"
-version = "0.6.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e90edd2ac1aa278a5c4599b1d89cf03074b610800f866d4026dc199d7929a28"
-dependencies = [
- "memchr",
-]
-
-[[package]]
-name = "winnow"
 version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
@@ -31915,7 +30161,7 @@ dependencies = [
  "pem",
  "ring",
  "signature 2.2.0",
- "spki 0.7.3",
+ "spki",
  "thiserror 1.0.69",
  "zeroize",
 ]
@@ -32052,7 +30298,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.118",
- "synstructure 0.13.2",
+ "synstructure",
 ]
 
 [[package]]
@@ -32237,7 +30483,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.118",
- "synstructure 0.13.2",
+ "synstructure",
 ]
 
 [[package]]
@@ -32534,3 +30780,7 @@ dependencies = [
  "syn 2.0.118",
  "winnow 1.0.3",
 ]
+
+[[patch.unused]]
+name = "core2"
+version = "0.4.0"
