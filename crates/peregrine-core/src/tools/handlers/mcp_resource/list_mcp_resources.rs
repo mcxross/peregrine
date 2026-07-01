@@ -41,7 +41,8 @@ impl ToolExecutor<ToolInvocation> for ListMcpResourcesHandler {
         true
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "MCP resource listing reads through the session-owned manager guard"
     )]
     async fn handle(

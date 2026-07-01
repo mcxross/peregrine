@@ -293,7 +293,8 @@ async fn verify_request_plugin_install_completed(
     }
 }
 
-#[allow(clippy::await_holding_invalid_type,
+#[allow(
+    clippy::await_holding_invalid_type,
     reason = "connector cache refresh reads through the session-owned manager guard"
 )]
 async fn refresh_missing_requested_connectors(

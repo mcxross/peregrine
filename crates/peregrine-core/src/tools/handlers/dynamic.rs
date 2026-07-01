@@ -139,7 +139,8 @@ impl CoreToolRuntime for DynamicToolHandler {
     }
 }
 
-#[allow(clippy::await_holding_invalid_type,
+#[allow(
+    clippy::await_holding_invalid_type,
     reason = "active turn checks and dynamic tool response registration must remain atomic"
 )]
 async fn request_dynamic_tool(

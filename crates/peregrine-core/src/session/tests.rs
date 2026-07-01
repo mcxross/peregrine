@@ -9793,7 +9793,8 @@ async fn abort_review_task_emits_exited_then_aborted_and_records_history() {
 }
 
 #[tokio::test]
-#[allow(clippy::await_holding_invalid_type,
+#[allow(
+    clippy::await_holding_invalid_type,
     reason = "test builds a router from session-owned MCP manager state"
 )]
 async fn fatal_tool_error_stops_turn_and_reports_error() {

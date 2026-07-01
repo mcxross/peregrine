@@ -306,7 +306,8 @@ impl GuardianReviewSessionManager {
         }
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "review session selection and trunk spawning must stay serialized"
     )]
     pub(super) async fn run_review(

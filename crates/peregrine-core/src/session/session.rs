@@ -492,7 +492,8 @@ impl Session {
 
     #[instrument(name = "session_init", level = "info", skip_all)]
     #[allow(clippy::too_many_arguments)]
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "session initialization must serialize access through session-owned manager guards"
     )]
     pub(crate) async fn new(

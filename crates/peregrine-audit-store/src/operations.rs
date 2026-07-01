@@ -151,7 +151,7 @@ impl AuditStore {
         result
     }
 
-#[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     pub fn record_capability_gap(
         &self,
         run_id: &str,

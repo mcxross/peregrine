@@ -97,7 +97,8 @@ fn extension_tool_test_registry() -> Arc<ExtensionRegistry<Config>> {
 }
 
 #[tokio::test]
-#[allow(clippy::await_holding_invalid_type,
+#[allow(
+    clippy::await_holding_invalid_type,
     reason = "test builds a router from session-owned MCP manager state"
 )]
 async fn parallel_support_does_not_match_namespaced_local_tool_names() -> anyhow::Result<()> {

@@ -1,5 +1,14 @@
-#![allow(clippy::unnecessary_to_owned, clippy::too_many_arguments, clippy::collapsible_if)]
-#![allow(clippy::unwrap_used, clippy::expect_used, unused_imports, clippy::match_like_matches_macro)]
+#![allow(
+    clippy::unnecessary_to_owned,
+    clippy::too_many_arguments,
+    clippy::collapsible_if
+)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    unused_imports,
+    clippy::match_like_matches_macro
+)]
 #![allow(clippy::result_large_err)]
 //! Shared in-process app-server client facade for CLI surfaces.
 //!

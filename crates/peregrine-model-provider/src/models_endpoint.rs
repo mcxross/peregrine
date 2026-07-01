@@ -89,13 +89,12 @@ impl ModelsEndpointClient for OpenAiModelsEndpoint {
             codex_otel::start_global_timer("codex.remote_models.fetch_update.duration_ms", &[]);
         let auth = self.auth().await;
         let auth_mode = auth.as_ref().map(codex_login::CodexAuth::auth_mode);
-        let api_auth_mode = auth_mode
-            .map(|mode| match format!("{mode:?}").as_str() {
-                "Chatgpt" => peregrine_models_manager::AuthMode::Chatgpt,
-                "ChatgptAuthTokens" => peregrine_models_manager::AuthMode::ChatgptAuthTokens,
-                "AgentIdentity" => peregrine_models_manager::AuthMode::AgentIdentity,
-                _ => peregrine_models_manager::AuthMode::Chatgpt,
-            });
+        let api_auth_mode = auth_mode.map(|mode| match format!("{mode:?}").as_str() {
+            "Chatgpt" => peregrine_models_manager::AuthMode::Chatgpt,
+            "ChatgptAuthTokens" => peregrine_models_manager::AuthMode::ChatgptAuthTokens,
+            "AgentIdentity" => peregrine_models_manager::AuthMode::AgentIdentity,
+            _ => peregrine_models_manager::AuthMode::Chatgpt,
+        });
         let api_provider = api_provider_from_info(&self.provider_info, api_auth_mode)?;
         let api_auth = resolve_provider_auth(auth.as_ref(), &self.provider_info)?;
         let transport = ReqwestTransport::new(build_reqwest_client());

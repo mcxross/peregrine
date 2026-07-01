@@ -2010,7 +2010,8 @@ impl Session {
     /// be used to derive the available decisions via
     /// [ExecApprovalRequestEvent::default_available_decisions].
     #[allow(clippy::too_many_arguments)]
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state updates must remain atomic"
     )]
     pub async fn request_command_approval(
@@ -2085,7 +2086,8 @@ impl Session {
         rx_approve.await.unwrap_or(ReviewDecision::Abort)
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state updates must remain atomic"
     )]
     pub async fn request_patch_approval(
@@ -2143,7 +2145,8 @@ impl Session {
         .await
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state updates must remain atomic"
     )]
     pub(crate) async fn request_permissions_for_cwd(
@@ -2300,7 +2303,8 @@ impl Session {
         }
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state updates must remain atomic"
     )]
     pub async fn request_user_input(
@@ -2338,7 +2342,8 @@ impl Session {
         rx_response.await.ok()
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state updates must remain atomic"
     )]
     pub async fn notify_user_input_response(
@@ -2366,7 +2371,8 @@ impl Session {
         }
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state updates must remain atomic"
     )]
     pub async fn notify_request_permissions_response(
@@ -2462,7 +2468,8 @@ impl Session {
         }
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn reads must stay consistent with the matching turn state"
     )]
     pub(crate) async fn granted_turn_permissions(&self) -> Option<AdditionalPermissionProfile> {
@@ -2472,7 +2479,8 @@ impl Session {
         ts.granted_permissions()
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn reads must stay consistent with the matching turn state"
     )]
     pub(crate) async fn strict_auto_review_enabled_for_turn(&self) -> bool {
@@ -2489,7 +2497,8 @@ impl Session {
         state.granted_permissions()
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state updates must remain atomic"
     )]
     pub async fn notify_dynamic_tool_response(&self, call_id: &str, response: DynamicToolResponse) {
@@ -2513,7 +2522,8 @@ impl Session {
         }
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state updates must remain atomic"
     )]
     pub async fn notify_approval(&self, approval_id: &str, decision: ReviewDecision) {
@@ -2669,7 +2679,8 @@ impl Session {
         }
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "MCP app context rendering reads through the session-owned manager guard"
     )]
     pub(crate) async fn build_initial_context(
@@ -3152,7 +3163,8 @@ impl Session {
     /// Inject additional user input into the currently active turn.
     ///
     /// Returns the active turn id when accepted.
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state updates must remain atomic"
     )]
     pub async fn steer_input(

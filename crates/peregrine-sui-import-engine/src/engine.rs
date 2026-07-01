@@ -22,8 +22,7 @@ const IMPORTED_PACKAGES_DIRECTORY: &str = "imported-packages";
 const PROJECT_METADATA_DIRECTORY: &str = ".peregrine";
 const IMPORT_ENGINE_METADATA_FILE: &str = "import-engine.json";
 
-#[derive(Clone, Debug)]
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub struct ImportEngine {
     config: ImportEngineConfig,
 }
@@ -144,7 +143,6 @@ struct ImportEngineMetadata<'a> {
     imported_at: u64,
 }
 
-
 impl ImportEngine {
     pub fn new(config: ImportEngineConfig) -> Self {
         Self { config }
@@ -167,7 +165,7 @@ impl ImportEngine {
         let mut queue = VecDeque::from([(package_id.clone(), 0usize)]);
 
         if request.generate_buildable {
-#[allow(clippy::while_let_loop)]
+            #[allow(clippy::while_let_loop)]
             loop {
                 let Some((current_package_id, current_depth)) = queue.pop_front() else {
                     break;

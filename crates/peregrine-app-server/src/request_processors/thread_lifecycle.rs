@@ -130,7 +130,8 @@ pub(super) enum EnsureConversationListenerResult {
     ConnectionClosed,
 }
 
-#[allow(clippy::await_holding_invalid_type,
+#[allow(
+    clippy::await_holding_invalid_type,
     reason = "listener subscription must be serialized against pending unloads"
 )]
 pub(super) async fn ensure_conversation_listener(
@@ -512,7 +513,8 @@ pub(super) async fn handle_thread_listener_command(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::await_holding_invalid_type,
+#[allow(
+    clippy::await_holding_invalid_type,
     reason = "running-thread resume subscription must be serialized against pending unloads"
 )]
 pub(super) async fn handle_pending_thread_resume_request(

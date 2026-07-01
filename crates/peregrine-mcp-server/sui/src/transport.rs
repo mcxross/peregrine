@@ -14,10 +14,7 @@ pub async fn run_sse_server(
     let config = StreamableHttpServerConfig::default();
 
     let service = StreamableHttpService::new(
-        move || {
-            service_factory()
-                .map_err(|e| std::io::Error::other(e.to_string()))
-        },
+        move || service_factory().map_err(|e| std::io::Error::other(e.to_string())),
         session_manager,
         config,
     );

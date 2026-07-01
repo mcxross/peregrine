@@ -167,7 +167,8 @@ impl InputQueue {
         turn_state.lock().await.pending_input.items.split_off(0)
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state updates must remain atomic"
     )]
     pub(crate) async fn get_pending_input(
@@ -204,7 +205,8 @@ impl InputQueue {
         }
     }
 
-    #[allow(clippy::await_holding_invalid_type,
+    #[allow(
+        clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state reads must remain atomic"
     )]
     pub(crate) async fn has_pending_input(&self, active_turn: &Mutex<Option<ActiveTurn>>) -> bool {

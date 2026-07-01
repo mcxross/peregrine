@@ -208,64 +208,66 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                     })),
                 });
                 if kind == OperationKind::Call
-                    && let Some(target) = target.as_deref() {
-                        let edge_target = resolve_call_edge_target(&function_ids, target)
-                            .unwrap_or_else(|| target.to_string());
-                        program.edges.push(Edge {
-                            id: stable_id(
-                                "edge",
-                                [
-                                    &program.package.id,
-                                    &function_id,
-                                    &edge_target,
-                                    &operation_id,
-                                    "CALLS",
-                                ],
-                            ),
-                            package_id: program.package.id.clone(),
-                            from_id: function_id.clone(),
-                            to_id: edge_target,
-                            edge_type: EdgeType::Calls,
-                            operation_id: Some(operation_id.clone()),
-                            source_span: operation_span.clone(),
-                            metadata_json: Some(serde_json::json!({ "target": target })),
-                        });
-                        emit_call_tag(program, &operation_id, target, operation_span.clone());
-                    }
+                    && let Some(target) = target.as_deref()
+                {
+                    let edge_target = resolve_call_edge_target(&function_ids, target)
+                        .unwrap_or_else(|| target.to_string());
+                    program.edges.push(Edge {
+                        id: stable_id(
+                            "edge",
+                            [
+                                &program.package.id,
+                                &function_id,
+                                &edge_target,
+                                &operation_id,
+                                "CALLS",
+                            ],
+                        ),
+                        package_id: program.package.id.clone(),
+                        from_id: function_id.clone(),
+                        to_id: edge_target,
+                        edge_type: EdgeType::Calls,
+                        operation_id: Some(operation_id.clone()),
+                        source_span: operation_span.clone(),
+                        metadata_json: Some(serde_json::json!({ "target": target })),
+                    });
+                    emit_call_tag(program, &operation_id, target, operation_span.clone());
+                }
                 if matches!(kind, OperationKind::Pack | OperationKind::Unpack)
-                    && let Some(target) = target.as_deref() {
-                        let edge_target = resolve_type_edge_target(&type_ids, target)
-                            .unwrap_or_else(|| target.to_string());
-                        let edge_type = if kind == OperationKind::Pack {
-                            EdgeType::PacksType
-                        } else {
-                            EdgeType::UnpacksType
-                        };
-                        let edge_kind = if kind == OperationKind::Pack {
-                            "PACKS_TYPE"
-                        } else {
-                            "UNPACKS_TYPE"
-                        };
-                        program.edges.push(Edge {
-                            id: stable_id(
-                                "edge",
-                                [
-                                    program.package.id.as_str(),
-                                    function_id.as_str(),
-                                    edge_target.as_str(),
-                                    operation_id.as_str(),
-                                    edge_kind,
-                                ],
-                            ),
-                            package_id: program.package.id.clone(),
-                            from_id: function_id.clone(),
-                            to_id: edge_target,
-                            edge_type,
-                            operation_id: Some(operation_id.clone()),
-                            source_span: operation_span.clone(),
-                            metadata_json: Some(serde_json::json!({ "target": target })),
-                        });
-                    }
+                    && let Some(target) = target.as_deref()
+                {
+                    let edge_target = resolve_type_edge_target(&type_ids, target)
+                        .unwrap_or_else(|| target.to_string());
+                    let edge_type = if kind == OperationKind::Pack {
+                        EdgeType::PacksType
+                    } else {
+                        EdgeType::UnpacksType
+                    };
+                    let edge_kind = if kind == OperationKind::Pack {
+                        "PACKS_TYPE"
+                    } else {
+                        "UNPACKS_TYPE"
+                    };
+                    program.edges.push(Edge {
+                        id: stable_id(
+                            "edge",
+                            [
+                                program.package.id.as_str(),
+                                function_id.as_str(),
+                                edge_target.as_str(),
+                                operation_id.as_str(),
+                                edge_kind,
+                            ],
+                        ),
+                        package_id: program.package.id.clone(),
+                        from_id: function_id.clone(),
+                        to_id: edge_target,
+                        edge_type,
+                        operation_id: Some(operation_id.clone()),
+                        source_span: operation_span.clone(),
+                        metadata_json: Some(serde_json::json!({ "target": target })),
+                    });
+                }
                 if let Some((field_target, is_mutable)) = field_borrow_target(&module, bytecode) {
                     let edge_target = resolve_field_edge_target(&field_ids, &field_target)
                         .unwrap_or_else(|| field_target.clone());
@@ -366,10 +368,10 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                             | Bytecode::MutBorrowFieldGeneric(_)
                             | Bytecode::ImmBorrowField(_)
                             | Bytecode::ImmBorrowFieldGeneric(_)
-                    )
-                        && !matches!(bytecode, Bytecode::ReadRef | Bytecode::WriteRef) => {
-                            pending_field_reference = None;
-                        }
+                    ) && !matches!(bytecode, Bytecode::ReadRef | Bytecode::WriteRef) =>
+                    {
+                        pending_field_reference = None;
+                    }
                     _ => {}
                 }
                 emit_operation_tag(program, &operation_id, &kind, operation_span);
