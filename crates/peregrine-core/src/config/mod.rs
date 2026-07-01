@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::agents_md::AgentsMdManager;
 use crate::config::edit::ConfigEdit;
 use crate::config::edit::ConfigEditsBuilder;

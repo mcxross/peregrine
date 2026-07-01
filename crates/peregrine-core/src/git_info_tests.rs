@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use codex_exec_server::LOCAL_FS;
 use codex_git_utils::GitInfo;
 use codex_git_utils::GitSha;

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -86,10 +88,9 @@ impl ModelsEndpointClient for OpenAiModelsEndpoint {
         let _timer =
             codex_otel::start_global_timer("codex.remote_models.fetch_update.duration_ms", &[]);
         let auth = self.auth().await;
-        let auth_mode = auth.as_ref().map(|a| a.auth_mode());
+        let auth_mode = auth.as_ref().map(codex_login::CodexAuth::auth_mode);
         let api_auth_mode = auth_mode
-            .clone()
-            .map(|mode| match format!("{:?}", mode).as_str() {
+            .map(|mode| match format!("{mode:?}").as_str() {
                 "Chatgpt" => peregrine_models_manager::AuthMode::Chatgpt,
                 "ChatgptAuthTokens" => peregrine_models_manager::AuthMode::ChatgptAuthTokens,
                 "AgentIdentity" => peregrine_models_manager::AuthMode::AgentIdentity,

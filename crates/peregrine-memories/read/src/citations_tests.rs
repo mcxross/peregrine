@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::parse_memory_citation;
 use super::thread_ids_from_memory_citation;
 use peregrine_types::ThreadId;

@@ -1,3 +1,4 @@
+#![allow(clippy::redundant_clone)]
 //! Model, collaboration, and reasoning popups for `ChatWidget`.
 //!
 //! These surfaces are tightly related because changing one often redirects

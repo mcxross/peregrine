@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use codex_sandboxing::SandboxType;
 use core_test_support::PathBufExt;

@@ -78,8 +78,7 @@ impl Session {
         Arc::new(GuardianMcpElicitationReviewer::new(self))
     }
 
-    #[expect(
-        clippy::await_holding_invalid_type,
+    #[allow(clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state updates must remain atomic"
     )]
     pub async fn request_mcp_server_elicitation(
@@ -210,8 +209,7 @@ impl Session {
         }
     }
 
-    #[expect(
-        clippy::await_holding_invalid_type,
+    #[allow(clippy::await_holding_invalid_type,
         reason = "active turn checks and manager fallback must stay serialized"
     )]
     pub async fn resolve_elicitation(
@@ -245,8 +243,7 @@ impl Session {
             .await
     }
 
-    #[expect(
-        clippy::await_holding_invalid_type,
+    #[allow(clippy::await_holding_invalid_type,
         reason = "MCP resource calls are serialized through the session-owned manager guard"
     )]
     pub async fn list_resources(
@@ -262,8 +259,7 @@ impl Session {
             .await
     }
 
-    #[expect(
-        clippy::await_holding_invalid_type,
+    #[allow(clippy::await_holding_invalid_type,
         reason = "MCP resource calls are serialized through the session-owned manager guard"
     )]
     pub async fn list_resource_templates(
@@ -279,8 +275,7 @@ impl Session {
             .await
     }
 
-    #[expect(
-        clippy::await_holding_invalid_type,
+    #[allow(clippy::await_holding_invalid_type,
         reason = "MCP resource calls are serialized through the session-owned manager guard"
     )]
     pub async fn read_resource(
@@ -296,8 +291,7 @@ impl Session {
             .await
     }
 
-    #[expect(
-        clippy::await_holding_invalid_type,
+    #[allow(clippy::await_holding_invalid_type,
         reason = "MCP tool calls are serialized through the session-owned manager guard"
     )]
     pub async fn call_tool(

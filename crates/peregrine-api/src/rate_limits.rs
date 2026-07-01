@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use http::HeaderMap;
 use peregrine_types::account::PlanType;
 use peregrine_types::protocol::CreditsSnapshot;

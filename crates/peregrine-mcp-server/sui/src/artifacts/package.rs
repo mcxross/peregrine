@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::error::{SecurityToolsError, SecurityToolsResult};
 use peregrine_sui_move_model::build_move_package;
 use serde::Serialize;

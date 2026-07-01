@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use crate::context::ContextualUserFragment;
 use crate::context::InternalContextSource;

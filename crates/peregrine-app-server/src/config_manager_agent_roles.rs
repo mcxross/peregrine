@@ -52,7 +52,7 @@ impl ConfigManager {
         let cwd = params.cwd.map(PathBuf::from);
         let scope = params.scope.unwrap_or(AgentRoleSaveScope::Global);
         let target = self
-            .resolve_role_save_target(scope.clone(), cwd.as_deref(), role_name)
+            .resolve_role_save_target(scope, cwd.as_deref(), role_name)
             .await?;
         let global_config_file = self
             .user_config_path()
@@ -153,7 +153,7 @@ impl ConfigManager {
         }
 
         let target = self
-            .resolve_role_save_target(params.scope.clone(), cwd.as_deref(), role_name)
+            .resolve_role_save_target(params.scope, cwd.as_deref(), role_name)
             .await?;
         validate_role_file_contents(role_name, &target.role_file, &params.editable_content)?;
         write_role_file(&target.role_file, params.editable_content).await?;

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::process::UnifiedExecProcess;
 use crate::unified_exec::UnifiedExecError;
 use async_trait::async_trait;

@@ -173,6 +173,28 @@ pub fn discover_move_state_access_graph_for_function(
     )
 }
 
+fn discover_move_project_model_with_graphs(root: &Path, include_graphs: bool) -> MoveProjectModel {
+    let packages = discover_move_packages(root, true);
+    let dependency_graph = build_package_dependency_graph(root, &packages);
+    let (call_graph, type_graph, state_access_graph) = if include_graphs {
+        build_move_graphs(root, &packages)
+    } else {
+        (
+            MoveCallGraph::default(),
+            MoveTypeGraph::default(),
+            MoveStateAccessGraph::default(),
+        )
+    };
+
+    MoveProjectModel {
+        packages,
+        dependency_graph,
+        call_graph,
+        type_graph,
+        state_access_graph,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -222,27 +244,5 @@ name = "app"
             project.dependency_graph.summary_path.as_deref(),
             Some("packages/app/package_summaries"),
         );
-    }
-}
-
-fn discover_move_project_model_with_graphs(root: &Path, include_graphs: bool) -> MoveProjectModel {
-    let packages = discover_move_packages(root, true);
-    let dependency_graph = build_package_dependency_graph(root, &packages);
-    let (call_graph, type_graph, state_access_graph) = if include_graphs {
-        build_move_graphs(root, &packages)
-    } else {
-        (
-            MoveCallGraph::default(),
-            MoveTypeGraph::default(),
-            MoveStateAccessGraph::default(),
-        )
-    };
-
-    MoveProjectModel {
-        packages,
-        dependency_graph,
-        call_graph,
-        type_graph,
-        state_access_graph,
     }
 }

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -208,8 +210,8 @@ pub trait ModelProvider: fmt::Debug + Send + Sync {
         api_provider_from_info(
             self.info(),
             auth.as_ref()
-                .map(|a| a.auth_mode())
-                .map(|mode| match format!("{:?}", mode).as_str() {
+                .map(codex_login::CodexAuth::auth_mode)
+                .map(|mode| match format!("{mode:?}").as_str() {
                     "Chatgpt" => AuthMode::Chatgpt,
                     "ChatgptAuthTokens" => AuthMode::ChatgptAuthTokens,
                     "AgentIdentity" => AuthMode::AgentIdentity,

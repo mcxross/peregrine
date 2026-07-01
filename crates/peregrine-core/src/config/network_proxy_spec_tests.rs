@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use codex_network_proxy::NetworkDomainPermission;
 use peregrine_config::NetworkDomainPermissionToml;

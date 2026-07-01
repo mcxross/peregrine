@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::cache::{EagerCache, PackageState};
 use crate::command;
 use crate::{
@@ -163,6 +165,7 @@ impl PeregrineMcpServer {
             .map_err(|error| error.to_string())
     }
 
+#[allow(clippy::too_many_arguments)]
     async fn run_package_analysis(
         &self,
         workspace: &WorkspaceState,
@@ -227,7 +230,7 @@ impl PeregrineMcpServer {
         let unbounded = request
             .arguments
             .as_ref()
-            .and_then(|args| args.get("unbounded").and_then(|v| v.as_bool()))
+            .and_then(|args| args.get("unbounded").and_then(serde_json::Value::as_bool))
             .unwrap_or(false);
         let arguments = request.arguments.unwrap_or_default();
         let value = match request.name.as_ref() {
@@ -235,7 +238,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<PackageArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 json!({
                     "status": "ok",
                     "package": package_summary(&ctx),
@@ -245,7 +248,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<ModulesArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args.package)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let (source, modules) =
                     sui_modules(&ctx).map_err(|error| tool_error(error.to_string()))?;
                 let modules = modules
@@ -291,7 +294,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<SignaturesArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args.package)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let module_filters = args
                     .modules
                     .iter()
@@ -342,12 +345,12 @@ impl PeregrineMcpServer {
                 let args = parse_args::<ImportPackageArgs>(&arguments)?;
                 let project_root = self
                     .resolve_project_root(args.project_root.as_deref())
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let import_root = match args.output_path.as_deref() {
                     Some(output_path) => workspace_output_path(&project_root, output_path)
-                        .map_err(|e| tool_error(e.to_string()))?,
+                        .map_err(tool_error)?,
                     None => default_import_root(&project_root, &args.network_id, &args.package_id)
-                        .map_err(|e| tool_error(e.to_string()))?,
+                        .map_err(tool_error)?,
                 };
                 let request = BuildableImportRequest {
                     network_id: args.network_id,
@@ -367,7 +370,7 @@ impl PeregrineMcpServer {
                 let artifact = engine
                     .import_buildable_package(request)
                     .await
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let artifact = serde_json::from_value::<ImportArtifact>(
                     serde_json::to_value(artifact).map_err(serialization_error)?,
                 )
@@ -383,7 +386,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<CreatePackageArgs>(&arguments)?;
                 let project_root = self
                     .resolve_project_root(args.project_root.as_deref())
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let adapter_settings = to_adapter_settings(&self.default_adapter_settings);
                 let security_command = build_sui_move_new_command(
                     &project_root,
@@ -412,7 +415,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<StaticAnalysisArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args.package)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let catalog = static_rule_catalog(&ctx, &args)
                     .map_err(|error| tool_error(error.to_string()))?;
                 let catalog = serde_json::from_value::<ProtocolAnalysisRuleCatalog>(
@@ -430,7 +433,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<StaticAnalysisArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args.package)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let workspace = self
                     .get_or_create_workspace(Path::new(&ctx.project_root))
                     .map_err(|e| tool_error(e.to_string()))?;
@@ -465,7 +468,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<PackageArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let workspace = self
                     .get_or_create_workspace(Path::new(&ctx.project_root))
                     .map_err(|e| tool_error(e.to_string()))?;
@@ -490,7 +493,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<TestScannerArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args.package)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 serde_json::to_value(TestScannerResponse {
                     status: "ok".to_string(),
                     package: package_summary(&ctx),
@@ -503,7 +506,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<PackageArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 json!({
                     "status": "ok",
                     "package": package_summary(&ctx),
@@ -515,7 +518,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<ProjectGraphsArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args.package)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
 
                 let mut options = AnalysisOptions::new();
                 // Since `modules` is an array and the legacy engine might expect a single string `moduleName`
@@ -572,7 +575,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<FunctionStateGraphArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args.package)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let workspace = self
                     .get_or_create_workspace(Path::new(&ctx.project_root))
                     .map_err(|e| tool_error(e.to_string()))?;
@@ -603,7 +606,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<BytecodeViewArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args.package)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let mut bytecode = serde_json::from_value::<MoveBytecodePackageView>(
                     serde_json::to_value(
                         sui_bytecode_view(&ctx).map_err(|error| tool_error(error.to_string()))?,
@@ -641,7 +644,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<PackageArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 json!({
                     "status": "ok",
                     "package": package_summary(&ctx),
@@ -653,7 +656,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<SuiCommandArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args.package)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let workspace = self
                     .get_or_create_workspace(&ctx.project_root)
                     .map_err(|e| tool_error(e.to_string()))?;
@@ -681,7 +684,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<MovyFuzzArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args.package)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let workspace = self
                     .get_or_create_workspace(&ctx.project_root)
                     .map_err(|e| tool_error(e.to_string()))?;
@@ -717,7 +720,7 @@ impl PeregrineMcpServer {
                 let args = parse_args::<FormalVerifyArgs>(&arguments)?;
                 let ctx = self
                     .resolve_context(&args.package)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let workspace = self
                     .get_or_create_workspace(Path::new(&ctx.project_root))
                     .map_err(|e| tool_error(e.to_string()))?;
@@ -804,7 +807,7 @@ impl PeregrineMcpServer {
                 };
                 let context = self
                     .resolve_context(&package)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 Ok((
                     AnalysisTarget::LocalPackage {
                         path: context.package_root.clone(),
@@ -823,9 +826,9 @@ impl PeregrineMcpServer {
             } => {
                 let project_root = self
                     .resolve_project_root(project_root.as_deref())
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let import_root = default_import_root(&project_root, &network_id, &package_id)
-                    .map_err(|e| tool_error(e.to_string()))?;
+                    .map_err(tool_error)?;
                 let artifact = ImportEngine::new(ImportEngineConfig {
                     max_dependency_depth: max_dependency_depth.unwrap_or(3).min(16),
                     max_dependency_packages: max_dependency_packages.unwrap_or(64).clamp(1, 512),
@@ -839,7 +842,7 @@ impl PeregrineMcpServer {
                     generate_buildable: true,
                 })
                 .await
-                .map_err(|e| tool_error(e.to_string()))?;
+                .map_err(tool_error)?;
                 Ok((
                     AnalysisTarget::LocalPackage {
                         path: artifact.buildable_root.clone(),

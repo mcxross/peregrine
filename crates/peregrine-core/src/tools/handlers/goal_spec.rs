@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 //! Responses API tool definitions for persisted thread goals.
 //!
 //! These specs expose goal read/update primitives to the model while keeping

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use codex_features::Feature;
 use core_test_support::load_default_config_for_test;
 use core_test_support::responses::mount_models_once;

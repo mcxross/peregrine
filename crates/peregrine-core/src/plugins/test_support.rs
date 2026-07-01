@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::config::CONFIG_TOML_FILE;
 use crate::config::ConfigBuilder;
 use std::fs;

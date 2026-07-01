@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use std::collections::HashMap;
 use std::future::Future;
 use std::path::PathBuf;
@@ -304,8 +306,7 @@ impl GuardianReviewSessionManager {
         }
     }
 
-    #[expect(
-        clippy::await_holding_invalid_type,
+    #[allow(clippy::await_holding_invalid_type,
         reason = "review session selection and trunk spawning must stay serialized"
     )]
     pub(super) async fn run_review(

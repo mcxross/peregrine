@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::protocol::ClientEnvelope;
 use super::protocol::ClientEvent;
 use super::protocol::ClientId;

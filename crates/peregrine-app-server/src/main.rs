@@ -1,3 +1,5 @@
+#![allow(clippy::unnecessary_to_owned, clippy::too_many_arguments, clippy::collapsible_if)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::match_like_matches_macro)]
 use clap::Parser;
 use codex_arg0::Arg0DispatchPaths;
 use codex_arg0::arg0_dispatch_or_else;

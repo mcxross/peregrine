@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use crate::config_toml::ConfigToml;
 use crate::diagnostics::TextPosition;

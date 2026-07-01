@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use core_test_support::PathBufExt;
 use core_test_support::PathExt;

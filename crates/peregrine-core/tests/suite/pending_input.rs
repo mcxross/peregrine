@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use std::sync::Arc;
 
 use core_test_support::context_snapshot;

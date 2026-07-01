@@ -176,6 +176,7 @@ pub fn summarize_index_layers(counts: IndexLayerCounts) -> Vec<IndexLayerSummary
     ]
 }
 
+#[allow(clippy::too_many_arguments)]
 fn layer(
     name: &str,
     purpose: &str,

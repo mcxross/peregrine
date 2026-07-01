@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use anyhow::Result;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use core_test_support::responses::ResponsesRequest;

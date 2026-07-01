@@ -444,8 +444,7 @@ async fn run_hooks_and_record_inputs(
     blocked_input && !accepted_user_input
 }
 
-#[expect(
-    clippy::await_holding_invalid_type,
+#[allow(clippy::await_holding_invalid_type,
     reason = "MCP tool listing borrows the read guard across cancellation-aware await"
 )]
 async fn build_skills_and_plugins(
@@ -1004,8 +1003,7 @@ async fn run_sampling_request(
     }
 }
 
-#[expect(
-    clippy::await_holding_invalid_type,
+#[allow(clippy::await_holding_invalid_type,
     reason = "tool router construction reads through the session-owned manager guard"
 )]
 #[instrument(level = "trace",

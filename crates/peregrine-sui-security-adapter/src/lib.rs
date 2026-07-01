@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use peregrine_security_tools::{
     AcquiredAuditTarget, AdapterFuture, AuditAdapterError, AuditChainAdapter, AuditTargetPreflight,
     AuditWorkspace, ExploitReplay,

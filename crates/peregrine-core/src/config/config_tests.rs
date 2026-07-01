@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::agents_md::DEFAULT_AGENTS_MD_FILENAME;
 use crate::agents_md::LOCAL_AGENTS_MD_FILENAME;
 use crate::config::edit::ConfigEdit;

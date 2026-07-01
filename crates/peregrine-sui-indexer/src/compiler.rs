@@ -43,7 +43,7 @@ fn collect_files(root: &Path, extensions: &[&str]) -> Vec<PathBuf> {
         .filter(|path| {
             path.extension()
                 .and_then(|extension| extension.to_str())
-                .is_some_and(|extension| extensions.iter().any(|allowed| extension == *allowed))
+                .is_some_and(|extension| extensions.contains(&extension))
         })
         .collect::<Vec<_>>();
     files.sort();

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use std::fs::OpenOptions;
 use std::io::Read;
 use std::io::Result;

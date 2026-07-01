@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use assert_matches::assert_matches;
 use std::sync::Arc;
 use std::time::Duration;

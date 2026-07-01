@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use codex_execpolicy::Decision;
 use codex_utils_absolute_path::AbsolutePathBuf;

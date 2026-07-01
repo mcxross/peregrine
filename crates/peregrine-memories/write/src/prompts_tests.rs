@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use peregrine_models_manager::model_info::model_info_from_slug;
 use tempfile::tempdir;

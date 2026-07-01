@@ -16,7 +16,7 @@ pub async fn run_sse_server(
     let service = StreamableHttpService::new(
         move || {
             service_factory()
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+                .map_err(|e| std::io::Error::other(e.to_string()))
         },
         session_manager,
         config,
@@ -26,7 +26,7 @@ pub async fn run_sse_server(
 
     let listener = TcpListener::bind(("127.0.0.1", port))
         .await
-        .with_context(|| format!("failed to bind TCP listener on port {}", port))?;
+        .with_context(|| format!("failed to bind TCP listener on port {port}"))?;
 
     tracing::info!(
         "Starting Peregrine MCP Server over SSE on 127.0.0.1:{}",

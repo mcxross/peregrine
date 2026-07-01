@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::ClientNotification;
 use crate::ClientRequest;
 use crate::ServerNotification;

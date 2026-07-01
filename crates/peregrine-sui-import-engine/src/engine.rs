@@ -23,6 +23,7 @@ const PROJECT_METADATA_DIRECTORY: &str = ".peregrine";
 const IMPORT_ENGINE_METADATA_FILE: &str = "import-engine.json";
 
 #[derive(Clone, Debug)]
+#[derive(Default)]
 pub struct ImportEngine {
     config: ImportEngineConfig,
 }
@@ -143,13 +144,6 @@ struct ImportEngineMetadata<'a> {
     imported_at: u64,
 }
 
-impl Default for ImportEngine {
-    fn default() -> Self {
-        Self {
-            config: ImportEngineConfig::default(),
-        }
-    }
-}
 
 impl ImportEngine {
     pub fn new(config: ImportEngineConfig) -> Self {
@@ -173,6 +167,7 @@ impl ImportEngine {
         let mut queue = VecDeque::from([(package_id.clone(), 0usize)]);
 
         if request.generate_buildable {
+#[allow(clippy::while_let_loop)]
             loop {
                 let Some((current_package_id, current_depth)) = queue.pop_front() else {
                     break;
@@ -1302,7 +1297,7 @@ mod tests {
             "0x53eedd7e88c454de73d0edea1aaeba07218cd5108fde2f07d3a987a140c10d80".to_string();
         let dependency_id =
             "0xf5ea2b3749c65d6e56507cc35388719aadb28f9cab873696a2f8687f5c785138".to_string();
-        let package_ids = vec![root_package_id.clone(), dependency_id.clone()];
+        let package_ids = [root_package_id.clone(), dependency_id.clone()];
         let aliases = address_aliases(&root_package_id, package_ids.iter()).expect("aliases");
 
         let root_alias = alias_for_address(&aliases, &root_package_id).expect("root alias");

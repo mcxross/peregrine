@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use anyhow::Context;
 use axum::http::HeaderMap;
 use axum::http::StatusCode;

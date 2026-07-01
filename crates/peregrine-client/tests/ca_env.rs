@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 //! Subprocess coverage for custom CA behavior that must build a real reqwest client.
 //!
 //! These tests intentionally run through `custom_ca_probe` and

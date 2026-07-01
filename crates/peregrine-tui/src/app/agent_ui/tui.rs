@@ -1,3 +1,4 @@
+#![allow(clippy::if_same_then_else)]
 use std::fmt;
 use std::future::Future;
 use std::io::IsTerminal;

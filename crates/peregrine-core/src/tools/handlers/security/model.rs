@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::{
     AuditScope, MAX_ID_BYTES, MAX_OBSERVATION_BYTES, MAX_SUMMARY_BYTES, model_error, validate_refs,
     validate_serialized_size, validate_text,

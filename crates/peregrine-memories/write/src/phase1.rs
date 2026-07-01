@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::build_stage_one_input_message;
 use crate::metrics::MEMORY_PHASE_ONE_E2E_MS;
 use crate::metrics::MEMORY_PHASE_ONE_JOBS;

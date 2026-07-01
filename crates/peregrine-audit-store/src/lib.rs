@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use peregrine_security_tools::AuditWorkspace;
 use peregrine_types::{AuditPlan, AuditRun, AuditStageId, AuditStageStatus, FindingCandidate};
 use rusqlite::{Connection, OptionalExtension, params};
@@ -442,7 +444,7 @@ mod tests {
             id: "audit-1".to_string(),
             plan_fingerprint: plan.fingerprint.clone(),
             target: plan.target.clone(),
-            profile: plan.profile.clone(),
+            profile: plan.profile,
             status: AuditRunStatus::Pending,
             current_stage: AuditStageId::AuditSession,
             coordinator_thread_id: None,
@@ -544,7 +546,7 @@ mod tests {
             id: "audit-read".to_string(),
             plan_fingerprint: plan.fingerprint.clone(),
             target: plan.target.clone(),
-            profile: plan.profile.clone(),
+            profile: plan.profile,
             status: AuditRunStatus::Pending,
             current_stage: AuditStageId::AuditSession,
             coordinator_thread_id: None,

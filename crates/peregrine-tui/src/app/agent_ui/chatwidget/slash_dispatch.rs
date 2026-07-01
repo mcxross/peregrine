@@ -1,3 +1,4 @@
+#![allow(clippy::redundant_clone)]
 //! Slash-command dispatch and local-recall handoff for `ChatWidget`.
 //!
 //! `ChatComposer` parses slash input and stages recognized command text for local

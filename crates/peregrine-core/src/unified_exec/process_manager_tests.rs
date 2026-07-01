@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use pretty_assertions::assert_eq;
 use tokio::time::Duration;

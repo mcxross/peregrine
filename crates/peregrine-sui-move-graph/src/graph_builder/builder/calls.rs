@@ -104,6 +104,7 @@ impl GraphBuilder {
         }
     }
 
+#[allow(clippy::too_many_arguments)]
     fn record_dot_call(
         &mut self,
         function: &mut FunctionContext,

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use anyhow::Result;
 use core_test_support::responses::ev_response_created;
 use core_test_support::responses::mount_sse_once;

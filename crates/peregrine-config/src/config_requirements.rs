@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use codex_utils_absolute_path::AbsolutePathBuf;
 use peregrine_types::config_types::ApprovalsReviewer;
 use peregrine_types::config_types::SandboxMode;

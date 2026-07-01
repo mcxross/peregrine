@@ -41,8 +41,7 @@ impl ToolExecutor<ToolInvocation> for ListMcpServersHandler {
         true
     }
 
-    #[expect(
-        clippy::await_holding_invalid_type,
+    #[allow(clippy::await_holding_invalid_type,
         reason = "MCP tool inventory reads through the session-owned manager guard"
     )]
     async fn handle(

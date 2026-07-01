@@ -5,8 +5,7 @@ use peregrine_types::models::ResponseItem;
 
 impl Session {
     /// Returns the input if there is no active turn to inject into.
-    #[expect(
-        clippy::await_holding_invalid_type,
+    #[allow(clippy::await_holding_invalid_type,
         reason = "active turn checks and turn state updates must remain atomic"
     )]
     pub async fn inject_if_running(

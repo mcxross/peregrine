@@ -1,3 +1,4 @@
+#![allow(clippy::field_reassign_with_default)]
 use peregrine_analysis::{
     AnalysisRequest, AnalysisStage, AnalysisTarget, ChainId, DynamicResultStatus,
 };

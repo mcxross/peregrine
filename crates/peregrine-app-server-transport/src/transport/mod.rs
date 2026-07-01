@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 pub mod auth;
 
 use crate::outgoing_message::ConnectionId;

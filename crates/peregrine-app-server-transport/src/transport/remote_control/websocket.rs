@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::transport::TransportEvent;
 use crate::transport::remote_control::client_tracker::ClientTracker;
 use crate::transport::remote_control::client_tracker::REMOTE_CONTROL_IDLE_SWEEP_INTERVAL;
@@ -418,8 +420,7 @@ impl RemoteControlWebsocket {
         }
     }
 
-    #[expect(
-        clippy::await_holding_invalid_type,
+    #[allow(clippy::await_holding_invalid_type,
         reason = "remote-control client shutdown must serialize tracker state"
     )]
     pub(crate) async fn run(
@@ -791,8 +792,7 @@ impl RemoteControlWebsocket {
         }
     }
 
-    #[expect(
-        clippy::await_holding_invalid_type,
+    #[allow(clippy::await_holding_invalid_type,
         reason = "remote-control server event receiver is shared across reconnects"
     )]
     async fn run_server_writer_inner(
@@ -951,8 +951,7 @@ impl RemoteControlWebsocket {
         }
     }
 
-    #[expect(
-        clippy::await_holding_invalid_type,
+    #[allow(clippy::await_holding_invalid_type,
         reason = "remote-control client tracking must stay serialized while processing inbound events"
     )]
     async fn run_websocket_reader_inner(
@@ -1617,7 +1616,7 @@ mod tests {
     use codex_login::token_data::parse_chatgpt_jwt_claims;
     use codex_state::StateRuntime;
     use futures::StreamExt;
-    use peregrine_app_server_protocol::AuthMode;
+    
     use peregrine_app_server_protocol::ConfigWarningNotification;
     use peregrine_app_server_protocol::JSONRPCMessage;
     use peregrine_app_server_protocol::JSONRPCNotification;

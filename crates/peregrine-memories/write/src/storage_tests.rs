@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::rollout_summary_file_stem;
 use crate::ensure_layout;
 use crate::raw_memories_file;

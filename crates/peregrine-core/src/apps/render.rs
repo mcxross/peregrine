@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::context::AppsInstructions;
 use crate::context::ContextualUserFragment;
 use codex_app_server_protocol::AppInfo;

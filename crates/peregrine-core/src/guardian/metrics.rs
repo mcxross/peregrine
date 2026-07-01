@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use std::time::Duration;
 
 use codex_analytics::GuardianApprovalRequestSource;

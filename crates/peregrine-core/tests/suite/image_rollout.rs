@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use anyhow::Context;
 use core_test_support::responses;
 use core_test_support::responses::ev_assistant_message;

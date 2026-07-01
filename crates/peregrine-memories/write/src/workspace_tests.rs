@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use codex_git_utils::GitBaselineChange;
 use codex_git_utils::GitBaselineChangeStatus;

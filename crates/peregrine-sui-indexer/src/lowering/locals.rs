@@ -24,6 +24,7 @@ pub fn lower_locals(
         .collect()
 }
 
+#[allow(clippy::only_used_in_recursion)]
 fn signature_token_label(module: &CompiledModule, token: &SignatureToken) -> String {
     match token {
         SignatureToken::Bool => "bool".to_string(),

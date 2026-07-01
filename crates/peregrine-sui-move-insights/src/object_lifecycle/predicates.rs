@@ -149,9 +149,7 @@ fn object_identity_names(body: &str, object_names: &BTreeSet<String>) -> BTreeSe
         };
 
         let name = raw_name
-            .split_whitespace()
-            .filter(|part| *part != "mut")
-            .next_back()
+            .split_whitespace().rfind(|part| *part != "mut")
             .unwrap_or("")
             .trim_matches(|character: char| !is_identifier_character(character));
 

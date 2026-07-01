@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use codex_model_provider_info::ModelProviderInfo;
 use codex_model_provider_info::WireApi;
 use core_test_support::responses::ev_completed;

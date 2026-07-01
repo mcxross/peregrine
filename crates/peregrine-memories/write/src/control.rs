@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use std::path::Path;
 
 pub async fn clear_memory_roots_contents(peregrine_home: &Path) -> std::io::Result<()> {

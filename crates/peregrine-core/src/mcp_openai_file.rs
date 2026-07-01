@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 //! Bridges Apps SDK-style `openai/fileParams` metadata into Peregrine's MCP flow.
 //!
 //! Strategy:

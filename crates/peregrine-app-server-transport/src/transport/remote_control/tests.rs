@@ -1,3 +1,6 @@
+#![allow(clippy::result_large_err)]
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::enroll::REMOTE_CONTROL_ACCOUNT_ID_HEADER;
 use super::enroll::REMOTE_CONTROL_INSTALLATION_ID_HEADER;
 use super::enroll::RemoteControlEnrollment;

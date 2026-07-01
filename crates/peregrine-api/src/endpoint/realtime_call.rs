@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::auth::SharedAuthProvider;
 use crate::endpoint::realtime_websocket::RealtimeSessionConfig;
 use crate::endpoint::realtime_websocket::session_update_session_json;

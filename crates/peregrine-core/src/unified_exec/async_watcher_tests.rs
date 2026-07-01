@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::split_valid_utf8_prefix_with_max;
 
 use pretty_assertions::assert_eq;

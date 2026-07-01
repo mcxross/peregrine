@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 //! Verifies that parent and spawned subagent Responses API requests carry the expected window,
 //! parent-thread, and subagent identity headers.
 

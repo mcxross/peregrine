@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::grant_read_root_non_elevated;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use peregrine_types::models::PermissionProfile;

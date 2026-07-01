@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use anyhow::Result;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;

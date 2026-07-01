@@ -6,6 +6,7 @@ impl GraphBuilder {
         })
     }
 
+#[allow(clippy::too_many_arguments)]
     fn record_state_type_accesses(
         &mut self,
         function_id: &str,

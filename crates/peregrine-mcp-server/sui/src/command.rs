@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::adapter::SecurityCommand;
 use peregrine_sui_mcp_protocol::{CommandResult, CommandStatus, MAX_OUTPUT_BYTES, PackageSummary};
 use std::{process::Stdio, time::Duration};

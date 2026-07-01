@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use std::sync::Arc;
 
 use peregrine_config::codex_compat;

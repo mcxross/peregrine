@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use codex_git_utils::merge_base_with_head;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_template::Template;

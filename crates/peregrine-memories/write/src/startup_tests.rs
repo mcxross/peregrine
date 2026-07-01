@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::start_memories_startup_task;
 use codex_features::Feature;
 use codex_git_utils::diff_since_latest_init;

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::CHANNEL_CAPACITY;
 use super::TransportEvent;
 use super::next_connection_id;

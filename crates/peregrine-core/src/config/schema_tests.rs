@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::canonicalize;
 use super::config_schema_json;
 use super::write_config_schema;

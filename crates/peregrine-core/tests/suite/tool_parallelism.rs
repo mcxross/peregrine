@@ -1,3 +1,4 @@
+#![allow(clippy::expect_used)]
 #![cfg(not(target_os = "windows"))]
 #![allow(clippy::unwrap_used)]
 

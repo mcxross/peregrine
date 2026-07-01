@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use crate::sandboxing::SandboxPermissions;
 use codex_network_proxy::BlockedRequestArgs;

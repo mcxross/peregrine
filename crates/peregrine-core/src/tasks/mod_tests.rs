@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::TASK_COMPACT_METRIC;
 use super::emit_compact_metric;
 use super::emit_turn_memory_metric;

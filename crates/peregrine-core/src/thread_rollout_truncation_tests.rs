@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use crate::session::tests::make_session_and_context;
 use peregrine_types::AgentPath;

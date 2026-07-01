@@ -1,3 +1,4 @@
+#![allow(clippy::unnecessary_cast, clippy::redundant_closure_for_method_calls)]
 //! Session headers, onboarding guidance, and transcript cards.
 
 use super::*;

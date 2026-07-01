@@ -670,8 +670,7 @@ async fn maybe_request_peregrine_apps_auth_elicitation(
     auth_elicitation_completed_result(&plan.auth_failure, result.meta)
 }
 
-#[expect(
-    clippy::await_holding_invalid_type,
+#[allow(clippy::await_holding_invalid_type,
     reason = "Peregrine Apps cache refresh reads through the session-owned manager guard"
 )]
 async fn refresh_peregrine_apps_after_connector_auth(sess: &Session, turn_context: &TurnContext) {
@@ -695,8 +694,7 @@ async fn refresh_peregrine_apps_after_connector_auth(sess: &Session, turn_contex
     }
 }
 
-#[expect(
-    clippy::await_holding_invalid_type,
+#[allow(clippy::await_holding_invalid_type,
     reason = "MCP sandbox metadata reads through the session-owned manager guard"
 )]
 async fn augment_mcp_tool_request_meta_with_sandbox_state(
@@ -1403,8 +1401,7 @@ async fn mcp_tool_approval_decision_from_guardian(
     }
 }
 
-#[expect(
-    clippy::await_holding_invalid_type,
+#[allow(clippy::await_holding_invalid_type,
     reason = "MCP approval metadata reads through the session-owned manager guard"
 )]
 pub(crate) async fn lookup_mcp_tool_metadata(
@@ -1498,8 +1495,7 @@ fn get_mcp_app_resource_uri(
     })
 }
 
-#[expect(
-    clippy::await_holding_invalid_type,
+#[allow(clippy::await_holding_invalid_type,
     reason = "MCP app metadata reads through the session-owned manager guard"
 )]
 async fn lookup_mcp_app_usage_metadata(

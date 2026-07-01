@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::AppServerTransport;
 use super::CHANNEL_CAPACITY;
 use super::TransportEvent;

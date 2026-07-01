@@ -1,3 +1,4 @@
+#![allow(clippy::large_enum_variant)]
 use super::session::AgentServerSessions;
 use peregrine_app_server_client::{AppServerClient, AppServerEvent};
 use peregrine_app_server_protocol::{JSONRPCErrorError, ServerNotification, ServerRequest};

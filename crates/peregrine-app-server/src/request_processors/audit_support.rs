@@ -41,7 +41,7 @@ pub(super) fn coverage_gaps(
             let binding = capabilities
                 .iter()
                 .find(|binding| binding.capability == *capability)?;
-            (!binding.available).then(|| (capability, binding))
+            (!binding.available).then_some((capability, binding))
         })
         .map(|(capability, binding)| AuditCoverageGap {
             capability: capability.clone(),

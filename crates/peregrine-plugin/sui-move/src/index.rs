@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use bm25::{Document, Language, SearchEngine, SearchEngineBuilder};
 use include_dir::{Dir, DirEntry};
 use serde::{Deserialize, Serialize};

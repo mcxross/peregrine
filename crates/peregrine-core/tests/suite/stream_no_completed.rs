@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 //! Verifies that the agent retries when the SSE stream terminates before
 //! delivering a `response.completed` event.
 

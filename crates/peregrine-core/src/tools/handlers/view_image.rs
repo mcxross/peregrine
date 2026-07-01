@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use codex_utils_image::PromptImageMode;
 use codex_utils_image::load_for_prompt_bytes;
 use peregrine_types::items::ImageViewItem;

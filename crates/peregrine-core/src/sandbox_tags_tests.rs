@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::permission_profile_policy_tag;
 use super::permission_profile_sandbox_tag;
 use codex_sandboxing::SandboxType;

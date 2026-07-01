@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use crate::compact::InitialContextInjection;
 use crate::environment_selection::ResolvedTurnEnvironments;
@@ -549,8 +551,7 @@ async fn process_compacted_history_preserves_separate_guardian_developer_message
 
 #[tokio::test]
 #[cfg(unix)]
-#[expect(
-    clippy::await_holding_invalid_type,
+#[allow(clippy::await_holding_invalid_type,
     reason = "test mutates active turn state directly to seed granted permissions"
 )]
 async fn shell_command_allows_sticky_turn_permissions_without_inline_request_permissions_feature() {

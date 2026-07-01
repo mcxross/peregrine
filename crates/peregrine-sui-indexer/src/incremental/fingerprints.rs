@@ -70,7 +70,7 @@ fn directory_hash(root: &Path, extensions: &[&str]) -> IndexerResult<Option<Stri
         .filter(|path| {
             path.extension()
                 .and_then(|extension| extension.to_str())
-                .is_some_and(|extension| extensions.iter().any(|allowed| extension == *allowed))
+                .is_some_and(|extension| extensions.contains(&extension))
         })
         .collect::<Vec<_>>();
     entries.sort();

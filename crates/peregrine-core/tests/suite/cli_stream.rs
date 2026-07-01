@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use assert_cmd::Command as AssertCommand;
 use codex_git_utils::collect_git_info;
 use codex_login::OPENAI_API_KEY_ENV_VAR as PEREGRINE_API_KEY_ENV_VAR;

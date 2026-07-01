@@ -151,6 +151,7 @@ impl AuditStore {
         result
     }
 
+#[allow(clippy::too_many_arguments)]
     pub fn record_capability_gap(
         &self,
         run_id: &str,
@@ -268,7 +269,7 @@ impl AuditStore {
                 category: activity.category,
                 message: activity.message,
                 stage: stage_for_work_item(run, work_item_id.as_deref()),
-                work_item_id: work_item_id,
+                work_item_id,
                 artifact_ref: Some(evidence_ref.clone()),
                 agent_role: None,
                 tool_name: activity.tool_name,

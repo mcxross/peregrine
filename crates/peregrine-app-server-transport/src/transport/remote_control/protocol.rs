@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::outgoing_message::OutgoingMessage;
 use peregrine_app_server_protocol::JSONRPCMessage;
 use serde::Deserialize;

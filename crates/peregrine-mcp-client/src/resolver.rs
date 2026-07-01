@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use peregrine_config::{
     CONFIG_TOML_FILE, DEFAULT_MCP_SERVER_ENVIRONMENT_ID, McpServerConfig, McpServerTransportConfig,
     config_toml::ConfigToml,
@@ -75,7 +77,7 @@ pub fn resolve_mcp_config(options: McpClientOptions) -> io::Result<ResolvedMcpCo
     let mut servers = config.mcp_servers.into_iter().collect::<BTreeMap<_, _>>();
     let tools = config.tools.clone();
     let (mode, adapter) = sui_settings(tools.clone());
-    let (move_analyzer_mode, move_analyzer_adapter) = move_analyzer_settings(tools.clone());
+    let (move_analyzer_mode, move_analyzer_adapter) = move_analyzer_settings(tools);
     if mode == SuiToolsMode::Disabled {
         servers.remove(SERVER_NAME);
     } else {

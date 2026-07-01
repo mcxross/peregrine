@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 //! TUI keymap config schema and canonical key-spec normalization.
 //!
 //! This module defines the on-disk `[tui.keymap]` contract used by

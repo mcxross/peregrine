@@ -207,8 +207,8 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                         "source_map_precision": format!("{:?}", operation_span.precision),
                     })),
                 });
-                if kind == OperationKind::Call {
-                    if let Some(target) = target.as_deref() {
+                if kind == OperationKind::Call
+                    && let Some(target) = target.as_deref() {
                         let edge_target = resolve_call_edge_target(&function_ids, target)
                             .unwrap_or_else(|| target.to_string());
                         program.edges.push(Edge {
@@ -232,9 +232,8 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                         });
                         emit_call_tag(program, &operation_id, target, operation_span.clone());
                     }
-                }
-                if matches!(kind, OperationKind::Pack | OperationKind::Unpack) {
-                    if let Some(target) = target.as_deref() {
+                if matches!(kind, OperationKind::Pack | OperationKind::Unpack)
+                    && let Some(target) = target.as_deref() {
                         let edge_target = resolve_type_edge_target(&type_ids, target)
                             .unwrap_or_else(|| target.to_string());
                         let edge_type = if kind == OperationKind::Pack {
@@ -267,7 +266,6 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                             metadata_json: Some(serde_json::json!({ "target": target })),
                         });
                     }
-                }
                 if let Some((field_target, is_mutable)) = field_borrow_target(&module, bytecode) {
                     let edge_target = resolve_field_edge_target(&field_ids, &field_target)
                         .unwrap_or_else(|| field_target.clone());
@@ -368,12 +366,10 @@ pub fn enrich_program_from_build(program: &mut ProgramIndex, build_root: &Path) 
                             | Bytecode::MutBorrowFieldGeneric(_)
                             | Bytecode::ImmBorrowField(_)
                             | Bytecode::ImmBorrowFieldGeneric(_)
-                    ) =>
-                    {
-                        if !matches!(bytecode, Bytecode::ReadRef | Bytecode::WriteRef) {
+                    )
+                        && !matches!(bytecode, Bytecode::ReadRef | Bytecode::WriteRef) => {
                             pending_field_reference = None;
                         }
-                    }
                     _ => {}
                 }
                 emit_operation_tag(program, &operation_id, &kind, operation_span);

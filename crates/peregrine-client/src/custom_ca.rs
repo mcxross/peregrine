@@ -1,3 +1,4 @@
+#![allow(clippy::expect_used)]
 //! Custom CA handling for Peregrine outbound HTTP and websocket clients.
 //!
 //! Peregrine constructs outbound reqwest clients and secure websocket connections in a few crates, but

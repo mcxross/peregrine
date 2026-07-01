@@ -1,3 +1,4 @@
+#![allow(clippy::expect_used)]
 use bytes::Bytes;
 use http::Method;
 use reqwest::header::HeaderMap;

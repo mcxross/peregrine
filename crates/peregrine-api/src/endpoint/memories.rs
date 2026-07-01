@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::auth::SharedAuthProvider;
 use crate::common::MemorySummarizeInput;
 use crate::common::MemorySummarizeOutput;

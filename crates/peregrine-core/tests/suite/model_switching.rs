@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use anyhow::Result;
 use codex_features::Feature;
 use codex_login::CodexAuth as PeregrineAuth;

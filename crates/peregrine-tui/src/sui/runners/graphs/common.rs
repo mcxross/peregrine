@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::{
     output::{CliDiagnostic, CliStatus, CliStep, EXIT_SUCCESS, elapsed_ms},
     sui::{

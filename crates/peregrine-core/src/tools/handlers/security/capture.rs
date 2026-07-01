@@ -114,7 +114,7 @@ fn provider_id(tool_name: &ToolName) -> String {
     tool_name
         .namespace
         .as_ref()
-        .map_or_else(|| "native".to_string(), |namespace| namespace.clone())
+        .map_or_else(|| "native".to_string(), std::clone::Clone::clone)
 }
 
 fn verification_method(tool_name: &str) -> VerificationMethod {

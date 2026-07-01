@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use codex_utils_absolute_path::test_support::PathExt;
 use peregrine_audit_store::AuditStore;

@@ -113,7 +113,7 @@ fun test_init() {}
             Some(temp.path().join("build/demo")),
         );
 
-        assert!(report.scanner_report.objects.capability_findings.len() >= 1);
+        assert!(!report.scanner_report.objects.capability_findings.is_empty());
         assert!(report.scanner_report.tests.has_unit_tests);
         assert_eq!(report.scanner_report.tests.unit_test_count, 1);
         assert!(report.attack_surface.capability_count >= 1);

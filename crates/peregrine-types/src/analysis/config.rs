@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::model::Severity;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -254,7 +256,7 @@ mod tests {
     #[test]
     fn plugin_config_defaults_to_global_plugins() {
         let config = toml::from_str::<AnalysisConfig>("[analysis.plugins]\npaths = []\n")
-            .expect("config")
+            .unwrap()
             .with_defaults();
 
         assert!(config.analysis.plugins.use_global);
@@ -269,17 +271,17 @@ mod tests {
 severity = "error"
 "#,
         )
-        .expect("config")
+        .unwrap()
         .with_defaults();
 
         let severity = config
             .analysis
             .rulesets
             .get("complexity")
-            .expect("complexity")
+            .unwrap()
             .rules
             .get("function_complexity")
-            .expect("function complexity")
+            .unwrap()
             .severity
             .clone();
 
@@ -294,14 +296,14 @@ severity = "error"
 severity = "error"
 "#,
         )
-        .expect("config")
+        .unwrap()
         .with_defaults();
 
         let severity = config
             .analysis
             .rulesets
             .get("unchecked_return")
-            .expect("unchecked return")
+            .unwrap()
             .rule_config("unchecked_return")
             .severity;
 

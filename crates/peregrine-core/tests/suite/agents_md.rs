@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use anyhow::Result;
 use codex_exec_server::CreateDirectoryOptions;
 use core_test_support::responses::ev_completed;

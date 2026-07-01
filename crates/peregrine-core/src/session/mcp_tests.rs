@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use rmcp::model::BooleanSchema;
 use rmcp::model::ElicitationSchema;

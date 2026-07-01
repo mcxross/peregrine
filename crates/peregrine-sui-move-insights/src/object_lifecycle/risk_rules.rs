@@ -175,7 +175,7 @@ fn combined_stage_evidence(stages: &[ObjectLifecycleStage], kinds: &[&str]) -> V
     evidence
 }
 
-fn sort_function_refs(functions: &mut Vec<ObjectLifecycleFunctionRef>) {
+fn sort_function_refs(functions: &mut [ObjectLifecycleFunctionRef]) {
     functions.sort_by(|left, right| {
         right
             .direct

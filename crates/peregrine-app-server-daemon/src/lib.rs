@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::match_like_matches_macro)]
 mod backend;
 mod client;
 mod managed_install;

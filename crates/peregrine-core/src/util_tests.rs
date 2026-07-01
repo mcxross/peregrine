@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use codex_feedback::FeedbackRequestTags;
 use codex_feedback::emit_feedback_request_tags;

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 #![cfg(target_os = "macos")]
 
 use codex_sandboxing::SandboxType;

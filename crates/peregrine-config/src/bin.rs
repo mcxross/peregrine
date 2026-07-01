@@ -11,6 +11,6 @@ async fn main() {
     .await
     {
         Ok(_) => println!("Successfully enabled plugin!"),
-        Err(e) => println!("Error: {}", e),
+        Err(e) => println!("Error: {e}"),
     }
 }

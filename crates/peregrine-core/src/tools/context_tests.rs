@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use core_test_support::assert_regex_match;
 use peregrine_types::models::DEFAULT_IMAGE_DETAIL;

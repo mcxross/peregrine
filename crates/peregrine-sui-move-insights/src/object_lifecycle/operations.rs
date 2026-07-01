@@ -101,9 +101,7 @@ fn constructed_value_names(body: &str, type_name: &str) -> BTreeSet<String> {
         };
 
         let name = raw_name
-            .split_whitespace()
-            .filter(|part| *part != "mut")
-            .next_back()
+            .split_whitespace().rfind(|part| *part != "mut")
             .unwrap_or("")
             .trim_matches(|character: char| !is_identifier_character(character));
 

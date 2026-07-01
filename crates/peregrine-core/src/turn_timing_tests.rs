@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use peregrine_types::items::AgentMessageItem;
 use peregrine_types::items::TurnItem;
 use peregrine_types::models::ContentItem;

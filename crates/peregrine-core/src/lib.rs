@@ -1,3 +1,4 @@
+#![allow(clippy::result_large_err)]
 //! Root of the `peregrine-core` library.
 
 // Prevent accidental direct writes to stdout/stderr in library code. All

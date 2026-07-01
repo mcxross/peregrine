@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use peregrine_types::AgentPath;
 use pretty_assertions::assert_eq;

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use peregrine_api::OpenAiVerbosity;
 use peregrine_api::ResponsesApiRequest;
 use peregrine_api::TextControls;

@@ -977,6 +977,7 @@ fn compact_signature(name: &str, value: &Value) -> String {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn summary_artifact(
     package_id: &str,
     package_alias: String,

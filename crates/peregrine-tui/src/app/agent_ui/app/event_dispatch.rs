@@ -1,3 +1,4 @@
+#![allow(clippy::redundant_clone, clippy::redundant_pattern_matching)]
 //! AppEvent dispatch for the TUI app.
 //!
 //! This module contains the exhaustive `AppEvent` dispatcher and exit-mode handling. Large domain

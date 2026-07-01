@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use crate::plugins::test_support::load_plugins_config;
 use crate::plugins::test_support::write_curated_plugin;

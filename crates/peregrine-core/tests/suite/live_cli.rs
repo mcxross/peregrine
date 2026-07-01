@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 #![expect(clippy::expect_used)]
 
 //! Optional smoke tests that hit the real OpenAI /v1/responses endpoint. They are `#[ignore]` by

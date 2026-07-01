@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::RealtimeHandoffState;
 use super::RealtimeSessionKind;
 use super::realtime_delegation_from_handoff;

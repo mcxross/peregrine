@@ -340,7 +340,7 @@ pub fn is_function_declaration(tokens: &[Token], index: usize) -> bool {
     previous_significant(tokens, index).is_some_and(|previous| previous.text == "fun")
 }
 
-pub fn qualified_call_module<'a>(tokens: &'a [Token], index: usize) -> Option<&'a str> {
+pub fn qualified_call_module(tokens: &[Token], index: usize) -> Option<&str> {
     if index >= 2 && tokens[index - 1].text == "::" && token_is_identifier(&tokens[index - 2].text)
     {
         Some(tokens[index - 2].text.as_str())
@@ -406,7 +406,7 @@ pub fn token_line_span(source: &str, token: &Token, base_span: Option<Span>) -> 
 
 pub fn has_test_attribute_near(source: &str, start: usize) -> bool {
     let window_start = source[..start.min(source.len())]
-        .rfind(|character| matches!(character, '}' | ';'))
+        .rfind(['}', ';'])
         .map(|index| index + 1)
         .unwrap_or(0);
     let prefix = &source[window_start..start.min(source.len())];
@@ -575,7 +575,7 @@ fn collect_let_annotation_types(body: &str, types: &mut BTreeMap<String, String>
         else {
             continue;
         };
-        if !tokens.get(index + 2).is_some_and(|token| token.text == ":") {
+        if tokens.get(index + 2).is_none_or(|token| token.text != ":") {
             continue;
         }
         let Some(type_token) = tokens.get(index + 3) else {

@@ -64,7 +64,7 @@ impl Rule for TypeConversionRule {
     }
 }
 
-fn cast_source_name<'a>(tokens: &'a [Token], cast_index: usize) -> Option<&'a str> {
+fn cast_source_name(tokens: &[Token], cast_index: usize) -> Option<&str> {
     let previous = cast_index
         .checked_sub(1)
         .and_then(|index| tokens.get(index))?;

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::{
     BUNDLED_CORPUS,
     index::{KnowledgeIndex, should_index_path},
@@ -247,9 +249,9 @@ mod tests {
 
     #[test]
     fn bundled_install_excludes_eval_outputs() {
-        let home = tempfile::tempdir().expect("tempdir");
+        let home = tempfile::tempdir().unwrap();
 
-        let installed = install_bundled_plugin(home.path()).expect("install");
+        let installed = install_bundled_plugin(home.path()).unwrap();
 
         assert!(installed.root.join("index.json").is_file());
         assert!(installed.root.join(".codex-plugin/plugin.json").is_file());

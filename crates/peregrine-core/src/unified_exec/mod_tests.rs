@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::head_tail_buffer::HeadTailBuffer;
 use super::*;
 use crate::exec::ExecCapturePolicy;

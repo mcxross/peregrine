@@ -4,18 +4,17 @@ fn main() -> anyhow::Result<()> {
     let mut transport = peregrine_sui_mcp_server::TransportKind::Stdio;
 
     while let Some(arg) = args.next() {
-        if arg == "--transport" {
-            if let Some(kind) = args.next() {
+        if arg == "--transport"
+            && let Some(kind) = args.next() {
                 if kind == "sse" {
                     let port = 8765; // Default or parsed from config
                     transport = peregrine_sui_mcp_server::TransportKind::Sse { port };
                 } else if kind == "stdio" {
                     transport = peregrine_sui_mcp_server::TransportKind::Stdio;
                 } else {
-                    anyhow::bail!("Unknown transport: {}", kind);
+                    anyhow::bail!("Unknown transport: {kind}");
                 }
             }
-        }
     }
 
     peregrine_sui_mcp_server::run_server(transport)

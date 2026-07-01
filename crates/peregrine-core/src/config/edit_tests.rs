@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use peregrine_config::types::AppToolApproval;
 use peregrine_config::types::McpServerOAuthConfig;

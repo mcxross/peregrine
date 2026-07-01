@@ -1,3 +1,4 @@
+#![allow(clippy::result_large_err)]
 mod amazon_bedrock;
 mod auth;
 mod bearer_auth_provider;

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use crate::tools::sandboxing::SandboxAttempt;
 use codex_sandboxing::SandboxManager;

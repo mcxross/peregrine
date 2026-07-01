@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 pub(crate) mod agent_jobs;
 pub(crate) mod agent_jobs_spec;
 pub(crate) mod apply_patch;

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use std::sync::Arc;
 
 use codex_agent_identity::AgentIdentityKey;

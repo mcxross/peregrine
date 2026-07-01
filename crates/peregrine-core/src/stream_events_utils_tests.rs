@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::HandleOutputCtx;
 use super::TurnItemContributorPolicy;
 use super::completed_item_defers_mailbox_delivery_to_next_turn;

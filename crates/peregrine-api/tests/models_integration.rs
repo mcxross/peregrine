@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use http::HeaderMap;
 use http::Method;
 use peregrine_api::AuthProvider;

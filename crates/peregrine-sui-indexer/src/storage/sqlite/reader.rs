@@ -297,13 +297,13 @@ impl SqliteIndexReader {
              ORDER BY operations.function_id, operations.index_in_function
              LIMIT ?3",
         )?;
-        let rows = stmt
+        
+        stmt
             .query_map(
                 params![package_id, tag, budget.max_operations as i64],
                 operation_from_row,
             )?
-            .collect();
-        rows
+            .collect()
     }
 
     pub fn get_functions_by_tag(
@@ -320,13 +320,13 @@ impl SqliteIndexReader {
              ORDER BY functions.full_name
              LIMIT ?3",
         )?;
-        let rows = stmt
+        
+        stmt
             .query_map(
                 params![package_id, tag, budget.max_callees as i64],
                 symbol_from_row,
             )?
-            .collect();
-        rows
+            .collect()
     }
 
     pub fn get_public_entry_functions(
@@ -339,8 +339,8 @@ impl SqliteIndexReader {
              WHERE package_id = ?1 AND is_entry = 1
              ORDER BY full_name",
         )?;
-        let rows = stmt.query_map([package_id], symbol_from_row)?.collect();
-        rows
+        
+        stmt.query_map([package_id], symbol_from_row)?.collect()
     }
 
     pub fn search_symbols(
@@ -360,10 +360,10 @@ impl SqliteIndexReader {
                SELECT id, 'module' AS kind, full_name, '' AS visibility, 0 AS is_entry FROM modules WHERE package_id = ?1 AND full_name LIKE ?2
              ) ORDER BY full_name LIMIT ?3",
         )?;
-        let rows = stmt
+        
+        stmt
             .query_map(params![package_id, like, limit], symbol_from_row)?
-            .collect();
-        rows
+            .collect()
     }
 
     pub fn get_summary_artifact_pointer(
@@ -462,7 +462,7 @@ impl SqliteIndexReader {
             trimmed = true;
             trim_reasons.push("call_depth_limited".to_string());
         }
-        if nodes.len() >= budget.max_callees + 1 {
+        if nodes.len() > budget.max_callees {
             trimmed = true;
             trim_reasons.push("callee_count_limited".to_string());
         }
@@ -479,8 +479,8 @@ impl SqliteIndexReader {
             "SELECT id, package_id, severity, source, message, source_span_json, metadata_json
              FROM diagnostics WHERE package_id = ?1 ORDER BY severity, source, message",
         )?;
-        let rows = stmt.query_map([package_id], diagnostic_from_row)?.collect();
-        rows
+        
+        stmt.query_map([package_id], diagnostic_from_row)?.collect()
     }
 
     fn index_layers_for_package(
@@ -638,8 +638,8 @@ impl SqliteIndexReader {
             "SELECT id, 'type', full_name, kind, 0 FROM types WHERE module_id = ?1 ORDER BY full_name"
         };
         let mut stmt = self.connection.prepare(sql)?;
-        let rows = stmt.query_map([module_id], symbol_from_row)?.collect();
-        rows
+        
+        stmt.query_map([module_id], symbol_from_row)?.collect()
     }
 
     fn fields_for_type(&self, type_id: &str) -> rusqlite::Result<Vec<crate::core::FieldInfo>> {
@@ -647,8 +647,8 @@ impl SqliteIndexReader {
             "SELECT id, package_id, module_id, type_id, name, type_name, source_span_json
              FROM fields WHERE type_id = ?1 ORDER BY name",
         )?;
-        let rows = stmt.query_map([type_id], field_from_row)?.collect();
-        rows
+        
+        stmt.query_map([type_id], field_from_row)?.collect()
     }
 
     fn tags_for_target(&self, target_id: &str) -> rusqlite::Result<Vec<SemanticTag>> {
@@ -656,10 +656,10 @@ impl SqliteIndexReader {
             "SELECT id, package_id, target_id, tag, source_span_json, metadata_json
              FROM semantic_tags WHERE target_id = ?1 ORDER BY tag",
         )?;
-        let rows = stmt
+        
+        stmt
             .query_map([target_id], semantic_tag_from_row)?
-            .collect();
-        rows
+            .collect()
     }
 
     fn operations_for_function(
@@ -671,10 +671,10 @@ impl SqliteIndexReader {
             "SELECT id, package_id, function_id, index_in_function, kind, display, target, source_span_json, metadata_json
              FROM operations WHERE function_id = ?1 ORDER BY index_in_function LIMIT ?2",
         )?;
-        let rows = stmt
+        
+        stmt
             .query_map(params![function_id, limit as i64], operation_from_row)?
-            .collect();
-        rows
+            .collect()
     }
 
     fn operation_count(&self, function_id: &str) -> rusqlite::Result<usize> {
@@ -753,10 +753,10 @@ impl SqliteIndexReader {
         let mut stmt = self.connection.prepare(
             "SELECT DISTINCT to_id FROM edges WHERE from_id = ?1 AND edge_type = ?2 ORDER BY to_id LIMIT ?3",
         )?;
-        let rows = stmt
+        
+        stmt
             .query_map(params![function_id, edge_type, limit], |row| row.get(0))?
-            .collect();
-        rows
+            .collect()
     }
 
     fn operation_histogram(
@@ -766,15 +766,15 @@ impl SqliteIndexReader {
         let mut stmt = self.connection.prepare(
             "SELECT kind, COUNT(*) FROM operations WHERE function_id = ?1 GROUP BY kind ORDER BY kind",
         )?;
-        let rows = stmt
+        
+        stmt
             .query_map([function_id], |row| {
                 Ok(OperationHistogramEntry {
                     kind: row.get(0)?,
                     count: row.get::<_, i64>(1)? as usize,
                 })
             })?
-            .collect();
-        rows
+            .collect()
     }
 
     fn related_types_for_function(
@@ -881,10 +881,10 @@ impl SqliteIndexReader {
             "SELECT {target_column} FROM edges WHERE {source_column} = ?1 AND edge_type = 'Calls' ORDER BY {target_column} LIMIT ?2"
         );
         let mut stmt = self.connection.prepare(&sql)?;
-        let rows = stmt
+        
+        stmt
             .query_map(params![id, limit as i64], |row| row.get(0))?
-            .collect();
-        rows
+            .collect()
     }
 }
 

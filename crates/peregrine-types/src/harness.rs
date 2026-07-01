@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -848,7 +850,7 @@ mod tests {
             metadata: Metadata::new(),
         };
 
-        let encoded = serde_json::to_value(manifest).expect("manifest json");
+        let encoded = serde_json::to_value(manifest).unwrap();
         assert_eq!(encoded["reducerId"], "staticAnalysis");
         assert_eq!(encoded["inputSchema"]["type"], "object");
     }
@@ -875,7 +877,7 @@ mod tests {
             metadata: Metadata::new(),
         };
 
-        let encoded = serde_json::to_value(packet).expect("audit session json");
+        let encoded = serde_json::to_value(packet).unwrap();
         assert_eq!(encoded["schemaVersion"], 1);
         assert_eq!(encoded["selectedChainAdapter"], "sui/move");
         assert_eq!(encoded["targetModules"][0], "vault");

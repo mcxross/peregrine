@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::artifacts::MovePackageContext;
 use notify::{Event, RecursiveMode, Watcher};
 use peregrine_analysis::{
@@ -96,18 +98,16 @@ async fn run_watcher(
                         // Filter for .move and Move.toml
                         let mut needs_rebuild = false;
                         for path in &event.paths {
-                            if let Some(ext) = path.extension() {
-                                if ext == "move" {
+                            if let Some(ext) = path.extension()
+                                && ext == "move" {
                                     needs_rebuild = true;
                                     break;
                                 }
-                            }
-                            if let Some(name) = path.file_name() {
-                                if name == "Move.toml" {
+                            if let Some(name) = path.file_name()
+                                && name == "Move.toml" {
                                     needs_rebuild = true;
                                     break;
                                 }
-                            }
                         }
 
                         if needs_rebuild {
@@ -147,7 +147,7 @@ async fn run_watcher(
                         }
                     }
                     Err(e) => {
-                        eprintln!("watch error: {:?}", e);
+                        eprintln!("watch error: {e:?}");
                     }
                 }
             }

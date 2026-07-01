@@ -43,7 +43,7 @@ pub fn harden_program_index(
         &coverage,
         &integrity,
         full_mode_requested,
-        &readiness,
+        readiness,
     );
     health
 }

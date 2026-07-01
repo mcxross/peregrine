@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::{
     CorpusIndex, KNOWLEDGE_ROOT_ENV, KnowledgeIndex, MAX_RESPONSE_TOKENS, MAX_SEARCH_RESULTS,
     tool_definitions, tool_name,
@@ -269,7 +271,7 @@ mod tests {
 
     #[tokio::test]
     async fn read_requires_indexed_chunk_id() {
-        let server = SuiMoveKnowledgeServer::bundled().expect("server");
+        let server = SuiMoveKnowledgeServer::bundled().unwrap();
 
         let result = server
             .dispatch(
@@ -284,7 +286,7 @@ mod tests {
 
     #[tokio::test]
     async fn search_is_bounded() {
-        let server = SuiMoveKnowledgeServer::bundled().expect("server");
+        let server = SuiMoveKnowledgeServer::bundled().unwrap();
 
         let result = server
             .dispatch(
@@ -296,15 +298,15 @@ mod tests {
                 ),
             )
             .await
-            .expect("search");
+            .unwrap();
 
         let results = result
             .structured_content
-            .expect("structured")
+            .unwrap()
             .get("results")
             .and_then(Value::as_array)
             .cloned()
-            .expect("results");
+            .unwrap();
         assert!(results.len() <= MAX_SEARCH_RESULTS);
     }
 }

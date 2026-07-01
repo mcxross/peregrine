@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 mod delegate;
 mod execute_handler;
 pub(crate) mod execute_spec;

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 //! Schema-heavy configuration TOML types used by Peregrine.
 
 use std::collections::BTreeMap;

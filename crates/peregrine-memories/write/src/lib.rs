@@ -1,3 +1,4 @@
+#![allow(clippy::result_large_err)]
 //! Write-path implementation for Peregrine memories.
 //!
 //! This crate owns the startup memory pipeline, file-backed memory artifact

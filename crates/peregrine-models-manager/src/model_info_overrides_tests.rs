@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use crate::ModelsManagerConfig;
 use crate::manager::ModelsManager;
 use peregrine_types::openai_models::TruncationPolicyConfig;

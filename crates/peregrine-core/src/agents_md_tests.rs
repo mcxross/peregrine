@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
 use super::*;
 use crate::config::ConfigBuilder;
 use codex_exec_server::LOCAL_FS;

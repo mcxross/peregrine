@@ -20,6 +20,7 @@ impl AnalyzerPluginRegistry {
         PluginRegistry::default_root()
     }
 
+#[allow(clippy::should_implement_trait)]
     pub fn default() -> Result<Self, String> {
         Ok(Self {
             registry: PluginRegistry::default()?,
