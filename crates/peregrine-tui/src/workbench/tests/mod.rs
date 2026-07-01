@@ -1,6 +1,7 @@
 use super::{
-    App, AppMode, CommandInput, EditorBuffer, EditorMode, Explorer, FocusPane, TuiSettings,
-    VimState, WorkbenchExit, WorkbenchTab, GraphTab, load_editor_mode_from_home, load_theme_from_home,
+    App, AppMode, CommandInput, EditorBuffer, EditorMode, Explorer, FocusPane, GraphTab,
+    TuiSettings, VimState, WorkbenchExit, WorkbenchTab, load_editor_mode_from_home,
+    load_theme_from_home,
 };
 use crate::bootstrap::is_helper_arg;
 use crate::chat;
@@ -1223,10 +1224,8 @@ fn graph_tab_ready_document_scrolls_vertically_and_horizontally() {
         .join("\n");
     app.set_active_tab(WorkbenchTab::Graphs);
     app.graphs.active_tab = GraphTab::TypeGraph;
-    app.graphs.set_ready(
-        GraphTab::TypeGraph,
-        GraphDocument::new("type graph", text),
-    );
+    app.graphs
+        .set_ready(GraphTab::TypeGraph, GraphDocument::new("type graph", text));
 
     let backend = TestBackend::new(100, 28);
     let mut terminal = Terminal::new(backend).expect("terminal");

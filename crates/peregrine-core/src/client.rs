@@ -1314,7 +1314,8 @@ impl ModelClientSession {
             {
                 Ok(new_conn) => new_conn,
                 Err(err) => {
-                    if matches!(err, ApiError::Transport(ref t) if matches!(**t, TransportError::Timeout)) {
+                    if matches!(err, ApiError::Transport(ref t) if matches!(**t, TransportError::Timeout))
+                    {
                         self.reset_websocket_session();
                     }
                     return Err(err);
@@ -1427,8 +1428,7 @@ impl ModelClientSession {
                     );
                     return Ok(stream);
                 }
-                Err(ApiError::Transport(transport))
-                    if matches!(&*transport, TransportError::Http { status, .. } if *status == StatusCode::UNAUTHORIZED) =>
+                Err(ApiError::Transport(transport)) if matches!(&*transport, TransportError::Http { status, .. } if *status == StatusCode::UNAUTHORIZED) =>
                 {
                     let unauthorized_transport = *transport;
                     let response_debug_context =
@@ -1539,8 +1539,7 @@ impl ModelClientSession {
                     );
                     return Ok(stream);
                 }
-                Err(ApiError::Transport(transport))
-                    if matches!(&*transport, TransportError::Http { status, .. } if *status == StatusCode::UNAUTHORIZED) =>
+                Err(ApiError::Transport(transport)) if matches!(&*transport, TransportError::Http { status, .. } if *status == StatusCode::UNAUTHORIZED) =>
                 {
                     let unauthorized_transport = *transport;
                     let response_debug_context =
@@ -1735,13 +1734,11 @@ impl ModelClientSession {
                 .await
             {
                 Ok(_) => {}
-                Err(ApiError::Transport(transport))
-                    if matches!(&*transport, TransportError::Http { status, .. } if *status == StatusCode::UPGRADE_REQUIRED) =>
+                Err(ApiError::Transport(transport)) if matches!(&*transport, TransportError::Http { status, .. } if *status == StatusCode::UPGRADE_REQUIRED) =>
                 {
                     return Ok(WebsocketStreamOutcome::FallbackToHttp);
                 }
-                Err(ApiError::Transport(transport))
-                    if matches!(&*transport, TransportError::Http { status, .. } if *status == StatusCode::UNAUTHORIZED) =>
+                Err(ApiError::Transport(transport)) if matches!(&*transport, TransportError::Http { status, .. } if *status == StatusCode::UNAUTHORIZED) =>
                 {
                     let unauthorized_transport = *transport;
                     pending_retry = PendingUnauthorizedRetry::from_recovery(
@@ -2444,7 +2441,11 @@ async fn handle_unauthorized(
 
 fn api_error_http_status(error: &ApiError) -> Option<u16> {
     match error {
-        ApiError::Transport(transport) if let TransportError::Http { status, .. } = &**transport => Some(status.as_u16()),
+        ApiError::Transport(transport)
+            if let TransportError::Http { status, .. } = &**transport =>
+        {
+            Some(status.as_u16())
+        }
         _ => None,
     }
 }

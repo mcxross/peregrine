@@ -263,7 +263,6 @@ impl ResponsesWebsocketConnection {
 
         let current_span = Span::current();
         tokio::spawn(
-
             async move {
                 if let Some(model) = server_model {
                     let _ = tx_event.send(Ok(ResponseEvent::ServerModel(model))).await;
@@ -855,7 +854,8 @@ mod tests {
             headers,
             body,
             ..
-        } = *transport else {
+        } = *transport
+        else {
             panic!("expected TransportError::Http");
         };
 

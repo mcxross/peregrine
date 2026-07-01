@@ -1077,18 +1077,19 @@ fn function_lifecycle_events(
             &function.signature,
             &object.type_name,
             &object.qualified_name,
-        ) {
-            events.push((
-                ObjectLifecycleStageKind::Mutated,
-                evidence_for_function(
-                    function,
-                    format!(
-                        "{} mutates state keyed by {} identity",
-                        function.qualified_name, object.type_name
-                    ),
+        )
+    {
+        events.push((
+            ObjectLifecycleStageKind::Mutated,
+            evidence_for_function(
+                function,
+                format!(
+                    "{} mutates state keyed by {} identity",
+                    function.qualified_name, object.type_name
                 ),
-            ));
-        }
+            ),
+        ));
+    }
 
     if function_operation_touches_type(
         function,
@@ -1707,7 +1708,8 @@ fn object_identity_names(body: &str, object_names: &BTreeSet<String>) -> BTreeSe
         };
 
         let name = raw_name
-            .split_whitespace().rfind(|part| *part != "mut")
+            .split_whitespace()
+            .rfind(|part| *part != "mut")
             .unwrap_or("")
             .trim_matches(|character: char| !is_identifier_character(character));
 
@@ -1917,7 +1919,8 @@ fn constructed_value_names(body: &str, type_name: &str) -> BTreeSet<String> {
         };
 
         let name = raw_name
-            .split_whitespace().rfind(|part| *part != "mut")
+            .split_whitespace()
+            .rfind(|part| *part != "mut")
             .unwrap_or("")
             .trim_matches(|character: char| !is_identifier_character(character));
 

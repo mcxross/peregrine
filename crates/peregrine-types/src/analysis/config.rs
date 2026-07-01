@@ -12,7 +12,6 @@ pub struct AnalysisConfig {
     pub analysis: AnalysisSection,
 }
 
-
 impl AnalysisConfig {
     pub fn load_from_package(package_path: impl AsRef<Path>) -> Result<Self, String> {
         let config_path = package_path.as_ref().join("peregrine.toml");

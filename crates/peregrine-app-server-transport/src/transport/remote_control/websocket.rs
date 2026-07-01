@@ -1609,6 +1609,7 @@ mod tests {
     use crate::transport::remote_control::protocol::StreamId;
     use crate::transport::remote_control::protocol::normalize_remote_control_url;
     use chrono::Utc;
+    use codex_login::AuthCredentialsStoreMode;
     use codex_login::AuthDotJson;
     use codex_login::CodexAuth;
     use codex_login::save_auth;
@@ -1621,7 +1622,6 @@ mod tests {
     use peregrine_app_server_protocol::JSONRPCMessage;
     use peregrine_app_server_protocol::JSONRPCNotification;
     use peregrine_app_server_protocol::ServerNotification;
-    use codex_login::AuthCredentialsStoreMode;
     use peregrine_core::test_support::auth_manager_from_auth;
     use pretty_assertions::assert_eq;
     use std::sync::Arc;

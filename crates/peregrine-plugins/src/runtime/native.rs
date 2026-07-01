@@ -3,8 +3,6 @@ use libloading::Library;
 use serde::Serialize;
 use std::{path::Path, slice};
 
-
-
 #[repr(C)]
 pub struct NativePluginBuffer {
     pub ptr: *mut u8,
