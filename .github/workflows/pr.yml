@@ -44,11 +44,11 @@ jobs:
       - name: Check Formatting
         run: cargo fmt --check
 
+      - name: Prepare Sidecars and Build TUI
+        run: bun run build:tui
+
       - name: Lint with Clippy
         run: cargo clippy --workspace -- -D warnings
 
       - name: Run Tests
         run: cargo test --workspace
-
-      - name: Prepare Sidecars and Build TUI
-        run: bun run build:tui
