@@ -7,9 +7,14 @@ on:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '**/*.md'
+      - '.github/ISSUE_TEMPLATE/**'
+      - 'docs/**'
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
 
 jobs:
   check-and-test:
@@ -24,10 +29,16 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Check Formatting
+        run: cargo fmt --check
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Install mold linker
+        uses: rui314/setup-mold@v1
 
       - name: Install System Dependencies (Ubuntu)
         if: runner.os == 'Linux'
@@ -38,20 +49,11 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Install Bun dependencies
-        run: bun install
-
-      - name: Check Formatting
-        run: cargo fmt --check
-
-      - name: Prepare Sidecars and Build TUI
-        run: bun scripts/prepare-sidecars.ts --include-tui
-
       - name: Lint with Clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace --locked -- -D warnings
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
 
       - name: Run Tests
-        run: cargo nextest run --workspace
+        run: cargo nextest run --workspace --locked
