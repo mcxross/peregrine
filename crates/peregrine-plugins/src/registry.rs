@@ -29,6 +29,7 @@ impl PluginRegistry {
         platform_config_root().map(|root| root.join(APP_CONFIG_DIR_NAME))
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Result<Self, String> {
         Ok(Self {
             root: Self::default_root()?,

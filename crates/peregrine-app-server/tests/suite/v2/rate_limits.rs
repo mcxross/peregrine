@@ -15,7 +15,7 @@ use peregrine_app_server_protocol::RateLimitWindow;
 use peregrine_app_server_protocol::RequestId;
 use peregrine_app_server_protocol::SendAddCreditsNudgeEmailParams;
 use peregrine_app_server_protocol::SendAddCreditsNudgeEmailResponse;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use peregrine_types::account::PlanType as AccountPlanType;
 use pretty_assertions::assert_eq;
 use serde_json::json;

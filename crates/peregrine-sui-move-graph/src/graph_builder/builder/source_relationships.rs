@@ -120,7 +120,7 @@ impl GraphBuilder {
         let mut type_parameters = BTreeMap::new();
 
         for (type_parameter, constraints) in &function.signature.type_parameters {
-            let id = type_parameter_id(&function_id, &type_parameter.value.to_string());
+            let id = type_parameter_id(&function_id, type_parameter.value.as_ref());
 
             self.type_nodes
                 .entry(id.clone())
@@ -257,7 +257,7 @@ impl GraphBuilder {
         let mut type_parameters = BTreeMap::new();
 
         for type_parameter in &move_struct.type_parameters {
-            let id = type_parameter_id(&struct_id, &type_parameter.name.value.to_string());
+            let id = type_parameter_id(&struct_id, type_parameter.name.value.as_ref());
 
             self.type_nodes
                 .entry(id.clone())
@@ -368,7 +368,7 @@ impl GraphBuilder {
         let mut type_parameters = BTreeMap::new();
 
         for type_parameter in &move_enum.type_parameters {
-            let id = type_parameter_id(&enum_id, &type_parameter.name.value.to_string());
+            let id = type_parameter_id(&enum_id, type_parameter.name.value.as_ref());
 
             self.type_nodes
                 .entry(id.clone())

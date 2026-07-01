@@ -946,19 +946,16 @@ fn resolve_managed_address(
     config: &SuiClientConfig,
     identity: &KeyIdentity,
 ) -> Result<SuiAddress, anyhow::Error> {
-    if let Ok(address) = config.keystore.get_by_identity(identity) {
-        if config.keystore.addresses().contains(&address) {
+    if let Ok(address) = config.keystore.get_by_identity(identity)
+        && config.keystore.addresses().contains(&address) {
             return Ok(address);
         }
-    }
 
-    if let Some(external_keys) = config.external_keys.as_ref() {
-        if let Ok(address) = external_keys.get_by_identity(identity) {
-            if external_keys.addresses().contains(&address) {
+    if let Some(external_keys) = config.external_keys.as_ref()
+        && let Ok(address) = external_keys.get_by_identity(identity)
+            && external_keys.addresses().contains(&address) {
                 return Ok(address);
             }
-        }
-    }
 
     bail!("No managed Sui address found for {identity}.")
 }

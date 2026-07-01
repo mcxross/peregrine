@@ -35,7 +35,7 @@ use peregrine_app_server_protocol::ServerNotification;
 use peregrine_app_server_protocol::ServerRequest;
 use peregrine_app_server_protocol::TurnCompletedNotification;
 use peregrine_app_server_protocol::TurnStatus;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use peregrine_types::account::PlanType as AccountPlanType;
 use pretty_assertions::assert_eq;
 use serde_json::json;

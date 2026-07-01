@@ -19,6 +19,7 @@ pub struct EagerCache {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub enum PackageState {
     Analyzing(watch::Receiver<Option<Arc<EngineAnalysisReport>>>),
     Ready(Arc<EngineAnalysisReport>),

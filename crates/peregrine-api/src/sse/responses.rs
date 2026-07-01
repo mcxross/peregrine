@@ -249,6 +249,7 @@ fn json_value_as_string(value: &Value) -> Option<String> {
 }
 
 #[derive(Debug)]
+#[allow(clippy::result_large_err)]
 pub enum ResponsesEventError {
     Api(ApiError),
 }

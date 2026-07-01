@@ -103,7 +103,7 @@ impl GraphBuilder {
                                     self.record_state_field_access(
                                         function,
                                         type_id,
-                                        &field_name.0.value.to_string(),
+                                        field_name.0.value.as_ref(),
                                         "read",
                                         span.clone(),
                                         vec![format!(
@@ -186,7 +186,7 @@ impl GraphBuilder {
                         self.record_state_field_access(
                             function,
                             type_id,
-                            &field_name.0.value.to_string(),
+                            field_name.0.value.as_ref(),
                             "write",
                             span.clone(),
                             vec![format!(
@@ -302,7 +302,7 @@ impl GraphBuilder {
                 self.record_field_access_from_receiver(
                     function,
                     receiver,
-                    &field.value.to_string(),
+                    field.value.as_ref(),
                     "read",
                     source_span(
                         &function.module.source,
@@ -410,7 +410,7 @@ impl GraphBuilder {
                             self.record_state_field_access(
                                 function,
                                 type_id,
-                                &field_name.0.value.to_string(),
+                                field_name.0.value.as_ref(),
                                 "read",
                                 span.clone(),
                                 vec![format!(

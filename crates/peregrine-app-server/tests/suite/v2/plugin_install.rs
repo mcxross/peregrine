@@ -30,7 +30,7 @@ use peregrine_app_server_protocol::PluginAvailability;
 use peregrine_app_server_protocol::PluginInstallParams;
 use peregrine_app_server_protocol::PluginInstallResponse;
 use peregrine_app_server_protocol::RequestId;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use pretty_assertions::assert_eq;
 use rmcp::handler::server::ServerHandler;
 use rmcp::model::JsonObject;

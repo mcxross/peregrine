@@ -28,7 +28,7 @@ use peregrine_app_server_protocol::TurnStartParams;
 use peregrine_app_server_protocol::TurnStartResponse;
 use peregrine_app_server_protocol::TurnStatus;
 use peregrine_app_server_protocol::UserInput;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use pretty_assertions::assert_eq;
 use serde_json::Value;
 use serde_json::json;

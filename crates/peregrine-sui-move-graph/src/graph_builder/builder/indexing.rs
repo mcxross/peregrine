@@ -51,7 +51,7 @@ impl GraphBuilder {
             Some(&module.package_path),
             module.address.as_deref(),
             &module.module_name,
-            &function.name.0.value.to_string(),
+            function.name.0.value.as_ref(),
         );
         let node = MoveCallGraphNode {
             id: id.clone(),
@@ -63,7 +63,7 @@ impl GraphBuilder {
             qualified_name: qualified_member(
                 module.address.as_deref(),
                 &module.module_name,
-                &function.name.0.value.to_string(),
+                function.name.0.value.as_ref(),
             ),
             file_path: Some(module.file_path.clone()),
             visibility: visibility.clone(),

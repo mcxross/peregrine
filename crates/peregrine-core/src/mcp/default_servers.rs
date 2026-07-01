@@ -266,7 +266,7 @@ enabled = false
     }
 
     fn test_default_server() -> codex_compat::McpServerConfig {
-        let server = default_peregrine_server(None, &SuiAdapterSettings::default());
+        let server = default_peregrine_server(None, &SuiAdapterSettings::default(), None);
         let servers = HashMap::from([(SERVER_NAME.to_string(), server)]);
         codex_compat::mcp_server_config_map_to_codex(&servers)
             .remove(SERVER_NAME)

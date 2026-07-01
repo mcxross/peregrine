@@ -36,7 +36,7 @@ pub fn map_api_error(err: ApiError) -> PeregrineErr {
         }
         ApiError::InvalidRequest { message } => PeregrineErr::InvalidRequest(message),
         ApiError::CyberPolicy { message } => PeregrineErr::CyberPolicy { message },
-        ApiError::Transport(transport) => match transport {
+        ApiError::Transport(transport) => match *transport {
             TransportError::Http {
                 status,
                 url,

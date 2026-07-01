@@ -17593,6 +17593,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clap",
+ "codex-app-server-protocol",
  "codex-login",
  "codex-state",
  "codex-uds",

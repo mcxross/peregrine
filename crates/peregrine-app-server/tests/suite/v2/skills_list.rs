@@ -8,7 +8,7 @@ use app_test_support::create_mock_responses_server_repeating_assistant;
 use app_test_support::to_response;
 use app_test_support::write_chatgpt_auth;
 use app_test_support::write_mock_responses_config_toml_with_chatgpt_base_url;
-use codex_exec_server::PEREGRINE_EXEC_SERVER_URL_ENV_VAR;
+use codex_exec_server::CODEX_EXEC_SERVER_URL_ENV_VAR;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use peregrine_app_server_protocol::JSONRPCResponse;
 use peregrine_app_server_protocol::PluginListParams;
@@ -20,7 +20,7 @@ use peregrine_app_server_protocol::SkillsExtraRootsSetResponse;
 use peregrine_app_server_protocol::SkillsListParams;
 use peregrine_app_server_protocol::SkillsListResponse;
 use peregrine_app_server_protocol::ThreadStartParams;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::time::timeout;
@@ -416,7 +416,7 @@ async fn skills_list_skips_cwd_roots_when_environment_disabled() -> Result<()> {
 
     let mut mcp = McpProcess::new_with_env(
         peregrine_home.path(),
-        &[(PEREGRINE_EXEC_SERVER_URL_ENV_VAR, Some("none"))],
+        &[(CODEX_EXEC_SERVER_URL_ENV_VAR, Some("none"))],
     )
     .await?;
     timeout(DEFAULT_TIMEOUT, mcp.initialize()).await??;
@@ -752,7 +752,7 @@ async fn skills_changed_notification_is_emitted_after_skill_change() -> Result<(
 
     let mut mcp = McpProcess::new_with_env(
         peregrine_home.path(),
-        &[(PEREGRINE_EXEC_SERVER_URL_ENV_VAR, None)],
+        &[(CODEX_EXEC_SERVER_URL_ENV_VAR, None)],
     )
     .await?;
     timeout(DEFAULT_TIMEOUT, mcp.initialize()).await??;

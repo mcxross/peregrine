@@ -118,7 +118,7 @@ impl GraphBuilder {
             Exp_::Dot(receiver, _, field) => self.record_field_access_from_receiver(
                 function,
                 receiver,
-                &field.value.to_string(),
+                field.value.as_ref(),
                 access_kind,
                 span,
             ),

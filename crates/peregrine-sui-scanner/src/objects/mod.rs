@@ -1071,8 +1071,8 @@ fn function_lifecycle_events(
         ));
     }
 
-    if let Some(body) = function.body.as_deref() {
-        if borrowed_identity_mutates_related_state(
+    if let Some(body) = function.body.as_deref()
+        && borrowed_identity_mutates_related_state(
             body,
             &function.signature,
             &object.type_name,
@@ -1089,7 +1089,6 @@ fn function_lifecycle_events(
                 ),
             ));
         }
-    }
 
     if function_operation_touches_type(
         function,
@@ -1504,7 +1503,7 @@ fn sort_evidence(evidence: &mut Vec<ObjectEvidence>) {
     evidence.dedup();
 }
 
-fn sort_function_refs(functions: &mut Vec<ObjectLifecycleFunctionRef>) {
+fn sort_function_refs(functions: &mut [ObjectLifecycleFunctionRef]) {
     functions.sort_by(|left, right| {
         right
             .direct
@@ -1708,9 +1707,7 @@ fn object_identity_names(body: &str, object_names: &BTreeSet<String>) -> BTreeSe
         };
 
         let name = raw_name
-            .split_whitespace()
-            .filter(|part| *part != "mut")
-            .next_back()
+            .split_whitespace().rfind(|part| *part != "mut")
             .unwrap_or("")
             .trim_matches(|character: char| !is_identifier_character(character));
 
@@ -1920,9 +1917,7 @@ fn constructed_value_names(body: &str, type_name: &str) -> BTreeSet<String> {
         };
 
         let name = raw_name
-            .split_whitespace()
-            .filter(|part| *part != "mut")
-            .next_back()
+            .split_whitespace().rfind(|part| *part != "mut")
             .unwrap_or("")
             .trim_matches(|character: char| !is_identifier_character(character));
 

@@ -19,7 +19,7 @@ fn module_aliases(module: &ModuleDefinition, current_address: &Option<String>) -
                 &mut aliases,
                 use_decl,
                 current_address,
-                &module.name.0.value.to_string(),
+                module.name.0.value.as_ref(),
             );
         }
     }
@@ -167,7 +167,7 @@ fn name_access_local_name(name: &NameAccessChain) -> Option<String> {
     }
 }
 
-fn name_access_type_arguments<'a>(name: &'a NameAccessChain, source: &str) -> Vec<String> {
+fn name_access_type_arguments(name: &NameAccessChain, source: &str) -> Vec<String> {
     name_access_types(name)
         .into_iter()
         .map(|type_| ast_type_source(type_, source))

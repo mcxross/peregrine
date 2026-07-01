@@ -2,7 +2,7 @@ use anyhow::Result;
 use app_test_support::ChatGptAuthFixture;
 use app_test_support::DEFAULT_CLIENT_NAME;
 use app_test_support::write_chatgpt_auth;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use peregrine_config::types::OtelExporterKind;
 use peregrine_config::types::OtelHttpProtocol;
 use peregrine_core::config::ConfigBuilder;

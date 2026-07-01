@@ -55,7 +55,7 @@ use peregrine_app_server_protocol::TurnStartParams;
 use peregrine_app_server_protocol::TurnStartResponse;
 use peregrine_app_server_protocol::TurnStatus;
 use peregrine_app_server_protocol::UserInput;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use peregrine_core::ARCHIVED_SESSIONS_SUBDIR;
 use peregrine_types::ThreadId;
 use peregrine_types::config_types::Personality;

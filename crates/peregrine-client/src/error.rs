@@ -3,6 +3,7 @@ use http::StatusCode;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+#[allow(clippy::result_large_err)]
 pub enum TransportError {
     #[error("http {status}: {body:?}")]
     Http {

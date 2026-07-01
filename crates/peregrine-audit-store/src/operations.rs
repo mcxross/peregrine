@@ -268,7 +268,7 @@ impl AuditStore {
                 category: activity.category,
                 message: activity.message,
                 stage: stage_for_work_item(run, work_item_id.as_deref()),
-                work_item_id: work_item_id.clone(),
+                work_item_id: work_item_id,
                 artifact_ref: Some(evidence_ref.clone()),
                 agent_role: None,
                 tool_name: activity.tool_name,
@@ -526,7 +526,7 @@ impl AuditStore {
             && let Ok(evidence) = self.read_work_evidence(run_id, evidence_ref)
         {
             let activity = evidence_activity(&evidence);
-            let work_item_id = evidence.work_item_id.clone();
+            let work_item_id = evidence.work_item_id;
             self.publish_event(AuditStoreEvent::Activity {
                 audit_id: run.id.clone(),
                 category: activity.category,
@@ -893,7 +893,7 @@ impl AuditStore {
                 action: "create audit artifact",
                 source,
             })?;
-        file.write_all(&bytes)
+        file.write_all(bytes)
             .map_err(|source| AuditStoreError::Io {
                 action: "write audit artifact",
                 source,

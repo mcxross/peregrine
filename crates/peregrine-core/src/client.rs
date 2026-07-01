@@ -930,7 +930,7 @@ impl ModelClient {
         .await
         {
             Ok(result) => result,
-            Err(_) => Err(ApiError::Transport(TransportError::Timeout)),
+            Err(_) => Err(ApiError::Transport(Box::new(TransportError::Timeout))),
         };
         let error_message = result.as_ref().err().map(telemetry_api_error_message);
         let response_debug = result
@@ -1314,7 +1314,7 @@ impl ModelClientSession {
             {
                 Ok(new_conn) => new_conn,
                 Err(err) => {
-                    if matches!(err, ApiError::Transport(TransportError::Timeout)) {
+                    if matches!(err, ApiError::Transport(ref t) if matches!(**t, TransportError::Timeout)) {
                         self.reset_websocket_session();
                     }
                     return Err(err);
@@ -1427,9 +1427,10 @@ impl ModelClientSession {
                     );
                     return Ok(stream);
                 }
-                Err(ApiError::Transport(
-                    unauthorized_transport @ TransportError::Http { status, .. },
-                )) if status == StatusCode::UNAUTHORIZED => {
+                Err(ApiError::Transport(transport))
+                    if matches!(&*transport, TransportError::Http { status, .. } if *status == StatusCode::UNAUTHORIZED) =>
+                {
+                    let unauthorized_transport = *transport;
                     let response_debug_context =
                         extract_response_debug_context(&unauthorized_transport);
                     inference_trace_attempt.record_failed(
@@ -1538,9 +1539,10 @@ impl ModelClientSession {
                     );
                     return Ok(stream);
                 }
-                Err(ApiError::Transport(
-                    unauthorized_transport @ TransportError::Http { status, .. },
-                )) if status == StatusCode::UNAUTHORIZED => {
+                Err(ApiError::Transport(transport))
+                    if matches!(&*transport, TransportError::Http { status, .. } if *status == StatusCode::UNAUTHORIZED) =>
+                {
+                    let unauthorized_transport = *transport;
                     let response_debug_context =
                         extract_response_debug_context(&unauthorized_transport);
                     inference_trace_attempt.record_failed(
@@ -1733,14 +1735,15 @@ impl ModelClientSession {
                 .await
             {
                 Ok(_) => {}
-                Err(ApiError::Transport(TransportError::Http { status, .. }))
-                    if status == StatusCode::UPGRADE_REQUIRED =>
+                Err(ApiError::Transport(transport))
+                    if matches!(&*transport, TransportError::Http { status, .. } if *status == StatusCode::UPGRADE_REQUIRED) =>
                 {
                     return Ok(WebsocketStreamOutcome::FallbackToHttp);
                 }
-                Err(ApiError::Transport(
-                    unauthorized_transport @ TransportError::Http { status, .. },
-                )) if status == StatusCode::UNAUTHORIZED => {
+                Err(ApiError::Transport(transport))
+                    if matches!(&*transport, TransportError::Http { status, .. } if *status == StatusCode::UNAUTHORIZED) =>
+                {
+                    let unauthorized_transport = *transport;
                     pending_retry = PendingUnauthorizedRetry::from_recovery(
                         handle_unauthorized(
                             unauthorized_transport,
@@ -2436,12 +2439,12 @@ async fn handle_unauthorized(
         debug.auth_error_code.as_deref(),
     );
 
-    Err(map_api_error(ApiError::Transport(transport)))
+    Err(map_api_error(ApiError::Transport(Box::new(transport))))
 }
 
 fn api_error_http_status(error: &ApiError) -> Option<u16> {
     match error {
-        ApiError::Transport(TransportError::Http { status, .. }) => Some(status.as_u16()),
+        ApiError::Transport(transport) if let TransportError::Http { status, .. } = &**transport => Some(status.as_u16()),
         _ => None,
     }
 }

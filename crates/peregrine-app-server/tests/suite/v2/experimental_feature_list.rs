@@ -22,7 +22,7 @@ use peregrine_app_server_protocol::RequestId;
 use peregrine_app_server_protocol::ThreadStartParams;
 use peregrine_app_server_protocol::ThreadStartResponse;
 use peregrine_config::LoaderOverrides;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use peregrine_core::config::ConfigBuilder;
 use pretty_assertions::assert_eq;
 use serde::de::DeserializeOwned;

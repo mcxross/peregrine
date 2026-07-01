@@ -994,6 +994,7 @@ mod tests {
             .resolve_context(&PackageArgs {
                 project_root: Some(outside.path().display().to_string()),
                 package_path: None,
+                unbounded: false,
             })
             .expect_err("workspace escape");
 

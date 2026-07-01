@@ -639,8 +639,8 @@ async fn streaming_client_does_not_retry_auth_build_error() -> Result<()> {
 
     assert!(matches!(
         err,
-        ApiError::Transport(TransportError::Build(message))
-            if message == "invalid auth configuration"
+        ApiError::Transport(transport)
+            if matches!(&*transport, TransportError::Build(message) if message == "invalid auth configuration")
     ));
     assert_eq!(auth.attempts(), 1);
     assert_eq!(state.take_stream_requests().len(), 0);

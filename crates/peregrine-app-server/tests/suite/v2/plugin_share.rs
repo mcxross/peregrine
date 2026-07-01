@@ -31,7 +31,7 @@ use peregrine_app_server_protocol::PluginShareUpdateTargetsResponse;
 use peregrine_app_server_protocol::PluginSource;
 use peregrine_app_server_protocol::PluginSummary;
 use peregrine_app_server_protocol::RequestId;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use tempfile::TempDir;

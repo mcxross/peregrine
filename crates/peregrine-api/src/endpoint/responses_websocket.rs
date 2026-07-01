@@ -213,10 +213,7 @@ impl ResponsesWebsocketConnection {
         skip_all,
         fields(transport = "responses_websocket", api.path = "responses")
     )]
-    #[expect(
-        clippy::await_holding_invalid_type,
-        reason = "the guard serializes exclusive use of the websocket while sending a request frame"
-    )]
+
     pub async fn send_response_processed(&self, response_id: String) -> Result<(), ApiError> {
         let request =
             ResponsesWsRequest::ResponseProcessed(ResponseProcessedWsRequest { response_id });
@@ -266,10 +263,7 @@ impl ResponsesWebsocketConnection {
 
         let current_span = Span::current();
         tokio::spawn(
-            #[expect(
-                clippy::await_holding_invalid_type,
-                reason = "the guard serializes exclusive use of the websocket stream for the lifetime of the response stream"
-            )]
+
             async move {
                 if let Some(model) = server_model {
                     let _ = tx_event.send(Ok(ResponseEvent::ServerModel(model))).await;
@@ -558,18 +552,18 @@ fn map_ws_error(err: WsError, url: &Url) -> ApiError {
                 .body()
                 .as_ref()
                 .and_then(|bytes| String::from_utf8(bytes.clone()).ok());
-            ApiError::Transport(TransportError::Http {
+            ApiError::Transport(Box::new(TransportError::Http {
                 status,
                 url: Some(url.to_string()),
                 headers: Some(headers),
                 body,
-            })
+            }))
         }
         WsError::ConnectionClosed | WsError::AlreadyClosed => {
             ApiError::Stream("websocket closed".to_string())
         }
-        WsError::Io(err) => ApiError::Transport(TransportError::Network(err.to_string())),
-        other => ApiError::Transport(TransportError::Network(other.to_string())),
+        WsError::Io(err) => ApiError::Transport(Box::new(TransportError::Network(err.to_string()))),
+        other => ApiError::Transport(Box::new(TransportError::Network(other.to_string()))),
     }
 }
 
@@ -628,12 +622,12 @@ fn map_wrapped_websocket_error_event(
         return None;
     }
 
-    Some(ApiError::Transport(TransportError::Http {
+    Some(ApiError::Transport(Box::new(TransportError::Http {
         status,
         url: None,
         headers: headers.map(json_headers_to_http_headers),
         body: Some(original_payload),
-    }))
+    })))
 }
 
 fn json_headers_to_http_headers(headers: JsonMap<String, Value>) -> HeaderMap {
@@ -853,14 +847,16 @@ mod tests {
         let api_error = map_wrapped_websocket_error_event(wrapped_error, payload)
             .expect("expected websocket error payload to map to ApiError");
 
-        let ApiError::Transport(TransportError::Http {
+        let ApiError::Transport(transport) = api_error else {
+            panic!("expected ApiError::Transport");
+        };
+        let TransportError::Http {
             status,
             headers,
             body,
             ..
-        }) = api_error
-        else {
-            panic!("expected ApiError::Transport(Http)");
+        } = *transport else {
+            panic!("expected TransportError::Http");
         };
 
         assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
@@ -912,8 +908,11 @@ mod tests {
             .expect("expected websocket error payload to be parsed");
         let api_error = map_wrapped_websocket_error_event(wrapped_error, payload)
             .expect("expected websocket error payload to map to ApiError");
-        let ApiError::Transport(TransportError::Http { status, body, .. }) = api_error else {
-            panic!("expected ApiError::Transport(Http)");
+        let ApiError::Transport(transport) = api_error else {
+            panic!("expected ApiError::Transport");
+        };
+        let TransportError::Http { status, body, .. } = *transport else {
+            panic!("expected TransportError::Http");
         };
         assert_eq!(status, StatusCode::BAD_REQUEST);
         let body = body.expect("expected body");

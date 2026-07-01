@@ -4,7 +4,6 @@ use crate::config::ModelsManagerConfig;
 use crate::model_info;
 use async_trait::async_trait;
 use codex_login::AuthManager;
-use peregrine_app_server_protocol::AuthMode;
 use peregrine_types::config_types::CollaborationModeMask;
 use peregrine_types::error::Result as CoreResult;
 use peregrine_types::openai_models::ModelInfo;
@@ -328,8 +327,8 @@ impl OpenAiModelsManager {
                 .iter()
                 .any(|model| model.visibility == ModelVisibility::List)
             && self.auth_manager.as_ref().is_some_and(|auth_manager| {
-                auth_manager.auth_mode().map_or(false, |mode| {
-                    let s = format!("{:?}", mode);
+                auth_manager.auth_mode().is_some_and(|mode| {
+                    let s = format!("{mode:?}");
                     s == "Chatgpt" || s == "ChatgptAuthTokens"
                 })
             });

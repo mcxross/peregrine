@@ -6,19 +6,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct AnalysisConfig {
     pub analysis: AnalysisSection,
 }
 
-impl Default for AnalysisConfig {
-    fn default() -> Self {
-        Self {
-            analysis: AnalysisSection::default(),
-        }
-    }
-}
 
 impl AnalysisConfig {
     pub fn load_from_package(package_path: impl AsRef<Path>) -> Result<Self, String> {

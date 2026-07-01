@@ -30,7 +30,7 @@ use peregrine_app_server_protocol::TurnCompletedNotification;
 use peregrine_app_server_protocol::TurnStartParams;
 use peregrine_app_server_protocol::TurnStartResponse;
 use peregrine_app_server_protocol::UserInput as V2UserInput;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use peregrine_types::models::ContentItem;
 use peregrine_types::models::ResponseItem;
 use pretty_assertions::assert_eq;

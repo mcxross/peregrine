@@ -197,7 +197,7 @@ fn module_fact(path: &Path, module: &CompiledModule) -> BytecodeModuleFact {
         .struct_defs()
         .iter()
         .enumerate()
-        .filter_map(|(index, definition)| {
+        .map(|(index, definition)| {
             let index = StructDefinitionIndex(index as u16);
             let handle = module.datatype_handle_at(definition.struct_handle);
             let type_name = module.identifier_at(handle.name).to_string();
@@ -209,7 +209,7 @@ fn module_fact(path: &Path, module: &CompiledModule) -> BytecodeModuleFact {
                 .unwrap_or(&name)
                 .to_string();
             let qualified_name = format!("{module_name}::{type_name}");
-            Some(BytecodeStructFact {
+            BytecodeStructFact {
                 address: address.clone(),
                 module_name,
                 type_name,
@@ -217,7 +217,7 @@ fn module_fact(path: &Path, module: &CompiledModule) -> BytecodeModuleFact {
                 full_name,
                 abilities: ability_labels(handle.abilities),
                 fields: struct_fields(module, index),
-            })
+            }
         })
         .collect();
     let functions = module

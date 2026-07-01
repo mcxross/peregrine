@@ -5,7 +5,7 @@ use app_test_support::create_mock_responses_server_sequence_unchecked;
 use app_test_support::to_response;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use codex_exec_server::PEREGRINE_EXEC_SERVER_URL_ENV_VAR;
+use codex_exec_server::CODEX_EXEC_SERVER_URL_ENV_VAR;
 use peregrine_app_server_protocol::CommandExecOutputDeltaNotification;
 use peregrine_app_server_protocol::CommandExecOutputStream;
 use peregrine_app_server_protocol::CommandExecParams;
@@ -408,7 +408,7 @@ async fn command_exec_returns_error_when_local_environment_is_disabled() -> Resu
     create_config_toml(peregrine_home.path(), &server.uri(), "never")?;
     let mut mcp = McpProcess::new_with_env(
         peregrine_home.path(),
-        &[(PEREGRINE_EXEC_SERVER_URL_ENV_VAR, Some("none"))],
+        &[(CODEX_EXEC_SERVER_URL_ENV_VAR, Some("none"))],
     )
     .await?;
     timeout(DEFAULT_READ_TIMEOUT, mcp.initialize()).await??;

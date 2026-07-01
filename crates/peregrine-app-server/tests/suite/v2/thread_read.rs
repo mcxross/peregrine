@@ -8,7 +8,7 @@ use app_test_support::test_absolute_path;
 use app_test_support::to_response;
 use codex_arg0::Arg0DispatchPaths;
 use codex_exec_server::EnvironmentManager;
-use codex_feedback::PeregrineFeedback;
+use codex_feedback::CodexFeedback;
 use codex_thread_store::AppendThreadItemsParams;
 use codex_thread_store::CreateThreadParams;
 use codex_thread_store::InMemoryThreadStore;
@@ -387,7 +387,7 @@ async fn thread_turns_list_reads_store_history_without_rollout_path_impl() -> Re
         strict_config: false,
         cloud_requirements: CloudRequirementsLoader::default(),
         thread_config_loader: Arc::new(peregrine_config::NoopThreadConfigLoader),
-        feedback: PeregrineFeedback::new(),
+        feedback: CodexFeedback::new(),
         log_db: None,
         state_db: None,
         environment_manager: Arc::new(EnvironmentManager::default_for_tests()),
@@ -461,7 +461,7 @@ async fn thread_read_loaded_include_turns_reads_store_history_without_rollout_pa
         strict_config: false,
         cloud_requirements: CloudRequirementsLoader::default(),
         thread_config_loader: Arc::new(peregrine_config::NoopThreadConfigLoader),
-        feedback: PeregrineFeedback::new(),
+        feedback: CodexFeedback::new(),
         log_db: None,
         state_db: None,
         environment_manager: Arc::new(EnvironmentManager::default_for_tests()),
@@ -554,7 +554,7 @@ async fn thread_list_includes_store_thread_without_rollout_path_impl() -> Result
         strict_config: false,
         cloud_requirements: CloudRequirementsLoader::default(),
         thread_config_loader: Arc::new(peregrine_config::NoopThreadConfigLoader),
-        feedback: PeregrineFeedback::new(),
+        feedback: CodexFeedback::new(),
         log_db: None,
         state_db: None,
         environment_manager: Arc::new(EnvironmentManager::default_for_tests()),

@@ -5,7 +5,7 @@ use app_test_support::create_mock_responses_server_sequence;
 use app_test_support::create_shell_command_sse_response;
 use app_test_support::format_with_current_shell_display;
 use app_test_support::to_response;
-use codex_exec_server::PEREGRINE_EXEC_SERVER_URL_ENV_VAR;
+use codex_exec_server::CODEX_EXEC_SERVER_URL_ENV_VAR;
 use codex_features::FEATURES;
 use codex_features::Feature;
 use peregrine_app_server_protocol::CommandExecutionApprovalDecision;
@@ -198,7 +198,7 @@ async fn thread_shell_command_returns_error_when_local_environment_is_disabled()
 
     let mut mcp = McpProcess::new_with_env(
         peregrine_home.as_path(),
-        &[(PEREGRINE_EXEC_SERVER_URL_ENV_VAR, Some("none"))],
+        &[(CODEX_EXEC_SERVER_URL_ENV_VAR, Some("none"))],
     )
     .await?;
     timeout(DEFAULT_READ_TIMEOUT, mcp.initialize()).await??;

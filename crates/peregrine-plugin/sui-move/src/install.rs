@@ -26,6 +26,7 @@ pub struct InstalledKnowledgePlugin {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct PluginManifest {
     name: String,
     version: String,
@@ -36,6 +37,7 @@ struct PluginManifest {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct PluginInterface {
     display_name: String,
     developer_name: String,

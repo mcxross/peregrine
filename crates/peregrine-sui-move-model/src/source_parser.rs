@@ -28,7 +28,7 @@ pub(crate) fn discover_modules_from_files(
     let mut modules = Vec::new();
 
     for path in source_files {
-        let Ok(source) = fs::read_to_string(&path) else {
+        let Ok(source) = fs::read_to_string(path) else {
             continue;
         };
 

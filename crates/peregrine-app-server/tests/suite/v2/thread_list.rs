@@ -620,7 +620,7 @@ sqlite = true
         .mark_backfill_complete(/*last_watermark*/ None)
         .await?;
     let rollout_config = codex_rollout::RolloutConfig {
-        peregrine_home: peregrine_home.path().to_path_buf(),
+        codex_home: peregrine_home.path().to_path_buf(),
         sqlite_home: peregrine_home.path().to_path_buf(),
         cwd: peregrine_home.path().to_path_buf(),
         model_provider_id: "mock_provider".to_string(),

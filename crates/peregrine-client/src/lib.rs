@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 mod chatgpt_cloudflare_cookies;
 mod chatgpt_hosts;
 mod custom_ca;

@@ -1621,7 +1621,7 @@ mod tests {
     use peregrine_app_server_protocol::JSONRPCMessage;
     use peregrine_app_server_protocol::JSONRPCNotification;
     use peregrine_app_server_protocol::ServerNotification;
-    use peregrine_config::types::AuthCredentialsStoreMode;
+    use codex_login::AuthCredentialsStoreMode;
     use peregrine_core::test_support::auth_manager_from_auth;
     use pretty_assertions::assert_eq;
     use std::sync::Arc;
@@ -1766,7 +1766,7 @@ mod tests {
         let fake_jwt = format!("{header_b64}.{payload_b64}.sig");
 
         AuthDotJson {
-            auth_mode: Some(AuthMode::Chatgpt),
+            auth_mode: Some(codex_app_server_protocol::AuthMode::Chatgpt),
             openai_api_key: None,
             tokens: Some(TokenData {
                 id_token: parse_chatgpt_jwt_claims(&fake_jwt).expect("fake jwt should parse"),

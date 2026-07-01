@@ -3,6 +3,8 @@ use libloading::Library;
 use serde::Serialize;
 use std::{path::Path, slice};
 
+
+
 #[repr(C)]
 pub struct NativePluginBuffer {
     pub ptr: *mut u8,
@@ -49,17 +51,21 @@ unsafe fn load_native_call(
     library: &Library,
     function_name: &str,
 ) -> Result<NativePluginCall, String> {
-    library
-        .get::<NativePluginCall>(function_name.as_bytes())
-        .map(|symbol| *symbol)
-        .map_err(|error| format!("Native plugin must export {function_name}: {error}"))
+    unsafe {
+        library
+            .get::<NativePluginCall>(function_name.as_bytes())
+            .map(|symbol| *symbol)
+            .map_err(|error| format!("Native plugin must export {function_name}: {error}"))
+    }
 }
 
 unsafe fn load_native_free(library: &Library) -> Result<NativePluginFree, String> {
-    library
-        .get::<NativePluginFree>(PLUGIN_FREE_EXPORT.as_bytes())
-        .map(|symbol| *symbol)
-        .map_err(|error| format!("Native plugin must export {PLUGIN_FREE_EXPORT}: {error}"))
+    unsafe {
+        library
+            .get::<NativePluginFree>(PLUGIN_FREE_EXPORT.as_bytes())
+            .map(|symbol| *symbol)
+            .map_err(|error| format!("Native plugin must export {PLUGIN_FREE_EXPORT}: {error}"))
+    }
 }
 
 fn read_native_plugin_output(

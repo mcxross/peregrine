@@ -19,17 +19,14 @@ pub struct ScanInput<'a> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Default)]
 pub enum SourceMode {
+    #[default]
     BestAvailable,
     CompilerOnly,
     SourceOnly,
 }
 
-impl Default for SourceMode {
-    fn default() -> Self {
-        Self::BestAvailable
-    }
-}
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

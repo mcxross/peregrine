@@ -293,6 +293,7 @@ mod tests {
             package: peregrine_sui_mcp_protocol::PackageArgs {
                 project_root: None,
                 package_path: None,
+                unbounded: false,
             },
             no_global_plugins: false,
             plugins: Vec::new(),

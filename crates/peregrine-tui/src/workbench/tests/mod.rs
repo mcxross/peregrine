@@ -1,6 +1,6 @@
 use super::{
     App, AppMode, CommandInput, EditorBuffer, EditorMode, Explorer, FocusPane, TuiSettings,
-    VimState, WorkbenchExit, WorkbenchTab, load_editor_mode_from_home, load_theme_from_home,
+    VimState, WorkbenchExit, WorkbenchTab, GraphTab, load_editor_mode_from_home, load_theme_from_home,
 };
 use crate::bootstrap::is_helper_arg;
 use crate::chat;
@@ -957,7 +957,7 @@ fn tab_bar_focus_changes_active_workbench_tab() {
     app.handle_key_event(key(KeyCode::Right));
     assert_eq!(app.active_tab, WorkbenchTab::Bytecode);
     app.handle_key_event(key(KeyCode::Left));
-    assert_eq!(app.active_tab, WorkbenchTab::Code);
+    assert_eq!(app.active_tab, WorkbenchTab::Editor);
     app.handle_key_event(key(KeyCode::Enter));
     assert_eq!(app.focus, FocusPane::FileTabs);
     app.handle_key_event(key(KeyCode::Enter));
@@ -979,7 +979,8 @@ fn workbench_never_renders_inspector_panel() {
     assert!(rendered.contains("Bytecode"));
     assert!(!rendered.contains("Inspector"));
 
-    app.set_active_tab(WorkbenchTab::Cfg);
+    app.set_active_tab(WorkbenchTab::Graphs);
+    app.graphs.active_tab = GraphTab::Cfg;
 
     let backend = TestBackend::new(120, 30);
     let mut terminal = Terminal::new(backend).expect("terminal");
@@ -1069,7 +1070,8 @@ fn mouse_clicking_tab_switches_view_without_staying_on_tabs() {
     let cfg_tab = app.layout.tab_hit_areas[2].1;
     app.handle_mouse_event(left_click(cfg_tab.x + 1, cfg_tab.y + 1));
 
-    assert_eq!(app.active_tab, WorkbenchTab::Cfg);
+    assert_eq!(app.active_tab, WorkbenchTab::Graphs);
+    assert_eq!(app.graphs.active_tab, GraphTab::Cfg);
     assert_eq!(app.focus, FocusPane::Editor);
 }
 
@@ -1194,17 +1196,17 @@ fn graph_loader_applies_background_result() {
     let mut app = App::new(temp.path(), EditorMode::Standard).expect("app");
     let expected = GraphDocument::new("type graph", "vault::Wallet".to_string());
     let (tx, rx) = mpsc::channel();
-    app.graphs.set_loading(WorkbenchTab::TypeGraph);
-    app.graph_loader_rx = Some((WorkbenchTab::TypeGraph, rx));
+    app.graphs.set_loading(GraphTab::TypeGraph);
+    app.graph_loader_rx = Some((GraphTab::TypeGraph, rx));
     tx.send(GraphLoadResult {
-        tab: WorkbenchTab::TypeGraph,
+        tab: GraphTab::TypeGraph,
         result: Ok(expected.clone()),
     })
     .expect("graph result");
 
     app.drain_graph_loader();
 
-    let Some(GraphPane::Ready(document)) = app.graphs.get(WorkbenchTab::TypeGraph) else {
+    let Some(GraphPane::Ready(document)) = app.graphs.get(GraphTab::TypeGraph) else {
         panic!("expected ready graph document");
     };
     assert_eq!(document, &expected);
@@ -1219,9 +1221,10 @@ fn graph_tab_ready_document_scrolls_vertically_and_horizontally() {
         .map(|line| format!("line {line:02} {}", "x".repeat(120)))
         .collect::<Vec<_>>()
         .join("\n");
-    app.set_active_tab(WorkbenchTab::TypeGraph);
+    app.set_active_tab(WorkbenchTab::Graphs);
+    app.graphs.active_tab = GraphTab::TypeGraph;
     app.graphs.set_ready(
-        WorkbenchTab::TypeGraph,
+        GraphTab::TypeGraph,
         GraphDocument::new("type graph", text),
     );
 
@@ -1233,7 +1236,7 @@ fn graph_tab_ready_document_scrolls_vertically_and_horizontally() {
     app.handle_mouse_event(scroll_down(graph_area.x, graph_area.y));
     app.handle_mouse_event(scroll_right(graph_area.x, graph_area.y));
 
-    let Some(GraphPane::Ready(document)) = app.graphs.get(WorkbenchTab::TypeGraph) else {
+    let Some(GraphPane::Ready(document)) = app.graphs.get(GraphTab::TypeGraph) else {
         panic!("expected ready graph document");
     };
     assert_eq!(document.scroll, MOUSE_VERTICAL_SCROLL_STEP);
@@ -1294,7 +1297,8 @@ fn workbench_prefix_selects_tabs_and_toggles_mode() {
 
     workbench_nav(&mut app, KeyCode::Char('3'));
     assert_eq!(app.focus, FocusPane::Editor);
-    assert_eq!(app.active_tab, WorkbenchTab::Cfg);
+    assert_eq!(app.active_tab, WorkbenchTab::Graphs);
+    assert_eq!(app.graphs.active_tab, GraphTab::Cfg);
 
     workbench_nav(&mut app, KeyCode::Char('m'));
     assert_eq!(app.editor_mode, EditorMode::Vim);
@@ -1308,7 +1312,7 @@ fn workbench_prefix_focuses_file_tabs_from_another_view() {
 
     workbench_nav(&mut app, KeyCode::Char('f'));
 
-    assert_eq!(app.active_tab, WorkbenchTab::Code);
+    assert_eq!(app.active_tab, WorkbenchTab::Editor);
     assert_eq!(app.focus, FocusPane::FileTabs);
 }
 
@@ -1320,7 +1324,8 @@ fn global_tab_shortcuts_preserve_current_focus() {
 
     app.handle_key_event(key_with_modifiers(KeyCode::Char('4'), KeyModifiers::ALT));
 
-    assert_eq!(app.active_tab, WorkbenchTab::CallGraph);
+    assert_eq!(app.active_tab, WorkbenchTab::Graphs);
+    assert_eq!(app.graphs.active_tab, GraphTab::CallGraph);
     assert_eq!(app.focus, FocusPane::Editor);
 }
 

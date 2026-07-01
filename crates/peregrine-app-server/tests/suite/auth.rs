@@ -13,7 +13,7 @@ use peregrine_app_server_protocol::JSONRPCError;
 use peregrine_app_server_protocol::JSONRPCResponse;
 use peregrine_app_server_protocol::LoginAccountResponse;
 use peregrine_app_server_protocol::RequestId;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use pretty_assertions::assert_eq;
 use std::path::Path;
 use tempfile::TempDir;

@@ -26,7 +26,7 @@ use peregrine_app_server_protocol::ThreadStatus;
 use peregrine_app_server_protocol::ThreadStatusChangedNotification;
 use peregrine_app_server_protocol::TurnEnvironmentParams;
 use peregrine_config::loader::project_trust_key;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use peregrine_core::config::set_project_trust_level;
 use peregrine_types::config_types::SERVICE_TIER_DEFAULT_REQUEST_VALUE;
 use peregrine_types::config_types::TrustLevel;

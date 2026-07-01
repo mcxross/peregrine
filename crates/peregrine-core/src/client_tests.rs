@@ -28,7 +28,7 @@ use futures::StreamExt;
 use peregrine_api::ApiError;
 use peregrine_api::ResponseEvent;
 use peregrine_model_provider::BearerAuthProvider;
-use peregrine_models_manager::AuthMode;
+use codex_app_server_protocol::AuthMode;
 use peregrine_types::SessionId;
 use peregrine_types::ThreadId;
 use peregrine_types::models::ContentItem;

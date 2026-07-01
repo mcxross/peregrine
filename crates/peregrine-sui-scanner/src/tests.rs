@@ -1157,16 +1157,14 @@ fn movy_hook_kind(function_name: &str) -> Option<(MovyHookKind, Option<String>)>
     if function_name == "movy_post_ptb" {
         return Some((MovyHookKind::SequencePost, Some("ptb".to_string())));
     }
-    if let Some(target) = function_name.strip_prefix("movy_pre_") {
-        if !target.is_empty() {
+    if let Some(target) = function_name.strip_prefix("movy_pre_")
+        && !target.is_empty() {
             return Some((MovyHookKind::FunctionPre, Some(target.to_string())));
         }
-    }
-    if let Some(target) = function_name.strip_prefix("movy_post_") {
-        if !target.is_empty() {
+    if let Some(target) = function_name.strip_prefix("movy_post_")
+        && !target.is_empty() {
             return Some((MovyHookKind::FunctionPost, Some(target.to_string())));
         }
-    }
     if function_name.starts_with("movy_oracle") {
         return Some((MovyHookKind::Oracle, None));
     }

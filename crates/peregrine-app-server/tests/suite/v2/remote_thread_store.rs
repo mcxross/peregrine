@@ -22,7 +22,7 @@ use app_test_support::create_mock_responses_server_repeating_assistant;
 use app_test_support::run_current_thread_test_with_stack;
 use codex_arg0::Arg0DispatchPaths;
 use codex_exec_server::EnvironmentManager;
-use codex_feedback::PeregrineFeedback;
+use codex_feedback::CodexFeedback;
 use codex_thread_store::InMemoryThreadStore;
 use peregrine_app_server::in_process;
 use peregrine_app_server::in_process::InProcessServerEvent;
@@ -86,7 +86,7 @@ async fn thread_start_with_non_local_thread_store_does_not_create_local_persiste
         strict_config: false,
         cloud_requirements: CloudRequirementsLoader::default(),
         thread_config_loader: Arc::new(NoopThreadConfigLoader),
-        feedback: PeregrineFeedback::new(),
+        feedback: CodexFeedback::new(),
         log_db: None,
         state_db: None,
         environment_manager: Arc::new(EnvironmentManager::default_for_tests()),

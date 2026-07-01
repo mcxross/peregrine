@@ -22,7 +22,7 @@ use peregrine_app_server_protocol::PluginShareDiscoverability;
 use peregrine_app_server_protocol::PluginSource;
 use peregrine_app_server_protocol::PluginSummary;
 use peregrine_app_server_protocol::RequestId;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use peregrine_core::config::set_project_trust_level;
 use peregrine_types::config_types::TrustLevel;
 use pretty_assertions::assert_eq;

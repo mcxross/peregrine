@@ -13,7 +13,7 @@ use peregrine_app_server_protocol::RemoteControlDisableResponse;
 use peregrine_app_server_protocol::RemoteControlEnableResponse;
 use peregrine_app_server_protocol::RemoteControlStatusReadResponse;
 use peregrine_app_server_protocol::RequestId;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::io::AsyncBufReadExt;

@@ -11,7 +11,7 @@ use codex_login::AuthDotJson;
 use codex_login::save_auth;
 use codex_login::token_data::TokenData;
 use codex_login::token_data::parse_chatgpt_jwt_claims;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use serde_json::json;
 
 /// Builder for writing a fake ChatGPT auth.json in tests.
@@ -169,7 +169,7 @@ pub fn write_chatgpt_auth(
     save_auth(
         peregrine_home,
         &auth,
-        peregrine_core::config::codex_auth_credentials_store_mode(cli_auth_credentials_store_mode),
+        cli_auth_credentials_store_mode,
     )
     .context("write auth.json")
 }

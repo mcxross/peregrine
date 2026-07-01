@@ -10,7 +10,7 @@ use app_test_support::write_chatgpt_auth;
 use axum::Router;
 use codex_arg0::Arg0DispatchPaths;
 use codex_exec_server::EnvironmentManager;
-use codex_feedback::PeregrineFeedback;
+use codex_feedback::CodexFeedback;
 use core_test_support::responses;
 use peregrine_app_server::in_process;
 use peregrine_app_server::in_process::InProcessStartArgs;
@@ -26,7 +26,7 @@ use peregrine_app_server_protocol::ThreadStartParams;
 use peregrine_app_server_protocol::ThreadStartResponse;
 use peregrine_config::CloudRequirementsLoader;
 use peregrine_config::LoaderOverrides;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use peregrine_core::config::ConfigBuilder;
 use peregrine_types::protocol::SessionSource;
 use pretty_assertions::assert_eq;
@@ -207,7 +207,7 @@ fn mcp_resource_read_returns_error_for_unknown_thread() -> Result<()> {
                 strict_config: false,
                 cloud_requirements: CloudRequirementsLoader::default(),
                 thread_config_loader: Arc::new(peregrine_config::NoopThreadConfigLoader),
-                feedback: PeregrineFeedback::new(),
+                feedback: CodexFeedback::new(),
                 log_db: None,
                 state_db: None,
                 environment_manager: Arc::new(EnvironmentManager::default_for_tests()),

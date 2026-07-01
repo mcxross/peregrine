@@ -5,9 +5,10 @@ use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+#[allow(clippy::result_large_err)]
 pub enum ApiError {
     #[error(transparent)]
-    Transport(#[from] TransportError),
+    Transport(Box<TransportError>),
     #[error("api error {status}: {message}")]
     Api { status: StatusCode, message: String },
     #[error("stream error: {0}")]
@@ -36,5 +37,11 @@ pub enum ApiError {
 impl From<RateLimitError> for ApiError {
     fn from(err: RateLimitError) -> Self {
         Self::RateLimit(err.to_string())
+    }
+}
+
+impl From<TransportError> for ApiError {
+    fn from(err: TransportError) -> Self {
+        Self::Transport(Box::new(err))
     }
 }

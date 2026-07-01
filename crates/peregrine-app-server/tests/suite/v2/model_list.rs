@@ -16,7 +16,7 @@ use peregrine_app_server_protocol::ModelServiceTier;
 use peregrine_app_server_protocol::ModelUpgradeInfo;
 use peregrine_app_server_protocol::ReasoningEffortOption;
 use peregrine_app_server_protocol::RequestId;
-use peregrine_config::types::AuthCredentialsStoreMode;
+use codex_login::AuthCredentialsStoreMode;
 use peregrine_types::openai_models::ModelInfo;
 use peregrine_types::openai_models::ModelPreset;
 use peregrine_types::openai_models::ModelsResponse;

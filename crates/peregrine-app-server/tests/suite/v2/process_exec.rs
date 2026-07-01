@@ -2,7 +2,7 @@ use anyhow::Context;
 use anyhow::Result;
 use app_test_support::McpProcess;
 use app_test_support::create_mock_responses_server_sequence_unchecked;
-use codex_exec_server::PEREGRINE_EXEC_SERVER_URL_ENV_VAR;
+use codex_exec_server::CODEX_EXEC_SERVER_URL_ENV_VAR;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use peregrine_app_server_protocol::ProcessExitedNotification;
 use peregrine_app_server_protocol::ProcessKillParams;
@@ -110,7 +110,7 @@ async fn process_spawn_returns_error_when_local_environment_is_disabled() -> Res
     create_config_toml(peregrine_home.path(), &server.uri(), "never")?;
     let mut mcp = McpProcess::new_with_env(
         peregrine_home.path(),
-        &[(PEREGRINE_EXEC_SERVER_URL_ENV_VAR, Some("none"))],
+        &[(CODEX_EXEC_SERVER_URL_ENV_VAR, Some("none"))],
     )
     .await?;
     timeout(DEFAULT_READ_TIMEOUT, mcp.initialize()).await??;

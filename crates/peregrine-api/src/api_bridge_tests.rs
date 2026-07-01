@@ -16,12 +16,12 @@ fn map_api_error_maps_server_overloaded_from_503_body() {
         }
     })
     .to_string();
-    let err = map_api_error(ApiError::Transport(TransportError::Http {
+    let err = map_api_error(ApiError::Transport(Box::new(TransportError::Http {
         status: http::StatusCode::SERVICE_UNAVAILABLE,
         url: Some("http://example.com/v1/responses".to_string()),
         headers: None,
         body: Some(body),
-    }));
+    })));
 
     assert!(matches!(err, PeregrineErr::ServerOverloaded));
 }
@@ -37,12 +37,12 @@ fn map_api_error_maps_cyber_policy_from_400_body() {
         }
     })
     .to_string();
-    let err = map_api_error(ApiError::Transport(TransportError::Http {
+    let err = map_api_error(ApiError::Transport(Box::new(TransportError::Http {
         status: http::StatusCode::BAD_REQUEST,
         url: Some("http://example.com/v1/responses".to_string()),
         headers: None,
         body: Some(body),
-    }));
+    })));
 
     let PeregrineErr::CyberPolicy { message } = err else {
         panic!("expected PeregrineErr::CyberPolicy, got {err:?}");
@@ -65,12 +65,12 @@ fn map_api_error_maps_wrapped_websocket_cyber_policy_from_400_body() {
         }
     })
     .to_string();
-    let err = map_api_error(ApiError::Transport(TransportError::Http {
+    let err = map_api_error(ApiError::Transport(Box::new(TransportError::Http {
         status: http::StatusCode::BAD_REQUEST,
         url: Some("ws://example.com/v1/responses".to_string()),
         headers: None,
         body: Some(body),
-    }));
+    })));
 
     let PeregrineErr::CyberPolicy { message } = err else {
         panic!("expected PeregrineErr::CyberPolicy, got {err:?}");
@@ -86,12 +86,12 @@ fn map_api_error_uses_cyber_policy_fallback_for_missing_message() {
         }
     })
     .to_string();
-    let err = map_api_error(ApiError::Transport(TransportError::Http {
+    let err = map_api_error(ApiError::Transport(Box::new(TransportError::Http {
         status: http::StatusCode::BAD_REQUEST,
         url: Some("http://example.com/v1/responses".to_string()),
         headers: None,
         body: Some(body),
-    }));
+    })));
 
     let PeregrineErr::CyberPolicy { message } = err else {
         panic!("expected PeregrineErr::CyberPolicy, got {err:?}");
@@ -111,12 +111,12 @@ fn map_api_error_keeps_unknown_400_errors_generic() {
         }
     })
     .to_string();
-    let err = map_api_error(ApiError::Transport(TransportError::Http {
+    let err = map_api_error(ApiError::Transport(Box::new(TransportError::Http {
         status: http::StatusCode::BAD_REQUEST,
         url: Some("http://example.com/v1/responses".to_string()),
         headers: None,
         body: Some(body.clone()),
-    }));
+    })));
 
     let PeregrineErr::InvalidRequest(message) = err else {
         panic!("expected PeregrineErr::InvalidRequest, got {err:?}");
@@ -142,12 +142,12 @@ fn map_api_error_maps_usage_limit_limit_name_header() {
         }
     })
     .to_string();
-    let err = map_api_error(ApiError::Transport(TransportError::Http {
+    let err = map_api_error(ApiError::Transport(Box::new(TransportError::Http {
         status: http::StatusCode::TOO_MANY_REQUESTS,
         url: Some("http://example.com/v1/responses".to_string()),
         headers: Some(headers),
         body: Some(body),
-    }));
+    })));
 
     let PeregrineErr::UsageLimitReached(usage_limit) = err else {
         panic!("expected PeregrineErr::UsageLimitReached, got {err:?}");
@@ -175,12 +175,12 @@ fn map_api_error_does_not_fallback_limit_name_to_limit_id() {
         }
     })
     .to_string();
-    let err = map_api_error(ApiError::Transport(TransportError::Http {
+    let err = map_api_error(ApiError::Transport(Box::new(TransportError::Http {
         status: http::StatusCode::TOO_MANY_REQUESTS,
         url: Some("http://example.com/v1/responses".to_string()),
         headers: Some(headers),
         body: Some(body),
-    }));
+    })));
 
     let PeregrineErr::UsageLimitReached(usage_limit) = err else {
         panic!("expected PeregrineErr::UsageLimitReached, got {err:?}");
@@ -211,12 +211,12 @@ fn map_api_error_ignores_unparseable_rate_limit_reached_type_headers() {
             }
         })
         .to_string();
-        let err = map_api_error(ApiError::Transport(TransportError::Http {
+        let err = map_api_error(ApiError::Transport(Box::new(TransportError::Http {
             status: http::StatusCode::TOO_MANY_REQUESTS,
             url: Some("http://example.com/v1/responses".to_string()),
             headers: Some(headers),
             body: Some(body),
-        }));
+        })));
 
         let PeregrineErr::UsageLimitReached(usage_limit) = err else {
             panic!("expected PeregrineErr::UsageLimitReached, got {err:?}");
@@ -241,12 +241,12 @@ fn map_api_error_extracts_identity_auth_details_from_headers() {
         http::HeaderValue::from_str(&x_error_json).expect("valid x-error-json header"),
     );
 
-    let err = map_api_error(ApiError::Transport(TransportError::Http {
+    let err = map_api_error(ApiError::Transport(Box::new(TransportError::Http {
         status: http::StatusCode::UNAUTHORIZED,
         url: Some("https://chatgpt.com/backend-api/codex/models".to_string()),
         headers: Some(headers),
         body: Some(r#"{"detail":"Unauthorized"}"#.to_string()),
-    }));
+    })));
 
     let PeregrineErr::UnexpectedStatus(err) = err else {
         panic!("expected PeregrineErr::UnexpectedStatus, got {err:?}");
