@@ -50,5 +50,8 @@ jobs:
       - name: Lint with Clippy
         run: cargo clippy --workspace -- -D warnings
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
       - name: Run Tests
-        run: cargo test --workspace
+        run: cargo nextest run --workspace
