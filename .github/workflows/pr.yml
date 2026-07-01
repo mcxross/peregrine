@@ -45,7 +45,7 @@ jobs:
         run: cargo fmt --check
 
       - name: Prepare Sidecars and Build TUI
-        run: bun run build:tui
+        run: bun scripts/prepare-sidecars.ts --include-tui
 
       - name: Lint with Clippy
         run: cargo clippy --workspace -- -D warnings
