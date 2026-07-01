@@ -1,10 +1,10 @@
+use codex_protocol::config_types::CollaborationModeMask;
+use codex_protocol::openai_models::ModelInfo;
+use codex_protocol::openai_models::ModelsResponse;
 use peregrine_models_manager::ModelsManagerConfig;
 use peregrine_models_manager::manager::ModelsManager;
 use peregrine_models_manager::manager::RefreshStrategy;
 use peregrine_models_manager::manager::SharedModelsManager;
-use codex_protocol::config_types::CollaborationModeMask;
-use codex_protocol::openai_models::ModelInfo;
-use codex_protocol::openai_models::ModelsResponse;
 use tokio::sync::TryLockError;
 
 const PEREGRINE_IDENTITY: &str = "You are Peregrine, a coding agent. You and the user share one workspace, and your job is to collaborate with them until their goal is genuinely handled.";

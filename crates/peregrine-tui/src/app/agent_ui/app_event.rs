@@ -752,7 +752,6 @@ pub(crate) enum AppEvent {
         model: Option<String>,
     },
 
-
     /// Submit the entered API key and persist the provider selection.
     SubmitProviderApiKey {
         provider_id: String,

@@ -12,10 +12,7 @@ use peregrine_sui_mcp_protocol::{
     PackageArgs, ProjectGraphsArgs, tool_name,
 };
 use serde_json::json;
-use std::{
-    collections::BTreeMap,
-    time::Instant,
-};
+use std::{collections::BTreeMap, time::Instant};
 
 pub fn run_call_graph(context: &CliContext, args: &CallGraphArgs) -> CliStep {
     let started_at = Instant::now();

@@ -6,8 +6,8 @@ use crate::function_tool::FunctionCallError;
 use peregrine_audit_store::ScheduledWorkBlock;
 use peregrine_types::{
     AuditAgentAssignment, AuditAgentAssignmentStatus, AuditAgentConclusion,
-    AuditAgentConclusionStatus, AuditAgentRole, AuditEvidence, AuditEvidenceAttestation, AuditRun,
-    AuditPlan, AuditPlannerOutput, AuditProfile, AuditRunStatus, AuditStageId, AuditTarget,
+    AuditAgentConclusionStatus, AuditAgentRole, AuditEvidence, AuditEvidenceAttestation, AuditPlan,
+    AuditPlannerOutput, AuditProfile, AuditRun, AuditRunStatus, AuditStageId, AuditTarget,
     AuditWorkItem, AuditWorkItemStatus, FindingCandidate, Metadata, SourcePrecision,
     VerificationMethod,
 };

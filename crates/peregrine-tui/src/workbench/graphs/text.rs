@@ -14,10 +14,7 @@ pub(crate) fn text_graph_output_args() -> GraphOutputArgs {
     }
 }
 
-pub(crate) fn graph_step_document(
-    tab: GraphTab,
-    step: CliStep,
-) -> Result<GraphDocument, String> {
+pub(crate) fn graph_step_document(tab: GraphTab, step: CliStep) -> Result<GraphDocument, String> {
     if step.status != CliStatus::Passed {
         return Err(render_graph_step_error(&step));
     }

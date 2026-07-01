@@ -1,5 +1,5 @@
-use crate::workbench::PendingVimCommand;
 use crate::workbench::GraphTab;
+use crate::workbench::PendingVimCommand;
 use crate::workbench::prelude::*;
 
 use crate::keybinds;

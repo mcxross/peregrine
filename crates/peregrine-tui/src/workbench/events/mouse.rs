@@ -1,9 +1,6 @@
 use crate::workbench::prelude::*;
 
-use ratatui::crossterm::event::{
-    MouseButton, MouseEvent,
-    MouseEventKind,
-};
+use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 impl App {
     pub(crate) fn handle_mouse_event(&mut self, mouse: MouseEvent) {
@@ -226,7 +223,11 @@ impl App {
             .find_map(|(tab, area)| rect_contains(*area, x, y).then_some(*tab))
     }
 
-    pub(crate) fn clicked_graph_tab(&self, x: u16, y: u16) -> Option<crate::workbench::types::GraphTab> {
+    pub(crate) fn clicked_graph_tab(
+        &self,
+        x: u16,
+        y: u16,
+    ) -> Option<crate::workbench::types::GraphTab> {
         self.layout
             .graph_tab_hit_areas
             .iter()

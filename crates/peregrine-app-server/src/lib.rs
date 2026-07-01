@@ -432,7 +432,10 @@ pub async fn execute_plugin_startup_tasks(
             .effective_config()
             .try_into()
             .unwrap_or_default();
-        if !effective_toml.plugins.contains_key(peregrine_sui_move_knowledge_plugin::PLUGIN_CONFIG_KEY) {
+        if !effective_toml
+            .plugins
+            .contains_key(peregrine_sui_move_knowledge_plugin::PLUGIN_CONFIG_KEY)
+        {
             info!("Auto-enabling bundled peregrine-sui-move-knowledge plugin");
             if let Err(e) = peregrine_config::set_user_plugin_enabled(
                 &config.peregrine_home,
@@ -444,9 +447,9 @@ pub async fn execute_plugin_startup_tasks(
                 warn!("Failed to auto-enable peregrine-sui-move-knowledge: {e}");
             }
         }
-        if let Err(e) = peregrine_sui_move_knowledge_plugin::install_bundled_plugin(
-            &config.peregrine_home,
-        ) {
+        if let Err(e) =
+            peregrine_sui_move_knowledge_plugin::install_bundled_plugin(&config.peregrine_home)
+        {
             warn!("Failed to install bundled peregrine-sui-move-knowledge: {e}");
         }
     }
@@ -649,8 +652,6 @@ pub async fn run_main_with_transport_options(
             range: None,
         });
     }
-
-
 
     execute_plugin_startup_tasks(&config, runtime_options.plugin_startup_tasks).await;
 

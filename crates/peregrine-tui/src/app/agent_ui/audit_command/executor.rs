@@ -24,7 +24,9 @@ pub(crate) async fn execute_audit_command(
         }
         AuditCommand::Run(request) => {
             let _ = request;
-            bail!("direct audit start requires /audit --plan followed by /audit start <fingerprint>")
+            bail!(
+                "direct audit start requires /audit --plan followed by /audit start <fingerprint>"
+            )
         }
         AuditCommand::Start { fingerprint } => {
             let started = app_server

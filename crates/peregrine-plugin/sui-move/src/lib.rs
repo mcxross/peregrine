@@ -15,7 +15,8 @@ pub use index::{
     MAX_RESPONSE_TOKENS, MAX_SEARCH_RESULTS, SearchResult, TrustTier,
 };
 pub use install::{
-    PLUGIN_CONFIG_KEY, InstalledKnowledgePlugin, KnowledgeInstallError, bundled_cache_root_dir, install_bundled_plugin,
+    InstalledKnowledgePlugin, KnowledgeInstallError, PLUGIN_CONFIG_KEY, bundled_cache_root_dir,
+    install_bundled_plugin,
 };
 pub use server::SuiMoveKnowledgeServer;
 

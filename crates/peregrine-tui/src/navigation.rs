@@ -175,12 +175,8 @@ fn global_command(key: KeyEvent, focus: FocusPane) -> Option<NavigationCommand> 
             KeyBindEvent::SelectCodeTab => NavigationCommand::SelectTab(WorkbenchTab::Editor),
             KeyBindEvent::SelectBytecodeTab => NavigationCommand::SelectTab(WorkbenchTab::Bytecode),
             KeyBindEvent::SelectCfgTab => NavigationCommand::SelectTab(WorkbenchTab::Graphs),
-            KeyBindEvent::SelectCallGraphTab => {
-                NavigationCommand::SelectTab(WorkbenchTab::Graphs)
-            }
-            KeyBindEvent::SelectTypeGraphTab => {
-                NavigationCommand::SelectTab(WorkbenchTab::Graphs)
-            }
+            KeyBindEvent::SelectCallGraphTab => NavigationCommand::SelectTab(WorkbenchTab::Graphs),
+            KeyBindEvent::SelectTypeGraphTab => NavigationCommand::SelectTab(WorkbenchTab::Graphs),
             KeyBindEvent::SelectChatTab => NavigationCommand::SelectTab(WorkbenchTab::Chat),
             _ => continue,
         };
@@ -219,7 +215,9 @@ fn workbench_command(key: KeyEvent) -> NavigationCommand {
             KeyBindEvent::WorkbenchSelectBytecodeTab => {
                 NavigationCommand::SelectTab(WorkbenchTab::Bytecode)
             }
-            KeyBindEvent::WorkbenchSelectCfgTab => NavigationCommand::SelectTab(WorkbenchTab::Graphs),
+            KeyBindEvent::WorkbenchSelectCfgTab => {
+                NavigationCommand::SelectTab(WorkbenchTab::Graphs)
+            }
             KeyBindEvent::WorkbenchSelectCallGraphTab => {
                 NavigationCommand::SelectTab(WorkbenchTab::Graphs)
             }

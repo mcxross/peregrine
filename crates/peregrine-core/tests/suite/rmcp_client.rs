@@ -22,11 +22,11 @@ use codex_exec_server::Environment;
 use codex_exec_server::HttpRequestParams;
 use codex_login::CodexAuth as PeregrineAuth;
 use codex_mcp::MCP_SANDBOX_STATE_META_CAPABILITY;
-use peregrine_models_manager::manager::RefreshStrategy;
 use peregrine_config::types::McpServerConfig;
 use peregrine_config::types::McpServerEnvVar;
 use peregrine_config::types::McpServerTransportConfig;
 use peregrine_core::config::Config;
+use peregrine_models_manager::manager::RefreshStrategy;
 
 use codex_utils_cargo_bin::cargo_bin;
 use core_test_support::assert_regex_match;

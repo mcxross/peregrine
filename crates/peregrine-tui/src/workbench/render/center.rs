@@ -1,8 +1,8 @@
 use crate::workbench::prelude::*;
 
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::Modifier;
-use ratatui::Frame;
 
 use crate::tabs::{TabNav, tab_hit_areas};
 
@@ -40,9 +40,7 @@ impl App {
                 self.render_editor(frame, code_rows[1]);
             }
             WorkbenchTab::Bytecode => self.render_bytecode(frame, rows[1]),
-            WorkbenchTab::Graphs => {
-                self.render_graph(frame, rows[1])
-            }
+            WorkbenchTab::Graphs => self.render_graph(frame, rows[1]),
             WorkbenchTab::Chat => {
                 self.chat
                     .render(frame, rows[1], self.focus == FocusPane::Input, palette);

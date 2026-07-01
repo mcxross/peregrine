@@ -4,9 +4,6 @@ use std::sync::Arc;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
 use codex_model_provider_info::ModelProviderInfo;
-use peregrine_models_manager::manager::SharedModelsManager;
-use peregrine_models_manager::manager::StaticModelsManager;
-use peregrine_models_manager::model_info::model_info_from_slug;
 use codex_protocol::error::Result;
 use codex_protocol::openai_models::ModelInfo;
 use codex_protocol::openai_models::ModelVisibility;
@@ -21,6 +18,9 @@ use peregrine_model_provider::ProviderCapabilities;
 use peregrine_model_provider::RuntimeWireApi;
 use peregrine_model_provider::api_provider_from_info;
 use peregrine_model_provider::unauthenticated_auth_provider;
+use peregrine_models_manager::manager::SharedModelsManager;
+use peregrine_models_manager::manager::StaticModelsManager;
+use peregrine_models_manager::model_info::model_info_from_slug;
 
 /// Runtime model provider for Anthropic's native Messages API.
 #[derive(Clone, Debug)]

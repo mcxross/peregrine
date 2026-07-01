@@ -7,10 +7,6 @@ use codex_login::AuthManager;
 use codex_login::CodexAuth;
 use codex_model_provider_info::CHATGPT_CODEX_BASE_URL;
 use codex_model_provider_info::ModelProviderInfo;
-use peregrine_models_manager::AuthMode;
-use peregrine_models_manager::manager::OpenAiModelsManager;
-use peregrine_models_manager::manager::SharedModelsManager;
-use peregrine_models_manager::manager::StaticModelsManager;
 use codex_protocol::account::ProviderAccount;
 use codex_protocol::openai_models::ModelsResponse;
 use http::HeaderMap;
@@ -19,6 +15,10 @@ use http::HeaderValue;
 use peregrine_api::Provider;
 use peregrine_api::RetryConfig;
 use peregrine_api::SharedAuthProvider;
+use peregrine_models_manager::AuthMode;
+use peregrine_models_manager::manager::OpenAiModelsManager;
+use peregrine_models_manager::manager::SharedModelsManager;
+use peregrine_models_manager::manager::StaticModelsManager;
 
 use crate::amazon_bedrock::AmazonBedrockModelProvider;
 use crate::auth::auth_manager_for_provider;
@@ -205,14 +205,17 @@ pub trait ModelProvider: fmt::Debug + Send + Sync {
     /// Returns provider configuration adapted for the API client.
     async fn api_provider(&self) -> codex_protocol::error::Result<Provider> {
         let auth = self.auth().await;
-        api_provider_from_info(self.info(), auth.as_ref().map(|a| a.auth_mode()).map(|mode| {
-            match format!("{:?}", mode).as_str() {
-                "Chatgpt" => AuthMode::Chatgpt,
-                "ChatgptAuthTokens" => AuthMode::ChatgptAuthTokens,
-                "AgentIdentity" => AuthMode::AgentIdentity,
-                _ => AuthMode::Chatgpt,
-            }
-        }))
+        api_provider_from_info(
+            self.info(),
+            auth.as_ref()
+                .map(|a| a.auth_mode())
+                .map(|mode| match format!("{:?}", mode).as_str() {
+                    "Chatgpt" => AuthMode::Chatgpt,
+                    "ChatgptAuthTokens" => AuthMode::ChatgptAuthTokens,
+                    "AgentIdentity" => AuthMode::AgentIdentity,
+                    _ => AuthMode::Chatgpt,
+                }),
+        )
     }
 
     /// Returns the provider base URL that will be used at request time.
@@ -360,10 +363,10 @@ mod tests {
 
     use codex_model_provider_info::ModelProviderAwsAuthInfo;
     use codex_model_provider_info::WireApi;
-    use peregrine_models_manager::manager::RefreshStrategy;
     use codex_protocol::config_types::ModelProviderAuthInfo;
     use codex_protocol::openai_models::ModelInfo;
     use codex_protocol::openai_models::ModelsResponse;
+    use peregrine_models_manager::manager::RefreshStrategy;
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use wiremock::Mock;

@@ -13,8 +13,8 @@ use crate::navigation::Navigation;
 use crate::sui::package_loader::{
     PackageCreateReport, PackageInspection, PackageLoadReport, WorkbenchTrustResolution,
     create_child_move_package, failed_create_report, inspect_package_directory,
-    load_package_after_trust, persist_created_package_trust,
-    resolve_trust_for_directory, trust_denied_load_report, workflow_failed_status,
+    load_package_after_trust, persist_created_package_trust, resolve_trust_for_directory,
+    trust_denied_load_report, workflow_failed_status,
 };
 use crate::sui::project::CliContext;
 use crate::theme::{Theme, ThemeState};

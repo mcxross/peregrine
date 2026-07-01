@@ -4,9 +4,7 @@ use crate::workbench::prelude::*;
 
 use crate::chat;
 use crate::navigation::NavigationIntent;
-use ratatui::crossterm::event::{
-    KeyCode, KeyEvent, KeyModifiers,
-};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 impl App {
     pub fn handle_key_event(&mut self, key: KeyEvent) {

@@ -1,9 +1,8 @@
 use crate::workbench::prelude::*;
 
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem, ListState};
-use ratatui::Frame;
-
 
 impl App {
     pub(crate) fn render_explorer(&self, frame: &mut Frame<'_>, area: Rect) {

@@ -926,8 +926,11 @@ impl App {
                 let m = model.clone();
                 let handle = app_server.request_handle();
                 tokio::spawn(async move {
-                    let edit = crate::agent::config_update::build_provider_api_key_edit(&p_id, &api_key);
-                    if let Ok(_) = crate::agent::config_update::write_config_batch(handle, vec![edit]).await {
+                    let edit =
+                        crate::agent::config_update::build_provider_api_key_edit(&p_id, &api_key);
+                    if let Ok(_) =
+                        crate::agent::config_update::write_config_batch(handle, vec![edit]).await
+                    {
                         tx.send(AppEvent::PersistProviderSelection {
                             provider_id: p_id,
                             model: m,
@@ -939,22 +942,28 @@ impl App {
                 let tx = self.app_event_tx.clone();
                 let handle = app_server.request_handle();
                 tokio::spawn(async move {
-                    let result = handle.request_typed::<peregrine_app_server_protocol::LoginAccountResponse>(
-                        peregrine_app_server_protocol::ClientRequest::LoginAccount {
-                            request_id: peregrine_app_server_protocol::RequestId::String(uuid::Uuid::new_v4().to_string()),
-                            params: peregrine_app_server_protocol::LoginAccountParams::Chatgpt {
-                                peregrine_streamlined_login: true,
+                    let result = handle
+                        .request_typed::<peregrine_app_server_protocol::LoginAccountResponse>(
+                            peregrine_app_server_protocol::ClientRequest::LoginAccount {
+                                request_id: peregrine_app_server_protocol::RequestId::String(
+                                    uuid::Uuid::new_v4().to_string(),
+                                ),
+                                params:
+                                    peregrine_app_server_protocol::LoginAccountParams::Chatgpt {
+                                        peregrine_streamlined_login: true,
+                                    },
                             },
-                        }
-                    ).await;
-                    if let Ok(peregrine_app_server_protocol::LoginAccountResponse::Chatgpt { auth_url, .. }) = result {
+                        )
+                        .await;
+                    if let Ok(peregrine_app_server_protocol::LoginAccountResponse::Chatgpt {
+                        auth_url,
+                        ..
+                    }) = result
+                    {
                         if let Err(err) = webbrowser::open(&auth_url) {
                             tracing::warn!("failed to open browser for login URL: {err}");
                         }
-                        tx.send(AppEvent::PersistProviderSelection {
-                            provider_id,
-                            model,
-                        });
+                        tx.send(AppEvent::PersistProviderSelection { provider_id, model });
                     }
                 });
             }

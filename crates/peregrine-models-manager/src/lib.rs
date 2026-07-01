@@ -6,8 +6,8 @@ pub mod model_info;
 pub mod model_presets;
 pub mod test_support;
 
-pub use peregrine_app_server_protocol::AuthMode;
 pub use config::ModelsManagerConfig;
+pub use peregrine_app_server_protocol::AuthMode;
 
 /// Load the bundled model catalog shipped with `codex-models-manager`.
 pub fn bundled_models_response()

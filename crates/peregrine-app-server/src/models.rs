@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use peregrine_models_manager::manager::RefreshStrategy;
 use peregrine_app_server_protocol::Model;
 use peregrine_app_server_protocol::ModelServiceTier;
 use peregrine_app_server_protocol::ModelUpgradeInfo;
 use peregrine_app_server_protocol::ReasoningEffortOption;
 use peregrine_core::ThreadManager;
+use peregrine_models_manager::manager::RefreshStrategy;
 use peregrine_types::openai_models::ModelPreset;
 use peregrine_types::openai_models::ReasoningEffortPreset;
 

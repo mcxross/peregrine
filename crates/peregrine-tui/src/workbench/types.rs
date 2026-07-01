@@ -63,12 +63,7 @@ impl GraphTab {
 }
 
 impl WorkbenchTab {
-    pub(crate) const ALL: [Self; 4] = [
-        Self::Chat,
-        Self::Editor,
-        Self::Bytecode,
-        Self::Graphs,
-    ];
+    pub(crate) const ALL: [Self; 4] = [Self::Chat, Self::Editor, Self::Bytecode, Self::Graphs];
 
     pub(crate) fn title(self) -> &'static str {
         match self {
@@ -138,7 +133,7 @@ impl InvalidPackageAction {
             Self::GoBack => Self::CreatePackage,
         }
     }
-    
+
     pub(crate) fn toggle_back(self) -> Self {
         match self {
             Self::CreatePackage => Self::GoBack,

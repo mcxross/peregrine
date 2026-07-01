@@ -10,13 +10,13 @@ use codex_login::CodexAuth;
 use codex_model_provider_info::AMAZON_BEDROCK_GPT_5_4_MODEL_ID;
 use codex_model_provider_info::ModelProviderAwsAuthInfo;
 use codex_model_provider_info::ModelProviderInfo;
-use peregrine_models_manager::manager::SharedModelsManager;
-use peregrine_models_manager::manager::StaticModelsManager;
 use codex_protocol::account::ProviderAccount;
 use codex_protocol::error::Result;
 use codex_protocol::openai_models::ModelsResponse;
 use peregrine_api::Provider;
 use peregrine_api::SharedAuthProvider;
+use peregrine_models_manager::manager::SharedModelsManager;
+use peregrine_models_manager::manager::StaticModelsManager;
 
 use crate::provider::ModelProvider;
 use crate::provider::ProviderAccountResult;

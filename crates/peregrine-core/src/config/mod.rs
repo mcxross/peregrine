@@ -28,7 +28,6 @@ use codex_model_provider_info::ModelProviderInfo;
 use codex_model_provider_info::OLLAMA_CHAT_PROVIDER_REMOVED_ERROR;
 use codex_model_provider_info::built_in_model_providers;
 use codex_model_provider_info::merge_configured_model_providers;
-use peregrine_models_manager::ModelsManagerConfig;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_absolute_path::AbsolutePathBufGuard;
 use peregrine_config::CloudRequirementsLoader;
@@ -83,6 +82,7 @@ use peregrine_config::types::UriBasedFileOpener;
 use peregrine_config::types::WindowsSandboxModeToml;
 use peregrine_memories_read::memory_root;
 use peregrine_model_provider::add_peregrine_builtin_model_providers;
+use peregrine_models_manager::ModelsManagerConfig;
 use peregrine_sui_mcp_protocol::{
     SuiAdapterSettings, SuiAdapterSource, SuiToolsConfig, SuiToolsMode,
 };

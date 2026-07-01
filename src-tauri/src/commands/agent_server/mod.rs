@@ -11,12 +11,11 @@ use models::{
     AgentServerTurnInterruptRequest, AgentServerTurnRequest, AgentServerTurnResponse,
 };
 use peregrine_app_server_protocol::{
-    ClientRequest, JSONRPCErrorError, Model, ModelListParams, ModelListResponse,
-    ModelProviderKind, ModelProviderListParams, ModelProviderListResponse,
-    ModelProviderModelsListParams, ModelProviderModelsListResponse, RequestId, ThreadListParams,
-    ThreadListResponse, ThreadReadParams, ThreadReadResponse, TurnInterruptParams,
-    TurnInterruptResponse, TurnStartParams, TurnStartResponse, TurnSteerParams, TurnSteerResponse,
-    UserInput,
+    ClientRequest, JSONRPCErrorError, Model, ModelListParams, ModelListResponse, ModelProviderKind,
+    ModelProviderListParams, ModelProviderListResponse, ModelProviderModelsListParams,
+    ModelProviderModelsListResponse, RequestId, ThreadListParams, ThreadListResponse,
+    ThreadReadParams, ThreadReadResponse, TurnInterruptParams, TurnInterruptResponse,
+    TurnStartParams, TurnStartResponse, TurnSteerParams, TurnSteerResponse, UserInput,
 };
 use tauri::{AppHandle, State};
 
@@ -210,12 +209,14 @@ pub(crate) async fn agent_server_model_list(
     {
         if selected.kind == ModelProviderKind::Ollama {
             let provider_models_response = client
-                .request_typed::<ModelProviderModelsListResponse>(ClientRequest::ModelProviderModelsList {
-                    request_id: RequestId::Integer(3),
-                    params: ModelProviderModelsListParams {
-                        provider_id: providers.selected_provider_id.clone(),
+                .request_typed::<ModelProviderModelsListResponse>(
+                    ClientRequest::ModelProviderModelsList {
+                        request_id: RequestId::Integer(3),
+                        params: ModelProviderModelsListParams {
+                            provider_id: providers.selected_provider_id.clone(),
+                        },
                     },
-                })
+                )
                 .await;
 
             if let Ok(provider_models) = provider_models_response {
@@ -333,13 +334,15 @@ pub(crate) async fn agent_server_model_provider_select(
         session::create_app_server_client(request.target, request.cwd, Vec::new()).await?;
 
     let _response = match client
-        .request_typed::<peregrine_app_server_protocol::ModelProviderSelectResponse>(ClientRequest::ModelProviderSelect {
-            request_id: RequestId::Integer(1),
-            params: ModelProviderSelectParams {
-                provider_id: request.provider_id,
-                model: request.model,
+        .request_typed::<peregrine_app_server_protocol::ModelProviderSelectResponse>(
+            ClientRequest::ModelProviderSelect {
+                request_id: RequestId::Integer(1),
+                params: ModelProviderSelectParams {
+                    provider_id: request.provider_id,
+                    model: request.model,
+                },
             },
-        })
+        )
         .await
     {
         Ok(res) => res,

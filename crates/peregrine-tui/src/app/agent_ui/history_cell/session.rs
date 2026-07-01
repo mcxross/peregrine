@@ -48,9 +48,16 @@ fn with_border_internal(
 
     let mut out = Vec::with_capacity(lines.len() + 2);
     let border_inner_width = content_width + 2;
-    let border_style = ratatui::style::Style::default().fg(crate::theme::shared_theme_state().palette().graph.edge);
+    let border_style = ratatui::style::Style::default()
+        .fg(crate::theme::shared_theme_state().palette().graph.edge);
 
-    out.push(vec![Span::styled(format!("╭{}╮", "─".repeat(border_inner_width)), border_style)].into());
+    out.push(
+        vec![Span::styled(
+            format!("╭{}╮", "─".repeat(border_inner_width)),
+            border_style,
+        )]
+        .into(),
+    );
 
     for line in lines.into_iter() {
         let used_width: usize = line
@@ -68,7 +75,13 @@ fn with_border_internal(
         out.push(Line::from(spans));
     }
 
-    out.push(vec![Span::styled(format!("╰{}╯", "─".repeat(border_inner_width)), border_style)].into());
+    out.push(
+        vec![Span::styled(
+            format!("╰{}╯", "─".repeat(border_inner_width)),
+            border_style,
+        )]
+        .into(),
+    );
 
     out
 }
@@ -212,7 +225,10 @@ pub(crate) fn new_session_info_with_directory(
             for &s in &self.art {
                 result.push(Line::from(vec![
                     Span::raw(art_padding.clone()),
-                    Span::styled(s, ratatui::style::Style::default().fg(ratatui::style::Color::Cyan)),
+                    Span::styled(
+                        s,
+                        ratatui::style::Style::default().fg(ratatui::style::Color::Cyan),
+                    ),
                 ]));
             }
 
@@ -222,7 +238,7 @@ pub(crate) fn new_session_info_with_directory(
             // 3. Add Centered Header Box
             for (i, line) in header_lines.into_iter().enumerate() {
                 let mut spans = vec![Span::raw(header_padding.clone())];
-                
+
                 // Center the first line (name and version) within the box
                 if i == 0 {
                     let line_width = line.width();
@@ -261,8 +277,11 @@ pub(crate) fn new_session_info_with_directory(
         "           ██  ██  ██           ",
         "            █      █            ",
     ];
-        
-    parts.push(Box::new(HeroHistoryCell { art: ascii_art, header }));
+
+    parts.push(Box::new(HeroHistoryCell {
+        art: ascii_art,
+        header,
+    }));
 
     if !is_first_event {
         if config.show_tooltips

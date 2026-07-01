@@ -1,9 +1,7 @@
 use crate::workbench::prelude::*;
 
-use ratatui::crossterm::event::{
-    self, Event, KeyEventKind,
-};
 use ratatui::DefaultTerminal;
+use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use std::io;
 
 impl App {

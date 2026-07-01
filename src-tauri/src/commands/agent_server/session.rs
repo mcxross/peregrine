@@ -375,7 +375,8 @@ async fn start_embedded_client(
         find_peregrine_home().map_err(|err| format!("failed to resolve PEREGRINE_HOME: {err}"))?;
     let codex_self_exe = crate::helper_args::resolve_helper_executable().ok();
     let local_runtime_paths =
-        ExecServerRuntimePaths::from_optional_paths(codex_self_exe.clone(), None).map_err(|err| err.to_string())?;
+        ExecServerRuntimePaths::from_optional_paths(codex_self_exe.clone(), None)
+            .map_err(|err| err.to_string())?;
     let environment_manager =
         EnvironmentManager::from_codex_home(peregrine_home, Some(local_runtime_paths))
             .await

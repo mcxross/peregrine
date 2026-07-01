@@ -825,7 +825,7 @@ impl Tui {
             let required_expansion = area.y - desired_y;
             let empty_space = area.y.saturating_sub(min_y);
             let scroll_by = required_expansion.saturating_sub(empty_space);
-            
+
             if scroll_by > 0 && !terminal_height_shrank {
                 terminal
                     .backend_mut()
@@ -921,7 +921,7 @@ impl Tui {
                 let required_expansion = area.y - desired_y;
                 let empty_space = area.y.saturating_sub(min_y);
                 let scroll_by = required_expansion.saturating_sub(empty_space);
-                
+
                 if scroll_by > 0 {
                     terminal
                         .backend_mut()

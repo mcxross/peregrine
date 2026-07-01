@@ -1,4 +1,4 @@
-use super::super::{PAGE_SIZE, GraphTab, char_len};
+use super::super::{GraphTab, PAGE_SIZE, char_len};
 use crate::sui::project::CliContext;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 

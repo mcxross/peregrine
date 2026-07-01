@@ -715,7 +715,10 @@ fn provider_credential_metadata(
             } else {
                 (
                     ModelProviderCredentialState::NeedsLogin,
-                    Some("Use the provider selection menu to login via browser or enter an API key.".to_string()),
+                    Some(
+                        "Use the provider selection menu to login via browser or enter an API key."
+                            .to_string(),
+                    ),
                 )
             }
         }

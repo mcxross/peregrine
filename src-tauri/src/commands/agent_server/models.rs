@@ -121,4 +121,3 @@ pub(crate) struct AgentServerThreadReadRequest {
     #[serde(default)]
     pub(crate) target: AgentServerTargetConfig,
 }
-

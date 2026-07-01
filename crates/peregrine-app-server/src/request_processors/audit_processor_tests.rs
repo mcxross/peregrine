@@ -243,7 +243,8 @@ async fn processor_fixture() -> anyhow::Result<ProcessorFixture> {
 fn test_planner_output() -> AuditPlannerOutput {
     AuditPlannerOutput {
         summary: "Test model-authored audit plan".to_string(),
-        rationale: "Exercise the persisted audit lifecycle with a typed planner output.".to_string(),
+        rationale: "Exercise the persisted audit lifecycle with a typed planner output."
+            .to_string(),
         focus_areas: vec!["entry points".to_string()],
         non_goals: Vec::new(),
         stage_plans: vec![

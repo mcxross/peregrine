@@ -1,11 +1,10 @@
 use crate::workbench::prelude::*;
 
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
-use ratatui::Frame;
-
 
 impl App {
     pub(crate) fn render_startup(&self, frame: &mut Frame<'_>, area: Rect) {

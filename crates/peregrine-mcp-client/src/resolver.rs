@@ -80,9 +80,9 @@ pub fn resolve_mcp_config(options: McpClientOptions) -> io::Result<ResolvedMcpCo
         servers.remove(SERVER_NAME);
     } else {
         let port = config.sui_mcp_server_port;
-        servers
-            .entry(SERVER_NAME.to_string())
-            .or_insert_with(|| default_peregrine_server(options.self_exe.as_deref(), &adapter, port));
+        servers.entry(SERVER_NAME.to_string()).or_insert_with(|| {
+            default_peregrine_server(options.self_exe.as_deref(), &adapter, port)
+        });
     }
     if move_analyzer_mode == MoveAnalyzerToolsMode::Disabled {
         servers.remove(MOVE_ANALYZER_SERVER_NAME);
@@ -102,8 +102,6 @@ pub fn resolve_mcp_config(options: McpClientOptions) -> io::Result<ResolvedMcpCo
         origin: options.origin,
     })
 }
-
-
 
 pub fn default_sui_move_analyzer_server(
     self_exe: Option<&Path>,
@@ -306,7 +304,6 @@ fn move_analyzer_settings(
     (mode, adapter)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -360,7 +357,7 @@ enabled = false
 
         assert!(!resolved.servers.contains_key(SERVER_NAME));
         assert!(resolved.servers.contains_key(MOVE_ANALYZER_SERVER_NAME));
-        
+
         Ok(())
     }
 
@@ -380,10 +377,9 @@ enabled = false
 
         assert!(resolved.servers.contains_key(SERVER_NAME));
         assert!(!resolved.servers.contains_key(MOVE_ANALYZER_SERVER_NAME));
-        
+
         Ok(())
     }
-
 
     #[test]
     fn all_bundled_peregrine_servers_are_registered_by_default()
@@ -397,7 +393,7 @@ enabled = false
 
         assert!(resolved.servers.contains_key(SERVER_NAME));
         assert!(resolved.servers.contains_key(MOVE_ANALYZER_SERVER_NAME));
-        
+
         Ok(())
     }
 

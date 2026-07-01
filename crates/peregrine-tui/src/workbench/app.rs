@@ -1,8 +1,8 @@
 use super::{
     AppMode, BytecodeCacheEntry, BytecodeLoadResult, BytecodePane, BytecodeTargetKey,
     CloseConfirmation, EditorMode, EditorRenderCache, EditorWorkspace, Explorer, FocusPane,
-    GraphLoadResult, GraphPanes, StartupTaskResult, VimState, WorkbenchExit, WorkbenchLayout,
-    WorkbenchStartupState, WorkbenchTab, GraphTab,
+    GraphLoadResult, GraphPanes, GraphTab, StartupTaskResult, VimState, WorkbenchExit,
+    WorkbenchLayout, WorkbenchStartupState, WorkbenchTab,
 };
 use crate::agent;
 use crate::app;

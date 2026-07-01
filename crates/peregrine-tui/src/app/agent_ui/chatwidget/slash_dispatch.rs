@@ -235,8 +235,10 @@ impl ChatWidget {
                         );
                         self.add_info_message(
                             AUDIT_USAGE.to_string(),
-                            Some("Use /audit --plan <target>, then /audit start <fingerprint>."
-                                .to_string()),
+                            Some(
+                                "Use /audit --plan <target>, then /audit start <fingerprint>."
+                                    .to_string(),
+                            ),
                         );
                         if source == SlashCommandDispatchSource::Live {
                             self.bottom_pane.drain_pending_submission_state();
@@ -258,7 +260,10 @@ impl ChatWidget {
                 self.add_error_message(message);
                 self.add_info_message(
                     AUDIT_USAGE.to_string(),
-                    Some("Examples: /audit --plan .  |  /audit start <fingerprint>  |  /audit list".to_string()),
+                    Some(
+                        "Examples: /audit --plan .  |  /audit start <fingerprint>  |  /audit list"
+                            .to_string(),
+                    ),
                 );
                 if source == SlashCommandDispatchSource::Live {
                     self.bottom_pane.drain_pending_submission_state();
@@ -487,7 +492,10 @@ impl ChatWidget {
             SlashCommand::Audit => {
                 self.add_info_message(
                     AUDIT_USAGE.to_string(),
-                    Some("Examples: /audit --plan .  |  /audit start <fingerprint>  |  /audit list".to_string()),
+                    Some(
+                        "Examples: /audit --plan .  |  /audit start <fingerprint>  |  /audit list"
+                            .to_string(),
+                    ),
                 );
             }
             SlashCommand::Side | SlashCommand::Btw => {

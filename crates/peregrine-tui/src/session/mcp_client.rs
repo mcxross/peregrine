@@ -67,7 +67,7 @@ fn workspace_client(workspace_root: &Path) -> Result<Arc<WorkspaceClient>, Strin
         .ok()
         .and_then(|raw| toml::from_str(&raw).ok())
         .unwrap_or_default();
-    
+
     if let Some(port) = config.sui_mcp_server_port {
         if std::net::TcpStream::connect(("127.0.0.1", port)).is_err() {
             let self_exe = std::env::current_exe().ok();
@@ -76,12 +76,12 @@ fn workspace_client(workspace_root: &Path) -> Result<Arc<WorkspaceClient>, Strin
                 std::env::var_os(peregrine_sui_mcp_protocol::SERVER_PATH_ENV),
                 std::env::var_os("PATH"),
             );
-            
+
             let _ = std::process::Command::new(server_executable)
                 .arg("--transport")
                 .arg(format!("sse:{port}"))
                 .spawn();
-                
+
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
     }

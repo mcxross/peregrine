@@ -1,8 +1,8 @@
 use crate::workbench::prelude::*;
 
+use ratatui::Frame;
 use ratatui::layout::{Position, Rect};
 use ratatui::widgets::Paragraph;
-use ratatui::Frame;
 
 use crate::workbench_render::{
     RenderedWorkbenchDocument, is_markdown_path, render_workbench_document,
@@ -136,7 +136,8 @@ impl App {
             ));
         frame.render_widget(paragraph, text_area);
 
-        if show_cursor && self.focus == FocusPane::Editor && self.active_tab == WorkbenchTab::Editor {
+        if show_cursor && self.focus == FocusPane::Editor && self.active_tab == WorkbenchTab::Editor
+        {
             let row = self.editor.cursor.row.saturating_sub(self.editor.scroll);
             let col = self
                 .editor

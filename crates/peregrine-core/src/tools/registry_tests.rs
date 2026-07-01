@@ -2,9 +2,9 @@ use super::*;
 use codex_utils_absolute_path::test_support::PathExt;
 use peregrine_audit_store::AuditStore;
 use peregrine_types::{
-    AuditEvidence, AuditEvidenceAttestation, AuditPlan, AuditPlannerOutput, AuditProfile,
-    AuditRun, AuditRunStatus, AuditStageId, AuditStagePlan, AuditTarget, AuditWorkItem,
-    AuditWorkItemStatus, Metadata, VerificationMethod,
+    AuditEvidence, AuditEvidenceAttestation, AuditPlan, AuditPlannerOutput, AuditProfile, AuditRun,
+    AuditRunStatus, AuditStageId, AuditStagePlan, AuditTarget, AuditWorkItem, AuditWorkItemStatus,
+    Metadata, VerificationMethod,
 };
 use pretty_assertions::assert_eq;
 use serde_json::json;

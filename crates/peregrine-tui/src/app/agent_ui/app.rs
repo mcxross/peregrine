@@ -86,8 +86,6 @@ use codex_arg0::Arg0DispatchPaths;
 use codex_exec_server::EnvironmentManager;
 use codex_features::Feature;
 use codex_features::FeaturesToml;
-use peregrine_models_manager::model_presets::HIDE_GPT_5_1_CODEX_MAX_MIGRATION_PROMPT_CONFIG;
-use peregrine_models_manager::model_presets::HIDE_GPT5_1_MIGRATION_PROMPT_CONFIG;
 use codex_otel::SessionTelemetry;
 use codex_rollout::StateDbHandle;
 use codex_terminal_detection::user_agent;
@@ -158,6 +156,8 @@ use peregrine_config::types::MemoriesToml;
 use peregrine_config::types::ModelAvailabilityNuxConfig;
 #[cfg(target_os = "windows")]
 use peregrine_config::types::WindowsToml;
+use peregrine_models_manager::model_presets::HIDE_GPT_5_1_CODEX_MAX_MIGRATION_PROMPT_CONFIG;
+use peregrine_models_manager::model_presets::HIDE_GPT5_1_MIGRATION_PROMPT_CONFIG;
 use peregrine_types::ThreadId;
 use peregrine_types::config_types::Personality;
 #[cfg(target_os = "windows")]

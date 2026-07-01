@@ -4,8 +4,6 @@
 use anyhow::Result;
 use codex_features::Feature;
 use codex_login::CodexAuth as PeregrineAuth;
-use peregrine_models_manager::manager::RefreshStrategy;
-use peregrine_models_manager::manager::SharedModelsManager;
 use core_test_support::responses::ev_completed;
 use core_test_support::responses::ev_response_created;
 use core_test_support::responses::mount_models_once;
@@ -14,6 +12,8 @@ use core_test_support::responses::namespace_child_tool;
 use core_test_support::responses::sse;
 use core_test_support::responses::start_mock_server;
 use core_test_support::test_codex::test_codex;
+use peregrine_models_manager::manager::RefreshStrategy;
+use peregrine_models_manager::manager::SharedModelsManager;
 use peregrine_types::config_types::ReasoningSummary;
 use peregrine_types::openai_models::ConfigShellToolType;
 use peregrine_types::openai_models::ModelInfo;

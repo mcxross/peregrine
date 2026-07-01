@@ -4,7 +4,6 @@
 use anyhow::Result;
 use codex_features::Feature;
 use codex_login::CodexAuth as PeregrineAuth;
-use peregrine_models_manager::bundled_models_response;
 use core_test_support::apps_test_server::AppsTestServer;
 use core_test_support::responses::ev_assistant_message;
 use core_test_support::responses::ev_completed;
@@ -17,6 +16,7 @@ use core_test_support::test_codex::test_codex;
 use peregrine_config::types::ToolSuggestDiscoverable;
 use peregrine_config::types::ToolSuggestDiscoverableType;
 use peregrine_core::config::Config;
+use peregrine_models_manager::bundled_models_response;
 use peregrine_types::models::PermissionProfile;
 use peregrine_types::protocol::AskForApproval;
 use serde_json::Value;

@@ -391,8 +391,7 @@ mod tests {
         AuditEvidenceAttestation, AuditPlannerOutput, AuditProfile, AuditReport, AuditRunStatus,
         AuditStageId, AuditStagePlan, AuditStageStatus, AuditTarget, AuditWorkItemStatus,
         EvidenceConfidence, FindingCandidate, FindingCandidateSeverity, FindingCandidateStatus,
-        Metadata, SourcePrecision,
-        ValidationPlan, VerificationMethod,
+        Metadata, SourcePrecision, ValidationPlan, VerificationMethod,
     };
 
     fn plan() -> AuditPlan {

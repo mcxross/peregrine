@@ -2,9 +2,9 @@
 
 use std::sync::LazyLock;
 
-use peregrine_models_manager::bundled_models_response;
 pub(crate) use codex_utils_absolute_path::test_support::PathBufExt;
 pub(crate) use codex_utils_absolute_path::test_support::test_path_buf;
+use peregrine_models_manager::bundled_models_response;
 use peregrine_types::openai_models::ModelPreset;
 use serde::Serialize;
 use serde::de::DeserializeOwned;

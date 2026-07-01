@@ -1,10 +1,10 @@
 use codex_collaboration_mode_templates::DEFAULT as COLLABORATION_MODE_DEFAULT;
 use codex_collaboration_mode_templates::PLAN as COLLABORATION_MODE_PLAN;
+use codex_utils_template::Template;
 use peregrine_types::config_types::CollaborationModeMask;
 use peregrine_types::config_types::ModeKind;
 use peregrine_types::config_types::TUI_VISIBLE_COLLABORATION_MODES;
 use peregrine_types::openai_models::ReasoningEffort;
-use codex_utils_template::Template;
 use std::sync::LazyLock;
 
 const KNOWN_MODE_NAMES_TEMPLATE_KEY: &str = "KNOWN_MODE_NAMES";

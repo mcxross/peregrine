@@ -1,4 +1,5 @@
 use crate::artifacts::MovePackageContext;
+use notify::{Event, RecursiveMode, Watcher};
 use peregrine_analysis::{
     AnalysisOptions, AnalysisReport as EngineAnalysisReport, AnalysisRequest, AnalysisStage,
     AnalysisTarget, GraphKind,
@@ -7,10 +8,9 @@ use peregrine_analysis_engine::AnalysisEngine;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::{RwLock, watch, mpsc};
-use tokio::time::{sleep, Duration};
-use notify::{Watcher, RecursiveMode, Event};
+use tokio::sync::{RwLock, mpsc, watch};
 use tokio::task::JoinHandle;
+use tokio::time::{Duration, sleep};
 
 #[derive(Clone)]
 pub struct EagerCache {
@@ -35,16 +35,13 @@ impl EagerCache {
     pub fn new(engine: AnalysisEngine) -> Self {
         let (watch_tx, watch_rx) = mpsc::unbounded_channel();
         let packages = Arc::new(RwLock::new(HashMap::new()));
-        
+
         let packages_clone = packages.clone();
         tokio::spawn(async move {
             run_watcher(engine, packages_clone, watch_rx).await;
         });
 
-        Self {
-            packages,
-            watch_tx,
-        }
+        Self { packages, watch_tx }
     }
 
     /// Ask the cache to analyze and watch this package.
@@ -71,10 +68,11 @@ async fn run_watcher(
     mut watch_rx: mpsc::UnboundedReceiver<MovePackageContext>,
 ) {
     let (event_tx, mut event_rx) = mpsc::unbounded_channel::<notify::Result<Event>>();
-    
+
     let mut watcher = notify::recommended_watcher(move |res| {
         let _ = event_tx.send(res);
-    }).expect("failed to create watcher");
+    })
+    .expect("failed to create watcher");
 
     // We keep track of the known contexts so we can rebuild them when files change
     let mut watched_contexts: HashMap<PathBuf, MovePackageContext> = HashMap::new();
@@ -130,7 +128,7 @@ async fn run_watcher(
                                 let ctx = watched_contexts.get(&root).unwrap().clone();
                                 let engine_clone = engine.clone();
                                 let packages_clone = packages.clone();
-                                
+
                                 // Set state to analyzing
                                 let root_clone = root.clone();
                                 let mut map = packages.write().await;
@@ -164,7 +162,7 @@ fn trigger_build(
 ) {
     tokio::spawn(async move {
         let (tx, _rx) = watch::channel(None);
-        
+
         // Update the state map to use the new receiver just in case
         let mut map = packages.write().await;
         if let Some(PackageState::Analyzing(existing_rx)) = map.get_mut(&root) {
@@ -198,8 +196,14 @@ async fn run_package_analysis_internal(
     engine: AnalysisEngine,
 ) -> EngineAnalysisReport {
     let mut options = AnalysisOptions::default();
-    options.insert("projectRoot".to_string(), serde_json::json!(context.project_root));
-    options.insert("packagePath".to_string(), serde_json::json!(context.package_path));
+    options.insert(
+        "projectRoot".to_string(),
+        serde_json::json!(context.project_root),
+    );
+    options.insert(
+        "packagePath".to_string(),
+        serde_json::json!(context.package_path),
+    );
     let mut request = AnalysisRequest::safe(
         peregrine_analysis::ChainId::new("sui"),
         AnalysisTarget::LocalPackage {
@@ -207,7 +211,11 @@ async fn run_package_analysis_internal(
         },
     );
     // Add missing stages we know are required for everything
-    request.stages = vec![AnalysisStage::Scan, AnalysisStage::Graph, AnalysisStage::Static];
+    request.stages = vec![
+        AnalysisStage::Scan,
+        AnalysisStage::Graph,
+        AnalysisStage::Static,
+    ];
     request.graph_kinds = vec![
         GraphKind::new(GraphKind::CALL),
         GraphKind::new(GraphKind::TYPE),

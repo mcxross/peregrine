@@ -32,12 +32,12 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
+use codex_app_server_protocol::AuthMode;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
 use codex_login::RefreshTokenError;
 use codex_login::UnauthorizedRecovery;
 use codex_login::default_client::build_reqwest_client;
-use codex_app_server_protocol::AuthMode;
 use codex_otel::SessionTelemetry;
 use codex_otel::current_span_w3c_trace_context;
 

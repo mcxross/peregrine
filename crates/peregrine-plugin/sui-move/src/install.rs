@@ -13,7 +13,8 @@ use std::{
 use thiserror::Error;
 
 pub const PLUGIN_CONFIG_KEY: &str = "peregrine-sui-move-knowledge@peregrine-bundled";
-const BUNDLED_PLUGIN_ROOT: &str = "plugins/cache/peregrine-bundled/peregrine-sui-move-knowledge/local";
+const BUNDLED_PLUGIN_ROOT: &str =
+    "plugins/cache/peregrine-bundled/peregrine-sui-move-knowledge/local";
 const MARKER_FILE: &str = ".peregrine-sui-move-knowledge.marker";
 const INSTALLER_SALT: &str = "v1";
 

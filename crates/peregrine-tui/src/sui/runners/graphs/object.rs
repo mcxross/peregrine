@@ -8,13 +8,11 @@ use crate::{
     sui::{args::ObjectGraphArgs, project::CliContext},
 };
 use peregrine_sui_mcp_protocol::{
-    GraphsResponse, MoveStateAccessGraph, MoveStateAccessGraphEdge, PackageArgs, ProjectGraphsArgs, tool_name,
+    GraphsResponse, MoveStateAccessGraph, MoveStateAccessGraphEdge, PackageArgs, ProjectGraphsArgs,
+    tool_name,
 };
 use serde_json::json;
-use std::{
-    collections::BTreeMap,
-    time::Instant,
-};
+use std::{collections::BTreeMap, time::Instant};
 
 pub fn run_object_graph(context: &CliContext, args: &ObjectGraphArgs) -> CliStep {
     let started_at = Instant::now();
@@ -79,7 +77,6 @@ pub fn run_object_graph(context: &CliContext, args: &ObjectGraphArgs) -> CliStep
         json!({ "graph": graph }),
     )
 }
-
 
 fn render_object_graph_text(graph: &MoveStateAccessGraph) -> String {
     let nodes = graph

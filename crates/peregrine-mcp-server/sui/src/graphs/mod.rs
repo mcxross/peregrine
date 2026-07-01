@@ -77,13 +77,22 @@ pub(crate) fn filter_project_graphs(
             call_node_ids.insert(node.id.clone());
         }
     }
-    graphs.call_graph.edges.retain(|e| call_node_ids.contains(&e.source) && call_node_ids.contains(&e.target));
+    graphs
+        .call_graph
+        .edges
+        .retain(|e| call_node_ids.contains(&e.source) && call_node_ids.contains(&e.target));
     for edge in &graphs.call_graph.edges {
         call_node_ids.insert(edge.source.clone());
         call_node_ids.insert(edge.target.clone());
     }
-    graphs.call_graph.nodes.retain(|n| call_node_ids.contains(&n.id));
-    graphs.call_graph.unresolved_calls.retain(|c| call_node_ids.contains(&c.source));
+    graphs
+        .call_graph
+        .nodes
+        .retain(|n| call_node_ids.contains(&n.id));
+    graphs
+        .call_graph
+        .unresolved_calls
+        .retain(|c| call_node_ids.contains(&c.source));
 
     let mut type_node_ids = HashSet::new();
     for node in &graphs.type_graph.nodes {
@@ -91,13 +100,22 @@ pub(crate) fn filter_project_graphs(
             type_node_ids.insert(node.id.clone());
         }
     }
-    graphs.type_graph.edges.retain(|e| type_node_ids.contains(&e.source) && type_node_ids.contains(&e.target));
+    graphs
+        .type_graph
+        .edges
+        .retain(|e| type_node_ids.contains(&e.source) && type_node_ids.contains(&e.target));
     for edge in &graphs.type_graph.edges {
         type_node_ids.insert(edge.source.clone());
         type_node_ids.insert(edge.target.clone());
     }
-    graphs.type_graph.nodes.retain(|n| type_node_ids.contains(&n.id));
-    graphs.type_graph.unresolved_types.retain(|c| type_node_ids.contains(&c.source));
+    graphs
+        .type_graph
+        .nodes
+        .retain(|n| type_node_ids.contains(&n.id));
+    graphs
+        .type_graph
+        .unresolved_types
+        .retain(|c| type_node_ids.contains(&c.source));
 
     let mut state_node_ids = HashSet::new();
     for node in &graphs.state_access_graph.nodes {
@@ -105,13 +123,22 @@ pub(crate) fn filter_project_graphs(
             state_node_ids.insert(node.id.clone());
         }
     }
-    graphs.state_access_graph.edges.retain(|e| state_node_ids.contains(&e.source) && state_node_ids.contains(&e.target));
+    graphs
+        .state_access_graph
+        .edges
+        .retain(|e| state_node_ids.contains(&e.source) && state_node_ids.contains(&e.target));
     for edge in &graphs.state_access_graph.edges {
         state_node_ids.insert(edge.source.clone());
         state_node_ids.insert(edge.target.clone());
     }
-    graphs.state_access_graph.nodes.retain(|n| state_node_ids.contains(&n.id));
-    graphs.state_access_graph.unresolved_accesses.retain(|c| state_node_ids.contains(&c.source));
+    graphs
+        .state_access_graph
+        .nodes
+        .retain(|n| state_node_ids.contains(&n.id));
+    graphs
+        .state_access_graph
+        .unresolved_accesses
+        .retain(|c| state_node_ids.contains(&c.source));
 
     graphs
 }
@@ -122,10 +149,16 @@ pub(crate) fn render_project_graphs(graphs: &MoveProjectGraphs, format: &str) ->
             let mut out = String::new();
             out.push_str("digraph peregrine_project_graphs {\n");
             for node in &graphs.call_graph.nodes {
-                out.push_str(&format!("  \"{}\" [label=\"{}\"];\n", node.id, node.qualified_name));
+                out.push_str(&format!(
+                    "  \"{}\" [label=\"{}\"];\n",
+                    node.id, node.qualified_name
+                ));
             }
             for edge in &graphs.call_graph.edges {
-                out.push_str(&format!("  \"{}\" -> \"{}\" [label=\"{}\"];\n", edge.source, edge.target, edge.call_kind));
+                out.push_str(&format!(
+                    "  \"{}\" -> \"{}\" [label=\"{}\"];\n",
+                    edge.source, edge.target, edge.call_kind
+                ));
             }
             out.push_str("}\n");
             out
@@ -134,18 +167,31 @@ pub(crate) fn render_project_graphs(graphs: &MoveProjectGraphs, format: &str) ->
             let mut out = String::new();
             out.push_str("graph TD;\n");
             for node in &graphs.call_graph.nodes {
-                out.push_str(&format!("  {}[\"{}\"];\n", node.id.replace("::", "_"), node.qualified_name));
+                out.push_str(&format!(
+                    "  {}[\"{}\"];\n",
+                    node.id.replace("::", "_"),
+                    node.qualified_name
+                ));
             }
             for edge in &graphs.call_graph.edges {
-                out.push_str(&format!("  {} -->|{}| {};\n", edge.source.replace("::", "_"), edge.call_kind, edge.target.replace("::", "_")));
+                out.push_str(&format!(
+                    "  {} -->|{}| {};\n",
+                    edge.source.replace("::", "_"),
+                    edge.call_kind,
+                    edge.target.replace("::", "_")
+                ));
             }
             out
         }
         "summary" => {
-            format!("Call Graph: {} nodes, {} edges\nType Graph: {} nodes, {} edges\nState Access Graph: {} nodes, {} edges",
-                graphs.call_graph.nodes.len(), graphs.call_graph.edges.len(),
-                graphs.type_graph.nodes.len(), graphs.type_graph.edges.len(),
-                graphs.state_access_graph.nodes.len(), graphs.state_access_graph.edges.len()
+            format!(
+                "Call Graph: {} nodes, {} edges\nType Graph: {} nodes, {} edges\nState Access Graph: {} nodes, {} edges",
+                graphs.call_graph.nodes.len(),
+                graphs.call_graph.edges.len(),
+                graphs.type_graph.nodes.len(),
+                graphs.type_graph.edges.len(),
+                graphs.state_access_graph.nodes.len(),
+                graphs.state_access_graph.edges.len()
             )
         }
         _ => "Unsupported format. Use 'json', 'dot', 'mermaid', or 'summary'.".to_string(),

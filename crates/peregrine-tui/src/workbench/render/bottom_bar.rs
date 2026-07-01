@@ -1,10 +1,10 @@
 use crate::workbench::prelude::*;
 
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use ratatui::Frame;
 use std::time::Duration;
 
 use super::super::{format_elapsed, package_load_spinner, package_load_status_spans};

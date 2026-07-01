@@ -40,15 +40,19 @@ async fn run_server_async(transport: TransportKind) -> anyhow::Result<()> {
         },
         cli_path: std::env::var(SUI_CLI_PATH_ENV).ok(),
     };
-    let service = PeregrineMcpServer::new(workspace_root)?
-        .with_adapter_settings(adapter_settings)?;
+    let service =
+        PeregrineMcpServer::new(workspace_root)?.with_adapter_settings(adapter_settings)?;
 
     match transport {
         TransportKind::Stdio => {
-            let service = service.serve(stdio())
+            let service = service
+                .serve(stdio())
                 .await
                 .context("start Peregrine MCP server over stdio")?;
-            service.waiting().await.context("run Peregrine MCP server over stdio")?;
+            service
+                .waiting()
+                .await
+                .context("run Peregrine MCP server over stdio")?;
         }
         TransportKind::Sse { port } => {
             let server = service;
@@ -58,7 +62,8 @@ async fn run_server_async(transport: TransportKind) -> anyhow::Result<()> {
                 let timeout_duration = std::time::Duration::from_secs(10 * 60);
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                    let last_activity = srv.last_activity.load(std::sync::atomic::Ordering::Relaxed);
+                    let last_activity =
+                        srv.last_activity.load(std::sync::atomic::Ordering::Relaxed);
                     let now = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()

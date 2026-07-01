@@ -1,33 +1,33 @@
 use crate::workbench::GraphTab;
 use crate::workbench::prelude::*;
 
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::widgets::Paragraph;
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
-use ratatui::Frame;
+use ratatui::widgets::Paragraph;
 
 impl App {
     pub(crate) fn render_graph(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let palette = self.palette();
         let focused = self.focus == FocusPane::Editor;
-        
+
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Min(3)])
             .split(area);
 
         self.layout.graph_tabs = rows[0];
-        
+
         let graph_tab_labels = ["cfg", "call graph", "type graph"];
-        
+
         let mut spans = Vec::new();
         let mut hit_areas = Vec::new();
         let mut current_x = rows[0].x;
 
         for (i, &label) in graph_tab_labels.iter().enumerate() {
             let is_active = i == self.graphs.active_tab.index();
-            
+
             if i > 0 {
                 let sep = " │ ";
                 spans.push(Span::raw(sep).style(self.muted_style()));

@@ -1,6 +1,4 @@
 use codex_features::Feature;
-use peregrine_models_manager::manager::RefreshStrategy;
-use peregrine_models_manager::manager::SharedModelsManager;
 use core_test_support::load_default_config_for_test;
 use core_test_support::responses::mount_models_once;
 use core_test_support::responses::mount_sse_once;
@@ -13,6 +11,8 @@ use core_test_support::test_codex::test_codex;
 use core_test_support::test_codex::turn_permission_fields;
 use core_test_support::wait_for_event;
 use peregrine_config::types::Personality;
+use peregrine_models_manager::manager::RefreshStrategy;
+use peregrine_models_manager::manager::SharedModelsManager;
 use peregrine_types::config_types::ReasoningSummary;
 use peregrine_types::models::PermissionProfile;
 use peregrine_types::openai_models::ConfigShellToolType;
