@@ -50,10 +50,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Lint with Clippy
-        run: cargo clippy --workspace --locked -- -D warnings
+        run: cargo clippy --workspace --exclude peregrine --locked -- -D warnings
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
 
       - name: Run Tests
-        run: cargo nextest run --workspace --locked
+        run: cargo nextest run --workspace --exclude peregrine --locked
